@@ -50,3 +50,5 @@ out/
 
 # Crash Logs
 *.crashlog
+bin/
+obj/
