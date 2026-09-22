@@ -12,6 +12,8 @@ namespace EventTicketBooking.Api.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+        // Trạng thái kích hoạt (T-07)
+        public bool IsActive { get; set; } = false;
         // Foreign Key liên kết tới Role
         public Guid RoleId { get; set; }
 

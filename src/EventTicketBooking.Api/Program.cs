@@ -53,6 +53,9 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Register Custom Services
+builder.Services.AddScoped<EventTicketBooking.Api.Services.IPasswordHasher, EventTicketBooking.Api.Services.PasswordHasher>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
