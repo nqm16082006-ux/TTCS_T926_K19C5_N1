@@ -21,6 +21,8 @@ x86/
 bld/
 [Bb]in/
 [Ob]j/
+bin/
+obj/
 [Ll]og/
 [Ll]ogs/
 
