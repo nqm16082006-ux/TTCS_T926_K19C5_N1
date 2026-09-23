@@ -50,10 +50,10 @@ jobs:
   deploy-staging:
     name: Deploy to Staging Server & Health Check
     needs: build-and-push
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - name: Deploy via SSH & Zero-Downtime Safe Swap
-        uses: appleboy/ssh-action@v1.0.3
+        uses: actions/checkout@v4
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
