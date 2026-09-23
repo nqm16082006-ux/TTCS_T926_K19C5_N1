@@ -14,15 +14,14 @@ using Microsoft.IdentityModel.Tokens;
 namespace EventTicketBooking.Api.Controllers
 {
     /// <summary>
-    /// Controller độc lập phục vụ kiểm thử phân quyền RBAC (Task TTKN-26).
-    /// Không chứa logic nghiệp vụ, không làm ảnh hưởng đến các Controller hiện có của nhóm.
+    /// Controller kiểm thử phân quyền RBAC và kích hoạt Email (T-08 & TTKN-26).
     /// </summary>
     [ApiController]
     [Route("api/test-auth")]
     public class RoleAuthTestController : ControllerBase
     {
         /// <summary>
-        /// 1. Endpoint công khai (Public) - Không yêu cầu đăng nhập.
+        /// 1. Endpoint công khai (Public) - Không yêu cầu đăng nhập hay xác thực email.
         /// </summary>
         [HttpGet("public")]
         public IActionResult PublicEndpoint()
@@ -35,8 +34,23 @@ namespace EventTicketBooking.Api.Controllers
         }
 
         /// <summary>
-        /// 2. Endpoint yêu cầu xác thực - Bất kỳ ai đã đăng nhập (bất kể role nào).
-        /// Trả về 401 Unauthorized nếu chưa đăng nhập.
+        /// 2. Endpoint yêu cầu tài khoản ĐÃ KÍCH HOẠT / XÁC THỰC EMAIL (Đáp ứng T-08 - AC4).
+        /// </summary>
+        [HttpGet("require-email-confirmed")]
+        [RequireRole]
+        [RequireEmailConfirmed] // Gắn thẻ chặn người dùng chưa kích hoạt email tại đây
+        public IActionResult RequireEmailConfirmedEndpoint()
+        {
+            return Ok(new
+            {
+                status = "Success",
+                message = "Bạn đã kích hoạt email thành công và được phép truy cập tính năng này!",
+                user = User.Identity?.Name ?? User.FindFirst("email")?.Value
+            });
+        }
+
+        /// <summary>
+        /// 3. Endpoint yêu cầu xác thực - Bất kỳ ai đã đăng nhập (bất kể role nào).
         /// </summary>
         [HttpGet("authenticated")]
         [RequireRole]
@@ -51,9 +65,7 @@ namespace EventTicketBooking.Api.Controllers
         }
 
         /// <summary>
-        /// 3. Endpoint chỉ dành cho Quản trị viên (Admin).
-        /// Trả về 401 Unauthorized nếu chưa đăng nhập.
-        /// Trả về 403 Forbidden nếu không có role Admin.
+        /// 4. Endpoint chỉ dành cho Quản trị viên (Admin).
         /// </summary>
         [HttpGet("admin-only")]
         [RequireRole("Admin")]
@@ -67,9 +79,7 @@ namespace EventTicketBooking.Api.Controllers
         }
 
         /// <summary>
-        /// 4. Endpoint dành cho Ban tổ chức sự kiện (Organizer) hoặc Quản trị viên (Admin).
-        /// Trả về 401 Unauthorized nếu chưa đăng nhập.
-        /// Trả về 403 Forbidden nếu không phải Organizer hoặc Admin.
+        /// 5. Endpoint dành cho Ban tổ chức sự kiện (Organizer) hoặc Quản trị viên (Admin).
         /// </summary>
         [HttpGet("organizer-only")]
         [RequireRole("Organizer", "Admin")]
@@ -83,7 +93,7 @@ namespace EventTicketBooking.Api.Controllers
         }
 
         /// <summary>
-        /// Endpoint hỗ trợ sinh test token nhanh theo email của các tài khoản demo đã seed để kiểm thử.
+        /// Endpoint hỗ trợ sinh test token nhanh theo email.
         /// </summary>
         [HttpPost("dev-token")]
         public async Task<IActionResult> GenerateDevToken(
@@ -105,7 +115,8 @@ namespace EventTicketBooking.Api.Controllers
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Username),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim("id", user.Id.ToString())
+                new Claim("id", user.Id.ToString()),
+                new Claim("IsActive", user.IsActive.ToString()) // Thêm claim IsActive để Middleware đọc được
             };
 
             foreach (var ur in user.UserRoles)
@@ -128,6 +139,7 @@ namespace EventTicketBooking.Api.Controllers
             return Ok(new
             {
                 email = user.Email,
+                isActive = user.IsActive,
                 roles = user.UserRoles.Select(ur => ur.Role.Name).ToList(),
                 token = new JwtSecurityTokenHandler().WriteToken(token)
             });
