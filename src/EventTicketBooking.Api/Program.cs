@@ -48,6 +48,9 @@ builder.Services.AddStackExchangeRedisCache(options =>
     options.InstanceName = "EventTicket_";
 });
 
+// Đăng ký dịch vụ băm mật khẩu Argon2id (TTKN-20)
+builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IPasswordHasher, EventTicketBooking.Api.Services.Implementations.Argon2PasswordHasher>();
+
 // Add Controllers & Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -60,6 +63,9 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    // Tự động seed 5 roles và 2 tài khoản demo khi khởi động ở môi trường Dev (TTKN-20)
+    await DataSeeder.SeedAsync(app.Services);
 }
 
 app.UseAuthorization();
