@@ -48,6 +48,17 @@ builder.Services.AddStackExchangeRedisCache(options =>
     options.InstanceName = "EventTicket_";
 });
 
+// Đăng ký kết nối Redis Multiplexer cho StackExchange.Redis (TTKN-25)
+builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp => 
+    StackExchange.Redis.ConnectionMultiplexer.Connect(redisConnection));
+
+// Đăng ký dịch vụ băm mật khẩu Argon2id (TTKN-20)
+builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IPasswordHasher, EventTicketBooking.Api.Services.Implementations.Argon2PasswordHasher>();
+
+// Đăng ký dịch vụ Token và Authentication (TTKN-25)
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITokenService, EventTicketBooking.Api.Services.Implementations.TokenService>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IAuthService, EventTicketBooking.Api.Services.Implementations.AuthService>();
+
 // Add Controllers & Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -60,9 +71,16 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    // Tự động seed 5 roles và 2 tài khoản demo khi khởi động ở môi trường Dev (TTKN-20)
+    await DataSeeder.SeedAsync(app.Services);
 }
 
+// Bật phục vụ static files cho wwwroot (login.html)
+app.UseStaticFiles();
+
 app.UseAuthorization();
+app.UseMiddleware<EventTicketBooking.Api.Middlewares.RoleAuthorizationMiddleware>();
 app.MapControllers();
 
 app.Run();
