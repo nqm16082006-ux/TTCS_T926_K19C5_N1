@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace EventTicketBooking.Api.DTOs.Auth
+namespace EventTicketBooking.Api.DTOs
 {
     public class RegisterRequestDto
     {

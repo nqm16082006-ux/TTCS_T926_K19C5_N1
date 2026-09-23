@@ -1,7 +1,11 @@
 using System;
+using System.Collections.Generic;
 
 namespace EventTicketBooking.Api.Models
 {
+    /// <summary>
+    /// Entity biểu diễn Người dùng (User) trong hệ thống.
+    /// </summary>
     public class User
     {
         public Guid Id { get; set; } = Guid.NewGuid();
@@ -11,13 +15,9 @@ namespace EventTicketBooking.Api.Models
         public string? FullName { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-
-        // Trạng thái kích hoạt (T-07)
         public bool IsActive { get; set; } = false;
-        // Foreign Key liên kết tới Role
-        public Guid RoleId { get; set; }
 
-        // Navigation property tới Role
-        public Role Role { get; set; } = null!;
+        // Navigation property quan hệ N:N thông qua bảng trung gian UserRoles
+        public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     }
 }

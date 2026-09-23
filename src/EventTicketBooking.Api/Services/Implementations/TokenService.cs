@@ -10,6 +10,9 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace EventTicketBooking.Api.Services.Implementations
 {
+    /// <summary>
+    /// Triển khai tạo JWT Access Token theo chuẩn JWT Security (Task TTKN-25 & TTKN-26).
+    /// </summary>
     public class TokenService : ITokenService
     {
         private readonly IConfiguration _configuration;
@@ -19,58 +22,53 @@ namespace EventTicketBooking.Api.Services.Implementations
             _configuration = configuration;
         }
 
-        public string GenerateToken(User user)
+        public string GenerateAccessToken(User user, IEnumerable<string> roles)
         {
-            var jwtKey = _configuration["Jwt:Key"] 
-                         ?? Environment.GetEnvironmentVariable("JWT_KEY")
-                         ?? "EventTicketBooking_Default_Super_Secret_Key_For_Jwt_Security_2026_!";
-            var issuer = _configuration["Jwt:Issuer"] 
-                         ?? Environment.GetEnvironmentVariable("JWT_ISSUER") 
+            var secretKey = _configuration["JwtSettings:SecretKey"]
+                            ?? _configuration["Jwt:Key"]
+                            ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
+                            ?? "EventTicketBooking_Super_Secret_Key_For_Jwt_Security_2026_!";
+
+            var issuer = _configuration["JwtSettings:Issuer"]
+                         ?? _configuration["Jwt:Issuer"]
                          ?? "EventTicketBooking.Api";
-            var audience = _configuration["Jwt:Audience"] 
-                           ?? Environment.GetEnvironmentVariable("JWT_AUDIENCE") 
+
+            var audience = _configuration["JwtSettings:Audience"]
+                           ?? _configuration["Jwt:Audience"]
                            ?? "EventTicketBooking.Client";
 
-            var expiryHoursStr = _configuration["Jwt:ExpiresInHours"] 
-                                 ?? Environment.GetEnvironmentVariable("JWT_EXPIRES_IN_HOURS");
-            int expiryHours = int.TryParse(expiryHoursStr, out int h) ? h : 24;
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var roleName = user.Role?.Name ?? string.Empty;
 
             var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim("id", user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(JwtRegisteredClaimNames.Name, user.Username),
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, roleName),
-                new Claim("role", roleName),
+                new Claim(ClaimTypes.Name, user.FullName ?? user.Username),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
-            var token = new JwtSecurityToken(
-                issuer: issuer,
-                audience: audience,
-                claims: claims,
-                notBefore: DateTime.UtcNow,
-                expires: DateTime.UtcNow.AddHours(expiryHours),
-                signingCredentials: credentials
-            );
+            foreach (var role in roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+                claims.Add(new Claim("role", role));
+            }
 
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.UtcNow.AddHours(24),
+                Issuer = issuer,
+                Audience = audience,
+                SigningCredentials = credentials
+            };
 
-        public int GetExpiresInSeconds()
-        {
-            var expiryHoursStr = _configuration["Jwt:ExpiresInHours"] 
-                                 ?? Environment.GetEnvironmentVariable("JWT_EXPIRES_IN_HOURS");
-            int expiryHours = int.TryParse(expiryHoursStr, out int h) ? h : 24;
-            return expiryHours * 3600;
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(token);
         }
     }
 }

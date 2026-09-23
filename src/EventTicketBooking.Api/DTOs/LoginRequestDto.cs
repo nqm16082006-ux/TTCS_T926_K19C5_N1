@@ -1,7 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace EventTicketBooking.Api.DTOs.Auth
+namespace EventTicketBooking.Api.DTOs
 {
+    /// <summary>
+    /// DTO tiếp nhận dữ liệu đăng nhập bằng email và mật khẩu (Task TTKN-25).
+    /// </summary>
     public class LoginRequestDto
     {
         [Required(ErrorMessage = "Email không được để trống.")]
