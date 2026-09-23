@@ -49,7 +49,7 @@ builder.Services.AddStackExchangeRedisCache(options =>
 });
 
 // Đăng ký kết nối Redis Multiplexer cho StackExchange.Redis (TTKN-25)
-builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp => 
+builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
     StackExchange.Redis.ConnectionMultiplexer.Connect(redisConnection));
 
 // Đăng ký dịch vụ băm mật khẩu Argon2id (TTKN-20)
