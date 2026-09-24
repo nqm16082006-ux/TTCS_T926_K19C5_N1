@@ -180,10 +180,8 @@ namespace EventTicketBooking.Api.Services.Implementations
                     user,
                     roles);
 
-            _logger.LogInformation(
-                "Người dùng {Email} đăng nhập thành công với vai trò [{Roles}]",
-                user.Email,
-                string.Join(", ", roles));
+            _logger.LogInformation("Người dùng {Email} (Id: {UserId}) đăng nhập thành công với vai trò: [{Roles}]",
+                user.Email, user.Id, string.Join(", ", roles));
 
             var loginResponse = new LoginResponseDto
             {
@@ -204,5 +202,4 @@ namespace EventTicketBooking.Api.Services.Implementations
             return AuthResult.Ok(loginResponse);
         }
     }
-
 }
