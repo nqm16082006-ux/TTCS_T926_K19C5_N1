@@ -3,6 +3,7 @@ using System;
 using EventTicketBooking.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EventTicketBooking.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260922181500_AddUsersAndRoles")]
+    partial class AddUsersAndRoles
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -44,9 +47,6 @@ namespace EventTicketBooking.Api.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<Guid>("OwnerId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("timestamp with time zone");
 
@@ -65,9 +65,7 @@ namespace EventTicketBooking.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OwnerId");
-
-                    b.ToTable("Events", (string)null);
+                    b.ToTable("Events");
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.Role", b =>
@@ -118,15 +116,13 @@ namespace EventTicketBooking.Api.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -138,16 +134,12 @@ namespace EventTicketBooking.Api.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<string>("VerificationCode")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("VerificationCodeExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("RoleId");
 
                     b.HasIndex("Username")
                         .IsUnique();
@@ -155,107 +147,20 @@ namespace EventTicketBooking.Api.Migrations
                     b.ToTable("Users", (string)null);
                 });
 
-            modelBuilder.Entity("EventTicketBooking.Api.Models.UserRole", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("RoleId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("AssignedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.HasKey("UserId", "RoleId");
-
-                    b.HasIndex("RoleId");
-
-                    b.ToTable("UserRoles", (string)null);
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.Showtime", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("AvailableSeats")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("EndTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EventId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("StartTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EventId");
-
-                    b.ToTable("Showtimes", (string)null);
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.Event", b =>
-                {
-                    b.HasOne("EventTicketBooking.Api.Models.User", "Owner")
-                        .WithMany("Events")
-                        .HasForeignKey("OwnerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Owner");
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.Showtime", b =>
-                {
-                    b.HasOne("EventTicketBooking.Api.Models.Event", "Event")
-                        .WithMany("Showtimes")
-                        .HasForeignKey("EventId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Event");
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.UserRole", b =>
+            modelBuilder.Entity("EventTicketBooking.Api.Models.User", b =>
                 {
                     b.HasOne("EventTicketBooking.Api.Models.Role", "Role")
-                        .WithMany("UserRoles")
+                        .WithMany("Users")
                         .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("EventTicketBooking.Api.Models.User", "User")
-                        .WithMany("UserRoles")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Role");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.Event", b =>
-                {
-                    b.Navigation("Showtimes");
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.Role", b =>
                 {
-                    b.Navigation("UserRoles");
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.User", b =>
-                {
-                    b.Navigation("Events");
-
-                    b.Navigation("UserRoles");
+                    b.Navigation("Users");
                 });
 #pragma warning restore 612, 618
         }
