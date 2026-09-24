@@ -52,8 +52,8 @@ namespace EventTicketBooking.Api.Services.Implementations
             if (isLocked)
             {
                 var ttl = await db.KeyTimeToLiveAsync(lockoutKey);
-                var minutesRemaining = ttl.HasValue && ttl.Value.TotalMinutes > 0 
-                    ? Math.Ceiling(ttl.Value.TotalMinutes) 
+                var minutesRemaining = ttl.HasValue && ttl.Value.TotalMinutes > 0
+                    ? Math.Ceiling(ttl.Value.TotalMinutes)
                     : 15;
 
                 _logger.LogWarning("Tài khoản {Email} đang bị khóa tạm thời trên Redis. Thời gian còn lại: {Minutes} phút.", normalizedEmail, minutesRemaining);
@@ -108,7 +108,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             // Sinh JWT Access Token
             var accessToken = _tokenService.GenerateAccessToken(user, roles);
 
-            _logger.LogInformation("Người dùng {Email} (Id: {UserId}) đăng nhập thành công với vai trò: [{Roles}]", 
+            _logger.LogInformation("Người dùng {Email} (Id: {UserId}) đăng nhập thành công với vai trò: [{Roles}]",
                 user.Email, user.Id, string.Join(", ", roles));
 
             var loginResponse = new LoginResponseDto

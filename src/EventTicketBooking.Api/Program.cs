@@ -18,7 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddEnvironmentVariables();
 
 // Chuỗi kết nối PostgreSQL (đọc từ biến môi trường hoặc configuration)
-string? pgConnection = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection") 
+string? pgConnection = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
                        ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
 if (string.IsNullOrEmpty(pgConnection))
@@ -28,7 +28,7 @@ if (string.IsNullOrEmpty(pgConnection))
     string db = Environment.GetEnvironmentVariable("POSTGRES_DB") ?? "event_ticket_db";
     string user = Environment.GetEnvironmentVariable("POSTGRES_USER") ?? "postgres";
     string pass = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD") ?? "postgres_password_123";
-    
+
     pgConnection = $"Host={host};Port={port};Database={db};Username={user};Password={pass}";
 }
 
@@ -49,7 +49,7 @@ builder.Services.AddStackExchangeRedisCache(options =>
 });
 
 // Đăng ký kết nối Redis Multiplexer cho StackExchange.Redis (TTKN-25)
-builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp => 
+builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
     StackExchange.Redis.ConnectionMultiplexer.Connect(redisConnection));
 
 // Đăng ký dịch vụ băm mật khẩu Argon2id (TTKN-20)

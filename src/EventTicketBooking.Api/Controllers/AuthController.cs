@@ -104,7 +104,7 @@ namespace EventTicketBooking.Api.Controllers
             // Dùng phần trước @ của Email để làm Username
             string baseUsername = request.Email.Split('@')[0];
             string username = baseUsername;
-            
+
             // Xử lý trùng lặp Username
             int counter = 1;
             while (await _context.Users.AnyAsync(u => u.Username == username))
