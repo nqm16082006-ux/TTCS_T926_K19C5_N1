@@ -16,9 +16,9 @@ namespace EventTicketBooking.Api.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public bool IsActive { get; set; } = false;
-public string? VerificationCode { get; set; }
+        public string? VerificationCode { get; set; }
         public DateTime? VerificationCodeExpiresAt { get; set; }
-        
+
         // Navigation property quan hệ N:N thông qua bảng trung gian UserRoles
         public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     }
