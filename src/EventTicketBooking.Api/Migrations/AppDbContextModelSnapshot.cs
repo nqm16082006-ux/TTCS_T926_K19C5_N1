@@ -285,6 +285,42 @@ namespace EventTicketBooking.Api.Migrations
                 {
                     b.Navigation("Users");
                 });
+
+            modelBuilder.Entity("EventTicketBooking.Api.Models.Showtime", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AvailableSeats")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("EndTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("StartTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId");
+
+                    b.ToTable("Showtimes");
+                });
+
+            modelBuilder.Entity("EventTicketBooking.Api.Models.Showtime", b =>
+                {
+                    b.HasOne("EventTicketBooking.Api.Models.Event", "Event")
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+                });
 #pragma warning restore 612, 618
         }
     }
