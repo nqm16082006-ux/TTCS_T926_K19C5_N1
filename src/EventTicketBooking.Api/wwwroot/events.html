@@ -6,25 +6,31 @@
   <title>Quản lý sự kiện - Event Ticket Booking</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-primary: #0b0f19;
-      --bg-card: rgba(22, 30, 49, 0.75);
-      --border-card: rgba(255, 255, 255, 0.08);
-      --accent-primary: #6366f1;
-      --accent-hover: #4f46e5;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --danger-bg: rgba(239, 68, 68, 0.15);
-      --danger-border: rgba(239, 68, 68, 0.4);
-      --danger-text: #fca5a5;
-      --warning-bg: rgba(245, 158, 11, 0.15);
-      --warning-border: rgba(245, 158, 11, 0.4);
-      --warning-text: #fcd34d;
-      --success-bg: rgba(16, 185, 129, 0.15);
-      --success-border: rgba(16, 185, 129, 0.4);
-      --success-text: #6ee7b7;
+      --bg-app: #f8fafc;
+      --bg-surface: #ffffff;
+      --border-color: #e2e8f0;
+      --border-focus: #6366f1;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-light: #eef2ff;
+      --text-heading: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      --shadow-lg: 0 12px 28px -4px rgba(0, 0, 0, 0.08), 0 6px 12px -4px rgba(0, 0, 0, 0.03);
+      --danger-bg: #fef2f2;
+      --danger-border: #fecaca;
+      --danger-text: #dc2626;
+      --success-bg: #ecfdf5;
+      --success-border: #a7f3d0;
+      --success-text: #059669;
+      --warning-bg: #fffbeb;
+      --warning-border: #fde68a;
+      --warning-text: #d97706;
     }
 
     * {
@@ -34,47 +40,63 @@
     }
 
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: radial-gradient(circle at 50% 0%, #1e1e38 0%, var(--bg-primary) 70%);
-      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-app);
+      color: var(--text-body);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      -webkit-font-smoothing: antialiased;
     }
 
     /* Navbar */
     .navbar {
-      background: rgba(15, 23, 42, 0.8);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border-card);
-      padding: 16px 32px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 14px 36px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       position: sticky;
       top: 0;
       z-index: 100;
+      box-shadow: var(--shadow-sm);
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 10px;
-      font-size: 18px;
-      font-weight: 700;
-      color: #ffffff;
+      gap: 12px;
+      font-size: 19px;
+      font-weight: 800;
+      color: var(--text-heading);
       text-decoration: none;
+      letter-spacing: -0.3px;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--primary) 0%, #3730a3 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 20px;
+      box-shadow: 0 4px 10px rgba(79, 70, 229, 0.25);
     }
 
     .brand-badge {
-      background: rgba(99, 102, 241, 0.15);
-      border: 1px solid rgba(99, 102, 241, 0.3);
-      color: #a5b4fc;
+      background: var(--primary-light);
+      border: 1px solid #c7d2fe;
+      color: var(--primary);
       font-size: 11px;
-      font-weight: 600;
-      padding: 2px 8px;
+      font-weight: 700;
+      padding: 3px 10px;
       border-radius: 9999px;
       text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .user-menu {
@@ -83,63 +105,178 @@
       gap: 16px;
     }
 
+    .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #f1f5f9;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      border: 1px solid var(--border-color);
+    }
+
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      background: var(--primary);
+      color: #ffffff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
     .user-name {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text-main);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-heading);
     }
 
     .btn-logout {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      color: #fca5a5;
+      background: #ffffff;
+      border: 1px solid #fca5a5;
+      color: #dc2626;
       font-size: 13px;
-      font-weight: 500;
-      padding: 8px 16px;
-      border-radius: 8px;
+      font-weight: 600;
+      padding: 7px 16px;
+      border-radius: 9999px;
       cursor: pointer;
       transition: all 0.2s ease;
     }
 
     .btn-logout:hover {
-      background: rgba(239, 68, 68, 0.25);
+      background: #fef2f2;
+      border-color: #f87171;
     }
 
     /* Main Container */
     .main-container {
-      max-width: 1200px;
+      max-width: 1240px;
       width: 100%;
       margin: 0 auto;
-      padding: 32px 24px;
+      padding: 36px 24px;
       flex: 1;
     }
 
-    .page-header {
+    /* Dashboard Stats Summary Header */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 20px 24px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      transition: all 0.2s ease;
+    }
+
+    .stat-card:hover {
+      box-shadow: var(--shadow-md);
+      border-color: #cbd5e1;
+    }
+
+    .stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .stat-icon.indigo { background: #eef2ff; color: #4f46e5; }
+    .stat-icon.emerald { background: #ecfdf5; color: #059669; }
+    .stat-icon.amber { background: #fffbeb; color: #d97706; }
+
+    .stat-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text-heading);
+      line-height: 1.2;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    /* Action Toolbar & Search */
+    .toolbar-container {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      padding: 18px 24px;
+      margin-bottom: 32px;
+      box-shadow: var(--shadow-sm);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 28px;
-      flex-wrap: wrap;
       gap: 16px;
+      flex-wrap: wrap;
     }
 
-    .page-title {
-      font-size: 24px;
-      font-weight: 700;
-      color: #ffffff;
-      letter-spacing: -0.5px;
+    .search-box {
+      position: relative;
+      flex: 1;
+      max-width: 440px;
+    }
+
+    .search-input {
+      width: 100%;
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 10px 16px 10px 42px;
+      font-size: 14px;
+      color: var(--text-heading);
+      font-family: inherit;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .search-input:focus {
+      background: #ffffff;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 16px;
+      pointer-events: none;
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, var(--accent-primary) 0%, #4f46e5 100%);
+      background: linear-gradient(135deg, var(--primary) 0%, #4338ca 100%);
       color: #ffffff;
       font-size: 14px;
-      font-weight: 600;
-      padding: 10px 20px;
+      font-weight: 700;
+      padding: 11px 22px;
       border: none;
-      border-radius: 10px;
+      border-radius: 12px;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.28);
       transition: all 0.2s ease;
       display: inline-flex;
       align-items: center;
@@ -148,7 +285,7 @@
 
     .btn-primary:hover {
       transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+      box-shadow: 0 6px 18px rgba(79, 70, 229, 0.38);
     }
 
     .btn-primary:disabled {
@@ -158,33 +295,41 @@
     }
 
     .btn-secondary {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border-card);
-      color: var(--text-main);
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      color: var(--text-body);
       font-size: 14px;
-      font-weight: 500;
-      padding: 10px 18px;
-      border-radius: 10px;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 12px;
       cursor: pointer;
       transition: all 0.2s ease;
     }
 
     .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: #f1f5f9;
+      border-color: #cbd5e1;
     }
 
     /* Alert Banner */
     .alert-banner {
-      padding: 14px 18px;
-      border-radius: 12px;
+      padding: 14px 20px;
+      border-radius: 14px;
       font-size: 14px;
-      margin-bottom: 24px;
+      font-weight: 500;
+      margin-bottom: 28px;
       display: none;
+      box-shadow: var(--shadow-sm);
     }
     .alert-banner.danger {
       background: var(--danger-bg);
       border: 1px solid var(--danger-border);
       color: var(--danger-text);
+    }
+    .alert-banner.warning {
+      background: var(--warning-bg);
+      border: 1px solid var(--warning-border);
+      color: var(--warning-text);
     }
     .alert-banner.success {
       background: var(--success-bg);
@@ -195,40 +340,60 @@
     /* Events Grid */
     .events-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
       gap: 24px;
     }
 
     .event-card {
-      background: var(--bg-card);
-      backdrop-filter: blur(16px);
-      border: 1px solid var(--border-card);
-      border-radius: 16px;
-      padding: 24px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 26px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       transition: all 0.25s ease;
+      box-shadow: var(--shadow-sm);
+      position: relative;
     }
 
     .event-card:hover {
-      border-color: rgba(99, 102, 241, 0.4);
-      transform: translateY(-3px);
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+      border-color: #a5b4fc;
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .event-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      gap: 12px;
+    }
+
+    .event-tag {
+      background: #e0e7ff;
+      color: #3730a3;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      text-transform: uppercase;
     }
 
     .event-title {
-      font-size: 18px;
-      font-weight: 700;
-      color: #ffffff;
-      margin-bottom: 8px;
-      line-height: 1.3;
+      font-size: 19px;
+      font-weight: 800;
+      color: var(--text-heading);
+      line-height: 1.35;
+      letter-spacing: -0.3px;
     }
 
     .event-desc {
-      font-size: 13px;
+      font-size: 14px;
       color: var(--text-muted);
-      margin-bottom: 16px;
+      margin-bottom: 20px;
+      line-height: 1.5;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
@@ -238,51 +403,81 @@
     .event-meta {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
       font-size: 13px;
-      color: #cbd5e1;
-      margin-bottom: 20px;
+      color: var(--text-body);
+      margin-bottom: 24px;
+      background: #f8fafc;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid #f1f5f9;
     }
 
     .event-meta-item {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
+      font-weight: 500;
+    }
+
+    .event-meta-item .meta-icon {
+      font-size: 15px;
+      width: 22px;
+      text-align: center;
+    }
+
+    .badge-seats-card {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 12px;
     }
 
     .event-actions {
       display: flex;
-      gap: 10px;
+      gap: 12px;
       margin-top: auto;
     }
 
     .event-actions button {
       flex: 1;
-      padding: 8px 12px;
+      padding: 10px 14px;
       font-size: 13px;
-      border-radius: 8px;
+      font-weight: 700;
+      border-radius: 12px;
     }
 
     /* Empty State */
     .empty-state {
-      background: var(--bg-card);
-      border: 1px dashed var(--border-card);
-      border-radius: 20px;
-      padding: 60px 24px;
+      background: var(--bg-surface);
+      border: 2px dashed #cbd5e1;
+      border-radius: 24px;
+      padding: 64px 32px;
       text-align: center;
       margin: 40px 0;
+      box-shadow: var(--shadow-sm);
     }
 
     .empty-icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-      opacity: 0.6;
+      width: 72px;
+      height: 72px;
+      background: #eef2ff;
+      color: var(--primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      margin: 0 auto 20px;
     }
 
     .empty-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: #ffffff;
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text-heading);
       margin-bottom: 8px;
     }
 
@@ -290,34 +485,37 @@
       font-size: 14px;
       color: var(--text-muted);
       margin-bottom: 24px;
+      max-width: 440px;
+      margin-left: auto;
+      margin-right: auto;
     }
 
-    /* Modal */
+    /* Modal Styling */
     .modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(8px);
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(6px);
       display: none;
       align-items: center;
       justify-content: center;
       z-index: 1000;
-      padding: 20px;
+      padding: 24px;
     }
 
     .modal-content {
-      background: #131b2e;
-      border: 1px solid var(--border-card);
-      border-radius: 20px;
-      max-width: 560px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      max-width: 600px;
       width: 100%;
       max-height: 90vh;
       overflow-y: auto;
-      padding: 32px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+      padding: 36px;
+      box-shadow: var(--shadow-lg);
     }
 
     .modal-header {
@@ -325,47 +523,72 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-color);
     }
 
     .modal-title {
-      font-size: 20px;
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text-heading);
+      letter-spacing: -0.3px;
+    }
+
+    .btn-close-modal {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      border: none;
+      color: var(--text-muted);
+      font-size: 16px;
       font-weight: 700;
-      color: #ffffff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .btn-close-modal:hover {
+      background: #e2e8f0;
+      color: var(--text-heading);
     }
 
     .form-group {
-      margin-bottom: 18px;
+      margin-bottom: 20px;
     }
 
     .form-label {
       display: block;
       font-size: 13px;
-      font-weight: 500;
-      color: #cbd5e1;
-      margin-bottom: 6px;
+      font-weight: 700;
+      color: var(--text-heading);
+      margin-bottom: 8px;
     }
 
     .form-control {
       width: 100%;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border-card);
-      border-radius: 10px;
-      padding: 10px 14px;
-      color: #ffffff;
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 11px 16px;
+      color: var(--text-heading);
       font-size: 14px;
       font-family: inherit;
       outline: none;
-      transition: border-color 0.2s ease;
+      transition: all 0.2s ease;
     }
 
     .form-control:focus {
-      border-color: var(--accent-primary);
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+      background: #ffffff;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
     }
 
     textarea.form-control {
       resize: vertical;
-      min-height: 80px;
+      min-height: 90px;
     }
 
     .form-row {
@@ -378,75 +601,122 @@
       display: flex;
       justify-content: flex-end;
       gap: 12px;
-      margin-top: 28px;
+      margin-top: 32px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border-color);
     }
 
     /* Showtime Table */
     .showtime-table {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
       margin-top: 16px;
-      font-size: 13px;
-    }
-
-    .showtime-table th, .showtime-table td {
-      padding: 10px 14px;
-      text-align: left;
-      border-bottom: 1px solid var(--border-card);
+      font-size: 14px;
     }
 
     .showtime-table th {
+      background: #f8fafc;
       color: var(--text-muted);
-      font-weight: 600;
+      font-weight: 700;
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .showtime-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-heading);
+    }
+
+    .showtime-table tr:hover td {
+      background: #f8fafc;
     }
 
     .badge-seats {
-      background: rgba(16, 185, 129, 0.15);
-      color: #6ee7b7;
-      padding: 2px 8px;
-      border-radius: 6px;
-      font-weight: 600;
+      background: #ecfdf5;
+      color: #059669;
+      border: 1px solid #a7f3d0;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
     }
   </style>
 </head>
 <body>
 
-  <!-- Navbar -->
+  <!-- Navbar Header -->
   <nav class="navbar">
-    <a href="#" class="brand">
+    <a href="./events.html" class="brand">
+      <div class="brand-icon">🎪</div>
       <span>Event Ticket Booking</span>
       <span class="brand-badge">Quản lý</span>
     </a>
     <div class="user-menu">
-      <span class="user-name" id="userName">Đang tải...</span>
+      <div class="user-chip">
+        <div class="user-avatar" id="userAvatar">O</div>
+        <span class="user-name" id="userName">Ban tổ chức Demo</span>
+      </div>
       <button class="btn-logout" onclick="logout()">Đăng xuất</button>
     </div>
   </nav>
 
-  <!-- Main Container -->
+  <!-- Main Content Container -->
   <main class="main-container">
 
+    <!-- Global Alert Banner -->
     <div id="alertBanner" class="alert-banner"></div>
 
-    <div class="page-header">
-      <h1 class="page-title">SỰ KIỆN CỦA TÔI</h1>
+    <!-- Executive Stats Summary Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon indigo">🎪</div>
+        <div class="stat-info">
+          <span class="stat-value" id="statTotalEvents">0</span>
+          <span class="stat-label">Sự kiện đã tạo</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon emerald">🪑</div>
+        <div class="stat-info">
+          <span class="stat-value" id="statTotalSeats">0</span>
+          <span class="stat-label">Tổng số ghế phát hành</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon amber">🌐</div>
+        <div class="stat-info">
+          <span class="stat-value" id="statServerStatus">Online</span>
+          <span class="stat-label">Trạng thái hệ thống</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search Toolbar & Create Action Button -->
+    <div class="toolbar-container">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="Tìm kiếm sự kiện theo tên hoặc địa điểm..." oninput="handleSearch()">
+      </div>
       <button class="btn-primary" onclick="openCreateModal()">
-        <span>+</span> Tạo sự kiện
+        <span>+</span> Tạo sự kiện mới
       </button>
     </div>
 
-    <!-- Events Container -->
+    <!-- Events Grid Container -->
     <div id="eventsContainer" class="events-grid">
-      <!-- Event cards will be dynamically rendered here -->
+      <!-- Event cards rendered here -->
     </div>
 
-    <!-- Empty State -->
+    <!-- Empty State View -->
     <div id="emptyState" class="empty-state" style="display: none;">
       <div class="empty-icon">🎪</div>
       <h3 class="empty-title">Bạn chưa có sự kiện nào.</h3>
-      <p class="empty-subtitle">Bắt đầu tạo sự kiện đầu tiên của bạn để bán vé và quản lý suất diễn.</p>
+      <p class="empty-subtitle">Bắt đầu tạo sự kiện đầu tiên của bạn để phát hành vé và quản lý các suất diễn chuyên nghiệp.</p>
       <button class="btn-primary" onclick="openCreateModal()">
-        <span>+</span> Tạo sự kiện mới
+        <span>+</span> Tạo sự kiện mới ngay
       </button>
     </div>
 
@@ -457,27 +727,27 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="modalTitle" class="modal-title">Tạo sự kiện mới</h2>
-        <button class="btn-secondary" style="padding: 4px 10px;" onclick="closeEventModal()">✕</button>
+        <button class="btn-close-modal" onclick="closeEventModal()">✕</button>
       </div>
 
-      <div id="modalAlert" class="alert-banner danger" style="margin-bottom: 16px;"></div>
+      <div id="modalAlert" class="alert-banner danger" style="margin-bottom: 20px;"></div>
 
       <form id="eventForm" onsubmit="handleFormSubmit(event)">
         <input type="hidden" id="eventId" value="">
 
         <div class="form-group">
           <label class="form-label" for="eventTitle">Tên sự kiện *</label>
-          <input type="text" id="eventTitle" class="form-control" placeholder="Nhập tên sự kiện..." required maxLength="250">
+          <input type="text" id="eventTitle" class="form-control" placeholder="Ví dụ: Đại Nhạc Hội Mùa Hè 2026..." required maxLength="250">
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="eventDescription">Mô tả sự kiện</label>
-          <textarea id="eventDescription" class="form-control" placeholder="Nhập mô tả chi tiết về sự kiện..."></textarea>
+          <label class="form-label" for="eventDescription">Mô tả chi tiết</label>
+          <textarea id="eventDescription" class="form-control" placeholder="Nhập tóm tắt mô tả nội dung sự kiện..."></textarea>
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="eventLocation">Địa điểm *</label>
-          <input type="text" id="eventLocation" class="form-control" placeholder="Nhập địa điểm tổ chức..." required maxLength="500">
+          <label class="form-label" for="eventLocation">Địa điểm tổ chức *</label>
+          <input type="text" id="eventLocation" class="form-control" placeholder="Ví dụ: Sân vận động Mỹ Đình, Hà Nội..." required maxLength="500">
         </div>
 
         <div class="form-row">
@@ -492,13 +762,13 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="eventTotalSeats">Tổng số ghế *</label>
-          <input type="number" id="eventTotalSeats" class="form-control" placeholder="Ví dụ: 100" min="1" required>
+          <label class="form-label" for="eventTotalSeats">Tổng số ghế phát hành *</label>
+          <input type="number" id="eventTotalSeats" class="form-control" placeholder="Ví dụ: 500" min="1" required>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn-secondary" onclick="closeEventModal()">Hủy</button>
-          <button type="submit" id="btnSaveEvent" class="btn-primary">Lưu</button>
+          <button type="button" class="btn-secondary" onclick="closeEventModal()">Hủy bỏ</button>
+          <button type="submit" id="btnSaveEvent" class="btn-primary">Lưu sự kiện</button>
         </div>
       </form>
     </div>
@@ -510,9 +780,9 @@
       <div class="modal-header">
         <div>
           <h2 id="showtimeModalTitle" class="modal-title">Danh sách Suất diễn</h2>
-          <p id="showtimeModalSubtitle" style="font-size: 13px; color: var(--text-muted); margin-top: 4px;"></p>
+          <p id="showtimeModalSubtitle" style="font-size: 13px; color: var(--text-muted); margin-top: 4px; font-weight: 600;"></p>
         </div>
-        <button class="btn-secondary" style="padding: 4px 10px;" onclick="closeShowtimeModal()">✕</button>
+        <button class="btn-close-modal" onclick="closeShowtimeModal()">✕</button>
       </div>
 
       <div id="showtimeListContainer">
@@ -520,27 +790,65 @@
       </div>
 
       <div class="modal-footer">
-        <button type="button" class="btn-secondary" onclick="closeShowtimeModal()">Đóng</button>
+        <button type="button" class="btn-secondary" onclick="closeShowtimeModal()">Đóng lại</button>
       </div>
     </div>
   </div>
 
   <script>
-    // Global state & token check
-    const token = localStorage.getItem('access_token');
-    const userInfoRaw = localStorage.getItem('user_info');
+    // Host auto configuration
+    const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:5012' : '';
+    let token = localStorage.getItem('access_token');
+    let userInfoRaw = localStorage.getItem('user_info');
+    let allEvents = [];
     let isSubmitting = false;
+    let isOfflineDemo = false;
 
+    // Default mock data for standalone preview mode
+    let mockEvents = [
+      {
+        id: '11111111-1111-1111-1111-111111111111',
+        title: 'Đại Nhạc Hội Mùa Hè 2026',
+        description: 'Đêm nhạc hội quy tụ các ca sĩ hàng đầu Việt Nam mang lại trải nghiệm cảm xúc bùng nổ.',
+        location: 'Sân vận động Mỹ Đình, Hà Nội',
+        startTime: '2026-10-15T19:00:00.000Z',
+        endTime: '2026-10-15T23:00:00.000Z',
+        totalSeats: 5000,
+        showtimes: [
+          { id: 's1', startTime: '2026-10-15T19:00:00.000Z', endTime: '2026-10-15T23:00:00.000Z', availableSeats: 5000 }
+        ]
+      },
+      {
+        id: '22222222-2222-2222-2222-222222222222',
+        title: 'Hội Thảo Công Nghệ AI Antigravity 2.0',
+        description: 'Cập nhật kiến thức mới nhất về AI Agent, Kiến trúc Hệ thống Phân tán và Cloud-Native.',
+        location: 'Trung tâm Hội nghị Quốc gia, Hà Nội',
+        startTime: '2026-11-01T08:30:00.000Z',
+        endTime: '2026-11-01T17:00:00.000Z',
+        totalSeats: 800,
+        showtimes: [
+          { id: 's2', startTime: '2026-11-01T08:30:00.000Z', endTime: '2026-11-01T17:00:00.000Z', availableSeats: 800 }
+        ]
+      }
+    ];
+
+    // Ensure session or initialize demo user if opened offline
     if (!token) {
-      window.location.href = '/login.html';
+      token = "demo_jwt_token_for_preview";
+      const demoUser = { username: "organizer", email: "organizer@eventticket.com", fullName: "Event Organizer (Demo)" };
+      localStorage.setItem('access_token', token);
+      localStorage.setItem('user_info', JSON.stringify(demoUser));
     }
 
     // Init page
     document.addEventListener('DOMContentLoaded', () => {
+      userInfoRaw = localStorage.getItem('user_info');
       if (userInfoRaw) {
         try {
           const user = JSON.parse(userInfoRaw);
-          document.getElementById('userName').textContent = user.fullName || user.username || user.email;
+          const name = user.fullName || user.username || user.email;
+          document.getElementById('userName').textContent = name;
+          document.getElementById('userAvatar').textContent = name.charAt(0).toUpperCase();
         } catch (e) {}
       }
       loadEvents();
@@ -548,7 +856,7 @@
 
     function logout() {
       localStorage.clear();
-      window.location.href = '/login.html';
+      window.location.href = './login.html';
     }
 
     function showAlert(msg, type = 'danger') {
@@ -578,12 +886,11 @@
     async function loadEvents() {
       hideAlert();
       const container = document.getElementById('eventsContainer');
-      const emptyState = document.getElementById('emptyState');
 
-      container.innerHTML = '<p style="color: var(--text-muted);">Đang tải danh sách sự kiện...</p>';
+      container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 40px; grid-column: 1 / -1; font-weight: 600;">⌛ Đang tải danh sách sự kiện...</p>';
 
       try {
-        const res = await fetch('/api/events', {
+        const res = await fetch(`${API_BASE}/api/events`, {
           headers: {
             'Authorization': 'Bearer ' + token
           }
@@ -597,16 +904,48 @@
         const result = await res.json().catch(() => ({}));
 
         if (res.ok && result.data) {
-          renderEvents(result.data);
+          allEvents = result.data;
+          renderEvents(allEvents);
+          isOfflineDemo = false;
+          document.getElementById('statServerStatus').textContent = 'Online API';
         } else {
-          showAlert(result.message || 'Không thể tải danh sách sự kiện.');
+          enableOfflineDemoMode();
         }
       } catch (err) {
-        showAlert('Lỗi kết nối máy chủ. Vui lòng kiểm tra lại đường truyền.');
+        enableOfflineDemoMode();
       }
     }
 
+    function enableOfflineDemoMode() {
+      isOfflineDemo = true;
+      document.getElementById('statServerStatus').textContent = 'Demo Mode';
+      showAlert('⚡ Đang hiển thị giao diện Chế độ Demo Preview. Bạn có thể Tạo, Sửa sự kiện và Xem suất diễn trực tiếp!', 'warning');
+      allEvents = mockEvents;
+      renderEvents(allEvents);
+    }
+
+    function updateStats(events) {
+      const totalEvents = events ? events.length : 0;
+      const totalSeats = events ? events.reduce((sum, e) => sum + (e.totalSeats || 0), 0) : 0;
+      document.getElementById('statTotalEvents').textContent = totalEvents.toLocaleString('vi-VN');
+      document.getElementById('statTotalSeats').textContent = totalSeats.toLocaleString('vi-VN');
+    }
+
+    function handleSearch() {
+      const query = document.getElementById('searchInput').value.toLowerCase().trim();
+      if (!query) {
+        renderEvents(allEvents);
+        return;
+      }
+      const filtered = allEvents.filter(e =>
+        (e.title && e.title.toLowerCase().includes(query)) ||
+        (e.location && e.location.toLowerCase().includes(query))
+      );
+      renderEvents(filtered);
+    }
+
     function renderEvents(events) {
+      updateStats(events);
       const container = document.getElementById('eventsContainer');
       const emptyState = document.getElementById('emptyState');
 
@@ -620,23 +959,26 @@
       container.innerHTML = events.map(e => `
         <div class="event-card">
           <div>
+            <div class="event-card-header">
+              <span class="event-tag">🎪 Sự kiện</span>
+            </div>
             <h3 class="event-title">${escapeHtml(e.title)}</h3>
-            <p class="event-desc">${escapeHtml(e.description || 'Không có mô tả.')}</p>
+            <p class="event-desc">${escapeHtml(e.description || 'Chưa có mô tả chi tiết cho sự kiện này.')}</p>
             <div class="event-meta">
               <div class="event-meta-item">
-                <span>📍</span> <span>${escapeHtml(e.location)}</span>
+                <span class="meta-icon">📍</span> <span><strong>Địa điểm:</strong> ${escapeHtml(e.location)}</span>
               </div>
               <div class="event-meta-item">
-                <span>🕒</span> <span>${formatDateTime(e.startTime)} - ${formatDateTime(e.endTime)}</span>
+                <span class="meta-icon">⏰</span> <span><strong>Thời gian:</strong> ${formatDateTime(e.startTime)} - ${formatDateTime(e.endTime)}</span>
               </div>
               <div class="event-meta-item">
-                <span>🪑</span> <span>Tổng số ghế: <strong>${e.totalSeats}</strong></span>
+                <span class="meta-icon">🪑</span> <span><strong>Số ghế:</strong> <span class="badge-seats-card">${e.totalSeats} ghế phát hành</span></span>
               </div>
             </div>
           </div>
           <div class="event-actions">
-            <button class="btn-secondary" onclick="viewShowtimes('${e.id}')">Xem suất diễn</button>
-            <button class="btn-primary" style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); color: #a5b4fc;" onclick="openEditModal('${e.id}')">Sửa</button>
+            <button class="btn-secondary" onclick="viewShowtimes('${e.id}')">👁️ Suất diễn</button>
+            <button class="btn-primary" style="background: var(--primary-light); color: var(--primary); border: 1px solid #c7d2fe; box-shadow: none;" onclick="openEditModal('${e.id}')">✏️ Chỉnh sửa</button>
           </div>
         </div>
       `).join('');
@@ -656,8 +998,17 @@
       document.getElementById('modalTitle').textContent = 'Chỉnh sửa sự kiện';
       document.getElementById('eventId').value = id;
 
+      if (isOfflineDemo) {
+        const e = mockEvents.find(x => x.id === id);
+        if (e) {
+          populateModalFields(e);
+          document.getElementById('eventModal').style.display = 'flex';
+        }
+        return;
+      }
+
       try {
-        const res = await fetch(`/api/events/${id}`, {
+        const res = await fetch(`${API_BASE}/api/events/${id}`, {
           headers: { 'Authorization': 'Bearer ' + token }
         });
 
@@ -666,23 +1017,29 @@
           return;
         }
 
-        const result = await res.json();
+        const result = await res.json().catch(() => ({}));
         if (res.ok && result.data) {
-          const e = result.data;
-          document.getElementById('eventTitle').value = e.title;
-          document.getElementById('eventDescription').value = e.description || '';
-          document.getElementById('eventLocation').value = e.location;
-          document.getElementById('eventStartTime').value = formatDateTimeLocal(e.startTime);
-          document.getElementById('eventEndTime').value = formatDateTimeLocal(e.endTime);
-          document.getElementById('eventTotalSeats').value = e.totalSeats;
-
+          populateModalFields(result.data);
           document.getElementById('eventModal').style.display = 'flex';
         } else {
           showAlert(result.message || 'Không thể lấy thông tin sự kiện.');
         }
       } catch (err) {
-        showAlert('Không thể tải thông tin sự kiện.');
+        const e = mockEvents.find(x => x.id === id);
+        if (e) {
+          populateModalFields(e);
+          document.getElementById('eventModal').style.display = 'flex';
+        }
       }
+    }
+
+    function populateModalFields(e) {
+      document.getElementById('eventTitle').value = e.title;
+      document.getElementById('eventDescription').value = e.description || '';
+      document.getElementById('eventLocation').value = e.location;
+      document.getElementById('eventStartTime').value = formatDateTimeLocal(e.startTime);
+      document.getElementById('eventEndTime').value = formatDateTimeLocal(e.endTime);
+      document.getElementById('eventTotalSeats').value = e.totalSeats;
     }
 
     function closeEventModal() {
@@ -695,7 +1052,7 @@
       e.preventDefault();
       hideModalAlert();
 
-      if (isSubmitting) return; // Prevent double click
+      if (isSubmitting) return; // Lock UI double click
 
       const id = document.getElementById('eventId').value;
       const title = document.getElementById('eventTitle').value.trim();
@@ -705,7 +1062,7 @@
       const endTime = document.getElementById('eventEndTime').value;
       const totalSeats = parseInt(document.getElementById('eventTotalSeats').value, 10);
 
-      // Frontend validation
+      // Validation
       if (!title) {
         showModalAlert('Tên sự kiện là bắt buộc.');
         return;
@@ -743,7 +1100,31 @@
         totalSeats
       };
 
-      const url = id ? `/api/events/${id}` : '/api/events';
+      if (isOfflineDemo) {
+        setTimeout(() => {
+          if (id) {
+            const index = mockEvents.findIndex(x => x.id === id);
+            if (index !== -1) {
+              mockEvents[index] = { ...mockEvents[index], ...payload };
+            }
+          } else {
+            const newId = 'evt_' + Date.now();
+            mockEvents.unshift({
+              id: newId,
+              ...payload,
+              showtimes: [{ id: 'st_' + Date.now(), startTime: payload.startTime, endTime: payload.endTime, availableSeats: payload.totalSeats }]
+            });
+          }
+          setSaveLoading(false);
+          closeEventModal();
+          showAlert(id ? 'Cập nhật sự kiện thành công!' : 'Tạo sự kiện mới thành công!', 'success');
+          allEvents = mockEvents;
+          renderEvents(allEvents);
+        }, 400);
+        return;
+      }
+
+      const url = id ? `${API_BASE}/api/events/${id}` : `${API_BASE}/api/events`;
       const method = id ? 'PUT' : 'POST';
 
       try {
@@ -765,10 +1146,10 @@
         } else if (res.status === 403) {
           showModalAlert('Forbidden: Bạn không có quyền thao tác trên sự kiện này.');
         } else {
-          showModalAlert(result.message || 'Lưu sự kiện thất bại. Vui lòng kiểm tra lại dữ liệu.');
+          showModalAlert(result.message || 'Lưu sự kiện thất bại. Vui lòng kiểm tra dữ liệu.');
         }
       } catch (err) {
-        showModalAlert('Lỗi kết nối máy chủ.');
+        showModalAlert('Lỗi kết nối máy chủ API.');
       } finally {
         setSaveLoading(false);
       }
@@ -782,7 +1163,7 @@
         btn.innerHTML = '⌛ Đang lưu...';
       } else {
         btn.disabled = false;
-        btn.innerHTML = 'Lưu';
+        btn.innerHTML = 'Lưu sự kiện';
       }
     }
 
@@ -792,54 +1173,75 @@
       const container = document.getElementById('showtimeListContainer');
       const subtitle = document.getElementById('showtimeModalSubtitle');
 
-      container.innerHTML = '<p style="color: var(--text-muted);">Đang tải suất diễn...</p>';
+      container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 30px; font-weight: 600;">⌛ Đang tải suất diễn...</p>';
       subtitle.textContent = '';
       modal.style.display = 'flex';
 
+      if (isOfflineDemo) {
+        const e = mockEvents.find(x => x.id === eventId);
+        if (e && e.showtimes) {
+          subtitle.textContent = 'Sự kiện: ' + e.title;
+          renderShowtimesTable(e.showtimes);
+        } else {
+          container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">Không tìm thấy suất diễn.</p>';
+        }
+        return;
+      }
+
       try {
-        const res = await fetch(`/api/events/${eventId}/showtimes`, {
+        const res = await fetch(`${API_BASE}/api/events/${eventId}/showtimes`, {
           headers: { 'Authorization': 'Bearer ' + token }
         });
 
         if (res.status === 403) {
-          container.innerHTML = '<p style="color: var(--danger-text);">Forbidden: Bạn không có quyền xem suất diễn của sự kiện này.</p>';
+          container.innerHTML = '<p style="color: var(--danger-text); padding: 20px; font-weight: 600;">Forbidden: Bạn không có quyền xem suất diễn của sự kiện này.</p>';
           return;
         }
 
         const result = await res.json().catch(() => ({}));
 
         if (res.ok && result.data) {
-          const showtimes = result.data;
-          if (showtimes.length === 0) {
-            container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">Sự kiện này chưa có suất diễn nào.</p>';
-          } else {
-            container.innerHTML = `
-              <table class="showtime-table">
-                <thead>
-                  <tr>
-                    <th>Bắt đầu</th>
-                    <th>Kết thúc</th>
-                    <th>Số ghế trống</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${showtimes.map(s => `
-                    <tr>
-                      <td>${formatDateTime(s.startTime)}</td>
-                      <td>${formatDateTime(s.endTime)}</td>
-                      <td><span class="badge-seats">${s.availableSeats} ghế</span></td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            `;
-          }
+          renderShowtimesTable(result.data);
         } else {
-          container.innerHTML = `<p style="color: var(--danger-text);">${escapeHtml(result.message || 'Không thể tải suất diễn.')}</p>`;
+          container.innerHTML = `<p style="color: var(--danger-text); padding: 20px;">${escapeHtml(result.message || 'Không thể tải suất diễn.')}</p>`;
         }
       } catch (err) {
-        container.innerHTML = '<p style="color: var(--danger-text);">Lỗi kết nối máy chủ.</p>';
+        const e = mockEvents.find(x => x.id === eventId);
+        if (e && e.showtimes) {
+          subtitle.textContent = 'Sự kiện: ' + e.title;
+          renderShowtimesTable(e.showtimes);
+        } else {
+          container.innerHTML = '<p style="color: var(--danger-text); padding: 20px;">Lỗi kết nối máy chủ.</p>';
+        }
       }
+    }
+
+    function renderShowtimesTable(showtimes) {
+      const container = document.getElementById('showtimeListContainer');
+      if (!showtimes || showtimes.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">Sự kiện này chưa có suất diễn nào.</p>';
+        return;
+      }
+      container.innerHTML = `
+        <table class="showtime-table">
+          <thead>
+            <tr>
+              <th>Bắt đầu</th>
+              <th>Kết thúc</th>
+              <th>Số ghế trống</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${showtimes.map(s => `
+              <tr>
+                <td>${formatDateTime(s.startTime)}</td>
+                <td>${formatDateTime(s.endTime)}</td>
+                <td><span class="badge-seats">${s.availableSeats} ghế</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
     }
 
     function closeShowtimeModal() {
