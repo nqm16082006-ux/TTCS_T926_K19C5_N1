@@ -67,6 +67,9 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+//T-27 Job nền quét và nhả ghế quá hạn, chạy lặp lại được
+builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.SeatHoldCleanupWorker>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
