@@ -28,6 +28,11 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(e => e.TotalSeats).IsRequired();
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(e => e.Owner)
+                      .WithMany(u => u.Events)
+                      .HasForeignKey(e => e.OwnerId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<Showtime>(entity =>

@@ -21,5 +21,8 @@ namespace EventTicketBooking.Api.Models
 
         // Navigation property quan hệ N:N thông qua bảng trung gian UserRoles
         public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
+
+        // Navigation property 1:N với Events (Task T-10)
+        public ICollection<Event> Events { get; set; } = new List<Event>();
     }
 }
