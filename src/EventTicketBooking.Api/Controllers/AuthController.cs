@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
@@ -118,7 +118,8 @@ namespace EventTicketBooking.Api.Controllers
             bool emailExists = await _context.Users.AnyAsync(u => u.Email == request.Email);
             if (emailExists)
             {
-                return BadRequest(new { message = "Email này đã được sử dụng." });
+                // Yêu cầu: "thông báo lỗi không phân biệt email đã tồn tại hay chưa"
+                return BadRequest(new { message = "Đăng ký không thành công. Thông tin không hợp lệ hoặc email đã tồn tại." });
             }
 
             // Lấy Role ""Customer"" từ Database (Tạo nếu chưa có để tránh lỗi khi không seed Data)

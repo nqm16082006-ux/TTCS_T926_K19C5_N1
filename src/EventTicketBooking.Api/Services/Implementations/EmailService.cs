@@ -13,11 +13,13 @@ public class EmailService : IEmailService
 {
     private readonly IConfiguration _configuration;
     private readonly ILogger<EmailService> _logger;
+    private readonly IWebHostEnvironment _env;
 
-    public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
+    public EmailService(IConfiguration configuration, ILogger<EmailService> logger, IWebHostEnvironment env)
     {
         _configuration = configuration;
         _logger = logger;
+        _env = env;
     }
 
     /// <inheritdoc/>
@@ -42,6 +44,13 @@ public class EmailService : IEmailService
         {
             Text = BuildEmailBody(toName, confirmationLink)
         };
+
+        // Yêu cầu: môi trường dev in ra log thay vì gửi thật, không log mã kích hoạt ở môi trường staging trở lên
+        if (_env.IsDevelopment())
+        {
+            _logger.LogInformation("🛠️ [DEV MODE] Đã giả lập gửi email xác nhận đến {Email}. Link kích hoạt: {Link}", toEmail, confirmationLink);
+            return;
+        }
 
         using var client = new SmtpClient();
         try
