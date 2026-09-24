@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using EventTicketBooking.Api.Data; 
+using EventTicketBooking.Api.Data;
 
 namespace EventTicketBooking.Api.BackgroundServices;
 
