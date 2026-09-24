@@ -20,12 +20,18 @@ namespace EventTicketBooking.Api.Controllers
         private readonly IAuthService _authService;
         private readonly AppDbContext _context;
         private readonly IPasswordHasher _passwordHasher;
+        private readonly IEmailService _emailService;
 
-        public AuthController(IAuthService authService, AppDbContext context, IPasswordHasher passwordHasher)
+        public AuthController(
+            IAuthService authService,
+            AppDbContext context,
+            IPasswordHasher passwordHasher,
+            IEmailService emailService)
         {
             _authService = authService;
             _context = context;
             _passwordHasher = passwordHasher;
+            _emailService = emailService;
         }
 
         /// <summary>
@@ -67,6 +73,39 @@ namespace EventTicketBooking.Api.Controllers
             });
         }
 
+        /// <summary>
+        /// API Xác thực Email thông qua Link (Task T-08).
+        /// </summary>
+        [HttpGet("verify-email")]
+        public async Task<IActionResult> VerifyEmail([FromQuery] string email, [FromQuery] string token)
+        {
+            if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
+            {
+                return BadRequest("Thiếu thông tin xác thực.");
+            }
+
+            var success = await _authService.VerifyEmailCodeAsync(email, token);
+
+            if (!success)
+            {
+                return BadRequest("Liên kết xác nhận không hợp lệ, đã hết hạn hoặc tài khoản đã được xác nhận.");
+            }
+
+            // Trả về HTML thân thiện cho người dùng click từ Email
+            var html = @"
+                <html>
+                <body style='font-family: sans-serif; text-align: center; padding: 50px;'>
+                    <h2 style='color: green;'>✅ Xác thực Email thành công!</h2>
+                    <p>Tài khoản của bạn đã được kích hoạt. Bạn có thể đăng nhập ngay bây giờ.</p>
+                </body>
+                </html>
+            ";
+            return Content(html, "text/html");
+        }
+
+        /// <summary>
+        /// API Đăng ký tài khoản mới (Task T-07).
+        /// </summary>
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
         {
@@ -83,7 +122,7 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(new { message = "Đăng ký không thành công. Thông tin không hợp lệ hoặc email đã tồn tại." });
             }
 
-            // Lấy Role "Customer" từ Database (Tạo nếu chưa có để tránh lỗi khi không seed Data)
+            // Lấy Role ""Customer"" từ Database (Tạo nếu chưa có để tránh lỗi khi không seed Data)
             var customerRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Customer");
             if (customerRole == null)
             {
@@ -117,10 +156,10 @@ namespace EventTicketBooking.Api.Controllers
             var newUser = new User
             {
                 Id = Guid.NewGuid(),
-                Username = username,
-                Email = request.Email,
-                PasswordHash = hashedPassword,
                 FullName = request.FullName,
+                Email = request.Email,
+                Username = username,
+                PasswordHash = hashedPassword,
                 IsActive = false
             };
 
@@ -134,6 +173,16 @@ namespace EventTicketBooking.Api.Controllers
 
             _context.Users.Add(newUser);
             await _context.SaveChangesAsync();
+
+            // T-08: Sinh mã xác thực và lưu vào DB (Hạn 24 giờ)
+            var token = await _authService.GenerateAndSaveVerificationCodeAsync(newUser);
+
+            // T-08: Tạo link xác thực chứa token và gửi qua Email Service
+            var scheme = Request.Scheme ?? "https";
+            var host = Request.Host.Value ?? "localhost";
+            var verificationLink = $"{scheme}://{host}/api/auth/verify-email?email={newUser.Email}&token={token}";
+
+            await _emailService.SendConfirmationEmailAsync(newUser.Email, newUser.FullName, verificationLink);
 
             // Trả về kết quả thành công
             return Created("", new

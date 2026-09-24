@@ -59,6 +59,9 @@ builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IPasswo
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITokenService, EventTicketBooking.Api.Services.Implementations.TokenService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IAuthService, EventTicketBooking.Api.Services.Implementations.AuthService>();
 
+// Đăng ký dịch vụ Email (T-08)
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IEmailService, EventTicketBooking.Api.Services.Implementations.EmailService>();
+
 // Add Controllers & Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

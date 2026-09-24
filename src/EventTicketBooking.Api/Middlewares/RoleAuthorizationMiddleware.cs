@@ -26,7 +26,34 @@ namespace EventTicketBooking.Api.Middlewares
         {
             _next = next;
         }
+        public async Task InvokeAsync(HttpContext context)
+        {
+            var endpoint = context.GetEndpoint();
+            if (endpoint != null)
+            {
+                // 1. Kiểm tra xem Controller / Action có gắn thẻ [RequireEmailConfirmed] hay không
+                var requiresEmailConfirmed = endpoint.Metadata.GetMetadata<RequireEmailConfirmedAttribute>();
 
+                if (requiresEmailConfirmed != null)
+                {
+                    // Lấy claim IsActive / IsEmailConfirmed từ User Token (sau khi đã decode JWT)
+                    var isActiveClaim = context.User.FindFirst("IsActive")?.Value;
+
+                    if (isActiveClaim == null || !bool.TryParse(isActiveClaim, out bool isActive) || !isActive)
+                    {
+                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        context.Response.ContentType = "application/json";
+                        await context.Response.WriteAsJsonAsync(new
+                        {
+                            message = "Tài khoản chưa được kích hoạt. Vui lòng xác thực email để sử dụng tính năng này."
+                        });
+                        return;
+                    }
+                }
+            }
+
+            await _next(context);
+        }
         public async Task InvokeAsync(HttpContext context, AppDbContext dbContext)
         {
             var endpoint = context.GetEndpoint();
