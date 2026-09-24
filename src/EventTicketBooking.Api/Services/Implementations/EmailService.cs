@@ -1,8 +1,9 @@
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
+using EventTicketBooking.Api.Services.Interfaces;
 
-namespace EmailConfirmation.Services;
+namespace EventTicketBooking.Api.Services.Implementations;
 
 /// <summary>
 /// Triển khai dịch vụ gửi email sử dụng MailKit qua SMTP.
@@ -130,3 +131,4 @@ public class EmailService : IEmailService
         </html>
         """;
 }
+

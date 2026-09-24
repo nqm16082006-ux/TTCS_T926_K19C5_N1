@@ -1,4 +1,4 @@
-namespace EmailConfirmation.Services;
+namespace EventTicketBooking.Api.Services.Interfaces;
 
 /// <summary>
 /// Contract dịch vụ gửi email xác nhận.
@@ -13,3 +13,4 @@ public interface IEmailService
     /// <param name="confirmationLink">Liên kết xác nhận đầy đủ.</param>
     Task SendConfirmationEmailAsync(string toEmail, string toName, string confirmationLink);
 }
+

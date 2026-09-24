@@ -33,14 +33,13 @@ namespace EventTicketBooking.Api.Services.Implementations
             _logger = logger;
         }
 
-        // Sinh mã xác thực email 6 số
+        // Sinh mã xác thực email dạng chuỗi (Guid) cho link và hết hạn 24 giờ (T-08)
         public async Task<string> GenerateAndSaveVerificationCodeAsync(User user)
         {
-            var code = new Random().Next(100000, 999999).ToString();
+            var code = Guid.NewGuid().ToString("N"); // Token an toàn
 
             user.VerificationCode = code;
-            user.VerificationCodeExpiresAt =
-                DateTime.UtcNow.AddMinutes(15);
+            user.VerificationCodeExpiresAt = DateTime.UtcNow.AddHours(24);
 
             await _dbContext.SaveChangesAsync();
 
