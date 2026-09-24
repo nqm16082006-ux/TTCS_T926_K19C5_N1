@@ -142,7 +142,7 @@ namespace EventTicketBooking.Api.Controllers
             // Dùng phần trước @ của Email để làm Username
             string baseUsername = request.Email.Split('@')[0];
             string username = baseUsername;
-            
+
             // Xử lý trùng lặp Username
             int counter = 1;
             while (await _context.Users.AnyAsync(u => u.Username == username))
@@ -180,7 +180,7 @@ namespace EventTicketBooking.Api.Controllers
             var scheme = Request.Scheme ?? "https";
             var host = Request.Host.Value ?? "localhost";
             var verificationLink = $"{scheme}://{host}/api/auth/verify-email?email={newUser.Email}&token={token}";
-            
+
             await _emailService.SendConfirmationEmailAsync(newUser.Email, newUser.FullName, verificationLink);
 
             // Trả về kết quả thành công
