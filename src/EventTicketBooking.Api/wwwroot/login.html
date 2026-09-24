@@ -614,6 +614,9 @@
         if (res.ok) {
           rbacResult.className = 'p-3 rounded-xl text-xs font-medium border bg-emerald-50 border-emerald-200 text-emerald-800';
           rbacResult.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600 mr-1.5"></i> <strong>HTTP 200 OK:</strong> ${json.message || 'Thành công.'}`;
+        } else if (res.status === 404) {
+          rbacResult.className = 'p-3 rounded-xl text-xs font-medium border bg-amber-50 border-amber-200 text-amber-800';
+          rbacResult.innerHTML = `<i class="fa-solid fa-info-circle text-amber-600 mr-1.5"></i> <strong>HTTP 404 Not Found:</strong> API Backend chưa bật ở local. Hãy bấm nút màu xanh <strong>"Quản lý Sự kiện của tôi (Task T-10)"</strong> ở phía trên để mở màn hình T-10!`;
         } else {
           rbacResult.className = 'p-3 rounded-xl text-xs font-medium border bg-rose-50 border-rose-200 text-rose-800';
           rbacResult.innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-600 mr-1.5"></i> <strong>HTTP ${res.status}:</strong> ${json.message || 'Không có quyền truy cập.'}`;
