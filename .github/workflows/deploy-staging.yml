@@ -32,11 +32,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set Lowercase Image Base
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_BASE=ghcr.io/$REPO_LOWER" >> $GITHUB_ENV
+
       - name: Extract Docker Metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ env.IMAGE_BASE }}
           tags: |
             type=raw,value=staging
             type=sha,format=short
@@ -70,10 +75,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set Lowercase Image Tag
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_TAG=ghcr.io/$REPO_LOWER:staging" >> $GITHUB_ENV
+
       - name: Pull Docker Image
         run: |
-          IMAGE="ghcr.io/${{ github.repository }}:staging"
-          docker pull $IMAGE
+          docker pull $IMAGE_TAG
 
       - name: Start Staging Infrastructure (PostgreSQL & Redis)
         run: |
@@ -86,7 +95,6 @@ jobs:
 
       - name: Deploy New Container
         run: |
-          IMAGE="ghcr.io/${{ github.repository }}:staging"
           TEMP_CONTAINER="event_ticket_api_staging_new"
 
           docker stop $TEMP_CONTAINER || true
@@ -106,7 +114,7 @@ jobs:
             -e ASPNETCORE_ENVIRONMENT=Staging \
             -e ConnectionStrings__DefaultConnection="Host=event_ticket_postgres_staging;Port=5432;Database=event_ticket_db;Username=postgres;Password=postgres_password_123" \
             -e ConnectionStrings__Redis="event_ticket_redis_staging:6379" \
-            $IMAGE
+            $IMAGE_TAG
 
       - name: Health Check New Container
         run: |
