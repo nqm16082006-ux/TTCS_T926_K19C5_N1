@@ -1,4 +1,5 @@
 using EventTicketBooking.Api.Data;
+using EventTicketBooking.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using DotNetEnv;
 
@@ -40,6 +41,8 @@ string? redisConnection = Environment.GetEnvironmentVariable("ConnectionStrings_
 // Register EF Core DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(pgConnection));
+
+builder.Services.AddScoped<SeatImportService>();
 
 // Register Redis Distributed Cache
 builder.Services.AddStackExchangeRedisCache(options =>
