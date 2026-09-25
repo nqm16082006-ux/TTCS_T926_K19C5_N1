@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using EventTicketBooking.Api.Controllers;
 using EventTicketBooking.Api.Data;
@@ -9,9 +8,7 @@ using EventTicketBooking.Api.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging.Abstractions;
-using Moq;
 using Xunit;
 
 namespace EventTicketBooking.Tests
@@ -19,7 +16,7 @@ namespace EventTicketBooking.Tests
     public class PublicEventsUiAndFlowTests : IDisposable
     {
         private readonly AppDbContext _context;
-        private readonly Mock<IDistributedCache> _mockCache;
+        private readonly TestDistributedCache _testCache;
 
         public PublicEventsUiAndFlowTests()
         {
@@ -28,7 +25,7 @@ namespace EventTicketBooking.Tests
                 .Options;
 
             _context = new AppDbContext(options);
-            _mockCache = new Mock<IDistributedCache>();
+            _testCache = new TestDistributedCache();
         }
 
         public void Dispose()
@@ -39,10 +36,10 @@ namespace EventTicketBooking.Tests
 
         private PublicShowtimeController CreateController()
         {
-            var httpContext = new DefaultHttpContext(); // Public Unauthenticated User
+            var httpContext = new DefaultHttpContext();
             return new PublicShowtimeController(
                 _context,
-                _mockCache.Object,
+                _testCache,
                 NullLogger<PublicShowtimeController>.Instance)
             {
                 ControllerContext = new ControllerContext
@@ -55,7 +52,6 @@ namespace EventTicketBooking.Tests
         [Fact]
         public async Task GetPublicShowtimeDetail_ShouldReturn200_WhenShowtimeExists()
         {
-            // Arrange
             var ev = new Event
             {
                 Id = Guid.NewGuid(),
@@ -85,11 +81,8 @@ namespace EventTicketBooking.Tests
             await _context.SaveChangesAsync();
 
             var controller = CreateController();
-
-            // Act
             var result = await controller.GetPublicShowtimeDetail(ev.Id, showtime.Id);
 
-            // Assert
             var okResult = Assert.IsType<OkObjectResult>(result);
             var response = Assert.IsType<ApiResponse<PublicShowtimeDto>>(okResult.Value);
 
@@ -104,13 +97,9 @@ namespace EventTicketBooking.Tests
         [Fact]
         public async Task GetPublicShowtimeDetail_ShouldReturn404_WhenNotFound()
         {
-            // Arrange
             var controller = CreateController();
-
-            // Act
             var result = await controller.GetPublicShowtimeDetail(Guid.NewGuid(), Guid.NewGuid());
 
-            // Assert
             var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
             var response = Assert.IsType<ApiResponse<object>>(notFoundResult.Value);
             Assert.False(response.Success);
