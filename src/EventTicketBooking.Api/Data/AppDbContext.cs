@@ -92,6 +92,8 @@ namespace EventTicketBooking.Api.Data
                 entity.HasIndex(s => s.SeatCategoryId);
                 entity.HasIndex(s => new { s.ShowtimeId, s.Row, s.SeatNumber })
                     .IsUnique();
+            });
+
             // Cấu hình bảng Roles
             modelBuilder.Entity<Role>(entity =>
             {
