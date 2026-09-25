@@ -21,6 +21,8 @@ namespace EventTicketBooking.Api.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            modelBuilder.HasPostgresEnum<ShowtimeStatus>();
+
             modelBuilder.Entity<Event>(entity =>
             {
                 entity.ToTable("Events");
@@ -45,6 +47,9 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(s => s.StartTime).IsRequired();
                 entity.Property(s => s.EndTime).IsRequired();
                 entity.Property(s => s.AvailableSeats).IsRequired();
+                entity.Property(s => s.Status)
+                      .HasColumnType("showtime_status")
+                      .HasDefaultValue(ShowtimeStatus.Draft);
 
                 entity.HasOne(s => s.Event)
                     .WithMany(e => e.Showtimes)
