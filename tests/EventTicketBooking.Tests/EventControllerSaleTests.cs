@@ -25,9 +25,9 @@ namespace EventTicketBooking.Tests
             var options = new DbContextOptionsBuilder<AppDbContext>()
                 .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
                 .Options;
-            
+
             _context = new AppDbContext(options);
-            
+
             // Setup User Context
             var claims = new List<Claim>
             {
@@ -88,7 +88,7 @@ namespace EventTicketBooking.Tests
             var apiResponse = Assert.IsType<ApiResponse<ShowtimeResponseDto>>(okResult.Value);
             Assert.True(apiResponse.Success);
             Assert.Equal(ShowtimeStatus.OnSale, apiResponse.Data.Status);
-            
+
             var showtimeInDb = await _context.Showtimes.FindAsync(showtime.Id);
             Assert.Equal(ShowtimeStatus.OnSale, showtimeInDb.Status);
         }
@@ -186,10 +186,10 @@ namespace EventTicketBooking.Tests
                 EndTime = ev.EndTime
             };
             ev.Showtimes.Add(showtime);
-            
+
             // Set status to OnSale first using ChangeStatus
             showtime.ChangeStatus(ShowtimeStatus.OnSale);
-            
+
             _context.Events.Add(ev);
             await _context.SaveChangesAsync();
 
@@ -236,7 +236,7 @@ namespace EventTicketBooking.Tests
             var okResult = Assert.IsType<OkObjectResult>(result);
             var apiResponse = Assert.IsType<ApiResponse<List<ShowtimeResponseDto>>>(okResult.Value);
             Assert.True(apiResponse.Success);
-            
+
             var dto = Assert.Single(apiResponse.Data);
             Assert.Equal(ShowtimeStatus.Draft, dto.Status);
             Assert.True(dto.CanOpenSale);
