@@ -11,6 +11,8 @@ namespace EventTicketBooking.Api.Data
 
         public DbSet<Event> Events { get; set; } = null!;
         public DbSet<Showtime> Showtimes { get; set; } = null!;
+        public DbSet<Seat> Seats { get; set; } = null!;
+        public DbSet<SeatCategory> SeatCategories { get; set; } = null!;
         public DbSet<Role> Roles { get; set; } = null!;
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<UserRole> UserRoles { get; set; } = null!;
@@ -50,6 +52,48 @@ namespace EventTicketBooking.Api.Data
                     .WithMany(e => e.Showtimes)
                     .HasForeignKey(s => s.EventId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<SeatCategory>(entity =>
+            {
+                entity.HasKey(sc => sc.Id);
+
+                entity.Property(sc => sc.Name)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.HasOne(sc => sc.Showtime)
+                    .WithMany()
+                    .HasForeignKey(sc => sc.ShowtimeId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(sc => sc.ShowtimeId);
+            });
+
+            modelBuilder.Entity<Seat>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+
+                entity.Property(s => s.Row)
+                    .IsRequired()
+                    .HasMaxLength(10);
+
+                entity.Property(s => s.SeatNumber).IsRequired();
+
+                entity.HasOne(s => s.Showtime)
+                    .WithMany()
+                    .HasForeignKey(s => s.ShowtimeId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(s => s.SeatCategory)
+                    .WithMany()
+                    .HasForeignKey(s => s.SeatCategoryId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(s => s.ShowtimeId);
+                entity.HasIndex(s => s.SeatCategoryId);
+                entity.HasIndex(s => new { s.ShowtimeId, s.Row, s.SeatNumber })
+                    .IsUnique();
             });
 
             // Cấu hình bảng Roles
