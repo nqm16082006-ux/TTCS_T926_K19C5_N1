@@ -36,12 +36,12 @@ namespace EventTicketBooking.Api.Tests
 
             // Assert
             Assert.Equal(4, errors.Count); // Ghế 0 có 3 lỗi, ghế 1 có 1 lỗi
-            
+
             // Lỗi ghế 0
             Assert.Contains(errors, e => e.SeatIndex == 0 && e.ErrorMessage.Contains("Thiếu thông tin Hàng ghế"));
             Assert.Contains(errors, e => e.SeatIndex == 0 && e.ErrorMessage.Contains("Số ghế"));
             Assert.Contains(errors, e => e.SeatIndex == 0 && e.ErrorMessage.Contains("Thiếu thông tin Hạng ghế"));
-            
+
             // Lỗi ghế 1
             Assert.Contains(errors, e => e.SeatIndex == 1 && e.ErrorMessage.Contains("Thiếu thông tin Hạng ghế"));
         }

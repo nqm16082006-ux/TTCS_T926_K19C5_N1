@@ -8,7 +8,7 @@ namespace EventTicketBooking.Api.Exceptions
     {
         public List<SeatImportError> Errors { get; }
 
-        public SeatValidationException(List<SeatImportError> errors) 
+        public SeatValidationException(List<SeatImportError> errors)
             : base("Quá trình kiểm tra tệp sơ đồ ghế phát hiện lỗi.")
         {
             Errors = errors;
