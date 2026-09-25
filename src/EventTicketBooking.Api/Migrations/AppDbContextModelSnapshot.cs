@@ -130,6 +130,30 @@ namespace EventTicketBooking.Api.Migrations
                     b.ToTable("Showtimes", (string)null);
                 });
 
+            modelBuilder.Entity("EventTicketBooking.Api.Models.SeatCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("ShowtimeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShowtimeId");
+
+                    b.ToTable("SeatCategories", (string)null);
+                });
+
             modelBuilder.Entity("EventTicketBooking.Api.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -216,6 +240,17 @@ namespace EventTicketBooking.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("EventTicketBooking.Api.Models.SeatCategory", b =>
+                {
+                    b.HasOne("EventTicketBooking.Api.Models.Showtime", "Showtime")
+                        .WithMany("SeatCategories")
+                        .HasForeignKey("ShowtimeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Showtime");
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.Showtime", b =>

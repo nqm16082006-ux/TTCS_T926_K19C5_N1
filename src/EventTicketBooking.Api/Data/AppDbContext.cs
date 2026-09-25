@@ -17,6 +17,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<UserRole> UserRoles { get; set; } = null!;
         public DbSet<Seat> Seats { get; set; } = null!;
         public DbSet<SeatHolds> SeatHold { get; set; } = null!;
+        public DbSet<SeatCategory> SeatCategories { get; set; } = null!;
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -55,6 +56,18 @@ namespace EventTicketBooking.Api.Data
                     .WithMany(e => e.Showtimes)
                     .HasForeignKey(s => s.EventId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<SeatCategory>(entity =>
+            {
+                entity.ToTable("SeatCategories");
+                entity.HasKey(sc => sc.Id);
+                entity.Property(sc => sc.Name).IsRequired().HasMaxLength(100);
+                entity.Property(sc => sc.Price).HasColumnType("numeric(18,2)").IsRequired();
+                entity.HasOne(sc => sc.Showtime)
+                      .WithMany(s => s.SeatCategories)
+                      .HasForeignKey(sc => sc.ShowtimeId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             // Cấu hình bảng Roles
