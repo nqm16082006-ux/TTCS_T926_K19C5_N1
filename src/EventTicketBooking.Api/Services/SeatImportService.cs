@@ -18,37 +18,22 @@ namespace EventTicketBooking.Api.Services
             _dbContext = dbContext;
         }
 
+        public async Task<List<SeatImportItemDto>> PreviewAsync(
+            Stream jsonStream,
+            CancellationToken cancellationToken = default)
+        {
+            var items = await ParseAndValidateAsync(jsonStream, cancellationToken);
+            return items;
+        }
+
         public async Task<SeatImportResultDto> ImportAsync(
             Guid showtimeId,
             Stream jsonStream,
             CancellationToken cancellationToken = default)
         {
-            List<SeatImportItemDto>? items;
+            var items = await ParseAndValidateAsync(jsonStream, cancellationToken);
 
-            try
-            {
-                items = await JsonSerializer.DeserializeAsync<List<SeatImportItemDto>>(
-                    jsonStream,
-                    JsonOptions,
-                    cancellationToken);
-            }
-            catch (JsonException ex)
-            {
-                // Báo lỗi định dạng kèm vị trí ký tự
-                var errors = new List<SeatImportError>
-                {
-                    new SeatImportError { ErrorMessage = $"Lỗi định dạng JSON tại dòng {ex.LineNumber}, ký tự {ex.BytePositionInLine}: {ex.Message}" }
-                };
-                throw new EventTicketBooking.Api.Exceptions.SeatValidationException(errors);
-            }
-
-            var validationErrors = SeatMapValidator.Validate(items);
-            if (validationErrors.Count > 0)
-            {
-                throw new EventTicketBooking.Api.Exceptions.SeatValidationException(validationErrors);
-            }
-
-            var validatedItems = new List<(string Row, int SeatNumber, string Category)>(items!.Count);
+            var validatedItems = new List<(string Row, int SeatNumber, string Category)>(items.Count);
             foreach (var item in items)
             {
                 validatedItems.Add((item.Row!.Trim(), item.SeatNumber, item.Category!.Trim()));
@@ -153,6 +138,35 @@ namespace EventTicketBooking.Api.Services
             {
                 // Preserve the original import failure if rollback also fails.
             }
+        }
+
+        private async Task<List<SeatImportItemDto>> ParseAndValidateAsync(Stream jsonStream, CancellationToken cancellationToken)
+        {
+            List<SeatImportItemDto>? items;
+
+            try
+            {
+                items = await JsonSerializer.DeserializeAsync<List<SeatImportItemDto>>(
+                    jsonStream,
+                    JsonOptions,
+                    cancellationToken);
+            }
+            catch (JsonException ex)
+            {
+                var errors = new List<SeatImportError>
+                {
+                    new SeatImportError { ErrorMessage = $"Lỗi định dạng JSON tại dòng {ex.LineNumber}, ký tự {ex.BytePositionInLine}: {ex.Message}" }
+                };
+                throw new EventTicketBooking.Api.Exceptions.SeatValidationException(errors);
+            }
+
+            var validationErrors = SeatMapValidator.Validate(items);
+            if (validationErrors.Count > 0)
+            {
+                throw new EventTicketBooking.Api.Exceptions.SeatValidationException(validationErrors);
+            }
+
+            return items!;
         }
     }
 }

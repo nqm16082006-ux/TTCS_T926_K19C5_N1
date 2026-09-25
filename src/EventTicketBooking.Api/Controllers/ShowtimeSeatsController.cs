@@ -80,5 +80,49 @@ namespace EventTicketBooking.Api.Controllers
                     detail: "The seat import could not be completed.");
             }
         }
+        [HttpPost("preview")]
+        [Consumes("multipart/form-data")]
+        [ProducesResponseType(typeof(List<SeatImportItemDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<List<SeatImportItemDto>>> Preview(
+            [FromForm] IFormFile? file,
+            CancellationToken cancellationToken)
+        {
+            if (file is null || file.Length == 0)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid seat import file",
+                    detail: "A non-empty JSON file is required.");
+            }
+
+            try
+            {
+                await using var stream = file.OpenReadStream();
+                var result = await _seatImportService.PreviewAsync(stream, cancellationToken);
+                return Ok(result);
+            }
+            catch (EventTicketBooking.Api.Exceptions.SeatValidationException ex)
+            {
+                return BadRequest(new { errors = ex.Errors });
+            }
+            catch (InvalidDataException ex)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid seat import file",
+                    detail: ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to preview seats.");
+
+                return Problem(
+                    statusCode: StatusCodes.Status500InternalServerError,
+                    title: "Seat preview failed",
+                    detail: "The seat preview could not be completed.");
+            }
+        }
     }
 }
