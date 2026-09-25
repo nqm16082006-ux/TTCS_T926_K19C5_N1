@@ -45,6 +45,10 @@ namespace EventTicketBooking.Api.Controllers
                 var result = await _seatImportService.ImportAsync(showtimeId, stream, cancellationToken);
                 return Ok(result);
             }
+            catch (EventTicketBooking.Api.Exceptions.SeatValidationException ex)
+            {
+                return BadRequest(new { errors = ex.Errors });
+            }
             catch (InvalidDataException ex)
             {
                 return Problem(

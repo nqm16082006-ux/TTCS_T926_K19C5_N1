@@ -34,42 +34,24 @@ namespace EventTicketBooking.Api.Services
             }
             catch (JsonException ex)
             {
-                throw new InvalidDataException("The file does not contain valid seat JSON.", ex);
+                // Báo lỗi định dạng kèm vị trí ký tự
+                var errors = new List<SeatImportError>
+                {
+                    new SeatImportError { ErrorMessage = $"Lỗi định dạng JSON tại dòng {ex.LineNumber}, ký tự {ex.BytePositionInLine}: {ex.Message}" }
+                };
+                throw new EventTicketBooking.Api.Exceptions.SeatValidationException(errors);
             }
 
-            if (items is null || items.Count == 0)
+            var validationErrors = SeatMapValidator.Validate(items);
+            if (validationErrors.Count > 0)
             {
-                throw new InvalidDataException("The seat list must not be empty.");
+                throw new EventTicketBooking.Api.Exceptions.SeatValidationException(validationErrors);
             }
 
-            var validatedItems = new List<(string Row, int SeatNumber, string Category)>(items.Count);
-            var importedSeatKeys = new HashSet<(string Row, int SeatNumber)>();
-
+            var validatedItems = new List<(string Row, int SeatNumber, string Category)>(items!.Count);
             foreach (var item in items)
             {
-                var row = item.Row?.Trim();
-                if (string.IsNullOrEmpty(row) || row.Length > 10)
-                {
-                    throw new InvalidDataException("Each seat must have a row between 1 and 10 characters.");
-                }
-
-                if (item.SeatNumber <= 0)
-                {
-                    throw new InvalidDataException("Each seat number must be greater than zero.");
-                }
-
-                var categoryName = item.Category?.Trim();
-                if (string.IsNullOrEmpty(categoryName) || categoryName.Length > 100)
-                {
-                    throw new InvalidDataException("Each seat must have a category between 1 and 100 characters.");
-                }
-
-                if (!importedSeatKeys.Add((row, item.SeatNumber)))
-                {
-                    throw new InvalidDataException("The file contains duplicate seats.");
-                }
-
-                validatedItems.Add((row, item.SeatNumber, categoryName));
+                validatedItems.Add((item.Row!.Trim(), item.SeatNumber, item.Category!.Trim()));
             }
 
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
