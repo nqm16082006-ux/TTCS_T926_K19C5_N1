@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đăng ký tài khoản - EventTicket Booking</title>
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- FontAwesome 6 CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <style>
+    /* Seat micro animations */
+    .seat-item {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .seat-item:hover {
+      transform: scale(1.3);
+      z-index: 20;
+    }
+
+    .seat-vip {
+      background-color: #8b5cf6;
+      box-shadow: 0 0 8px rgba(139, 92, 246, 0.35);
+    }
+
+    .seat-regular {
+      background-color: #3b82f6;
+      box-shadow: 0 0 6px rgba(59, 130, 246, 0.3);
+    }
+
+    .seat-occupied {
+      background-color: #cbd5e1;
+      cursor: not-allowed;
+    }
+
+    /* Ambient glow elements */
+    .ambient-bg {
+      background: radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(59, 130, 246, 0.08) 0%, transparent 40%);
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-10 ambient-bg">
+
+  <!-- Main Container Card -->
+  <div
+    class="w-full max-w-5xl bg-white border border-slate-200/90 rounded-3xl shadow-xl shadow-slate-200/60 overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[660px]">
+
+    <!-- ========================================================
+         CỘT TRÁI: MINH HỌA TRỰC QUAN & SHOWCASE SƠ ĐỒ GHẾ
+         ======================================================== -->
+    <div
+      class="lg:col-span-6 bg-gradient-to-br from-indigo-50/80 via-slate-50 to-purple-50/60 p-8 sm:p-10 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-slate-200/70">
+
+      <div>
+        <!-- Brand Logo Header -->
+        <div class="flex items-center gap-3 mb-6">
+          <div
+            class="w-11 h-11 rounded-2xl bg-indigo-600 flex items-center justify-center text-white text-lg shadow-md shadow-indigo-200">
+            <i class="fa-solid fa-ticket"></i>
+          </div>
+          <div>
+            <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">EventTicket <span
+                class="text-indigo-600">Booking</span></h1>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Nền tảng vé sự kiện trực tuyến</p>
+          </div>
+        </div>
+
+        <!-- Headline & Slogan -->
+        <div class="mb-6">
+          <span
+            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-100/70 text-indigo-700 mb-3">
+            <i class="fa-solid fa-user-plus text-indigo-600"></i> Tham gia ngay
+          </span>
+          <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 leading-tight">
+            Tạo tài khoản mới,<br><span class="text-indigo-600">đặt vé liền tay.</span>
+          </h2>
+          <p class="text-sm text-slate-500 mt-2 leading-relaxed">
+            Hệ thống phân phối vé chuyên nghiệp với sơ đồ chọn ghế trực quan thời gian thực và xác thực bảo mật đa tầng.
+          </p>
+        </div>
+
+        <!-- Event Preview & Seating Grid Card -->
+        <div class="bg-white/90 border border-slate-200/80 rounded-2xl p-5 shadow-sm hidden sm:block">
+          <!-- Event Header Bar -->
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+            <div class="flex items-center gap-2.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span class="text-xs font-bold text-slate-700 uppercase tracking-wide">Live Concert & Festival 2026</span>
+            </div>
+            <span class="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">Khán phòng A</span>
+          </div>
+
+          <!-- Stage Indicator -->
+          <div
+            class="w-full bg-indigo-50 border border-indigo-200/80 rounded-t-full py-1.5 mb-5 flex items-center justify-center text-[11px] font-bold text-indigo-700 uppercase tracking-widest shadow-inner">
+            <i class="fa-solid fa-music mr-2 text-indigo-500"></i> SÂN KHẤU CHÍNH / STAGE
+          </div>
+
+          <!-- Seating Grid -->
+          <div class="flex flex-col gap-2 items-center">
+            <!-- Row A (VIP) -->
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-bold text-slate-400 w-4 text-right">A</span>
+              <div class="w-4 h-4 rounded-md seat-item seat-vip"></div>
+              <div class="w-4 h-4 rounded-md seat-item seat-vip"></div>
+              <div class="w-4 h-4 rounded-md seat-item seat-occupied"></div>
+              <div class="w-4 h-4 rounded-md seat-item seat-vip"></div>
+              <div class="w-4 h-4 rounded-md seat-item seat-vip"></div>
+              <div class="w-4 h-4 rounded-md seat-item seat-occupied"></div>
+              <div class="w-4 h-4 rounded-md seat-item seat-vip"></div>
+              <div class="w-4 h-4 rounded-md seat-item seat-vip"></div>
+            </div>
+            <!-- Row B (Regular) -->
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-bold text-slate-400 w-4 text-right">B</span>
+              <div class="w-4 h-4 rounded-md seat-item seat-regular"></div>
+              <div class="w-4 h-4 rounded-md seat-item seat-regular"></div>
+              <div class="w-4 h-4 rounded-md seat-item seat-regular"></div>
+              <div class="w-4 h-4 rounded-md seat-item seat-occupied"></div>
+              <div class="w-4 h-4 rounded-md seat-item seat-regular"></div>
+              <div class="w-4 h-4 rounded-md seat-item seat-regular"></div>
+              <div class="w-4 h-4 rounded-md seat-item seat-regular"></div>
+              <div class="w-4 h-4 rounded-md seat-item seat-occupied"></div>
+            </div>
+          </div>
+          
+          <div class="flex items-center justify-center gap-5 mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 font-medium">
+            <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-purple-500 inline-block"></span> VIP</div>
+            <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-blue-500 inline-block"></span> Thường</div>
+            <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-300 inline-block"></span> Đã bán</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trust Badges Footer -->
+      <div class="mt-6 flex flex-wrap gap-2 pt-4 border-t border-slate-200/60">
+        <span class="inline-flex items-center gap-1.5 text-xs text-slate-600 bg-white/80 border border-slate-200 px-3 py-1.5 rounded-lg shadow-2xs">
+          <i class="fa-solid fa-shield-check text-emerald-600"></i> Mã hóa Argon2id
+        </span>
+        <span class="inline-flex items-center gap-1.5 text-xs text-slate-600 bg-white/80 border border-slate-200 px-3 py-1.5 rounded-lg shadow-2xs">
+          <i class="fa-solid fa-envelope-circle-check text-indigo-600"></i> Email Verification
+        </span>
+      </div>
+
+    </div>
+
+    <!-- ========================================================
+         CỘT PHẢI: FORM ĐĂNG KÝ
+         ======================================================== -->
+    <div class="lg:col-span-6 bg-white p-8 sm:p-12 flex flex-col justify-center">
+
+      <!-- Alert Notification Banner -->
+      <div id="alertBox" class="hidden mb-6 p-4 rounded-xl text-sm transition-all duration-300"></div>
+
+      <!-- VIEW 1: FORM ĐĂNG KÝ -->
+      <div id="registerView">
+
+        <!-- Header Form -->
+        <div class="mb-6">
+          <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Đăng ký tài khoản</h2>
+          <p class="text-sm text-slate-500 mt-1">Vui lòng điền thông tin để tạo tài khoản mới.</p>
+        </div>
+
+        <!-- Form Fields -->
+        <form id="registerForm" autocomplete="off" class="space-y-4">
+
+          <!-- Input Full Name -->
+          <div>
+            <label for="fullName" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Họ và Tên</label>
+            <div class="relative flex items-center">
+              <span class="absolute left-3.5 text-slate-400 pointer-events-none"><i class="fa-solid fa-user"></i></span>
+              <input type="text" id="fullName" name="fullName" required autofocus placeholder="Nguyễn Văn A"
+                class="w-full pl-10 pr-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 outline-none transition-all duration-200">
+            </div>
+          </div>
+
+          <!-- Input Email -->
+          <div>
+            <label for="email" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Địa chỉ Email</label>
+            <div class="relative flex items-center">
+              <span class="absolute left-3.5 text-slate-400 pointer-events-none"><i class="fa-solid fa-envelope"></i></span>
+              <input type="email" id="email" name="email" required placeholder="user@example.com"
+                class="w-full pl-10 pr-4 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 outline-none transition-all duration-200">
+            </div>
+          </div>
+
+          <!-- Input Password -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label for="password" class="block text-xs font-bold uppercase tracking-wider text-slate-700">Mật khẩu</label>
+            </div>
+            <div class="relative flex items-center">
+              <span class="absolute left-3.5 text-slate-400 pointer-events-none"><i class="fa-solid fa-lock"></i></span>
+              <input type="password" id="password" name="password" required placeholder="••••••••" minlength="8"
+                class="w-full pl-10 pr-11 py-3 bg-slate-50/70 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 outline-none transition-all duration-200">
+              <button type="button" id="togglePasswordBtn"
+                class="absolute right-3.5 text-slate-400 hover:text-slate-600 p-1 focus:outline-none transition-colors"
+                title="Ẩn/Hiện mật khẩu">
+                <i class="fa-solid fa-eye" id="togglePasswordIcon"></i>
+              </button>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1.5"><i class="fa-solid fa-circle-info mr-1"></i> Mật khẩu phải có ít nhất 8 ký tự.</p>
+          </div>
+
+          <!-- Primary Submit Button -->
+          <button type="submit" id="btnSubmit"
+            class="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-200 transition-all duration-200 flex items-center justify-center gap-2 mt-2 disabled:opacity-60 disabled:cursor-not-allowed">
+            <span class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" id="btnSpinner"></span>
+            <span id="btnText"><i class="fa-solid fa-user-plus mr-1.5"></i> Tạo Tài Khoản Mới</span>
+          </button>
+        </form>
+
+        <div class="mt-6 text-center text-sm text-slate-500">
+          Đã có tài khoản? <a href="/login.html" class="font-bold text-indigo-600 hover:text-indigo-800 hover:underline">Đăng nhập ngay</a>
+        </div>
+        
+
+
+      </div>
+
+      <!-- VIEW 2: MÀN HÌNH ĐÃ ĐĂNG KÝ THÀNH CÔNG -->
+      <div id="successView" class="hidden text-center py-6">
+        <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+          <i class="fa-solid fa-envelope-open-text"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-slate-900 mb-2">Đăng ký thành công!</h2>
+        <p class="text-slate-500 text-sm mb-6">Chúng tôi đã gửi một email xác thực đến địa chỉ <strong id="resEmail" class="text-slate-800"></strong>. Vui lòng kiểm tra hộp thư đến (và thư mục Spam) để kích hoạt tài khoản của bạn.</p>
+        
+        <a href="/login.html" class="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-xl transition-colors">
+          <i class="fa-solid fa-arrow-left"></i> Quay lại trang Đăng Nhập
+        </a>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    const registerForm = document.getElementById('registerForm');
+    const registerView = document.getElementById('registerView');
+    const successView = document.getElementById('successView');
+    const fullNameInput = document.getElementById('fullName');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const btnSubmit = document.getElementById('btnSubmit');
+    const btnText = document.getElementById('btnText');
+    const btnSpinner = document.getElementById('btnSpinner');
+    const alertBox = document.getElementById('alertBox');
+    const togglePasswordBtn = document.getElementById('togglePasswordBtn');
+    const togglePasswordIcon = document.getElementById('togglePasswordIcon');
+
+    // Toggle Ẩn / Hiện Mật khẩu
+    togglePasswordBtn.addEventListener('click', () => {
+      const isPassword = passwordInput.getAttribute('type') === 'password';
+      passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+      togglePasswordIcon.className = isPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+    });
+
+    // Điền nhanh tài khoản demo
+    function fillAccount(name, email, password) {
+      fullNameInput.value = name;
+      emailInput.value = email;
+      passwordInput.value = password;
+      clearAlert();
+      fullNameInput.focus();
+    }
+
+    // Hiển thị thông báo Alert Banner
+    function showAlert(htmlMessage, type = 'error') {
+      alertBox.className = 'mb-6 p-4 rounded-xl text-sm transition-all duration-300 ';
+      if (type === 'error') {
+        alertBox.className += 'bg-rose-50 border border-rose-200 text-rose-800';
+      } else if (type === 'success') {
+        alertBox.className += 'bg-emerald-50 border border-emerald-200 text-emerald-800';
+      }
+      alertBox.innerHTML = htmlMessage;
+      alertBox.classList.remove('hidden');
+    }
+
+    // Xóa Alert Banner
+    function clearAlert() {
+      alertBox.classList.add('hidden');
+      alertBox.innerHTML = '';
+    }
+
+    // Đặt trạng thái Loading khi gửi request
+    function setLoading(isLoading) {
+      btnSubmit.disabled = isLoading;
+      if (isLoading) {
+        btnSpinner.classList.remove('hidden');
+        btnText.textContent = 'Đang đăng ký...';
+      } else {
+        btnSpinner.classList.add('hidden');
+        btnText.innerHTML = '<i class="fa-solid fa-user-plus mr-1.5"></i> Tạo Tài Khoản Mới';
+      }
+    }
+
+    // Xử lý gửi Form Đăng Ký
+    registerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearAlert();
+
+      const fullName = fullNameInput.value.trim();
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+
+      if (!email || !password || !fullName) {
+        showAlert('<i class="fa-solid fa-circle-exclamation mr-1.5"></i> Vui lòng nhập đầy đủ thông tin.', 'error');
+        return;
+      }
+      
+      if (password.length < 8) {
+        showAlert('<i class="fa-solid fa-circle-exclamation mr-1.5"></i> Mật khẩu phải dài ít nhất 8 ký tự.', 'error');
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fullName, email, password })
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok || response.status === 201) {
+          // HTTP 201: Đăng ký thành công
+          registerView.classList.add('hidden');
+          successView.classList.remove('hidden');
+          document.getElementById('resEmail').textContent = email;
+        } else {
+          // HTTP 400: Lỗi (Ví dụ: Email trùng lặp)
+          const errorMessage = data.message || (data.errors && Object.values(data.errors).flat()[0]) || 'Lỗi khi đăng ký tài khoản.';
+          showAlert(<i class="fa-solid fa-circle-exclamation mr-1.5"></i> , 'error');
+        }
+      } catch (err) {
+        showAlert('<i class="fa-solid fa-wifi mr-1.5"></i> Không thể kết nối tới máy chủ. Vui lòng kiểm tra lại đường truyền.', 'error');
+      } finally {
+        setLoading(false);
+      }
+    });
+  </script>
+</body>
+
+</html>
