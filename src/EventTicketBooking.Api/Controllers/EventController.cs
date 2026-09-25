@@ -262,163 +262,13 @@ namespace EventTicketBooking.Api.Controllers
                 EventId = s.EventId,
                 StartTime = s.StartTime,
                 EndTime = s.EndTime,
-                AvailableSeats = s.AvailableSeats,
-                Status = s.Status,
-                StatusActionMessage = GetShowtimeStatusActionMessage(s)
+                AvailableSeats = s.AvailableSeats
             }).ToList();
 
             return Ok(ApiResponse<List<ShowtimeResponseDto>>.SuccessResult(showtimesDto, "Lấy danh sách suất diễn thành công."));
         }
 
-        /// <summary>
-        /// Mở bán suất diễn (Task T-16).
-        /// POST /api/events/{eventId}/showtimes/{showtimeId}/open-sale
-        /// </summary>
-        [HttpPost("{eventId:guid}/showtimes/{showtimeId:guid}/open-sale")]
-        [RequireRole("Organizer", "Admin")]
-        [ProducesResponseType(typeof(ApiResponse<ShowtimeResponseDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        [ProducesResponseType(StatusCodes.Status403Forbidden)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> OpenSale(Guid eventId, Guid showtimeId)
-        {
-            var currentUserId = GetCurrentUserId();
-            if (!currentUserId.HasValue)
-            {
-                return StatusCode(StatusCodes.Status401Unauthorized, ApiResponse<object>.FailureResult("Vui lòng đăng nhập để thực hiện thao tác này."));
-            }
-
-            var ev = await _context.Events
-                .Include(e => e.Showtimes)
-                .FirstOrDefaultAsync(e => e.Id == eventId);
-
-            if (ev == null)
-            {
-                return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
-            }
-
-            if (ev.OwnerId != currentUserId.Value)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền thao tác trên sự kiện này."));
-            }
-
-            var showtime = ev.Showtimes.FirstOrDefault(s => s.Id == showtimeId);
-            if (showtime == null)
-            {
-                return NotFound(ApiResponse<object>.FailureResult("Suất diễn không tồn tại."));
-            }
-
-            try
-            {
-                showtime.ChangeStatus(ShowtimeStatus.OnSale);
-                await _context.SaveChangesAsync();
-
-                var responseDto = new ShowtimeResponseDto
-                {
-                    Id = showtime.Id,
-                    EventId = showtime.EventId,
-                    StartTime = showtime.StartTime,
-                    EndTime = showtime.EndTime,
-                    AvailableSeats = showtime.AvailableSeats,
-                    Status = showtime.Status,
-                    StatusActionMessage = GetShowtimeStatusActionMessage(showtime)
-                };
-                return Ok(ApiResponse<ShowtimeResponseDto>.SuccessResult(responseDto, "Mở bán suất diễn thành công."));
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ApiResponse<object>.FailureResult(ex.Message));
-            }
-        }
-
-        /// <summary>
-        /// Đóng bán suất diễn (Task T-16).
-        /// POST /api/events/{eventId}/showtimes/{showtimeId}/close-sale
-        /// </summary>
-        [HttpPost("{eventId:guid}/showtimes/{showtimeId:guid}/close-sale")]
-        [RequireRole("Organizer", "Admin")]
-        [ProducesResponseType(typeof(ApiResponse<ShowtimeResponseDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        [ProducesResponseType(StatusCodes.Status403Forbidden)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> CloseSale(Guid eventId, Guid showtimeId)
-        {
-            var currentUserId = GetCurrentUserId();
-            if (!currentUserId.HasValue)
-            {
-                return StatusCode(StatusCodes.Status401Unauthorized, ApiResponse<object>.FailureResult("Vui lòng đăng nhập để thực hiện thao tác này."));
-            }
-
-            var ev = await _context.Events
-                .Include(e => e.Showtimes)
-                .FirstOrDefaultAsync(e => e.Id == eventId);
-
-            if (ev == null)
-            {
-                return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
-            }
-
-            if (ev.OwnerId != currentUserId.Value)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền thao tác trên sự kiện này."));
-            }
-
-            var showtime = ev.Showtimes.FirstOrDefault(s => s.Id == showtimeId);
-            if (showtime == null)
-            {
-                return NotFound(ApiResponse<object>.FailureResult("Suất diễn không tồn tại."));
-            }
-
-            try
-            {
-                showtime.ChangeStatus(ShowtimeStatus.Closed);
-                await _context.SaveChangesAsync();
-
-                var responseDto = new ShowtimeResponseDto
-                {
-                    Id = showtime.Id,
-                    EventId = showtime.EventId,
-                    StartTime = showtime.StartTime,
-                    EndTime = showtime.EndTime,
-                    AvailableSeats = showtime.AvailableSeats,
-                    Status = showtime.Status,
-                    StatusActionMessage = GetShowtimeStatusActionMessage(showtime)
-                };
-                return Ok(ApiResponse<ShowtimeResponseDto>.SuccessResult(responseDto, "Đóng bán suất diễn thành công."));
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ApiResponse<object>.FailureResult(ex.Message));
-            }
-        }
-
         #region Helper Methods
-
-        private static string? GetShowtimeStatusActionMessage(Showtime showtime)
-        {
-            if (showtime.Status == ShowtimeStatus.Draft)
-            {
-                if (showtime.AvailableSeats <= 0)
-                {
-                    return "Chưa có ghế để mở bán.";
-                }
-                return "Suất diễn đủ điều kiện để mở bán.";
-            }
-
-            if (showtime.Status == ShowtimeStatus.OnSale)
-            {
-                return "Suất diễn đang mở bán.";
-            }
-
-            if (showtime.Status == ShowtimeStatus.Closed)
-            {
-                return "Suất diễn đã đóng bán.";
-            }
-
-            return null;
-        }
 
         private Guid? GetCurrentUserId()
         {
@@ -453,9 +303,7 @@ namespace EventTicketBooking.Api.Controllers
                     EventId = s.EventId,
                     StartTime = s.StartTime,
                     EndTime = s.EndTime,
-                    AvailableSeats = s.AvailableSeats,
-                    Status = s.Status,
-                    StatusActionMessage = GetShowtimeStatusActionMessage(s)
+                    AvailableSeats = s.AvailableSeats
                 }).ToList() ?? new List<ShowtimeResponseDto>()
             };
         }
