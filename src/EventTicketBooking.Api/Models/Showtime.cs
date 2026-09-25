@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace EventTicketBooking.Api.Models
 {
@@ -18,7 +19,7 @@ namespace EventTicketBooking.Api.Models
 
         public Event Event { get; set; } = null!;
 
-        public System.Collections.Generic.ICollection<SeatCategory> SeatCategories { get; set; } = new System.Collections.Generic.List<SeatCategory>();
+        public ICollection<SeatCategory> SeatCategories { get; set; } = new List<SeatCategory>();
 
         /// <summary>
         /// Phương thức duy nhất chịu trách nhiệm chuyển trạng thái và kiểm tra điều kiện cho suất diễn (Task T-15).
