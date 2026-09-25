@@ -92,6 +92,74 @@ namespace EventTicketBooking.Api.Data
                     await context.UserRoles.AddRangeAsync(userRoles);
                     await context.SaveChangesAsync();
                 }
+
+                // 3. Kiểm tra nếu bảng Events chưa có dữ liệu thì seed 2 sự kiện công khai mẫu đang mở bán
+                if (!await context.Events.AnyAsync())
+                {
+                    var organizerUser = await context.Users.FirstAsync(u => u.Username == "organizer");
+
+                    var event1 = new Event
+                    {
+                        Id = Guid.NewGuid(),
+                        OwnerId = organizerUser.Id,
+                        Title = "Live Concert Anh Trai Say Hi 2026",
+                        Description = "Đêm nhạc quy tụ dàn ca sĩ hàng đầu với hệ thống âm thanh, ánh sáng chuẩn quốc tế.",
+                        Location = "Sân vận động Quốc gia Mỹ Đình, Hà Nội",
+                        StartTime = DateTime.UtcNow.AddDays(7),
+                        EndTime = DateTime.UtcNow.AddDays(7).AddHours(4),
+                        TotalSeats = 5000,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    var showtime1 = new Showtime
+                    {
+                        Id = Guid.NewGuid(),
+                        EventId = event1.Id,
+                        StartTime = event1.StartTime,
+                        EndTime = event1.EndTime,
+                        AvailableSeats = 5000
+                    };
+                    showtime1.ChangeStatus(ShowtimeStatus.OnSale);
+
+                    showtime1.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "Standard / Vé Thường", Price = 300000m });
+                    showtime1.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "VIP / Vé Cao Cấp", Price = 1200000m });
+                    showtime1.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "VVIP / Vé Đặc Biệt", Price = 2500000m });
+
+                    event1.Showtimes.Add(showtime1);
+
+                    var event2 = new Event
+                    {
+                        Id = Guid.NewGuid(),
+                        OwnerId = organizerUser.Id,
+                        Title = "Festival Âm Nhạc Mùa Hè 2026",
+                        Description = "Lễ hội âm nhạc mùa hè cuồng nhiệt với nhiều nghệ sĩ Indie và Rock bùng nổ.",
+                        Location = "Phố đi bộ Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh",
+                        StartTime = DateTime.UtcNow.AddDays(14),
+                        EndTime = DateTime.UtcNow.AddDays(14).AddHours(5),
+                        TotalSeats = 3000,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    var showtime2 = new Showtime
+                    {
+                        Id = Guid.NewGuid(),
+                        EventId = event2.Id,
+                        StartTime = event2.StartTime,
+                        EndTime = event2.EndTime,
+                        AvailableSeats = 3000
+                    };
+                    showtime2.ChangeStatus(ShowtimeStatus.OnSale);
+
+                    showtime2.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime2.Id, Name = "Vé Phổ Thông", Price = 200000m });
+                    showtime2.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime2.Id, Name = "Vé Fan Zone", Price = 800000m });
+
+                    event2.Showtimes.Add(showtime2);
+
+                    await context.Events.AddRangeAsync(event1, event2);
+                    await context.SaveChangesAsync();
+                }
             }
             catch (Exception ex)
             {

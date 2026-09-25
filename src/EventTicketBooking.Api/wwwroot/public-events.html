@@ -250,6 +250,13 @@
         }
       } catch (err) {
         console.error("Lỗi khi tải suất chiếu:", err);
+        loadingGrid.classList.add('hidden');
+        const alertBox = document.getElementById('alertContainer');
+        if (alertBox) {
+          alertBox.className = "mb-6 p-4 rounded-2xl text-xs font-semibold bg-amber-50 border border-amber-200 text-amber-800 flex items-center gap-2.5 shadow-sm";
+          alertBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-600 text-base"></i> <div><strong>Thông báo kết nối API:</strong> Không thể kết nối tới máy chủ Web API. Vui lòng đảm bảo Server Backend đang chạy và bạn đang mở trang qua giao thức HTTP (ví dụ: <code>http://localhost:5012/public-events.html</code>).</div>`;
+          alertBox.classList.remove('hidden');
+        }
       } finally {
         isLoading = false;
       }
