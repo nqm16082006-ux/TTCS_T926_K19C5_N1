@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sự kiện & Suất chiếu công khai - EventTicket Booking</title>
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- FontAwesome 6 CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <style>
+    body {
+      background-color: #f8fafc;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+  <!-- Navbar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="./public-events.html" class="flex items-center gap-2.5 text-lg font-extrabold text-slate-900 tracking-tight">
+          <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white text-base shadow-md shadow-indigo-200">
+            <i class="fa-solid fa-ticket"></i>
+          </div>
+          <span>EventTicket <span class="text-indigo-600">Public</span></span>
+        </a>
+      </div>
+
+      <div class="flex items-center gap-3" id="authNavContainer">
+        <!-- JS Populated based on login state -->
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 text-white py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto text-center">
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 mb-3">
+        <i class="fa-solid fa-fire text-amber-400"></i> Suất Chiếu Đang Mở Bán
+      </span>
+      <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Khám Phá Sự Kiện & Đặt Vé Ngay</h1>
+      <p class="text-slate-300 max-w-2xl mx-auto mt-2 text-sm sm:text-base">
+        Tra cứu lịch chiếu, địa điểm, bảng giá vé thấp nhất - cao nhất realtime và giữ chỗ tức thì.
+      </p>
+    </div>
+  </section>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+
+    <!-- Controls Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div>
+        <h2 class="text-xl font-bold text-slate-900">Danh sách Suất Chiếu Công Khai</h2>
+        <p class="text-xs text-slate-500">Cập nhật danh sách suất chiếu mới nhất hiện đang mở bán</p>
+      </div>
+      <button onclick="refreshData()" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm transition">
+        <i class="fa-solid fa-rotate-right text-indigo-600" id="refreshIcon"></i> Làm mới
+      </button>
+    </div>
+
+    <!-- Alert / Toast Container -->
+    <div id="alertContainer" class="mb-6 hidden"></div>
+
+    <!-- Loading Skeleton Grid -->
+    <div id="loadingGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 animate-pulse h-64"></div>
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 animate-pulse h-64"></div>
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 animate-pulse h-64"></div>
+    </div>
+
+    <!-- Showtimes Grid -->
+    <div id="showtimesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden">
+      <!-- Cards dynamically inserted -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden text-center py-16 bg-white border border-slate-200 rounded-2xl">
+      <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center text-2xl mx-auto mb-3">
+        <i class="fa-solid fa-calendar-xmark"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-800">Chưa có suất chiếu nào đang mở bán</h3>
+      <p class="text-xs text-slate-500 mt-1">Vui lòng quay lại sau khi Ban tổ chức mở bán vé mới.</p>
+    </div>
+
+    <!-- Load More Button -->
+    <div class="mt-8 text-center" id="loadMoreContainer" class="hidden">
+      <button id="loadMoreBtn" onclick="loadMoreShowtimes()" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-200 transition">
+        <span>Xem tiếp suất chiếu khác</span>
+        <i class="fa-solid fa-arrow-down"></i>
+      </button>
+    </div>
+  </main>
+
+  <!-- Detail Modal -->
+  <div id="detailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-100">
+      <button onclick="closeDetailModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center text-sm">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div id="modalContent">
+        <!-- Dynamically rendered -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 mt-12">
+    <p>© 2026 EventTicket Booking System. Tất cả quyền được bảo lưu.</p>
+  </footer>
+
+  <script>
+    let currentNextCursor = null;
+    let isLoading = false;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderAuthNav();
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const eventId = urlParams.get('eventId');
+      const showtimeId = urlParams.get('showtimeId');
+
+      if (eventId && showtimeId) {
+        openShowtimeDetail(eventId, showtimeId);
+      }
+
+      fetchShowtimes(null);
+    });
+
+    function renderAuthNav() {
+      const container = document.getElementById('authNavContainer');
+      const token = localStorage.getItem('access_token');
+      const userInfoStr = localStorage.getItem('user_info');
+
+      if (token && userInfoStr) {
+        try {
+          const user = JSON.parse(userInfoStr);
+          container.innerHTML = `
+            <div class="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">
+              <i class="fa-solid fa-user-circle text-indigo-600 text-sm"></i>
+              <span>${user.fullName || user.username}</span>
+            </div>
+            <a href="./events.html" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition">
+              Quản lý sự kiện
+            </a>
+            <button onclick="logout()" class="px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition">
+              Đăng xuất
+            </button>
+          `;
+          return;
+        } catch (e) {}
+      }
+
+      container.innerHTML = `
+        <a href="./login.html" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition">
+          Đăng nhập
+        </a>
+        <a href="./register.html" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition">
+          Đăng ký
+        </a>
+      `;
+    }
+
+    function logout() {
+      localStorage.clear();
+      renderAuthNav();
+    }
+
+    async function fetchShowtimes(cursor) {
+      if (isLoading) return;
+      isLoading = true;
+
+      const loadingGrid = document.getElementById('loadingGrid');
+      const showtimesGrid = document.getElementById('showtimesGrid');
+      const emptyState = document.getElementById('emptyState');
+      const loadMoreContainer = document.getElementById('loadMoreContainer');
+
+      if (!cursor) {
+        loadingGrid.classList.remove('hidden');
+        showtimesGrid.classList.add('hidden');
+        emptyState.classList.add('hidden');
+        showtimesGrid.innerHTML = '';
+      }
+
+      try {
+        let url = `/api/public/showtimes?limit=6`;
+        if (cursor) {
+          url += `&cursor=${encodeURIComponent(cursor)}`;
+        }
+
+        const res = await fetch(url);
+        const json = await res.json();
+
+        loadingGrid.classList.add('hidden');
+        showtimesGrid.classList.remove('hidden');
+
+        if (json.success && json.data) {
+          const items = json.data.items || [];
+          currentNextCursor = json.data.nextCursor;
+
+          if (!cursor && items.length === 0) {
+            emptyState.classList.remove('hidden');
+            showtimesGrid.classList.add('hidden');
+            loadMoreContainer.classList.add('hidden');
+            return;
+          }
+
+          items.forEach(item => {
+            const card = createShowtimeCard(item);
+            showtimesGrid.appendChild(card);
+          });
+
+          if (json.data.hasMore && currentNextCursor) {
+            loadMoreContainer.classList.remove('hidden');
+          } else {
+            loadMoreContainer.classList.add('hidden');
+          }
+        }
+      } catch (err) {
+        console.error("Lỗi khi tải suất chiếu:", err);
+        loadingGrid.classList.add('hidden');
+        const alertBox = document.getElementById('alertContainer');
+        if (alertBox) {
+          alertBox.className = "mb-6 p-4 rounded-2xl text-xs font-semibold bg-amber-50 border border-amber-200 text-amber-800 flex items-center gap-2.5 shadow-sm";
+          alertBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-600 text-base"></i> <div><strong>Thông báo kết nối API:</strong> Không thể kết nối tới máy chủ Web API. Vui lòng đảm bảo Server Backend đang chạy và bạn đang mở trang qua giao thức HTTP (ví dụ: <code>http://localhost:5012/public-events.html</code>).</div>`;
+          alertBox.classList.remove('hidden');
+        }
+      } finally {
+        isLoading = false;
+      }
+    }
+
+    function createShowtimeCard(item) {
+      const card = document.createElement('div');
+      card.className = "bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-indigo-200 transition flex flex-col justify-between";
+
+      const startTimeStr = formatDateTime(item.startTime);
+      const endTimeStr = formatDateTime(item.endTime);
+
+      const isAvailable = item.status === "OnSale" && item.availableSeats > 0;
+      const statusBadge = isAvailable
+        ? `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-700 border border-emerald-200">Đang mở bán</span>`
+        : `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200">Đã đóng bán</span>`;
+
+      const priceText = item.minPrice > 0
+        ? `${formatCurrency(item.minPrice)} - ${formatCurrency(item.maxPrice)}`
+        : `<span class="text-slate-400 font-normal">Chưa cập nhật giá</span>`;
+
+      card.innerHTML = `
+        <div>
+          <div class="flex items-center justify-between gap-2 mb-3">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">Suất chiếu</span>
+            ${statusBadge}
+          </div>
+
+          <h3 class="text-base font-bold text-slate-900 line-clamp-1 mb-2" title="${item.eventTitle}">${item.eventTitle}</h3>
+          
+          <div class="space-y-1.5 text-xs text-slate-600 mb-4">
+            <div class="flex items-center gap-2">
+              <i class="fa-regular fa-clock text-indigo-500 w-4"></i>
+              <span>${startTimeStr}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-location-dot text-indigo-500 w-4"></i>
+              <span class="line-clamp-1">${item.eventLocation}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-chair text-indigo-500 w-4"></i>
+              <span>Còn lại: <strong class="text-slate-800">${item.availableSeats} ghế</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-slate-100 pt-3 flex items-center justify-between">
+          <div>
+            <div class="text-[10px] uppercase font-bold text-slate-400">Giá vé</div>
+            <div class="text-xs font-bold text-slate-800">${priceText}</div>
+          </div>
+
+          <button onclick="handleSeatSelection('${item.eventId}', '${item.id}', ${isAvailable})" 
+            class="px-4 py-2 rounded-xl text-xs font-bold ${isAvailable ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-200' : 'bg-slate-100 text-slate-400 cursor-not-allowed'} transition">
+            ${isAvailable ? '<i class="fa-solid fa-ticket mr-1.5"></i> Chọn ghế' : 'Tạm dừng bán'}
+          </button>
+        </div>
+      `;
+
+      return card;
+    }
+
+    function handleSeatSelection(eventId, showtimeId, isAvailable) {
+      if (!isAvailable) return;
+
+      const token = localStorage.getItem('access_token');
+      const targetUrl = `./events.html?showtimeId=${showtimeId}`;
+
+      if (!token) {
+        const returnUrl = encodeURIComponent(`./public-events.html?eventId=${eventId}&showtimeId=${showtimeId}`);
+        window.location.href = `./login.html?returnUrl=${returnUrl}`;
+      } else {
+        window.location.href = targetUrl;
+      }
+    }
+
+    async function openShowtimeDetail(eventId, showtimeId) {
+      const modal = document.getElementById('detailModal');
+      const content = document.getElementById('modalContent');
+      modal.classList.remove('hidden');
+
+      content.innerHTML = `
+        <div class="text-center py-8">
+          <i class="fa-solid fa-circle-notch fa-spin text-2xl text-indigo-600"></i>
+          <p class="text-xs text-slate-500 mt-2">Đang tải thông tin suất chiếu...</p>
+        </div>
+      `;
+
+      try {
+        const res = await fetch(`/api/public/events/${eventId}/showtimes/${showtimeId}`);
+        const json = await res.json();
+
+        if (json.success && json.data) {
+          const item = json.data;
+          const isAvailable = item.status === "OnSale" && item.availableSeats > 0;
+          const priceText = item.minPrice > 0 ? `${formatCurrency(item.minPrice)} - ${formatCurrency(item.maxPrice)}` : 'Chưa cập nhật giá';
+
+          content.innerHTML = `
+            <div class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-indigo-50 text-indigo-600 border border-indigo-100 mb-2">Chi tiết suất chiếu</div>
+            <h2 class="text-xl font-extrabold text-slate-900 mb-2">${item.eventTitle}</h2>
+            <p class="text-xs text-slate-500 mb-4">${item.eventDescription || 'Không có mô tả bổ sung.'}</p>
+
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-xs mb-6">
+              <div class="flex justify-between"><span class="text-slate-500">Địa điểm:</span><strong class="text-slate-800">${item.eventLocation}</strong></div>
+              <div class="flex justify-between"><span class="text-slate-500">Bắt đầu:</span><strong class="text-slate-800">${formatDateTime(item.startTime)}</strong></div>
+              <div class="flex justify-between"><span class="text-slate-500">Kết thúc:</span><strong class="text-slate-800">${formatDateTime(item.endTime)}</strong></div>
+              <div class="flex justify-between"><span class="text-slate-500">Số ghế trống:</span><strong class="text-slate-800">${item.availableSeats} ghế</strong></div>
+              <div class="flex justify-between border-t border-slate-200 pt-2 mt-2"><span class="text-slate-500">Khoảng giá vé:</span><strong class="text-indigo-600 font-bold">${priceText}</strong></div>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <button onclick="closeDetailModal()" class="w-1/2 py-2.5 rounded-xl font-bold text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 transition">Đóng</button>
+              <button onclick="handleSeatSelection('${item.eventId}', '${item.id}', ${isAvailable})" class="w-1/2 py-2.5 rounded-xl font-bold text-xs ${isAvailable ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'} transition">
+                ${isAvailable ? 'Chọn ghế ngay' : 'Tạm ngưng bán'}
+              </button>
+            </div>
+          `;
+        }
+      } catch (e) {
+        content.innerHTML = `<p class="text-xs text-rose-600 text-center py-4">Không thể tải thông tin suất chiếu.</p>`;
+      }
+    }
+
+    function closeDetailModal() {
+      document.getElementById('detailModal').classList.add('hidden');
+    }
+
+    function loadMoreShowtimes() {
+      if (currentNextCursor) {
+        fetchShowtimes(currentNextCursor);
+      }
+    }
+
+    function refreshData() {
+      const icon = document.getElementById('refreshIcon');
+      icon.classList.add('fa-spin');
+      fetchShowtimes(null).finally(() => {
+        setTimeout(() => icon.classList.remove('fa-spin'), 400);
+      });
+    }
+
+    function formatDateTime(dtStr) {
+      if (!dtStr) return '';
+      const d = new Date(dtStr);
+      return d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
+    function formatCurrency(val) {
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+    }
+  </script>
+</body>
+</html>

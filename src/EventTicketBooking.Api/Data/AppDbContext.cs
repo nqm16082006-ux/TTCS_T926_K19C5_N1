@@ -14,10 +14,11 @@ namespace EventTicketBooking.Api.Data
         public DbSet<Showtime> Showtimes { get; set; } = null!;
         public DbSet<Seat> Seats { get; set; } = null!;
         public DbSet<SeatCategory> SeatCategories { get; set; } = null!;
+        public DbSet<SeatHolds> SeatHold { get; set; } = null!;
         public DbSet<Role> Roles { get; set; } = null!;
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<UserRole> UserRoles { get; set; } = null!;
-        public DbSet<SeatHolds> SeatHold { get; set; } = null!;
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -48,7 +49,6 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(s => s.StartTime).IsRequired();
                 entity.Property(s => s.EndTime).IsRequired();
                 entity.Property(s => s.AvailableSeats).IsRequired();
-
                 entity.Property(s => s.Status)
                       .HasColumnType("showtime_status")
                       .HasDefaultValue(ShowtimeStatus.Draft);
@@ -61,22 +61,20 @@ namespace EventTicketBooking.Api.Data
 
             modelBuilder.Entity<SeatCategory>(entity =>
             {
+                entity.ToTable("SeatCategories");
                 entity.HasKey(sc => sc.Id);
-
-                entity.Property(sc => sc.Name)
-                    .IsRequired()
-                    .HasMaxLength(100);
-
+                entity.Property(sc => sc.Name).IsRequired().HasMaxLength(100);
+                entity.Property(sc => sc.Price).HasColumnType("numeric(18,2)").IsRequired();
                 entity.HasOne(sc => sc.Showtime)
-                    .WithMany()
-                    .HasForeignKey(sc => sc.ShowtimeId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
+                      .WithMany(s => s.SeatCategories)
+                      .HasForeignKey(sc => sc.ShowtimeId)
+                      .OnDelete(DeleteBehavior.Cascade);
                 entity.HasIndex(sc => sc.ShowtimeId);
             });
 
             modelBuilder.Entity<Seat>(entity =>
             {
+                entity.ToTable("Seats");
                 entity.HasKey(s => s.Id);
 
                 entity.Property(s => s.Row)

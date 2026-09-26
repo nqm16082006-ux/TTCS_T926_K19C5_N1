@@ -182,7 +182,7 @@ namespace EventTicketBooking.Api.Controllers
             var host = Request.Host.Value ?? "localhost";
             var verificationLink = $"{scheme}://{host}/api/auth/verify-email?email={newUser.Email}&token={token}";
 
-            await _emailService.SendConfirmationEmailAsync(newUser.Email, newUser.FullName, verificationLink);
+            await _emailService.SendConfirmationEmailAsync(newUser.Email, newUser.FullName ?? newUser.Username, verificationLink);
 
             // Trả về kết quả thành công
             return Created("", new

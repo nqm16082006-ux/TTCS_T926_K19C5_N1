@@ -1,12 +1,12 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using EventTicketBooking.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using EventTicketBooking.Api.Data;
 
 namespace EventTicketBooking.Api.BackgroundServices;
 
@@ -61,15 +61,10 @@ public class SeatHoldCleanupWorker : BackgroundService
 
             if (expiredSeatIds.Any())
             {
-                // 2. Chuyển trạng thái lượt giữ chỗ sang EXPIRED
+                // 2. Chuyển trạng thái lượt giữ chỗ sang EXPIRED (nhả ghế)
                 await dbContext.SeatHold
                     .Where(sh => sh.Status == "ACTIVE" && sh.ExpiresAt <= now)
                     .ExecuteUpdateAsync(s => s.SetProperty(h => h.Status, "EXPIRED"), stoppingToken);
-
-                // 3. Nhả ghế: Đưa trạng thái ghế về AVAILABLE
-                await dbContext.Seats
-                    .Where(s => expiredSeatIds.Contains(s.Id))
-                    .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, "AVAILABLE"), stoppingToken);
 
                 await transaction.CommitAsync(stoppingToken);
 

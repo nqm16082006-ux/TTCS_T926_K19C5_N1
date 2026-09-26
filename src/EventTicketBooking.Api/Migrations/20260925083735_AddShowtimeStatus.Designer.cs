@@ -3,6 +3,7 @@ using System;
 using EventTicketBooking.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EventTicketBooking.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260925083735_AddShowtimeStatus")]
+    partial class AddShowtimeStatus
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -99,61 +102,6 @@ namespace EventTicketBooking.Api.Migrations
                     b.ToTable("Roles", (string)null);
                 });
 
-            modelBuilder.Entity("EventTicketBooking.Api.Models.Seat", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Row")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<Guid>("SeatCategoryId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("SeatNumber")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("ShowtimeId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SeatCategoryId");
-
-                    b.HasIndex("ShowtimeId");
-
-                    b.HasIndex("ShowtimeId", "Row", "SeatNumber")
-                        .IsUnique();
-
-                    b.ToTable("Seats", (string)null);
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.SeatCategory", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<decimal>("Price")
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<Guid>("ShowtimeId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ShowtimeId");
-
-                    b.ToTable("SeatCategories", (string)null);
-                });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.Showtime", b =>
                 {
@@ -273,36 +221,6 @@ namespace EventTicketBooking.Api.Migrations
                     b.Navigation("Owner");
                 });
 
-            modelBuilder.Entity("EventTicketBooking.Api.Models.Seat", b =>
-                {
-                    b.HasOne("EventTicketBooking.Api.Models.SeatCategory", "SeatCategory")
-                        .WithMany()
-                        .HasForeignKey("SeatCategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("EventTicketBooking.Api.Models.Showtime", "Showtime")
-                        .WithMany()
-                        .HasForeignKey("ShowtimeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("SeatCategory");
-
-                    b.Navigation("Showtime");
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.SeatCategory", b =>
-                {
-                    b.HasOne("EventTicketBooking.Api.Models.Showtime", "Showtime")
-                        .WithMany("SeatCategories")
-                        .HasForeignKey("ShowtimeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Showtime");
-                });
-
             modelBuilder.Entity("EventTicketBooking.Api.Models.Showtime", b =>
                 {
                     b.HasOne("EventTicketBooking.Api.Models.Event", "Event")
@@ -341,11 +259,6 @@ namespace EventTicketBooking.Api.Migrations
             modelBuilder.Entity("EventTicketBooking.Api.Models.Role", b =>
                 {
                     b.Navigation("UserRoles");
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.Showtime", b =>
-                {
-                    b.Navigation("SeatCategories");
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.User", b =>
