@@ -103,7 +103,41 @@ namespace EventTicketBooking.Tests
             var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
             var response = Assert.IsType<ApiResponse<object>>(notFoundResult.Value);
             Assert.False(response.Success);
-            Assert.Equal("Không tìm thấy suất chiếu.", response.Message);
+            Assert.Contains("Không tìm thấy", response.Message);
+        }
+
+        [Fact]
+        public async Task GetPublicShowtimeDetail_ShouldReturn404_WhenShowtimeNotOnSale()
+        {
+            var ev = new Event
+            {
+                Id = Guid.NewGuid(),
+                OwnerId = Guid.NewGuid(),
+                Title = "Draft Concert 2026",
+                Location = "Stadium",
+                TotalSeats = 100
+            };
+            var showtimeDraft = new Showtime
+            {
+                Id = Guid.NewGuid(),
+                EventId = ev.Id,
+                AvailableSeats = 100,
+                StartTime = DateTime.UtcNow.AddDays(5),
+                EndTime = DateTime.UtcNow.AddDays(5).AddHours(2)
+            };
+            // Status remains Draft (not OnSale)
+
+            _context.Events.Add(ev);
+            _context.Showtimes.Add(showtimeDraft);
+            await _context.SaveChangesAsync();
+
+            var controller = CreateController();
+            var result = await controller.GetPublicShowtimeDetail(ev.Id, showtimeDraft.Id);
+
+            var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+            var response = Assert.IsType<ApiResponse<object>>(notFoundResult.Value);
+            Assert.False(response.Success);
+            Assert.Contains("chưa mở bán/đã đóng", response.Message);
         }
     }
 }

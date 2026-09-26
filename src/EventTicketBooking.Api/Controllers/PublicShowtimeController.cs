@@ -166,11 +166,11 @@ namespace EventTicketBooking.Api.Controllers
                 .AsNoTracking()
                 .Include(s => s.Event)
                 .Include(s => s.SeatCategories)
-                .FirstOrDefaultAsync(s => s.EventId == eventId && s.Id == showtimeId);
+                .FirstOrDefaultAsync(s => s.EventId == eventId && s.Id == showtimeId && s.Status == ShowtimeStatus.OnSale);
 
             if (showtime == null)
             {
-                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy suất chiếu."));
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy suất chiếu hoặc suất chiếu chưa mở bán/đã đóng."));
             }
 
             var dto = new PublicShowtimeDto
@@ -237,10 +237,10 @@ namespace EventTicketBooking.Api.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetShowtimeSeats(Guid showtimeId)
         {
-            var showtimeExists = await _context.Showtimes.AnyAsync(s => s.Id == showtimeId);
+            var showtimeExists = await _context.Showtimes.AnyAsync(s => s.Id == showtimeId && s.Status == ShowtimeStatus.OnSale);
             if (!showtimeExists)
             {
-                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy suất chiếu."));
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy suất chiếu hoặc suất chiếu chưa mở bán/đã đóng."));
             }
 
             var now = DateTime.UtcNow;

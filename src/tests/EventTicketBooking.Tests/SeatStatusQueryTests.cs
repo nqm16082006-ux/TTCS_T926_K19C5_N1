@@ -48,7 +48,9 @@ namespace EventTicketBooking.Tests
             var showtimeId = Guid.NewGuid();
 
             _context.Events.Add(new Event { Id = eventId, OwnerId = Guid.NewGuid(), Title = "Test Event", Location = "Hanoi", TotalSeats = 100 });
-            _context.Showtimes.Add(new Showtime { Id = showtimeId, EventId = eventId, StartTime = DateTime.UtcNow, EndTime = DateTime.UtcNow.AddHours(2), AvailableSeats = 100 });
+            var st1 = new Showtime { Id = showtimeId, EventId = eventId, StartTime = DateTime.UtcNow, EndTime = DateTime.UtcNow.AddHours(2), AvailableSeats = 100 };
+            st1.ChangeStatus(ShowtimeStatus.OnSale);
+            _context.Showtimes.Add(st1);
 
             var category = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtimeId, Name = "VIP", Price = 500000m };
             _context.SeatCategories.Add(category);
@@ -83,7 +85,9 @@ namespace EventTicketBooking.Tests
             var showtimeId = Guid.NewGuid();
 
             _context.Events.Add(new Event { Id = eventId, OwnerId = Guid.NewGuid(), Title = "Mega Event", Location = "Stadium", TotalSeats = 2000 });
-            _context.Showtimes.Add(new Showtime { Id = showtimeId, EventId = eventId, StartTime = DateTime.UtcNow, EndTime = DateTime.UtcNow.AddHours(2), AvailableSeats = 2000 });
+            var st2 = new Showtime { Id = showtimeId, EventId = eventId, StartTime = DateTime.UtcNow, EndTime = DateTime.UtcNow.AddHours(2), AvailableSeats = 2000 };
+            st2.ChangeStatus(ShowtimeStatus.OnSale);
+            _context.Showtimes.Add(st2);
 
             var category = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtimeId, Name = "Standard", Price = 100000m };
             _context.SeatCategories.Add(category);
