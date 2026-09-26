@@ -4,12 +4,14 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.DTOs.Common;
 using EventTicketBooking.Api.Services;
 using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace EventTicketBooking.Api.Controllers
@@ -212,7 +214,31 @@ namespace EventTicketBooking.Api.Controllers
                     detail: "The seat preview could not be completed.");
             }
         }
+        /// <summary>
+        /// API Truy vấn danh sách ghế trống cho suất chiếu (Task T-28)
+        /// GET /api/showtimes/{showtimeId}/seats/available
+        /// Loại trừ giữ chỗ hết hạn dù background job chưa kịp quét nhả.
+        /// </summary>
+        [HttpGet("available")]
+        public async Task<IActionResult> GetAvailableSeats(
+            Guid showtimeId,
+            [FromQuery] DateTime? nowOverride,
+            [FromServices] AppDbContext context)
+        {
+            // Cho phép nhận thời điểm giả lập từ query string để viết Test không phải chờ thật
+            var currentTime = nowOverride ?? DateTime.UtcNow;
 
+            // LINQ: Lấy ghế AVAILABLE hoặc ghế đang ACTIVE hold nhưng đã hết hạn
+            var availableSeats = await context.Seats
+                .Where(s => s.ShowtimeId == showtimeId)
+                .Where(s => s.Status == "AVAILABLE" ||
+                            context.SeatHold.Any(h => h.SeatId == s.Id &&
+                                                        h.Status == "ACTIVE" &&
+                                                        h.ExpiresAt <= currentTime))
+                .ToListAsync();
+
+            return Ok(ApiResponse<object>.SuccessResult(availableSeats, "Lấy danh sách ghế trống thành công."));
+        }
         #region Private Helpers
 
         private Guid? GetCurrentUserId()
