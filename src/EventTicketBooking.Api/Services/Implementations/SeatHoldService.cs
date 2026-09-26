@@ -175,7 +175,8 @@ namespace EventTicketBooking.Api.Services.Implementations
             var responseData = new HoldSeatsResponseDto
             {
                 SeatIds = seatIds,
-                ExpiresAt = expiresAt
+                ExpiresAt = expiresAt,
+                ServerTime = now
             };
 
             return HoldSeatsResult.SuccessResult(responseData, "Giữ chỗ ghế thành công.");
