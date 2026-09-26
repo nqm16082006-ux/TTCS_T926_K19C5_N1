@@ -119,8 +119,27 @@
         <div class="legend-item"><div class="legend-box legend-sold">X</div>Đã bán</div>
         <div class="legend-item"><div class="legend-box legend-selected"><i class="fa-solid fa-check"></i></div>Đang chọn</div>
       </div>
-    </div>
   </header>
+
+  <!-- Hold Countdown Banner (Task T-24) -->
+  <div id="hold-timer-banner" class="hidden bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 py-2.5 flex items-center justify-between font-bold text-sm shadow-md z-40 relative">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white text-base">
+        <i class="fa-solid fa-clock text-lg"></i>
+      </div>
+      <div>
+        <p class="text-xs text-amber-100 font-semibold uppercase tracking-wider">Thời gian giữ ghế còn lại</p>
+        <div class="flex items-center gap-2">
+          <span id="countdownDisplay" class="text-xl font-black font-mono tracking-widest text-white">10:00</span>
+          <span class="text-xs font-medium text-amber-100">(Đồng bộ máy chủ)</span>
+        </div>
+      </div>
+    </div>
+    <div class="hidden sm:flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/20">
+      <i class="fa-solid fa-shield-halved text-xs text-amber-200"></i>
+      <span class="text-xs font-semibold">Ghế của bạn đã được khóa an toàn</span>
+    </div>
+  </div>
 
   <!-- Workspace area (Canvas) -->
   <div class="workspace" id="workspace">
@@ -186,10 +205,38 @@
     let dragStartX = 0;
     let dragStartY = 0;
 
+    // Fetch seats from T-20 API
+    async function fetchSeats() {
+      const fetchStartTime = performance.now();
+      const response = await fetch(`/api/public/showtimes/${showtimeId}/seats`);
+      const json = await response.json();
+      const fetchEndTime = performance.now();
+      
+      if (json.success) {
+        seats = json.data;
+        
+        const processStartTime = performance.now();
+        processSeatLayout();
+        setupCanvas();
+        drawCanvas();
+        centerView();
+        const processEndTime = performance.now();
+
+        const renderEndTime = performance.now();
+        
+        console.group('%c[T-21 Benchmark] Performance Metrics', 'color: #10b981; font-weight: bold;');
+        console.log(`Số lượng ghế xử lý: ${seats.length}`);
+        console.log(`Thời gian gọi API: ${(fetchEndTime - fetchStartTime).toFixed(2)} ms`);
+        console.log(`Thời gian tính toán và vẽ Canvas: ${(processEndTime - processStartTime).toFixed(2)} ms`);
+        console.log(`%cTổng thời gian hiển thị: ${(renderEndTime - renderStartTime).toFixed(2)} ms`, 'color: #3b82f6; font-weight: bold;');
+        console.groupEnd();
+      } else {
+        alert("Lỗi tải sơ đồ ghế: " + json.message);
+      }
+    }
+
     // Initialization
     async function init() {
-      const renderStartTime = performance.now();
-
       if (!showtimeId) {
         alert("Thiếu ShowtimeId");
         return;
@@ -201,33 +248,7 @@
 
       // Fetch seats
       try {
-        const fetchStartTime = performance.now();
-        const response = await fetch(`/api/public/showtimes/${showtimeId}/seats`);
-        const json = await response.json();
-        const fetchEndTime = performance.now();
-        
-        if (json.success) {
-          seats = json.data;
-          
-          const processStartTime = performance.now();
-          processSeatLayout();
-          setupCanvas();
-          drawCanvas();
-          centerView();
-          const processEndTime = performance.now();
-
-          const renderEndTime = performance.now();
-          
-          console.group('%c[T-21 Benchmark] Performance Metrics', 'color: #10b981; font-weight: bold;');
-          console.log(`Số lượng ghế xử lý: ${seats.length}`);
-          console.log(`Thời gian gọi API: ${(fetchEndTime - fetchStartTime).toFixed(2)} ms`);
-          console.log(`Thời gian tính toán và vẽ Canvas: ${(processEndTime - processStartTime).toFixed(2)} ms`);
-          console.log(`%cTổng thời gian hiển thị: ${(renderEndTime - renderStartTime).toFixed(2)} ms`, 'color: #3b82f6; font-weight: bold;');
-          console.groupEnd();
-          
-        } else {
-          alert("Lỗi tải sơ đồ ghế: " + json.message);
-        }
+        await fetchSeats();
       } catch (e) {
         console.error(e);
         alert("Không thể kết nối máy chủ");
@@ -589,9 +610,178 @@
       }
     }
 
-    function proceedToBooking() {
-      // TODO: Integration with T-23 to hold seats
-      alert(`Sẵn sàng đặt ${selectedSeatIds.size} ghế!\nTiến trình tiếp theo sẽ đẩy mảng ID sang API T-23 để giữ chỗ.`);
+    // --- Task T-24 Countdown Timer & Server Time Calibration ---
+    let holdTimerInterval = null;
+    let holdRefServerTimeMs = 0;
+    let holdRefLocalPerfMs = 0;
+    let holdExpiresAtMs = 0;
+    let isHoldExpiredRefreshed = false;
+
+    function startHoldCountdown(expiresAtIso, serverTimeIso, httpDateHeader) {
+      stopHoldCountdown(); // Dọn dẹp timer cũ nếu có
+
+      // 1. Xác định thời gian máy chủ tại thời điểm trả về response
+      let serverTimeMs = 0;
+      if (serverTimeIso) {
+        serverTimeMs = new Date(serverTimeIso).getTime();
+      } else if (httpDateHeader) {
+        serverTimeMs = new Date(httpDateHeader).getTime();
+      } else {
+        serverTimeMs = Date.now();
+      }
+
+      // 2. Parse mốc hết hạn target expiresAt
+      const expiresAtMs = new Date(expiresAtIso).getTime();
+      if (isNaN(expiresAtMs) || isNaN(serverTimeMs)) {
+        console.error("[T-24] Mốc thời gian không hợp lệ:", { expiresAtIso, serverTimeIso });
+        return;
+      }
+
+      // 3. Ghi nhận mốc đo thời gian monotonic (performance.now chống chỉnh đồng hồ OS client)
+      holdRefServerTimeMs = serverTimeMs;
+      holdRefLocalPerfMs = performance.now();
+      holdExpiresAtMs = expiresAtMs;
+      isHoldExpiredRefreshed = false;
+
+      // 4. Hiển thị Banner đồng hồ
+      const banner = document.getElementById('hold-timer-banner');
+      if (banner) banner.classList.remove('hidden');
+
+      // 5. Chạy tick đầu tiên ngay lập tức và khởi tạo lặp lại mỗi 1 giây
+      updateCountdownTick();
+      holdTimerInterval = setInterval(updateCountdownTick, 1000);
+    }
+
+    function updateCountdownTick() {
+      if (!holdExpiresAtMs) return;
+
+      // Tính thời gian đã trôi qua dạng monotonic tính từ mốc tham chiếu
+      const elapsedPerfMs = performance.now() - holdRefLocalPerfMs;
+      const currentServerTimeMs = holdRefServerTimeMs + elapsedPerfMs;
+      const remainingMs = holdExpiresAtMs - currentServerTimeMs;
+      const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+
+      // Định dạng MM:SS
+      const minutes = Math.floor(remainingSeconds / 60);
+      const seconds = remainingSeconds % 60;
+      const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+      const displayEl = document.getElementById('countdownDisplay');
+      if (displayEl) {
+        displayEl.textContent = formattedTime;
+      }
+
+      // Khi đếm ngược về 0
+      if (remainingSeconds <= 0) {
+        stopHoldCountdown();
+
+        if (!isHoldExpiredRefreshed) {
+          isHoldExpiredRefreshed = true;
+          handleHoldExpired();
+        }
+      }
+    }
+
+    function stopHoldCountdown() {
+      if (holdTimerInterval) {
+        clearInterval(holdTimerInterval);
+        holdTimerInterval = null;
+      }
+
+      const banner = document.getElementById('hold-timer-banner');
+      if (banner) banner.classList.add('hidden');
+    }
+
+    async function handleHoldExpired() {
+      alert("Thời gian giữ ghế của bạn đã hết hạn. Sơ đồ ghế sẽ tự động làm mới.");
+
+      // Xóa danh sách ghế đang chọn và cập nhật giỏ hàng UI
+      selectedSeatIds.clear();
+      updateCart();
+
+      // Làm mới sơ đồ ghế từ T-20 API
+      try {
+        await fetchSeats();
+      } catch (err) {
+        console.error("[T-24] Lỗi làm mới sơ đồ ghế sau khi hết hạn:", err);
+        alert("Lỗi tải lại sơ đồ ghế. Vui lòng tải lại trang.");
+      }
+    }
+
+    // Cập nhật đếm ngược ngay lập tức khi người dùng quay lại tab
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && holdTimerInterval) {
+        updateCountdownTick();
+      }
+    });
+
+    // Dọn dẹp timer khi người dùng rời trang để tránh memory leak
+    window.addEventListener('beforeunload', () => {
+      stopHoldCountdown();
+    });
+
+    // --- Tiến hành Giữ Ghế (Tích hợp API T-23 & T-24) ---
+    async function proceedToBooking() {
+      if (selectedSeatIds.size === 0) return;
+
+      const btnEl = document.getElementById('btnBook');
+      const originalText = btnEl.innerHTML;
+
+      btnEl.disabled = true;
+      btnEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Đang giữ ghế...</span>`;
+
+      try {
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`/api/showtimes/${showtimeId}/seats/hold`, {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify({ seatIds: Array.from(selectedSeatIds) })
+        });
+
+        const httpDateHeader = response.headers.get('Date');
+        const json = await response.json();
+
+        if (response.status === 200 && json.success) {
+          const data = json.data;
+          const heldSeatIds = data.seatIds;
+          const expiresAt = data.expiresAt;
+          const serverTime = data.serverTime;
+
+          // Xóa chọn local & cập nhật UI
+          selectedSeatIds.clear();
+          updateCart();
+
+          // Tải lại sơ đồ để hiển thị trạng thái HELD
+          await fetchSeats();
+
+          // Kích hoạt đồng hồ đếm ngược T-24
+          startHoldCountdown(expiresAt, serverTime, httpDateHeader);
+
+          alert(`Giữ chỗ thành công ${heldSeatIds.length} ghế! Thời gian giữ chỗ: 10 phút.`);
+        } else if (response.status === 409) {
+          alert("Không thể giữ ghế: " + (json.message || "Một hoặc nhiều ghế đã được giữ chỗ bởi người dùng khác."));
+          selectedSeatIds.clear();
+          updateCart();
+          await fetchSeats();
+        } else if (response.status === 401) {
+          alert("Vui lòng đăng nhập để thực hiện giữ chỗ.");
+          window.location.href = `./login.html?redirect=${encodeURIComponent(window.location.href)}`;
+        } else {
+          alert("Lỗi giữ ghế: " + (json.message || "Không thể thực hiện giữ ghế."));
+          await fetchSeats();
+        }
+      } catch (err) {
+        console.error("[T-23/T-24] Lỗi kết nối API giữ ghế:", err);
+        alert("Không thể kết nối máy chủ để giữ ghế.");
+      } finally {
+        btnEl.disabled = (selectedSeatIds.size === 0);
+        btnEl.innerHTML = originalText;
+      }
     }
 
     // Start
