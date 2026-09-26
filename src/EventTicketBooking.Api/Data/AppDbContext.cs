@@ -17,14 +17,12 @@ namespace EventTicketBooking.Api.Data
         public DbSet<Role> Roles { get; set; } = null!;
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<UserRole> UserRoles { get; set; } = null!;
-<<<<<<< HEAD
-        public DbSet<Seat> Seats { get; set; } = null!;
         public DbSet<SeatHolds> SeatHold { get; set; } = null!;
-=======
->>>>>>> b0c1f8ec9976b1e05175d677d1c6c02ec1d9723c
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            
+            modelBuilder.HasPostgresEnum<ShowtimeStatus>();
 
             modelBuilder.Entity<Event>(entity =>
             {
@@ -50,6 +48,10 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(s => s.StartTime).IsRequired();
                 entity.Property(s => s.EndTime).IsRequired();
                 entity.Property(s => s.AvailableSeats).IsRequired();
+                
+                entity.Property(s => s.Status)
+                      .HasColumnType("showtime_status")
+                      .HasDefaultValue(ShowtimeStatus.Draft);
 
                 entity.HasOne(s => s.Event)
                     .WithMany(e => e.Showtimes)
