@@ -142,6 +142,11 @@
   </footer>
 
   <script>
+    if (window.location.protocol === 'file:') {
+      const fileName = window.location.pathname.split('/').pop() || 'public-events.html';
+      window.location.href = 'http://localhost:5012/' + fileName + window.location.search;
+    }
+
     let currentNextCursor = null;
     let isLoading = false;
 

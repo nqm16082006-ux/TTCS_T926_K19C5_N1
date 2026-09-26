@@ -15,22 +15,22 @@ namespace EventTicketBooking.Api.Services.Implementations
     {
         private readonly AppDbContext _dbContext;
         private readonly IPasswordHasher _passwordHasher;
-        private readonly IConnectionMultiplexer _redis;
+        private readonly IConnectionMultiplexer? _redis;
         private readonly ITokenService _tokenService;
         private readonly ILogger<AuthService> _logger;
 
         public AuthService(
             AppDbContext dbContext,
             IPasswordHasher passwordHasher,
-            IConnectionMultiplexer redis,
             ITokenService tokenService,
-            ILogger<AuthService> logger)
+            ILogger<AuthService> logger,
+            IConnectionMultiplexer? redis = null)
         {
             _dbContext = dbContext;
             _passwordHasher = passwordHasher;
-            _redis = redis;
             _tokenService = tokenService;
             _logger = logger;
+            _redis = redis;
         }
 
         // Sinh mã xác thực email dạng chuỗi (Guid) cho link và hết hạn 24 giờ (T-08)
@@ -82,36 +82,43 @@ namespace EventTicketBooking.Api.Services.Implementations
             var normalizedEmail =
                 request.Email.Trim().ToLowerInvariant();
 
-            var db = _redis.GetDatabase();
-
-            var lockoutKey =
-                $"login:lockout:{normalizedEmail}";
-
-            var attemptsKey =
-                $"login:attempts:{normalizedEmail}";
-
-            // Kiểm tra tài khoản đang bị khóa
-            bool isLocked =
-                await db.KeyExistsAsync(lockoutKey);
-
-            if (isLocked)
+            IDatabase? db = null;
+            if (_redis != null && _redis.IsConnected)
             {
-                var ttl =
-                    await db.KeyTimeToLiveAsync(lockoutKey);
+                try
+                {
+                    db = _redis.GetDatabase();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Redis không khả dụng khi kiểm tra khoá tài khoản.");
+                }
+            }
 
-                var minutesRemaining =
-                    ttl.HasValue && ttl.Value.TotalMinutes > 0
-                        ? Math.Ceiling(ttl.Value.TotalMinutes)
-                        : 15;
+            var lockoutKey = $"login:lockout:{normalizedEmail}";
+            var attemptsKey = $"login:attempts:{normalizedEmail}";
 
-                _logger.LogWarning(
-                    "Tài khoản {Email} đang bị khóa. Còn {Minutes} phút.",
-                    normalizedEmail,
-                    minutesRemaining);
+            // Kiểm tra tài khoản đang bị khóa nếu Redis hoạt động
+            if (db != null)
+            {
+                try
+                {
+                    bool isLocked = await db.KeyExistsAsync(lockoutKey);
+                    if (isLocked)
+                    {
+                        var ttl = await db.KeyTimeToLiveAsync(lockoutKey);
+                        var minutesRemaining = ttl.HasValue && ttl.Value.TotalMinutes > 0
+                            ? Math.Ceiling(ttl.Value.TotalMinutes)
+                            : 15;
 
-                return AuthResult.Locked(
-                    $"Tài khoản của bạn đã bị khóa tạm thời trong 15 phút. " +
-                    $"Vui lòng thử lại sau khoảng {minutesRemaining} phút.");
+                        _logger.LogWarning("Tài khoản {Email} đang bị khóa. Còn {Minutes} phút.", normalizedEmail, minutesRemaining);
+                        return AuthResult.Locked($"Tài khoản của bạn đã bị khóa tạm thời trong 15 phút. Vui lòng thử lại sau khoảng {minutesRemaining} phút.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Lỗi kiểm tra Redis lockout.");
+                }
             }
 
             // Tìm user
@@ -127,38 +134,30 @@ namespace EventTicketBooking.Api.Services.Implementations
                     request.Password,
                     user.PasswordHash))
             {
-                long attempts =
-                    await db.StringIncrementAsync(attemptsKey);
-
-                if (attempts == 1)
+                if (db != null)
                 {
-                    await db.KeyExpireAsync(
-                        attemptsKey,
-                        TimeSpan.FromMinutes(15));
-                }
+                    try
+                    {
+                        long attempts = await db.StringIncrementAsync(attemptsKey);
+                        if (attempts == 1)
+                        {
+                            await db.KeyExpireAsync(attemptsKey, TimeSpan.FromMinutes(15));
+                        }
 
-                _logger.LogInformation(
-                    "Đăng nhập thất bại {Email}. Lần sai: {Attempts}",
-                    normalizedEmail,
-                    attempts);
+                        _logger.LogInformation("Đăng nhập thất bại {Email}. Lần sai: {Attempts}", normalizedEmail, attempts);
 
-                // Sai 6 lần → khóa 15 phút
-                if (attempts >= 6)
-                {
-                    await db.StringSetAsync(
-                        lockoutKey,
-                        "locked",
-                        TimeSpan.FromMinutes(15));
+                        if (attempts >= 6)
+                        {
+                            await db.StringSetAsync(lockoutKey, "locked", TimeSpan.FromMinutes(15));
+                            await db.KeyDeleteAsync(attemptsKey);
 
-                    await db.KeyDeleteAsync(attemptsKey);
-
-                    _logger.LogWarning(
-                        "Tài khoản {Email} bị khóa 15 phút.",
-                        normalizedEmail);
-
-                    return AuthResult.Locked(
-                        "Tài khoản của bạn đã bị khóa tạm thời " +
-                        "trong 15 phút do nhập sai quá nhiều lần.");
+                            return AuthResult.Locked("Tài khoản của bạn đã bị khóa tạm thời trong 15 phút do nhập sai quá nhiều lần.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Lỗi ghi nhận số lần nhập sai mật khẩu vào Redis.");
+                    }
                 }
 
                 return AuthResult.Unauthorized(
@@ -166,7 +165,17 @@ namespace EventTicketBooking.Api.Services.Implementations
             }
 
             // Đăng nhập thành công → xóa bộ đếm
-            await db.KeyDeleteAsync(attemptsKey);
+            if (db != null)
+            {
+                try
+                {
+                    await db.KeyDeleteAsync(attemptsKey);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Lỗi xóa bộ đếm đăng nhập thất bại từ Redis.");
+                }
+            }
 
             // Lấy Role
             var roles = user.UserRoles

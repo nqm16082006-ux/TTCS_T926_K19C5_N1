@@ -33,27 +33,69 @@ if (string.IsNullOrEmpty(pgConnection))
     pgConnection = $"Host={host};Port={port};Database={db};Username={user};Password={pass}";
 }
 
+// Kiểm tra khả năng kết nối PostgreSQL
+bool isPgAvailable = false;
+try
+{
+    using var testConn = new Npgsql.NpgsqlConnection(pgConnection);
+    testConn.Open();
+    isPgAvailable = true;
+}
+catch
+{
+    isPgAvailable = false;
+}
+
+if (isPgAvailable)
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseNpgsql(pgConnection));
+}
+else
+{
+    Console.WriteLine("[INFO] PostgreSQL không kết nối được. Tự động khởi chạy với SQLite cục bộ.");
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlite("Data Source=eventticket_dev.db"));
+}
+
+builder.Services.AddScoped<SeatImportService>();
+
 // Chuỗi kết nối Redis (đọc từ biến môi trường hoặc configuration)
 string? redisConnection = Environment.GetEnvironmentVariable("ConnectionStrings__Redis")
                           ?? builder.Configuration.GetConnectionString("Redis")
                           ?? "localhost:6379";
 
-// Register EF Core DbContext
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(pgConnection));
-
-builder.Services.AddScoped<SeatImportService>();
-
-// Register Redis Distributed Cache
-builder.Services.AddStackExchangeRedisCache(options =>
+bool isRedisAvailable = false;
+StackExchange.Redis.IConnectionMultiplexer? redisMultiplexer = null;
+try
 {
-    options.Configuration = redisConnection;
-    options.InstanceName = "EventTicket_";
-});
+    var redisOptions = StackExchange.Redis.ConfigurationOptions.Parse(redisConnection);
+    redisOptions.ConnectTimeout = 800;
+    redisOptions.SyncTimeout = 800;
+    redisOptions.AbortOnConnectFail = false;
+    redisMultiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(redisOptions);
+    isRedisAvailable = redisMultiplexer.IsConnected;
+}
+catch
+{
+    isRedisAvailable = false;
+}
 
-// Đăng ký kết nối Redis Multiplexer cho StackExchange.Redis (TTKN-25)
-builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
-    StackExchange.Redis.ConnectionMultiplexer.Connect(redisConnection));
+if (isRedisAvailable && redisMultiplexer != null)
+{
+    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(redisMultiplexer);
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnection;
+        options.InstanceName = "EventTicket_";
+    });
+}
+else
+{
+    Console.WriteLine("[INFO] Redis không kết nối được. Tự động sử dụng Memory Cache.");
+    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp => null!);
+    builder.Services.AddDistributedMemoryCache();
+}
 
 // Đăng ký dịch vụ băm mật khẩu Argon2id (TTKN-20)
 builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IPasswordHasher, EventTicketBooking.Api.Services.Implementations.Argon2PasswordHasher>();
@@ -69,7 +111,17 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IEmailServ
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ISeatHoldService, EventTicketBooking.Api.Services.Implementations.SeatHoldService>();
 
 
-// Add Controllers & Swagger
+// Add Controllers, CORS & Swagger
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -78,6 +130,8 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.SeatHoldCleanupWorker>();
 
 var app = builder.Build();
+
+app.UseCors("AllowAll");
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
