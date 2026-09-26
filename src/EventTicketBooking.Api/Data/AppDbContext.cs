@@ -99,6 +99,43 @@ namespace EventTicketBooking.Api.Data
                     .IsUnique();
             });
 
+            // Cấu hình bảng seat_holds (Task T-22)
+            modelBuilder.Entity<SeatHolds>(entity =>
+            {
+                entity.ToTable("seat_holds");
+                entity.HasKey(sh => sh.Id);
+
+                entity.Property(sh => sh.Status)
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasDefaultValue("ACTIVE");
+
+                entity.Property(sh => sh.HeldAt)
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.Property(sh => sh.ExpiresAt)
+                    .IsRequired();
+
+                entity.HasOne(sh => sh.Seat)
+                    .WithMany()
+                    .HasForeignKey(sh => sh.SeatId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(sh => sh.User)
+                    .WithMany()
+                    .HasForeignKey(sh => sh.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(sh => sh.ExpiresAt)
+                    .HasDatabaseName("IX_seat_holds_expires_at");
+
+                entity.HasIndex(sh => new { sh.Status, sh.ExpiresAt })
+                    .HasDatabaseName("IX_seat_holds_status_expires_at");
+
+                entity.HasIndex(sh => sh.SeatId);
+                entity.HasIndex(sh => sh.UserId);
+            });
+
             // Cấu hình bảng Roles
             modelBuilder.Entity<Role>(entity =>
             {
