@@ -14,6 +14,8 @@ namespace EventTicketBooking.Api.Models
 
         public int SeatNumber { get; set; }
 
+        public string Status { get; set; } = "AVAILABLE";
+
         public Showtime Showtime { get; set; } = null!;
 
         public SeatCategory SeatCategory { get; set; } = null!;
