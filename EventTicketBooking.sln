@@ -9,9 +9,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventTicketBooking.Api", "s
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventTicketBooking.Tests", "tests\EventTicketBooking.Tests\EventTicketBooking.Tests.csproj", "{D7CA1AC0-9A8B-48D8-994A-DC0530AE5853}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventTicketBooking.Tests", "src\tests\EventTicketBooking.Tests\EventTicketBooking.Tests.csproj", "{D7CA1AC0-9A8B-48D8-994A-DC0530AE5853}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventTicketBooking.Api.Tests", "tests\EventTicketBooking.Api.Tests\EventTicketBooking.Api.Tests.csproj", "{ED80005B-3CAC-4D09-AED4-D470CA8421F2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventTicketBooking.Api.Tests", "src\tests\EventTicketBooking.Api.Tests\EventTicketBooking.Api.Tests.csproj", "{ED80005B-3CAC-4D09-AED4-D470CA8421F2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
