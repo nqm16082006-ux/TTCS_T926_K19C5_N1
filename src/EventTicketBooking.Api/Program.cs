@@ -65,6 +65,10 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IAuthServi
 // Đăng ký dịch vụ Email (T-08)
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IEmailService, EventTicketBooking.Api.Services.Implementations.EmailService>();
 
+// Đăng ký dịch vụ Giữ ghế (T-23 / S-10)
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ISeatHoldService, EventTicketBooking.Api.Services.Implementations.SeatHoldService>();
+
+
 // Add Controllers & Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
