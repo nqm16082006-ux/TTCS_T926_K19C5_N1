@@ -643,6 +643,87 @@
       font-weight: 700;
       font-size: 13px;
     }
+
+    /* Seat Import Modal UI */
+    .file-drop-area {
+      border: 2px dashed var(--border-focus);
+      border-radius: 12px;
+      padding: 30px;
+      text-align: center;
+      background: var(--primary-light);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 20px;
+    }
+    .file-drop-area:hover {
+      background: #e0e7ff;
+    }
+    .file-drop-area input[type="file"] {
+      display: none;
+    }
+    .seat-grid-preview {
+      display: grid;
+      gap: 6px;
+      margin-top: 20px;
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 10px;
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+    }
+    .seat-row-preview {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .seat-row-label {
+      width: 30px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-align: right;
+    }
+    .seat-box {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: var(--primary);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: help;
+    }
+    .error-list {
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 20px;
+      max-height: 200px;
+      overflow-y: auto;
+      color: var(--danger-text);
+      font-size: 13px;
+    }
+    .error-list ul {
+      margin-left: 20px;
+      margin-top: 8px;
+    }
+    .btn-action-sm {
+      background: #f1f5f9;
+      border: 1px solid var(--border-color);
+      color: var(--text-body);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-action-sm:hover {
+      background: #e2e8f0;
+    }
   </style>
 </head>
 <body>
@@ -791,6 +872,38 @@
 
       <div class="modal-footer">
         <button type="button" class="btn-secondary" onclick="closeShowtimeModal()">Đóng lại</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Seat Import Modal -->
+  <div id="seatImportModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Nạp sơ đồ ghế</h2>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px; font-weight: 600;">Tải lên tệp JSON cấu trúc ghế</p>
+        </div>
+        <button class="btn-close-modal" onclick="closeSeatImportModal()">✕</button>
+      </div>
+
+      <div id="seatImportAlert" class="alert-banner danger" style="margin-bottom: 20px;"></div>
+
+      <input type="hidden" id="importShowtimeId" value="">
+      
+      <div class="file-drop-area" onclick="document.getElementById('seatFile').click()">
+        <div style="font-size: 24px; margin-bottom: 8px;">📂</div>
+        <div id="fileNameDisplay" style="font-weight: 700; color: var(--primary);">Nhấn để chọn tệp JSON</div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Hoặc kéo thả tệp vào đây. Tối đa 5MB.</div>
+        <input type="file" id="seatFile" accept=".json" onchange="handleFileSelect(event)">
+      </div>
+
+      <div id="importPreviewArea" style="display: none;"></div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeSeatImportModal()">Hủy bỏ</button>
+        <button type="button" id="btnPreviewSeats" class="btn-secondary" onclick="previewSeats()" disabled>Xem trước</button>
+        <button type="button" id="btnConfirmImport" class="btn-primary" onclick="confirmImport()" disabled>Xác nhận nạp</button>
       </div>
     </div>
   </div>
@@ -1228,7 +1341,8 @@
             <tr>
               <th>Bắt đầu</th>
               <th>Kết thúc</th>
-              <th>Số ghế trống</th>
+              <th>Số lượng vé</th>
+              <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -1237,6 +1351,7 @@
                 <td>${formatDateTime(s.startTime)}</td>
                 <td>${formatDateTime(s.endTime)}</td>
                 <td><span class="badge-seats">${s.availableSeats} ghế</span></td>
+                <td><button class="btn-action-sm" onclick="openSeatImportModal('${s.id}')">Nạp ghế</button></td>
               </tr>
             `).join('')}
           </tbody>
@@ -1246,6 +1361,172 @@
 
     function closeShowtimeModal() {
       document.getElementById('showtimeModal').style.display = 'none';
+    }
+
+    // --- Seat Import Logic ---
+    function openSeatImportModal(showtimeId) {
+      document.getElementById('importShowtimeId').value = showtimeId;
+      document.getElementById('seatFile').value = '';
+      document.getElementById('fileNameDisplay').textContent = 'Nhấn để chọn tệp JSON';
+      document.getElementById('importPreviewArea').style.display = 'none';
+      document.getElementById('importPreviewArea').innerHTML = '';
+      document.getElementById('seatImportAlert').style.display = 'none';
+      document.getElementById('btnPreviewSeats').disabled = true;
+      document.getElementById('btnConfirmImport').disabled = true;
+      document.getElementById('seatImportModal').style.display = 'flex';
+      closeShowtimeModal();
+    }
+
+    function closeSeatImportModal() {
+      document.getElementById('seatImportModal').style.display = 'none';
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (file) {
+        if (file.size > 5 * 1024 * 1024) {
+           const alert = document.getElementById('seatImportAlert');
+           alert.textContent = 'Kích thước tệp vượt quá giới hạn 5MB.';
+           alert.style.display = 'block';
+           document.getElementById('btnPreviewSeats').disabled = true;
+           return;
+        }
+        document.getElementById('seatImportAlert').style.display = 'none';
+        document.getElementById('fileNameDisplay').textContent = file.name;
+        document.getElementById('btnPreviewSeats').disabled = false;
+        document.getElementById('btnConfirmImport').disabled = true;
+        document.getElementById('importPreviewArea').style.display = 'none';
+      }
+    }
+
+    async function previewSeats() {
+      const showtimeId = document.getElementById('importShowtimeId').value;
+      const fileInput = document.getElementById('seatFile');
+      if (!fileInput.files || fileInput.files.length === 0) return;
+      
+      const file = fileInput.files[0];
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const btnPreview = document.getElementById('btnPreviewSeats');
+      btnPreview.innerHTML = '⌛ Đang kiểm tra...';
+      btnPreview.disabled = true;
+      document.getElementById('btnConfirmImport').disabled = true;
+      document.getElementById('seatImportAlert').style.display = 'none';
+      
+      try {
+        const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/seats/preview`, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token },
+          body: formData
+        });
+        
+        const result = await res.json().catch(() => ({}));
+        const previewArea = document.getElementById('importPreviewArea');
+        previewArea.style.display = 'block';
+
+        if (res.ok) {
+          const seats = result;
+          renderSeatGrid(seats);
+          document.getElementById('btnConfirmImport').disabled = false;
+        } else if (res.status === 400 && result.errors) {
+          renderSeatErrors(result.errors);
+        } else {
+          const alert = document.getElementById('seatImportAlert');
+          alert.textContent = result.detail || result.title || 'Lỗi định dạng tệp.';
+          alert.style.display = 'block';
+        }
+      } catch (err) {
+        const alert = document.getElementById('seatImportAlert');
+        alert.textContent = 'Lỗi kết nối máy chủ.';
+        alert.style.display = 'block';
+      } finally {
+        btnPreview.innerHTML = 'Xem trước';
+        btnPreview.disabled = false;
+      }
+    }
+
+    function renderSeatGrid(seats) {
+      const previewArea = document.getElementById('importPreviewArea');
+      
+      const rowMap = {};
+      seats.forEach(s => {
+        if (!rowMap[s.row]) rowMap[s.row] = [];
+        rowMap[s.row].push(s);
+      });
+      
+      const sortedRows = Object.keys(rowMap).sort();
+      
+      let html = `<div style="font-weight: 700; margin-bottom: 12px; color: var(--success-text);">✅ Tệp hợp lệ! Sẵn sàng nạp ${seats.length} ghế.</div>`;
+      html += `<div class="seat-grid-preview">`;
+      
+      sortedRows.forEach(row => {
+        const rowSeats = rowMap[row].sort((a, b) => a.seatNumber - b.seatNumber);
+        html += `<div class="seat-row-preview">`;
+        html += `<div class="seat-row-label">${escapeHtml(row)}</div>`;
+        rowSeats.forEach(s => {
+          html += `<div class="seat-box" title="Hạng: ${escapeHtml(s.category)}">${s.seatNumber}</div>`;
+        });
+        html += `</div>`;
+      });
+      
+      html += `</div>`;
+      previewArea.innerHTML = html;
+    }
+
+    function renderSeatErrors(errors) {
+      const previewArea = document.getElementById('importPreviewArea');
+      let html = `<div class="error-list">`;
+      html += `<strong>❌ Tệp JSON có lỗi cấu trúc hoặc dữ liệu:</strong><ul>`;
+      errors.forEach(e => {
+        const indexText = e.seatIndex !== null && e.seatIndex !== undefined ? `(Ghế thứ ${e.seatIndex + 1}) ` : '';
+        html += `<li>${indexText}${escapeHtml(e.errorMessage)}</li>`;
+      });
+      html += `</ul></div>`;
+      previewArea.innerHTML = html;
+    }
+
+    async function confirmImport() {
+      const showtimeId = document.getElementById('importShowtimeId').value;
+      const fileInput = document.getElementById('seatFile');
+      if (!fileInput.files || fileInput.files.length === 0) return;
+      
+      const file = fileInput.files[0];
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const btnConfirm = document.getElementById('btnConfirmImport');
+      btnConfirm.innerHTML = '⌛ Đang nạp...';
+      btnConfirm.disabled = true;
+      document.getElementById('btnPreviewSeats').disabled = true;
+      
+      try {
+        const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/seats/import`, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token },
+          body: formData
+        });
+        
+        const result = await res.json().catch(() => ({}));
+
+        if (res.ok) {
+          showAlert(`Đã nạp thành công ${result.importedSeatCount} ghế và tạo ${result.createdCategoryCount} hạng ghế.`, 'success');
+          closeSeatImportModal();
+          loadEvents(); 
+        } else {
+          const alert = document.getElementById('seatImportAlert');
+          alert.textContent = result.detail || result.title || 'Lỗi khi nạp tệp.';
+          alert.style.display = 'block';
+        }
+      } catch (err) {
+        const alert = document.getElementById('seatImportAlert');
+        alert.textContent = 'Lỗi kết nối máy chủ.';
+        alert.style.display = 'block';
+      } finally {
+        btnConfirm.innerHTML = 'Xác nhận nạp';
+        btnConfirm.disabled = false;
+        document.getElementById('btnPreviewSeats').disabled = false;
+      }
     }
 
     // Helper functions
