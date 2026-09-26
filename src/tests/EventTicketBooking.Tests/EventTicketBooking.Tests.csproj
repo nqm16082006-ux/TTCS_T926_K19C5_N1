@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\EventTicketBooking.Api\EventTicketBooking.Api.csproj" />
+    <ProjectReference Include="../../EventTicketBooking.Api/EventTicketBooking.Api.csproj" />
   </ItemGroup>
 
 </Project>

@@ -70,6 +70,42 @@ namespace EventTicketBooking.Api.Controllers
             };
         }
 
+        /// <summary>
+        /// API Huỷ giữ ghế cho người dùng đăng nhập (Task T-25).
+        /// DELETE /api/showtimes/{showtimeId}/seats/{seatId}/hold
+        /// </summary>
+        [HttpDelete("{seatId:guid}/hold")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> CancelSeatHold(
+            Guid showtimeId,
+            Guid seatId,
+            CancellationToken cancellationToken)
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+            {
+                return StatusCode(StatusCodes.Status401Unauthorized, ApiResponse<object>.FailureResult("Vui lòng đăng nhập để thực hiện huỷ giữ chỗ."));
+            }
+
+            var result = await _seatHoldService.CancelSeatHoldAsync(
+                showtimeId,
+                seatId,
+                userId.Value,
+                cancellationToken);
+
+            return result.Status switch
+            {
+                HoldSeatsResultStatus.Success => Ok(ApiResponse<object>.SuccessResult(new { }, result.Message)),
+                HoldSeatsResultStatus.NotFound => NotFound(ApiResponse<object>.FailureResult(result.Message)),
+                HoldSeatsResultStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult(result.Message)),
+                _ => StatusCode(StatusCodes.Status500InternalServerError, ApiResponse<object>.FailureResult(result.Message))
+            };
+        }
+
         [HttpPost("import")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(SeatImportResultDto), StatusCodes.Status200OK)]

@@ -183,6 +183,51 @@ namespace EventTicketBooking.Api.Services.Implementations
         }
 
         /// <summary>
+        /// Huỷ giữ chỗ một ghế (Task T-25).
+        /// </summary>
+        public async Task<HoldSeatsResult> CancelSeatHoldAsync(
+            Guid showtimeId,
+            Guid seatId,
+            Guid userId,
+            CancellationToken cancellationToken = default)
+        {
+            var now = DateTime.UtcNow;
+
+            var showtime = await _context.Showtimes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == showtimeId, cancellationToken);
+
+            if (showtime == null)
+            {
+                return HoldSeatsResult.NotFoundResult("Suất chiếu không tồn tại.");
+            }
+
+            var hold = await _context.SeatHold
+                .FirstOrDefaultAsync(sh => sh.SeatId == seatId && sh.Status == "ACTIVE" && sh.ExpiresAt > now, cancellationToken);
+
+            if (hold == null)
+            {
+                return HoldSeatsResult.NotFoundResult("Ghế này hiện không được giữ.");
+            }
+
+            if (hold.UserId != userId)
+            {
+                return HoldSeatsResult.ForbiddenResult("Bạn không có quyền huỷ giữ chỗ của ghế này.");
+            }
+
+            _context.SeatHold.Remove(hold);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            if (_redis != null && _redis.IsConnected)
+            {
+                var redisKey = (RedisKey)$"seat_hold:{showtime.EventId}:{seatId}";
+                await ReleaseRedisHoldConditionalAsync(new[] { redisKey }, userId);
+            }
+
+            return HoldSeatsResult.SuccessResult(null!, "Huỷ giữ ghế thành công.");
+        }
+
+        /// <summary>
         /// Giải phóng hoán tác (compensation) Redis keys CÓ ĐIỀU KIỆN bằng Lua Script.
         /// Chỉ xóa key nếu giá trị hiện tại trên Redis bằng chính userId của request.
         /// </summary>
