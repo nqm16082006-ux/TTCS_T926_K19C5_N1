@@ -21,7 +21,7 @@ namespace EventTicketBooking.Api.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-            
+
             modelBuilder.HasPostgresEnum<ShowtimeStatus>();
 
             modelBuilder.Entity<Event>(entity =>
@@ -48,7 +48,7 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(s => s.StartTime).IsRequired();
                 entity.Property(s => s.EndTime).IsRequired();
                 entity.Property(s => s.AvailableSeats).IsRequired();
-                
+
                 entity.Property(s => s.Status)
                       .HasColumnType("showtime_status")
                       .HasDefaultValue(ShowtimeStatus.Draft);
