@@ -25,6 +25,8 @@ namespace EventTicketBooking.Api.Data
 
             try
             {
+                await context.Database.EnsureCreatedAsync();
+
                 // 1. Kiểm tra nếu bảng Roles chưa có dữ liệu thì seed 5 roles
                 if (!await context.Roles.AnyAsync())
                 {
@@ -107,7 +109,7 @@ namespace EventTicketBooking.Api.Data
                         Location = "Sân vận động Quốc gia Mỹ Đình, Hà Nội",
                         StartTime = DateTime.UtcNow.AddDays(7),
                         EndTime = DateTime.UtcNow.AddDays(7).AddHours(4),
-                        TotalSeats = 5000,
+                        TotalSeats = 50,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
                     };
@@ -118,13 +120,17 @@ namespace EventTicketBooking.Api.Data
                         EventId = event1.Id,
                         StartTime = event1.StartTime,
                         EndTime = event1.EndTime,
-                        AvailableSeats = 5000
+                        AvailableSeats = 50
                     };
                     showtime1.ChangeStatus(ShowtimeStatus.OnSale);
 
-                    showtime1.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "Standard / Vé Thường", Price = 300000m });
-                    showtime1.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "VIP / Vé Cao Cấp", Price = 1200000m });
-                    showtime1.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "VVIP / Vé Đặc Biệt", Price = 2500000m });
+                    var catStandard = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "Standard / Vé Thường", Price = 300000m };
+                    var catVip = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "VIP / Vé Cao Cấp", Price = 1200000m };
+                    var catVvip = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "VVIP / Vé Đặc Biệt", Price = 2500000m };
+
+                    showtime1.SeatCategories.Add(catStandard);
+                    showtime1.SeatCategories.Add(catVip);
+                    showtime1.SeatCategories.Add(catVvip);
 
                     event1.Showtimes.Add(showtime1);
 
@@ -137,7 +143,7 @@ namespace EventTicketBooking.Api.Data
                         Location = "Phố đi bộ Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh",
                         StartTime = DateTime.UtcNow.AddDays(14),
                         EndTime = DateTime.UtcNow.AddDays(14).AddHours(5),
-                        TotalSeats = 3000,
+                        TotalSeats = 50,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
                     };
@@ -148,16 +154,58 @@ namespace EventTicketBooking.Api.Data
                         EventId = event2.Id,
                         StartTime = event2.StartTime,
                         EndTime = event2.EndTime,
-                        AvailableSeats = 3000
+                        AvailableSeats = 50
                     };
                     showtime2.ChangeStatus(ShowtimeStatus.OnSale);
 
-                    showtime2.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime2.Id, Name = "Vé Phổ Thông", Price = 200000m });
-                    showtime2.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime2.Id, Name = "Vé Fan Zone", Price = 800000m });
+                    var catFanZone = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime2.Id, Name = "Vé Fan Zone", Price = 800000m };
+                    var catPhoThong = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime2.Id, Name = "Vé Phổ Thông", Price = 200000m };
+
+                    showtime2.SeatCategories.Add(catPhoThong);
+                    showtime2.SeatCategories.Add(catFanZone);
 
                     event2.Showtimes.Add(showtime2);
 
                     await context.Events.AddRangeAsync(event1, event2);
+                    await context.SaveChangesAsync();
+
+                    // Seed ghế cho showtime1 (Hàng A, B, C, D, E x 10 ghế = 50 ghế)
+                    var seatsList = new List<Seat>();
+                    string[] rows = new[] { "A", "B", "C", "D", "E" };
+                    foreach (var r in rows)
+                    {
+                        for (int num = 1; num <= 10; num++)
+                        {
+                            var cat = (r == "A" || r == "B") ? catVvip : (r == "C" ? catVip : catStandard);
+                            seatsList.Add(new Seat
+                            {
+                                Id = Guid.NewGuid(),
+                                ShowtimeId = showtime1.Id,
+                                SeatCategoryId = cat.Id,
+                                Row = r,
+                                SeatNumber = num
+                            });
+                        }
+                    }
+
+                    // Seed ghế cho showtime2
+                    foreach (var r in rows)
+                    {
+                        for (int num = 1; num <= 10; num++)
+                        {
+                            var cat = (r == "A" || r == "B") ? catFanZone : catPhoThong;
+                            seatsList.Add(new Seat
+                            {
+                                Id = Guid.NewGuid(),
+                                ShowtimeId = showtime2.Id,
+                                SeatCategoryId = cat.Id,
+                                Row = r,
+                                SeatNumber = num
+                            });
+                        }
+                    }
+
+                    await context.Seats.AddRangeAsync(seatsList);
                     await context.SaveChangesAsync();
                 }
             }

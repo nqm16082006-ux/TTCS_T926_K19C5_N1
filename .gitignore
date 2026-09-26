@@ -54,3 +54,8 @@ out/
 *.crashlog
 bin/
 obj/
+
+# SQLite local databases
+*.db
+*.db-shm
+*.db-wal

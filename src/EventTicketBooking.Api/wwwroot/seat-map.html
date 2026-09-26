@@ -157,15 +157,24 @@
 
   <!-- Bottom Bar (Cart) -->
   <div id="bottom-bar" class="bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-      <div>
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Đã chọn: <span id="selectedCount" class="text-indigo-600 font-extrabold">0</span> ghế</p>
-        <p class="text-xl font-extrabold text-slate-900" id="totalPrice">0 ₫</p>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+      <!-- Selected & Held Seats Chips List Container (Task T-26) -->
+      <div id="selectedSeatsContainer" class="hidden mb-2 pb-2 border-b border-slate-100 flex flex-wrap items-center gap-2">
+        <span class="text-xs font-bold text-slate-500 mr-1 flex items-center gap-1">
+          <i class="fa-solid fa-list-check text-indigo-500"></i> Ghế đã chọn:
+        </span>
+        <div id="selectedSeatsList" class="flex flex-wrap gap-2 items-center"></div>
       </div>
-      <button onclick="proceedToBooking()" id="btnBook" disabled class="px-6 py-3 rounded-xl font-bold text-sm bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-200 transition flex items-center gap-2">
-        <span>Tiếp tục thanh toán</span>
-        <i class="fa-solid fa-arrow-right"></i>
-      </button>
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Đã chọn: <span id="selectedCount" class="text-indigo-600 font-extrabold">0</span> ghế</p>
+          <p class="text-xl font-extrabold text-slate-900" id="totalPrice">0 ₫</p>
+        </div>
+        <button onclick="proceedToBooking()" id="btnBook" disabled class="px-6 py-3 rounded-xl font-bold text-sm bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-200 transition flex items-center gap-2">
+          <span>Tiếp tục thanh toán</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -178,6 +187,11 @@
 
   <!-- Scripts -->
   <script>
+    if (window.location.protocol === 'file:') {
+      const fileName = window.location.pathname.split('/').pop() || 'seat-map.html';
+      window.location.href = 'http://localhost:5012/' + fileName + window.location.search;
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const showtimeId = urlParams.get('showtimeId');
     const eventId = urlParams.get('eventId');
@@ -185,6 +199,7 @@
     // State
     let seats = [];
     let selectedSeatIds = new Set();
+    let myHeldSeatIds = new Set();
     let seatMap = new Map();
     let seatLayout = { rows: 0, cols: 0, matrix: [] };
 
@@ -567,46 +582,157 @@
     }
 
     function toggleSeat(seat) {
-      // NFR: Clicking SOLD or HELD does nothing
-      if (seat.status !== 'AVAILABLE') return;
+      if (seat.status === 'SOLD') return;
 
-      if (selectedSeatIds.has(seat.id)) {
-        selectedSeatIds.delete(seat.id);
-      } else {
-        // NFR: Check limit (e.g. 10 max)
-        if (selectedSeatIds.size >= 10) {
-          alert("Bạn chỉ được chọn tối đa 10 ghế mỗi lần.");
-          return;
+      // NFR (T-26): Bấm lại ghế đang giữ thì gọi T-25 và đổi màu ghế ngay tại chỗ không tải lại trang
+      if (seat.status === 'HELD') {
+        if (myHeldSeatIds.has(seat.id)) {
+          releaseHeldSeat(seat.id);
+        } else {
+          alert("Ghế này đang được giữ chỗ bởi người dùng khác.");
         }
-        selectedSeatIds.add(seat.id);
+        return;
       }
-      
-      // Update Canvas
-      drawCanvas();
-      
-      // Update Cart
-      updateCart();
+
+      if (seat.status === 'AVAILABLE') {
+        if (selectedSeatIds.has(seat.id)) {
+          selectedSeatIds.delete(seat.id);
+        } else {
+          if (selectedSeatIds.size + myHeldSeatIds.size >= 10) {
+            alert("Bạn chỉ được chọn tối đa 10 ghế mỗi lần.");
+            return;
+          }
+          selectedSeatIds.add(seat.id);
+        }
+        
+        // Cập nhật Canvas và Cart ngay tại chỗ không tải lại trang
+        drawCanvas();
+        updateCart();
+      }
+    }
+
+    // Bỏ chọn ghế đang chọn nháp (Task T-26)
+    function deselectSeat(seatId) {
+      if (selectedSeatIds.has(seatId)) {
+        selectedSeatIds.delete(seatId);
+        drawCanvas();
+        updateCart();
+      }
+    }
+
+    // Huỷ giữ ghế đã giữ trên Server via T-25 API (Task T-26)
+    async function releaseHeldSeat(seatId) {
+      const seat = seatMap.get(seatId);
+      if (!seat) return;
+
+      try {
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`/api/showtimes/${showtimeId}/seats/${seatId}/hold`, {
+          method: 'DELETE',
+          headers: headers
+        });
+
+        const json = await response.json();
+
+        if (response.status === 200 && json.success) {
+          // 1. Cập nhật trạng thái ghế trong bộ nhớ tại chỗ (không tải lại trang)
+          seat.status = 'AVAILABLE';
+          myHeldSeatIds.delete(seatId);
+
+          // 2. Đổi màu ghế ngay tại chỗ trên Canvas
+          drawCanvas();
+
+          // 3. Cập nhật tổng tiền tạm tính và danh sách ghế
+          updateCart();
+
+          // 4. Ẩn đồng hồ khi hết ghế đang giữ
+          if (myHeldSeatIds.size === 0) {
+            stopHoldCountdown();
+          }
+        } else if (response.status === 401) {
+          alert("Vui lòng đăng nhập để huỷ giữ ghế.");
+          window.location.href = `./login.html?redirect=${encodeURIComponent(window.location.href)}`;
+        } else {
+          alert("Lỗi huỷ giữ ghế: " + (json.message || "Không thể huỷ giữ ghế"));
+        }
+      } catch (err) {
+        console.error("[T-25] Lỗi huỷ giữ ghế:", err);
+        alert("Không thể kết nối máy chủ để huỷ giữ ghế.");
+      }
     }
 
     function updateCart() {
       const countEl = document.getElementById('selectedCount');
       const priceEl = document.getElementById('totalPrice');
       const btnEl = document.getElementById('btnBook');
+      const containerEl = document.getElementById('selectedSeatsContainer');
+      const listEl = document.getElementById('selectedSeatsList');
 
-      countEl.textContent = selectedSeatIds.size;
+      const totalCount = selectedSeatIds.size + myHeldSeatIds.size;
+      countEl.textContent = totalCount;
       
       let total = 0;
+      let listHtml = '';
+
+      // Hiển thị các ghế đang chọn nháp (Màu xanh Emerald)
       selectedSeatIds.forEach(id => {
         const seat = seatMap.get(id);
-        total += seat.price;
+        if (seat) {
+          total += seat.price;
+          const seatLabel = `${seat.row}${seat.seatNumber}`;
+          listHtml += `
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-full text-xs font-bold shadow-sm transition hover:bg-emerald-100">
+              <span>${seatLabel}</span>
+              <button onclick="deselectSeat('${id}')" class="w-4 h-4 rounded-full flex items-center justify-center hover:bg-emerald-200 text-emerald-800 transition" title="Bỏ chọn ghế ${seatLabel}">
+                <i class="fa-solid fa-xmark text-xs"></i>
+              </button>
+            </span>`;
+        }
+      });
+
+      // Hiển thị các ghế đang giữ trên Server (Màu vàng Amber)
+      myHeldSeatIds.forEach(id => {
+        const seat = seatMap.get(id);
+        if (seat) {
+          total += seat.price;
+          const seatLabel = `${seat.row}${seat.seatNumber}`;
+          listHtml += `
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded-full text-xs font-bold shadow-sm transition hover:bg-amber-100">
+              <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+              <span>${seatLabel} (Đang giữ)</span>
+              <button onclick="releaseHeldSeat('${id}')" class="w-4 h-4 rounded-full flex items-center justify-center hover:bg-amber-200 text-amber-950 transition" title="Huỷ giữ ghế ${seatLabel}">
+                <i class="fa-solid fa-xmark text-xs"></i>
+              </button>
+            </span>`;
+        }
       });
 
       priceEl.textContent = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(total);
 
+      if (listEl) listEl.innerHTML = listHtml;
+
+      if (containerEl) {
+        if (totalCount > 0) {
+          containerEl.classList.remove('hidden');
+        } else {
+          containerEl.classList.add('hidden');
+        }
+      }
+
       if (selectedSeatIds.size > 0) {
         btnEl.disabled = false;
+        btnEl.querySelector('span').textContent = 'Tiếp tục thanh toán';
+      } else if (myHeldSeatIds.size > 0) {
+        btnEl.disabled = false;
+        btnEl.querySelector('span').textContent = 'Xác nhận thanh toán';
       } else {
         btnEl.disabled = true;
+        btnEl.querySelector('span').textContent = 'Tiếp tục thanh toán';
       }
     }
 
@@ -693,10 +819,12 @@
     }
 
     async function handleHoldExpired() {
-      alert("Thời gian giữ ghế của bạn đã hết hạn. Sơ đồ ghế sẽ tự động làm mới.");
+      alert("Thời gian giữ ghế của bạn đã hết hạn.");
 
-      // Xóa danh sách ghế đang chọn và cập nhật giỏ hàng UI
+      // Xóa danh sách ghế đang giữ/chọn và ẩn đồng hồ
+      myHeldSeatIds.clear();
       selectedSeatIds.clear();
+      stopHoldCountdown();
       updateCart();
 
       // Làm mới sơ đồ ghế từ T-20 API
@@ -704,7 +832,6 @@
         await fetchSeats();
       } catch (err) {
         console.error("[T-24] Lỗi làm mới sơ đồ ghế sau khi hết hạn:", err);
-        alert("Lỗi tải lại sơ đồ ghế. Vui lòng tải lại trang.");
       }
     }
 
@@ -722,6 +849,11 @@
 
     // --- Tiến hành Giữ Ghế (Tích hợp API T-23 & T-24) ---
     async function proceedToBooking() {
+      if (selectedSeatIds.size === 0 && myHeldSeatIds.size > 0) {
+        alert("Các ghế của bạn đã được giữ chỗ thành công. Tiến hành thanh toán!");
+        return;
+      }
+
       if (selectedSeatIds.size === 0) return;
 
       const btnEl = document.getElementById('btnBook');
@@ -748,21 +880,28 @@
 
         if (response.status === 200 && json.success) {
           const data = json.data;
-          const heldSeatIds = data.seatIds;
+          const newlyHeldIds = data.seatIds || [];
           const expiresAt = data.expiresAt;
           const serverTime = data.serverTime;
 
-          // Xóa chọn local & cập nhật UI
-          selectedSeatIds.clear();
-          updateCart();
+          // Cập nhật trạng thái ghế trong bộ nhớ tại chỗ và lưu vào myHeldSeatIds
+          newlyHeldIds.forEach(id => {
+            myHeldSeatIds.add(id);
+            const seat = seatMap.get(id);
+            if (seat) seat.status = 'HELD';
+          });
 
-          // Tải lại sơ đồ để hiển thị trạng thái HELD
-          await fetchSeats();
+          // Xóa chọn nháp & cập nhật UI
+          selectedSeatIds.clear();
+
+          // Đổi màu ghế ngay tại chỗ không cần reload trang
+          drawCanvas();
+          updateCart();
 
           // Kích hoạt đồng hồ đếm ngược T-24
           startHoldCountdown(expiresAt, serverTime, httpDateHeader);
 
-          alert(`Giữ chỗ thành công ${heldSeatIds.length} ghế! Thời gian giữ chỗ: 10 phút.`);
+          alert(`Giữ chỗ thành công ${newlyHeldIds.length} ghế! Thời gian giữ chỗ: 10 phút.`);
         } else if (response.status === 409) {
           alert("Không thể giữ ghế: " + (json.message || "Một hoặc nhiều ghế đã được giữ chỗ bởi người dùng khác."));
           selectedSeatIds.clear();
@@ -779,8 +918,9 @@
         console.error("[T-23/T-24] Lỗi kết nối API giữ ghế:", err);
         alert("Không thể kết nối máy chủ để giữ ghế.");
       } finally {
-        btnEl.disabled = (selectedSeatIds.size === 0);
+        btnEl.disabled = false;
         btnEl.innerHTML = originalText;
+        updateCart();
       }
     }
 
