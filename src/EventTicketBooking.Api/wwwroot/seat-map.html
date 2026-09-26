@@ -188,6 +188,8 @@
 
     // Initialization
     async function init() {
+      const renderStartTime = performance.now();
+
       if (!showtimeId) {
         alert("Thiếu ShowtimeId");
         return;
@@ -199,15 +201,30 @@
 
       // Fetch seats
       try {
+        const fetchStartTime = performance.now();
         const response = await fetch(`/api/public/showtimes/${showtimeId}/seats`);
         const json = await response.json();
+        const fetchEndTime = performance.now();
         
         if (json.success) {
           seats = json.data;
+          
+          const processStartTime = performance.now();
           processSeatLayout();
           setupCanvas();
           drawCanvas();
           centerView();
+          const processEndTime = performance.now();
+
+          const renderEndTime = performance.now();
+          
+          console.group('%c[T-21 Benchmark] Performance Metrics', 'color: #10b981; font-weight: bold;');
+          console.log(`Số lượng ghế xử lý: ${seats.length}`);
+          console.log(`Thời gian gọi API: ${(fetchEndTime - fetchStartTime).toFixed(2)} ms`);
+          console.log(`Thời gian tính toán và vẽ Canvas: ${(processEndTime - processStartTime).toFixed(2)} ms`);
+          console.log(`%cTổng thời gian hiển thị: ${(renderEndTime - renderStartTime).toFixed(2)} ms`, 'color: #3b82f6; font-weight: bold;');
+          console.groupEnd();
+          
         } else {
           alert("Lỗi tải sơ đồ ghế: " + json.message);
         }
