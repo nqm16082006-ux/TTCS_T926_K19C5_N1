@@ -46,16 +46,16 @@ namespace EventTicketBooking.Tests
         {
             var eventId = Guid.NewGuid();
             var showtimeId = Guid.NewGuid();
-            
+
             _context.Events.Add(new Event { Id = eventId, OwnerId = Guid.NewGuid(), Title = "Test Event", Location = "Hanoi", TotalSeats = 100 });
             _context.Showtimes.Add(new Showtime { Id = showtimeId, EventId = eventId, StartTime = DateTime.UtcNow, EndTime = DateTime.UtcNow.AddHours(2), AvailableSeats = 100 });
-            
+
             var category = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtimeId, Name = "VIP", Price = 500000m };
             _context.SeatCategories.Add(category);
 
             var availableSeat = new Seat { Id = Guid.NewGuid(), ShowtimeId = showtimeId, SeatCategoryId = category.Id, Row = "A", SeatNumber = 1 };
             var availableSeat2 = new Seat { Id = Guid.NewGuid(), ShowtimeId = showtimeId, SeatCategoryId = category.Id, Row = "A", SeatNumber = 2 };
-            
+
             _context.Seats.AddRange(availableSeat, availableSeat2);
             await _context.SaveChangesAsync();
 
@@ -64,7 +64,7 @@ namespace EventTicketBooking.Tests
 
             var okResult = Assert.IsType<OkObjectResult>(result);
             var response = Assert.IsType<ApiResponse<List<SeatStatusDto>>>(okResult.Value);
-            
+
             Assert.True(response.Success);
             Assert.Equal(2, response.Data.Count);
 
@@ -81,10 +81,10 @@ namespace EventTicketBooking.Tests
         {
             var eventId = Guid.NewGuid();
             var showtimeId = Guid.NewGuid();
-            
+
             _context.Events.Add(new Event { Id = eventId, OwnerId = Guid.NewGuid(), Title = "Mega Event", Location = "Stadium", TotalSeats = 2000 });
             _context.Showtimes.Add(new Showtime { Id = showtimeId, EventId = eventId, StartTime = DateTime.UtcNow, EndTime = DateTime.UtcNow.AddHours(2), AvailableSeats = 2000 });
-            
+
             var category = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtimeId, Name = "Standard", Price = 100000m };
             _context.SeatCategories.Add(category);
 
@@ -92,7 +92,7 @@ namespace EventTicketBooking.Tests
 
             for (int i = 0; i < 2000; i++)
             {
-                var seat = new Seat { Id = Guid.NewGuid(), ShowtimeId = showtimeId, SeatCategoryId = category.Id, Row = $"R{i/100}", SeatNumber = i % 100 };
+                var seat = new Seat { Id = Guid.NewGuid(), ShowtimeId = showtimeId, SeatCategoryId = category.Id, Row = $"R{i / 100}", SeatNumber = i % 100 };
                 seats.Add(seat);
             }
 
@@ -111,10 +111,10 @@ namespace EventTicketBooking.Tests
 
             var okResult = Assert.IsType<OkObjectResult>(result);
             var response = Assert.IsType<ApiResponse<List<SeatStatusDto>>>(okResult.Value);
-            
+
             Assert.Equal(2000, response.Data.Count);
             Assert.Equal(2000, response.Data.Count(s => s.Status == "AVAILABLE"));
-            
+
             Assert.True(sw.ElapsedMilliseconds < 200, $"Query took {sw.ElapsedMilliseconds}ms, which exceeds 200ms");
         }
     }
