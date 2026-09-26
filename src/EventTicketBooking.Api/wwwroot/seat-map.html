@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <title>Sơ đồ Ghế - EventTicket Booking</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #f8fafc;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    /* Header & Footer */
+    header { flex-shrink: 0; z-index: 50; }
+    #bottom-bar { flex-shrink: 0; z-index: 50; }
+    
+    /* Workspace for Canvas */
+    .workspace {
+      flex: 1;
+      position: relative;
+      background-color: #e2e8f0;
+      overflow: hidden; /* We will use custom mouse drag to pan */
+      background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    /* Container that gets moved and scaled */
+    #canvas-container {
+      position: absolute;
+      transform-origin: 0 0;
+      cursor: grab;
+      box-shadow: 0 20px 40px -10px rgba(0,0,0,0.15);
+      border-radius: 12px;
+      background: white;
+    }
+
+    #canvas-container:active {
+      cursor: grabbing;
+    }
+
+    /* Legend */
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #475569; }
+    .legend-box { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; border: 1px solid rgba(0,0,0,0.1); }
+    .legend-available { background-color: #e0e7ff; color: #4f46e5; border-color: #a5b4fc; }
+    .legend-held { background-color: #fef08a; color: #ca8a04; border-color: #fde047; }
+    .legend-sold { background-color: #e2e8f0; color: #64748b; border-color: #cbd5e1; }
+    .legend-selected { background-color: #10b981; color: white; border-color: #059669; }
+
+    /* Controls overlay */
+    .controls-overlay {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 10;
+    }
+    .btn-control {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: white;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+      border: 1px solid #e2e8f0;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-control:hover { background: #f8fafc; color: #4f46e5; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 shadow-sm relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <a href="./public-events.html" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition">
+          <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <div>
+          <h1 class="text-base font-extrabold text-slate-900 leading-tight" id="headerTitle">Đang tải sơ đồ...</h1>
+          <p class="text-xs text-slate-500 font-medium" id="headerSubtitle">Vui lòng chờ trong giây lát</p>
+        </div>
+      </div>
+      <div class="hidden md:flex items-center gap-6 p-2 bg-slate-50 rounded-xl border border-slate-200">
+        <div class="legend-item"><div class="legend-box legend-available">A</div>Trống</div>
+        <div class="legend-item"><div class="legend-box legend-held">H</div>Đang giữ</div>
+        <div class="legend-item"><div class="legend-box legend-sold">X</div>Đã bán</div>
+        <div class="legend-item"><div class="legend-box legend-selected"><i class="fa-solid fa-check"></i></div>Đang chọn</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Workspace area (Canvas) -->
+  <div class="workspace" id="workspace">
+    <div id="canvas-container">
+      <canvas id="seatCanvas"></canvas>
+    </div>
+
+    <!-- Zoom Controls -->
+    <div class="controls-overlay">
+      <button class="btn-control" onclick="zoomIn()" title="Phóng to"><i class="fa-solid fa-plus"></i></button>
+      <button class="btn-control" onclick="zoomOut()" title="Thu nhỏ"><i class="fa-solid fa-minus"></i></button>
+      <button class="btn-control" onclick="resetView()" title="Mặc định"><i class="fa-solid fa-expand"></i></button>
+    </div>
+  </div>
+
+  <!-- Bottom Bar (Cart) -->
+  <div id="bottom-bar" class="bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Đã chọn: <span id="selectedCount" class="text-indigo-600 font-extrabold">0</span> ghế</p>
+        <p class="text-xl font-extrabold text-slate-900" id="totalPrice">0 ₫</p>
+      </div>
+      <button onclick="proceedToBooking()" id="btnBook" disabled class="px-6 py-3 rounded-xl font-bold text-sm bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-200 transition flex items-center gap-2">
+        <span>Tiếp tục thanh toán</span>
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobile Legend (Visible only on small screens) -->
+  <div class="md:hidden bg-slate-50 border-b border-slate-200 px-4 py-2 flex justify-between overflow-x-auto gap-4">
+    <div class="legend-item whitespace-nowrap"><div class="legend-box legend-available">A</div>Trống</div>
+    <div class="legend-item whitespace-nowrap"><div class="legend-box legend-held">H</div>Đang giữ</div>
+    <div class="legend-item whitespace-nowrap"><div class="legend-box legend-sold">X</div>Đã bán</div>
+  </div>
+
+  <!-- Scripts -->
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const showtimeId = urlParams.get('showtimeId');
+    const eventId = urlParams.get('eventId');
+
+    // State
+    let seats = [];
+    let selectedSeatIds = new Set();
+    let seatMap = new Map();
+    let seatLayout = { rows: 0, cols: 0, matrix: [] };
+
+    // Canvas & Viewport state
+    const canvas = document.getElementById('seatCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('canvas-container');
+    const workspace = document.getElementById('workspace');
+
+    const SEAT_SIZE = 36;
+    const SEAT_GAP = 12;
+    const MARGIN = 40;
+
+    let scale = 1;
+    let translateX = 0;
+    let translateY = 0;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+
+    // Initialization
+    async function init() {
+      if (!showtimeId) {
+        alert("Thiếu ShowtimeId");
+        return;
+      }
+      
+      // Update header
+      document.getElementById('headerTitle').textContent = `Sơ đồ ghế`;
+      document.getElementById('headerSubtitle').textContent = `Mã suất diễn: ${showtimeId.substring(0,8)}`;
+
+      // Fetch seats
+      try {
+        const response = await fetch(`/api/public/showtimes/${showtimeId}/seats`);
+        const json = await response.json();
+        
+        if (json.success) {
+          seats = json.data;
+          processSeatLayout();
+          setupCanvas();
+          drawCanvas();
+          centerView();
+        } else {
+          alert("Lỗi tải sơ đồ ghế: " + json.message);
+        }
+      } catch (e) {
+        console.error(e);
+        alert("Không thể kết nối máy chủ");
+      }
+    }
+
+    // Process flat seat list into a visual grid
+    function processSeatLayout() {
+      // Group by row
+      const rowGroups = {};
+      seats.forEach(s => {
+        if (!rowGroups[s.row]) rowGroups[s.row] = [];
+        rowGroups[s.row].push(s);
+        seatMap.set(s.id, s);
+      });
+
+      // Sort rows alphabetically (A, B, C...)
+      const sortedRows = Object.keys(rowGroups).sort();
+      
+      let maxCols = 0;
+      const matrix = [];
+
+      sortedRows.forEach((rowKey, rIdx) => {
+        // Sort seats in row by seatNumber
+        const rowSeats = rowGroups[rowKey].sort((a,b) => a.seatNumber - b.seatNumber);
+        
+        // Find max seat number to determine columns
+        const maxNum = Math.max(...rowSeats.map(s => s.seatNumber));
+        if (maxNum > maxCols) maxCols = maxNum;
+
+        matrix.push({
+          rowName: rowKey,
+          seats: rowSeats
+        });
+      });
+
+      seatLayout = {
+        rows: sortedRows.length,
+        cols: maxCols,
+        matrix: matrix
+      };
+    }
+
+    // Set canvas internal resolution based on layout size
+    function setupCanvas() {
+      const width = MARGIN * 2 + (seatLayout.cols * SEAT_SIZE) + ((seatLayout.cols - 1) * SEAT_GAP) + 60; // +60 for row labels
+      const height = MARGIN * 2 + (seatLayout.rows * SEAT_SIZE) + ((seatLayout.rows - 1) * SEAT_GAP);
+
+      // Set internal resolution (Support Retina displays)
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      
+      // Set CSS display size
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      container.style.width = `${width}px`;
+      container.style.height = `${height}px`;
+
+      ctx.scale(dpr, dpr);
+    }
+
+    // Main Draw Function (Only draws once per interaction, highly optimized)
+    function drawCanvas() {
+      // Clear
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw screen/stage curve at top
+      ctx.beginPath();
+      ctx.moveTo(MARGIN + 60, MARGIN - 20);
+      ctx.quadraticCurveTo(
+        (canvas.style.width.replace('px','') / 2), MARGIN + 10, 
+        canvas.style.width.replace('px','') - MARGIN, MARGIN - 20
+      );
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'bold 14px "Plus Jakarta Sans"';
+      ctx.textAlign = 'center';
+      ctx.fillText('MÀN HÌNH / SÂN KHẤU', canvas.style.width.replace('px','') / 2 + 30, MARGIN - 25);
+
+      const startY = MARGIN + 40;
+
+      seatLayout.matrix.forEach((rowObj, rIdx) => {
+        const y = startY + rIdx * (SEAT_SIZE + SEAT_GAP);
+        
+        // Draw row label
+        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 14px "Plus Jakarta Sans"';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(rowObj.rowName, MARGIN + 20, y + SEAT_SIZE/2);
+
+        // Draw seats
+        rowObj.seats.forEach(seat => {
+          // Calculate x position based on seatNumber (1-indexed)
+          const x = MARGIN + 50 + (seat.seatNumber - 1) * (SEAT_SIZE + SEAT_GAP);
+
+          // Save hit area to seat object for click detection
+          seat.hitArea = { x, y, w: SEAT_SIZE, h: SEAT_SIZE };
+
+          const isSelected = selectedSeatIds.has(seat.id);
+          
+          // Colors & Labels (Accessibility NFR: Symbols A, H, X)
+          let bgColor, borderColor, textColor, symbol;
+          
+          if (isSelected) {
+            bgColor = '#10b981'; // Emerald 500
+            borderColor = '#059669';
+            textColor = '#ffffff';
+            symbol = '✓';
+          } else if (seat.status === 'AVAILABLE') {
+            bgColor = '#e0e7ff'; // Indigo 100
+            borderColor = '#a5b4fc';
+            textColor = '#4f46e5';
+            symbol = 'A';
+          } else if (seat.status === 'HELD') {
+            bgColor = '#fef08a'; // Yellow 200
+            borderColor = '#fde047';
+            textColor = '#ca8a04';
+            symbol = 'H';
+          } else { // SOLD
+            bgColor = '#e2e8f0'; // Slate 200
+            borderColor = '#cbd5e1';
+            textColor = '#64748b';
+            symbol = 'X';
+          }
+
+          // Draw seat rect
+          ctx.beginPath();
+          ctx.roundRect(x, y, SEAT_SIZE, SEAT_SIZE, 6);
+          ctx.fillStyle = bgColor;
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = borderColor;
+          ctx.stroke();
+
+          // Draw symbol
+          ctx.fillStyle = textColor;
+          ctx.font = 'bold 14px "Plus Jakarta Sans"';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(symbol, x + SEAT_SIZE/2, y + SEAT_SIZE/2);
+        });
+      });
+    }
+
+    // --- Pan & Zoom Logic (Transforming CSS instead of redrawing Canvas is 60fps smooth) ---
+    
+    function applyTransform() {
+      container.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+    }
+
+    function zoomIn() {
+      scale = Math.min(scale * 1.2, 3);
+      applyTransform();
+    }
+
+    function zoomOut() {
+      scale = Math.max(scale / 1.2, 0.3);
+      applyTransform();
+    }
+
+    function resetView() {
+      centerView();
+    }
+
+    function centerView() {
+      const wWidth = workspace.clientWidth;
+      const wHeight = workspace.clientHeight;
+      const cWidth = parseFloat(container.style.width);
+      const cHeight = parseFloat(container.style.height);
+
+      // Auto scale to fit width or height initially
+      const scaleX = (wWidth - 40) / cWidth;
+      const scaleY = (wHeight - 40) / cHeight;
+      scale = Math.min(scaleX, scaleY, 1); // Don't scale up above 1 on load
+
+      translateX = (wWidth - cWidth * scale) / 2;
+      translateY = (wHeight - cHeight * scale) / 2;
+      applyTransform();
+    }
+
+    // Mouse Events for Panning
+    workspace.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      dragStartX = e.clientX - translateX;
+      dragStartY = e.clientY - translateY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      translateX = e.clientX - dragStartX;
+      translateY = e.clientY - dragStartY;
+      applyTransform();
+    });
+
+    window.addEventListener('mouseup', () => { isDragging = false; });
+    
+    // Touch Events for Mobile Panning
+    let initialPinchDistance = null;
+    let initialScale = 1;
+
+    workspace.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        isDragging = true;
+        dragStartX = e.touches[0].clientX - translateX;
+        dragStartY = e.touches[0].clientY - translateY;
+      } else if (e.touches.length === 2) {
+        // Pinch zoom start
+        initialPinchDistance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        initialScale = scale;
+      }
+    });
+
+    workspace.addEventListener('touchmove', (e) => {
+      e.preventDefault(); // prevent native scroll
+      if (e.touches.length === 1 && isDragging) {
+        translateX = e.touches[0].clientX - dragStartX;
+        translateY = e.touches[0].clientY - dragStartY;
+        applyTransform();
+      } else if (e.touches.length === 2 && initialPinchDistance) {
+        // Pinch zoom move
+        const currentDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        scale = Math.max(0.3, Math.min(initialScale * (currentDist / initialPinchDistance), 3));
+        applyTransform();
+      }
+    }, { passive: false });
+
+    workspace.addEventListener('touchend', () => {
+      isDragging = false;
+      initialPinchDistance = null;
+    });
+
+    // Mouse Wheel Zoom
+    workspace.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+      
+      // Zoom towards mouse pointer
+      const rect = workspace.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const newScale = Math.max(0.3, Math.min(scale * zoomFactor, 3));
+      
+      // Adjust translation to zoom around cursor
+      translateX = mouseX - (mouseX - translateX) * (newScale / scale);
+      translateY = mouseY - (mouseY - translateY) * (newScale / scale);
+      scale = newScale;
+      
+      applyTransform();
+    }, { passive: false });
+
+    // --- Click Detection on Canvas ---
+    
+    // Click event for Canvas
+    // Using point distance to detect click vs drag
+    let mousedownPoint = {x: 0, y: 0};
+    
+    container.addEventListener('mousedown', (e) => {
+      mousedownPoint = { x: e.clientX, y: e.clientY };
+    });
+
+    container.addEventListener('mouseup', (e) => {
+      const dist = Math.hypot(e.clientX - mousedownPoint.x, e.clientY - mousedownPoint.y);
+      if (dist > 5) return; // It was a drag, not a click
+
+      const rect = container.getBoundingClientRect();
+      // Calculate coordinates inside the unscaled canvas
+      const x = (e.clientX - rect.left) / scale;
+      const y = (e.clientY - rect.top) / scale;
+
+      handleCanvasClick(x, y);
+    });
+
+    // Mobile click support
+    let touchStartPoint = {x: 0, y: 0};
+    container.addEventListener('touchstart', (e) => {
+      if(e.touches.length === 1) {
+        touchStartPoint = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+    });
+
+    container.addEventListener('touchend', (e) => {
+      if(e.changedTouches.length === 1) {
+        const touch = e.changedTouches[0];
+        const dist = Math.hypot(touch.clientX - touchStartPoint.x, touch.clientY - touchStartPoint.y);
+        if (dist > 10) return; // Dragged
+
+        const rect = container.getBoundingClientRect();
+        const x = (touch.clientX - rect.left) / scale;
+        const y = (touch.clientY - rect.top) / scale;
+
+        handleCanvasClick(x, y);
+      }
+    });
+
+    function handleCanvasClick(x, y) {
+      // Find which seat was clicked
+      for (const seat of seats) {
+        const h = seat.hitArea;
+        if (h && x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) {
+          toggleSeat(seat);
+          break;
+        }
+      }
+    }
+
+    function toggleSeat(seat) {
+      // NFR: Clicking SOLD or HELD does nothing
+      if (seat.status !== 'AVAILABLE') return;
+
+      if (selectedSeatIds.has(seat.id)) {
+        selectedSeatIds.delete(seat.id);
+      } else {
+        // NFR: Check limit (e.g. 10 max)
+        if (selectedSeatIds.size >= 10) {
+          alert("Bạn chỉ được chọn tối đa 10 ghế mỗi lần.");
+          return;
+        }
+        selectedSeatIds.add(seat.id);
+      }
+      
+      // Update Canvas
+      drawCanvas();
+      
+      // Update Cart
+      updateCart();
+    }
+
+    function updateCart() {
+      const countEl = document.getElementById('selectedCount');
+      const priceEl = document.getElementById('totalPrice');
+      const btnEl = document.getElementById('btnBook');
+
+      countEl.textContent = selectedSeatIds.size;
+      
+      let total = 0;
+      selectedSeatIds.forEach(id => {
+        const seat = seatMap.get(id);
+        total += seat.price;
+      });
+
+      priceEl.textContent = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(total);
+
+      if (selectedSeatIds.size > 0) {
+        btnEl.disabled = false;
+      } else {
+        btnEl.disabled = true;
+      }
+    }
+
+    function proceedToBooking() {
+      // TODO: Integration with T-23 to hold seats
+      alert(`Sẵn sàng đặt ${selectedSeatIds.size} ghế!\nTiến trình tiếp theo sẽ đẩy mảng ID sang API T-23 để giữ chỗ.`);
+    }
+
+    // Start
+    init();
+
+  </script>
+</body>
+</html>

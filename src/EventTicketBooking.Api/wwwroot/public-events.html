@@ -323,7 +323,7 @@
       if (!isAvailable) return;
 
       const token = localStorage.getItem('access_token');
-      const targetUrl = `./events.html?showtimeId=${showtimeId}`;
+      const targetUrl = `./seat-map.html?eventId=${eventId}&showtimeId=${showtimeId}`;
 
       if (!token) {
         const returnUrl = encodeURIComponent(`./public-events.html?eventId=${eventId}&showtimeId=${showtimeId}`);
