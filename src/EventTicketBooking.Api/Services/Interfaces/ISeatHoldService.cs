@@ -12,6 +12,7 @@ namespace EventTicketBooking.Api.Services.Interfaces
         NotFound,
         InvalidRequest,
         Conflict,
+        Forbidden,
         ServerError
     }
 
@@ -45,10 +46,16 @@ namespace EventTicketBooking.Api.Services.Interfaces
         {
             return new HoldSeatsResult { Status = HoldSeatsResultStatus.ServerError, Message = message };
         }
+
+        public static HoldSeatsResult ForbiddenResult(string message)
+        {
+            return new HoldSeatsResult { Status = HoldSeatsResultStatus.Forbidden, Message = message };
+        }
     }
 
     public interface ISeatHoldService
     {
         Task<HoldSeatsResult> HoldSeatsAsync(Guid showtimeId, List<Guid> seatIds, Guid userId, CancellationToken cancellationToken = default);
+        Task<HoldSeatsResult> CancelSeatHoldAsync(Guid showtimeId, Guid seatId, Guid userId, CancellationToken cancellationToken = default);
     }
 }
