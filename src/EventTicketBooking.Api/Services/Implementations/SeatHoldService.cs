@@ -230,6 +230,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             // 7. Trả về kết quả giữ chỗ thành công
             var responseData = new HoldSeatsResponseDto
             {
+                ShowtimeId = showtimeId,
                 SeatIds = seatIds,
                 ExpiresAt = expiresAt,
                 ServerTime = now
@@ -281,6 +282,78 @@ namespace EventTicketBooking.Api.Services.Implementations
             }
 
             return HoldSeatsResult.SuccessResult(null!, "Huỷ giữ ghế thành công.");
+        }
+
+        /// <summary>
+        /// Lấy danh sách giữ chỗ còn hiệu lực của người dùng trong một suất diễn (Task T-32 / S-14).
+        /// </summary>
+        public async Task<HoldSeatsResult> GetUserActiveHoldsAsync(
+            Guid showtimeId,
+            Guid userId,
+            DateTime? nowOverride = null,
+            CancellationToken cancellationToken = default)
+        {
+            var now = nowOverride ?? DateTime.UtcNow;
+
+            var showtimeExists = await _context.Showtimes
+                .AsNoTracking()
+                .AnyAsync(s => s.Id == showtimeId, cancellationToken);
+
+            if (!showtimeExists)
+            {
+                return HoldSeatsResult.NotFoundResult("Suất chiếu không tồn tại.");
+            }
+
+            var activeHoldsWithSeats = await (from sh in _context.SeatHold
+                                              join s in _context.Seats on sh.SeatId equals s.Id
+                                              where s.ShowtimeId == showtimeId &&
+                                                    sh.UserId == userId &&
+                                                    sh.Status == "ACTIVE" &&
+                                                    sh.ExpiresAt > now
+                                              orderby s.Row, s.SeatNumber
+                                              select new
+                                              {
+                                                  SeatId = s.Id,
+                                                  Row = s.Row,
+                                                  SeatNumber = s.SeatNumber,
+                                                  ExpiresAt = sh.ExpiresAt
+                                              }).ToListAsync(cancellationToken);
+
+            if (activeHoldsWithSeats.Count == 0)
+            {
+                var emptyData = new HoldSeatsResponseDto
+                {
+                    ShowtimeId = showtimeId,
+                    SeatIds = new List<Guid>(),
+                    ExpiresAt = DateTime.MinValue,
+                    ServerTime = now,
+                    Holds = new List<UserSeatHoldItemDto>()
+                };
+
+                return HoldSeatsResult.SuccessResult(emptyData, "Người dùng không có ghế nào đang giữ cho suất chiếu này.");
+            }
+
+            var holdItems = activeHoldsWithSeats.Select(item => new UserSeatHoldItemDto
+            {
+                SeatId = item.SeatId,
+                Row = item.Row,
+                SeatNumber = item.SeatNumber,
+                ExpiresAt = item.ExpiresAt
+            }).ToList();
+
+            var seatIds = activeHoldsWithSeats.Select(item => item.SeatId).ToList();
+            var earliestExpiration = activeHoldsWithSeats.Min(item => item.ExpiresAt);
+
+            var resultData = new HoldSeatsResponseDto
+            {
+                ShowtimeId = showtimeId,
+                SeatIds = seatIds,
+                ExpiresAt = earliestExpiration,
+                ServerTime = now,
+                Holds = holdItems
+            };
+
+            return HoldSeatsResult.SuccessResult(resultData, "Lấy danh sách ghế đang giữ thành công.");
         }
 
         /// <summary>

@@ -108,6 +108,42 @@ namespace EventTicketBooking.Api.Controllers
             };
         }
 
+        /// <summary>
+        /// API Lấy danh sách giữ chỗ còn hiệu lực của người dùng hiện tại trong một suất diễn (Task T-32 / S-14).
+        /// GET /api/showtimes/{showtimeId}/seats/my-holds
+        /// GET /api/showtimes/{showtimeId}/seats/holds
+        /// </summary>
+        [HttpGet("my-holds")]
+        [HttpGet("holds")]
+        [ProducesResponseType(typeof(ApiResponse<HoldSeatsResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> GetMyHeldSeats(
+            Guid showtimeId,
+            [FromQuery] DateTime? nowOverride,
+            CancellationToken cancellationToken)
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+            {
+                return StatusCode(StatusCodes.Status401Unauthorized, ApiResponse<object>.FailureResult("Vui lòng đăng nhập để xem thông tin giữ chỗ."));
+            }
+
+            var result = await _seatHoldService.GetUserActiveHoldsAsync(
+                showtimeId,
+                userId.Value,
+                nowOverride,
+                cancellationToken);
+
+            return result.Status switch
+            {
+                HoldSeatsResultStatus.Success => Ok(ApiResponse<HoldSeatsResponseDto>.SuccessResult(result.Data!, result.Message)),
+                HoldSeatsResultStatus.NotFound => NotFound(ApiResponse<object>.FailureResult(result.Message)),
+                _ => StatusCode(StatusCodes.Status500InternalServerError, ApiResponse<object>.FailureResult(result.Message))
+            };
+        }
+
         [HttpPost("import")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(SeatImportResultDto), StatusCodes.Status200OK)]
