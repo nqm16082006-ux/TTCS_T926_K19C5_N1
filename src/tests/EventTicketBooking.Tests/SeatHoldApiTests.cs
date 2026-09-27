@@ -332,5 +332,237 @@ namespace EventTicketBooking.Tests
             Assert.True(response.Success);
             Assert.Single(response.Data!.SeatIds);
         }
+
+        #region Task T-32 Tests
+
+        [Fact]
+        public async Task T32_Case1_UserHasOneActiveHold_ReturnsSeatAndValidExpiresAt()
+        {
+            var seed = await SeedShowtimeWithSeatsAsync(1);
+            var controller = CreateController(_userId);
+
+            // Giữ 1 ghế
+            var holdResult = await controller.HoldSeats(seed.showtimeId, new HoldSeatsRequestDto
+            {
+                SeatIds = new List<Guid> { seed.seats[0].Id }
+            }, default);
+            Assert.IsType<OkObjectResult>(holdResult);
+
+            // Gọi API T-32 lấy ghế đang giữ của user
+            var actionResult = await controller.GetMyHeldSeats(seed.showtimeId, null, default);
+
+            var okResult = Assert.IsType<OkObjectResult>(actionResult);
+            var response = Assert.IsType<ApiResponse<HoldSeatsResponseDto>>(okResult.Value);
+
+            Assert.True(response.Success);
+            Assert.NotNull(response.Data);
+            Assert.Equal(seed.showtimeId, response.Data!.ShowtimeId);
+            Assert.Single(response.Data.SeatIds);
+            Assert.Equal(seed.seats[0].Id, response.Data.SeatIds[0]);
+            Assert.True(response.Data.ExpiresAt > DateTime.UtcNow);
+            Assert.NotNull(response.Data.Holds);
+            Assert.Single(response.Data.Holds!);
+            Assert.Equal(seed.seats[0].Id, response.Data.Holds![0].SeatId);
+        }
+
+        [Fact]
+        public async Task T32_Case2_UserHasMultipleActiveHolds_ReturnsAllSeats()
+        {
+            var seed = await SeedShowtimeWithSeatsAsync(3);
+            var controller = CreateController(_userId);
+
+            // Giữ cả 3 ghế
+            var holdResult = await controller.HoldSeats(seed.showtimeId, new HoldSeatsRequestDto
+            {
+                SeatIds = seed.seats.Select(s => s.Id).ToList()
+            }, default);
+            Assert.IsType<OkObjectResult>(holdResult);
+
+            // Gọi API T-32
+            var actionResult = await controller.GetMyHeldSeats(seed.showtimeId, null, default);
+
+            var okResult = Assert.IsType<OkObjectResult>(actionResult);
+            var response = Assert.IsType<ApiResponse<HoldSeatsResponseDto>>(okResult.Value);
+
+            Assert.True(response.Success);
+            Assert.Equal(3, response.Data!.SeatIds.Count);
+            foreach (var seat in seed.seats)
+            {
+                Assert.Contains(seat.Id, response.Data.SeatIds);
+            }
+        }
+
+        [Fact]
+        public async Task T32_Case3_ExpiredHold_NotReturned()
+        {
+            var seed = await SeedShowtimeWithSeatsAsync(2);
+            var controller = CreateController(_userId);
+
+            // Ghế 1: Giữ chỗ đã hết hạn (ExpiresAt trong quá khứ)
+            _context.SeatHold.Add(new SeatHolds
+            {
+                Id = Guid.NewGuid(),
+                SeatId = seed.seats[0].Id,
+                UserId = _userId,
+                Status = "ACTIVE",
+                HeldAt = DateTime.UtcNow.AddMinutes(-20),
+                ExpiresAt = DateTime.UtcNow.AddMinutes(-5)
+            });
+
+            // Ghế 2: Giữ chỗ còn hiệu lực (ExpiresAt tương lai)
+            _context.SeatHold.Add(new SeatHolds
+            {
+                Id = Guid.NewGuid(),
+                SeatId = seed.seats[1].Id,
+                UserId = _userId,
+                Status = "ACTIVE",
+                HeldAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+            });
+            await _context.SaveChangesAsync();
+
+            // Gọi API T-32
+            var actionResult = await controller.GetMyHeldSeats(seed.showtimeId, null, default);
+
+            var okResult = Assert.IsType<OkObjectResult>(actionResult);
+            var response = Assert.IsType<ApiResponse<HoldSeatsResponseDto>>(okResult.Value);
+
+            Assert.True(response.Success);
+            Assert.Single(response.Data!.SeatIds);
+            Assert.Equal(seed.seats[1].Id, response.Data.SeatIds[0]); // Chỉ trả về ghế 2 còn hạn
+        }
+
+        [Fact]
+        public async Task T32_Case4_HoldBelongsToOtherUser_NotReturned()
+        {
+            var seed = await SeedShowtimeWithSeatsAsync(2);
+            var otherUserId = Guid.NewGuid();
+
+            // User khác giữ ghế 0
+            _context.SeatHold.Add(new SeatHolds
+            {
+                Id = Guid.NewGuid(),
+                SeatId = seed.seats[0].Id,
+                UserId = otherUserId,
+                Status = "ACTIVE",
+                HeldAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+            });
+
+            // Current user giữ ghế 1
+            _context.SeatHold.Add(new SeatHolds
+            {
+                Id = Guid.NewGuid(),
+                SeatId = seed.seats[1].Id,
+                UserId = _userId,
+                Status = "ACTIVE",
+                HeldAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+            });
+            await _context.SaveChangesAsync();
+
+            var controller = CreateController(_userId);
+
+            // Gọi API T-32
+            var actionResult = await controller.GetMyHeldSeats(seed.showtimeId, null, default);
+
+            var okResult = Assert.IsType<OkObjectResult>(actionResult);
+            var response = Assert.IsType<ApiResponse<HoldSeatsResponseDto>>(okResult.Value);
+
+            Assert.True(response.Success);
+            Assert.Single(response.Data!.SeatIds);
+            Assert.Equal(seed.seats[1].Id, response.Data.SeatIds[0]); // Chỉ trả về ghế của current user
+            Assert.DoesNotContain(seed.seats[0].Id, response.Data.SeatIds);
+        }
+
+        [Fact]
+        public async Task T32_Case5_HoldBelongsToDifferentShowtime_NotReturned()
+        {
+            var seed1 = await SeedShowtimeWithSeatsAsync(1);
+            var seed2 = await SeedShowtimeWithSeatsAsync(1);
+
+            // User giữ ghế ở cả 2 showtime
+            _context.SeatHold.Add(new SeatHolds
+            {
+                Id = Guid.NewGuid(),
+                SeatId = seed1.seats[0].Id,
+                UserId = _userId,
+                Status = "ACTIVE",
+                HeldAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+            });
+
+            _context.SeatHold.Add(new SeatHolds
+            {
+                Id = Guid.NewGuid(),
+                SeatId = seed2.seats[0].Id,
+                UserId = _userId,
+                Status = "ACTIVE",
+                HeldAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+            });
+            await _context.SaveChangesAsync();
+
+            var controller = CreateController(_userId);
+
+            // Gọi API T-32 cho showtime 1
+            var actionResult = await controller.GetMyHeldSeats(seed1.showtimeId, null, default);
+
+            var okResult = Assert.IsType<OkObjectResult>(actionResult);
+            var response = Assert.IsType<ApiResponse<HoldSeatsResponseDto>>(okResult.Value);
+
+            Assert.True(response.Success);
+            Assert.Single(response.Data!.SeatIds);
+            Assert.Equal(seed1.seats[0].Id, response.Data.SeatIds[0]);
+            Assert.DoesNotContain(seed2.seats[0].Id, response.Data.SeatIds);
+        }
+
+        [Fact]
+        public async Task T32_Case6_UserHasNoHolds_ReturnsSuccessWithEmptyList()
+        {
+            var seed = await SeedShowtimeWithSeatsAsync(2);
+            var controller = CreateController(_userId);
+
+            // User không giữ bất kỳ ghế nào
+            var actionResult = await controller.GetMyHeldSeats(seed.showtimeId, null, default);
+
+            var okResult = Assert.IsType<OkObjectResult>(actionResult);
+            var response = Assert.IsType<ApiResponse<HoldSeatsResponseDto>>(okResult.Value);
+
+            Assert.True(response.Success);
+            Assert.NotNull(response.Data);
+            Assert.Empty(response.Data!.SeatIds);
+            Assert.Empty(response.Data.Holds!);
+        }
+
+        [Fact]
+        public async Task T32_Case7_UnauthenticatedUser_Returns401()
+        {
+            var seed = await SeedShowtimeWithSeatsAsync(1);
+            var controller = CreateController(currentUserId: null); // Chưa đăng nhập
+
+            var actionResult = await controller.GetMyHeldSeats(seed.showtimeId, null, default);
+
+            var unauthorizedResult = Assert.IsType<ObjectResult>(actionResult);
+            Assert.Equal(StatusCodes.Status401Unauthorized, unauthorizedResult.StatusCode);
+
+            var response = Assert.IsType<ApiResponse<object>>(unauthorizedResult.Value);
+            Assert.False(response.Success);
+        }
+
+        [Fact]
+        public async Task T32_NonExistentShowtime_Returns404NotFound()
+        {
+            var controller = CreateController(_userId);
+            var nonExistentShowtimeId = Guid.NewGuid();
+
+            var actionResult = await controller.GetMyHeldSeats(nonExistentShowtimeId, null, default);
+
+            var notFoundResult = Assert.IsType<NotFoundObjectResult>(actionResult);
+            var response = Assert.IsType<ApiResponse<object>>(notFoundResult.Value);
+            Assert.False(response.Success);
+        }
+
+        #endregion
     }
 }
