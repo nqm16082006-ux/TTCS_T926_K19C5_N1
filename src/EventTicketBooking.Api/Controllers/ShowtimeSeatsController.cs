@@ -67,7 +67,7 @@ namespace EventTicketBooking.Api.Controllers
                 HoldSeatsResultStatus.Success => Ok(ApiResponse<HoldSeatsResponseDto>.SuccessResult(result.Data!, result.Message)),
                 HoldSeatsResultStatus.NotFound => NotFound(ApiResponse<object>.FailureResult(result.Message)),
                 HoldSeatsResultStatus.InvalidRequest => BadRequest(ApiResponse<object>.FailureResult(result.Message)),
-                HoldSeatsResultStatus.Conflict => StatusCode(StatusCodes.Status409Conflict, ApiResponse<object>.FailureResult(result.Message)),
+                HoldSeatsResultStatus.Conflict => StatusCode(StatusCodes.Status409Conflict, ApiResponse<object>.FailureResult(result.Message, new { ConflictingSeatIds = result.ConflictingSeatIds ?? new List<Guid>() })),
                 _ => StatusCode(StatusCodes.Status500InternalServerError, ApiResponse<object>.FailureResult(result.Message))
             };
         }
