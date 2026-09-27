@@ -65,10 +65,11 @@
     }
 
     /* Legend */
-    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #475569; }
-    .legend-box { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; border: 1px solid rgba(0,0,0,0.1); }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #475569; }
+    .legend-box { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; border: 1px solid rgba(0,0,0,0.1); }
     .legend-available { background-color: #e0e7ff; color: #4f46e5; border-color: #a5b4fc; }
-    .legend-held { background-color: #fef08a; color: #ca8a04; border-color: #fde047; }
+    .legend-my-held { background-color: #fef3c7; color: #b45309; border-color: #f59e0b; }
+    .legend-other-held { background-color: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
     .legend-sold { background-color: #e2e8f0; color: #64748b; border-color: #cbd5e1; }
     .legend-selected { background-color: #10b981; color: white; border-color: #059669; }
 
@@ -105,7 +106,7 @@
   <header class="bg-white border-b border-slate-200 shadow-sm relative">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center gap-4">
-        <a href="./public-events.html" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition">
+        <a href="./public-events.html" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition" title="Quay lại danh sách sự kiện">
           <i class="fa-solid fa-arrow-left"></i>
         </a>
         <div>
@@ -113,36 +114,64 @@
           <p class="text-xs text-slate-500 font-medium" id="headerSubtitle">Vui lòng chờ trong giây lát</p>
         </div>
       </div>
-      <div class="hidden md:flex items-center gap-6 p-2 bg-slate-50 rounded-xl border border-slate-200">
+      <div class="hidden md:flex items-center gap-4 lg:gap-6 p-2 bg-slate-50 rounded-xl border border-slate-200">
         <div class="legend-item"><div class="legend-box legend-available">A</div>Trống</div>
-        <div class="legend-item"><div class="legend-box legend-held">H</div>Đang giữ</div>
-        <div class="legend-item"><div class="legend-box legend-sold">X</div>Đã bán</div>
         <div class="legend-item"><div class="legend-box legend-selected"><i class="fa-solid fa-check"></i></div>Đang chọn</div>
+        <div class="legend-item"><div class="legend-box legend-my-held">★</div>Bạn đang giữ</div>
+        <div class="legend-item"><div class="legend-box legend-other-held">H</div>Người khác giữ</div>
+        <div class="legend-item"><div class="legend-box legend-sold">X</div>Đã bán</div>
       </div>
+    </div>
   </header>
 
-  <!-- Hold Countdown Banner (Task T-24) -->
-  <div id="hold-timer-banner" class="hidden bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 py-2.5 flex items-center justify-between font-bold text-sm shadow-md z-40 relative">
+  <!-- Hold Countdown Banner & Card (Task T-24 / T-33) -->
+  <div id="hold-timer-banner" class="hidden bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 font-bold text-sm shadow-md z-40 relative transition-all duration-300">
     <div class="flex items-center gap-3">
-      <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white text-base">
+      <div id="timerIconBox" class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-white text-base shadow-inner">
         <i class="fa-solid fa-clock text-lg"></i>
       </div>
       <div>
-        <p class="text-xs text-amber-100 font-semibold uppercase tracking-wider">Thời gian giữ ghế còn lại</p>
         <div class="flex items-center gap-2">
-          <span id="countdownDisplay" class="text-xl font-black font-mono tracking-widest text-white">10:00</span>
-          <span class="text-xs font-medium text-amber-100">(Đồng bộ máy chủ)</span>
+          <p class="text-[11px] text-amber-100 font-bold uppercase tracking-wider">GHẾ BẠN ĐANG GIỮ</p>
+          <span id="heldCountBadge" class="px-2 py-0.5 bg-black/25 text-white text-[11px] rounded-full font-black">0 ghế</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="countdownDisplay" class="text-2xl font-black font-mono tracking-widest text-white drop-shadow">00:00</span>
+          <span id="timerSubtext" class="text-xs font-medium text-amber-100">(Đồng bộ máy chủ)</span>
         </div>
       </div>
     </div>
-    <div class="hidden sm:flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/20">
-      <i class="fa-solid fa-shield-halved text-xs text-amber-200"></i>
-      <span class="text-xs font-semibold">Ghế của bạn đã được khóa an toàn</span>
+    <div class="flex items-center gap-3">
+      <div id="heldSeatsQuickList" class="hidden md:flex items-center gap-1.5 max-w-md overflow-x-auto py-1"></div>
+      <div id="timerStatusBadge" class="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/20">
+        <i class="fa-solid fa-shield-halved text-xs text-amber-200"></i>
+        <span class="text-xs font-semibold">Ghế của bạn đã được khóa an toàn</span>
+      </div>
     </div>
+  </div>
+
+  <!-- Error State Banner (Task T-33) -->
+  <div id="errorBanner" class="hidden bg-rose-50 border-b border-rose-200 px-4 py-2.5 flex items-center justify-between text-rose-800 text-xs font-semibold shadow-sm z-40 relative">
+    <div class="flex items-center gap-2">
+      <i class="fa-solid fa-circle-exclamation text-rose-600 text-sm"></i>
+      <span id="errorMessage">Không thể tải trạng thái ghế đang giữ.</span>
+    </div>
+    <button onclick="retryRestoreHolds()" class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold transition flex items-center gap-1 shadow-sm">
+      <i class="fa-solid fa-rotate-right"></i> Thử lại
+    </button>
   </div>
 
   <!-- Workspace area (Canvas) -->
   <div class="workspace" id="workspace">
+    <!-- Loading Overlay (Task T-33) -->
+    <div id="loadingOverlay" class="absolute inset-0 bg-white/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center transition-opacity duration-300">
+      <div class="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-3"></div>
+      <p class="text-sm font-bold text-slate-700">Đang tải sơ đồ ghế...</p>
+    </div>
+
+    <!-- Seat Tooltip (Accessibility T-33) -->
+    <div id="seatTooltip" class="hidden absolute pointer-events-none z-20 px-2.5 py-1.5 bg-slate-900/90 text-white text-xs font-medium rounded-lg shadow-lg border border-slate-700 backdrop-blur-sm whitespace-nowrap transition-opacity duration-150"></div>
+
     <div id="canvas-container">
       <canvas id="seatCanvas"></canvas>
     </div>
@@ -158,10 +187,10 @@
   <!-- Bottom Bar (Cart) -->
   <div id="bottom-bar" class="bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-      <!-- Selected & Held Seats Chips List Container (Task T-26) -->
+      <!-- Selected & Held Seats Chips List Container (Task T-26 / T-33) -->
       <div id="selectedSeatsContainer" class="hidden mb-2 pb-2 border-b border-slate-100 flex flex-wrap items-center gap-2">
         <span class="text-xs font-bold text-slate-500 mr-1 flex items-center gap-1">
-          <i class="fa-solid fa-list-check text-indigo-500"></i> Ghế đã chọn:
+          <i class="fa-solid fa-list-check text-indigo-500"></i> Ghế của bạn:
         </span>
         <div id="selectedSeatsList" class="flex flex-wrap gap-2 items-center"></div>
       </div>
@@ -181,7 +210,9 @@
   <!-- Mobile Legend (Visible only on small screens) -->
   <div class="md:hidden bg-slate-50 border-b border-slate-200 px-4 py-2 flex justify-between overflow-x-auto gap-4">
     <div class="legend-item whitespace-nowrap"><div class="legend-box legend-available">A</div>Trống</div>
-    <div class="legend-item whitespace-nowrap"><div class="legend-box legend-held">H</div>Đang giữ</div>
+    <div class="legend-item whitespace-nowrap"><div class="legend-box legend-selected"><i class="fa-solid fa-check"></i></div>Đang chọn</div>
+    <div class="legend-item whitespace-nowrap"><div class="legend-box legend-my-held">★</div>Bạn đang giữ</div>
+    <div class="legend-item whitespace-nowrap"><div class="legend-box legend-other-held">H</div>Người khác giữ</div>
     <div class="legend-item whitespace-nowrap"><div class="legend-box legend-sold">X</div>Đã bán</div>
   </div>
 
@@ -261,12 +292,20 @@
       document.getElementById('headerTitle').textContent = `Sơ đồ ghế`;
       document.getElementById('headerSubtitle').textContent = `Mã suất diễn: ${showtimeId.substring(0,8)}`;
 
-      // Fetch seats
+      const loadingOverlay = document.getElementById('loadingOverlay');
+      if (loadingOverlay) loadingOverlay.classList.remove('hidden');
+
       try {
+        // Bước 1 (T-33): Tải sơ đồ ghế
         await fetchSeats();
+
+        // Bước 2 (T-33): Khôi phục ghế đang giữ và countdown từ T-32 API
+        await restoreHeldSeats();
       } catch (e) {
-        console.error(e);
+        console.error("[Init Error]", e);
         alert("Không thể kết nối máy chủ");
+      } finally {
+        if (loadingOverlay) loadingOverlay.classList.add('hidden');
       }
     }
 
@@ -368,8 +407,9 @@
           seat.hitArea = { x, y, w: SEAT_SIZE, h: SEAT_SIZE };
 
           const isSelected = selectedSeatIds.has(seat.id);
+          const isMyHeld = myHeldSeatIds.has(seat.id);
           
-          // Colors & Labels (Accessibility NFR: Symbols A, H, X)
+          // Colors & Labels (Accessibility NFR: Symbols A, ✓, ★, H, X)
           let bgColor, borderColor, textColor, symbol;
           
           if (isSelected) {
@@ -377,15 +417,22 @@
             borderColor = '#059669';
             textColor = '#ffffff';
             symbol = '✓';
+          } else if (isMyHeld) {
+            // HELD BY CURRENT USER (Task T-33)
+            bgColor = '#fef3c7'; // Amber 100
+            borderColor = '#f59e0b'; // Amber 500
+            textColor = '#b45309'; // Amber 700
+            symbol = '★';
           } else if (seat.status === 'AVAILABLE') {
             bgColor = '#e0e7ff'; // Indigo 100
             borderColor = '#a5b4fc';
             textColor = '#4f46e5';
             symbol = 'A';
           } else if (seat.status === 'HELD') {
-            bgColor = '#fef08a'; // Yellow 200
-            borderColor = '#fde047';
-            textColor = '#ca8a04';
+            // HELD BY OTHER USER (Task T-33)
+            bgColor = '#fee2e2'; // Rose 100
+            borderColor = '#fca5a5'; // Rose 300
+            textColor = '#b91c1c'; // Rose 700
             symbol = 'H';
           } else { // SOLD
             bgColor = '#e2e8f0'; // Slate 200
@@ -399,7 +446,7 @@
           ctx.roundRect(x, y, SEAT_SIZE, SEAT_SIZE, 6);
           ctx.fillStyle = bgColor;
           ctx.fill();
-          ctx.lineWidth = 1;
+          ctx.lineWidth = isMyHeld ? 2 : 1;
           ctx.strokeStyle = borderColor;
           ctx.stroke();
 
@@ -546,6 +593,59 @@
       const y = (e.clientY - rect.top) / scale;
 
       handleCanvasClick(x, y);
+    });
+
+    // Accessibility Hover Tooltip (Task T-33)
+    const tooltipEl = document.getElementById('seatTooltip');
+    container.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        if (tooltipEl) tooltipEl.classList.add('hidden');
+        return;
+      }
+
+      const rect = container.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / scale;
+      const y = (e.clientY - rect.top) / scale;
+
+      let hoveredSeat = null;
+      for (const seat of seats) {
+        const h = seat.hitArea;
+        if (h && x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) {
+          hoveredSeat = seat;
+          break;
+        }
+      }
+
+      if (hoveredSeat && tooltipEl) {
+        const seatLabel = `${hoveredSeat.row}${hoveredSeat.seatNumber}`;
+        const priceFmt = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(hoveredSeat.price);
+
+        let desc = '';
+        if (selectedSeatIds.has(hoveredSeat.id)) {
+          desc = `Ghế ${seatLabel} - Đang chọn (${priceFmt})`;
+        } else if (myHeldSeatIds.has(hoveredSeat.id)) {
+          desc = `Ghế ${seatLabel} - Đang được bạn giữ (Bấm để huỷ giữ)`;
+        } else if (hoveredSeat.status === 'AVAILABLE') {
+          desc = `Ghế ${seatLabel} - Còn trống (${priceFmt})`;
+        } else if (hoveredSeat.status === 'HELD') {
+          desc = `Ghế ${seatLabel} - Người khác đang giữ`;
+        } else {
+          desc = `Ghế ${seatLabel} - Đã bán`;
+        }
+
+        tooltipEl.textContent = desc;
+        tooltipEl.style.left = `${e.clientX + 14}px`;
+        tooltipEl.style.top = `${e.clientY + 14}px`;
+        tooltipEl.classList.remove('hidden');
+        container.style.cursor = (hoveredSeat.status === 'AVAILABLE' || myHeldSeatIds.has(hoveredSeat.id)) ? 'pointer' : 'not-allowed';
+      } else {
+        if (tooltipEl) tooltipEl.classList.add('hidden');
+        container.style.cursor = isDragging ? 'grabbing' : 'grab';
+      }
+    });
+
+    container.addEventListener('mouseleave', () => {
+      if (tooltipEl) tooltipEl.classList.add('hidden');
     });
 
     // Mobile click support
@@ -736,12 +836,116 @@
       }
     }
 
-    // --- Task T-24 Countdown Timer & Server Time Calibration ---
+    // --- Task T-24 / T-33: Countdown Timer & Server Time Calibration ---
     let holdTimerInterval = null;
     let holdRefServerTimeMs = 0;
     let holdRefLocalPerfMs = 0;
     let holdExpiresAtMs = 0;
     let isHoldExpiredRefreshed = false;
+
+    // --- Task T-33: Khôi phục ghế đang giữ và countdown từ T-32 API ---
+    async function restoreHeldSeats() {
+      const errBanner = document.getElementById('errorBanner');
+      if (errBanner) errBanner.classList.add('hidden');
+
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+      // Nếu user chưa đăng nhập thì không có giữ chỗ cá nhân nào
+      if (!token) {
+        myHeldSeatIds.clear();
+        stopHoldCountdown();
+        updateCart();
+        drawCanvas();
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/showtimes/${showtimeId}/seats/my-holds`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        // 401: Token hết hạn hoặc chưa đăng nhập hợp lệ
+        if (response.status === 401) {
+          myHeldSeatIds.clear();
+          stopHoldCountdown();
+          updateCart();
+          drawCanvas();
+          return;
+        }
+
+        if (response.status === 404) {
+          console.warn("[T-33] Suất chiếu không tồn tại.");
+          return;
+        }
+
+        const httpDateHeader = response.headers.get('Date');
+        const json = await response.json();
+
+        if (response.ok && json.success && json.data) {
+          const data = json.data;
+          const heldIds = data.seatIds || [];
+
+          // TEST 1 & CASE không có hold: Nếu danh sách rỗng
+          if (!heldIds || heldIds.length === 0) {
+            myHeldSeatIds.clear();
+            stopHoldCountdown();
+            updateCart();
+            drawCanvas();
+            return;
+          }
+
+          // Kiểm tra expiresAt hợp lệ (tránh 0001-01-01T00:00:00)
+          const expiresAt = data.expiresAt;
+          if (!expiresAt || expiresAt.startsWith('0001-01-01')) {
+            myHeldSeatIds.clear();
+            stopHoldCountdown();
+            updateCart();
+            drawCanvas();
+            return;
+          }
+
+          // Đối chiếu và khôi phục ghế vào myHeldSeatIds (HELD BY CURRENT USER)
+          myHeldSeatIds.clear();
+          heldIds.forEach(id => {
+            myHeldSeatIds.add(id);
+            const seat = seatMap.get(id);
+            if (seat) {
+              seat.status = 'HELD';
+            }
+          });
+
+          // Cập nhật giao diện ghế và giỏ tạm tính
+          drawCanvas();
+          updateCart();
+
+          // Khởi động đồng hồ đếm ngược với thời gian thực còn lại
+          startHoldCountdown(expiresAt, data.serverTime, httpDateHeader);
+        } else {
+          showHoldError(json.message || "Không thể tải trạng thái ghế đang giữ.");
+        }
+      } catch (err) {
+        console.error("[T-33] Lỗi gọi API my-holds:", err);
+        showHoldError("Không thể kết nối máy chủ để kiểm tra ghế đang giữ.");
+      }
+    }
+
+    function showHoldError(msg) {
+      const errBanner = document.getElementById('errorBanner');
+      const errMsg = document.getElementById('errorMessage');
+      if (errBanner && errMsg) {
+        errMsg.textContent = msg;
+        errBanner.classList.remove('hidden');
+      }
+    }
+
+    async function retryRestoreHolds() {
+      const errBanner = document.getElementById('errorBanner');
+      if (errBanner) errBanner.classList.add('hidden');
+      await restoreHeldSeats();
+    }
 
     function startHoldCountdown(expiresAtIso, serverTimeIso, httpDateHeader) {
       stopHoldCountdown(); // Dọn dẹp timer cũ nếu có
@@ -759,7 +963,13 @@
       // 2. Parse mốc hết hạn target expiresAt
       const expiresAtMs = new Date(expiresAtIso).getTime();
       if (isNaN(expiresAtMs) || isNaN(serverTimeMs)) {
-        console.error("[T-24] Mốc thời gian không hợp lệ:", { expiresAtIso, serverTimeIso });
+        console.error("[T-24 / T-33] Mốc thời gian không hợp lệ:", { expiresAtIso, serverTimeIso });
+        return;
+      }
+
+      // Nếu đã hết hạn trước khi bắt đầu
+      if (expiresAtMs <= serverTimeMs) {
+        handleHoldExpired();
         return;
       }
 
@@ -797,6 +1007,53 @@
         displayEl.textContent = formattedTime;
       }
 
+      // Cập nhật số lượng và danh sách ghế đang giữ trên banner
+      const countBadge = document.getElementById('heldCountBadge');
+      if (countBadge) {
+        countBadge.textContent = `${myHeldSeatIds.size} ghế`;
+      }
+
+      const quickList = document.getElementById('heldSeatsQuickList');
+      if (quickList) {
+        const labels = Array.from(myHeldSeatIds)
+          .map(id => seatMap.get(id))
+          .filter(Boolean)
+          .map(s => `<span class="px-2 py-0.5 bg-white/20 rounded text-xs font-bold">${s.row}${s.seatNumber}</span>`)
+          .join('');
+        quickList.innerHTML = labels;
+      }
+
+      // Trạng thái cảnh báo nhẹ khi gần hết hạn (< 90 giây) (Task T-33)
+      const banner = document.getElementById('hold-timer-banner');
+      const subtextEl = document.getElementById('timerSubtext');
+      const statusBadge = document.getElementById('timerStatusBadge');
+      
+      if (remainingSeconds <= 90 && remainingSeconds > 0) {
+        if (banner) {
+          banner.classList.remove('from-amber-500', 'via-amber-600', 'to-orange-600');
+          banner.classList.add('from-rose-600', 'via-rose-600', 'to-red-700');
+        }
+        if (subtextEl) {
+          subtextEl.textContent = '⚠️ Sắp hết hạn giữ chỗ!';
+          subtextEl.classList.add('text-rose-200');
+        }
+        if (statusBadge) {
+          statusBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-xs text-rose-200"></i><span class="text-xs font-semibold">Vui lòng hoàn tất thanh toán</span>`;
+        }
+      } else {
+        if (banner) {
+          banner.classList.remove('from-rose-600', 'via-rose-600', 'to-red-700');
+          banner.classList.add('from-amber-500', 'via-amber-600', 'to-orange-600');
+        }
+        if (subtextEl) {
+          subtextEl.textContent = '(Đồng bộ máy chủ)';
+          subtextEl.classList.remove('text-rose-200');
+        }
+        if (statusBadge) {
+          statusBadge.innerHTML = `<i class="fa-solid fa-shield-halved text-xs text-amber-200"></i><span class="text-xs font-semibold">Ghế của bạn đã được khóa an toàn</span>`;
+        }
+      }
+
       // Khi đếm ngược về 0
       if (remainingSeconds <= 0) {
         stopHoldCountdown();
@@ -819,19 +1076,22 @@
     }
 
     async function handleHoldExpired() {
-      alert("Thời gian giữ ghế của bạn đã hết hạn.");
+      // Dừng timer ngay
+      stopHoldCountdown();
 
-      // Xóa danh sách ghế đang giữ/chọn và ẩn đồng hồ
+      // Bỏ trạng thái giữ ghế của current user
       myHeldSeatIds.clear();
       selectedSeatIds.clear();
-      stopHoldCountdown();
       updateCart();
+      drawCanvas();
 
-      // Làm mới sơ đồ ghế từ T-20 API
+      alert("Thời gian giữ ghế của bạn đã hết hạn.");
+
+      // Làm mới sơ đồ ghế từ API
       try {
         await fetchSeats();
       } catch (err) {
-        console.error("[T-24] Lỗi làm mới sơ đồ ghế sau khi hết hạn:", err);
+        console.error("[T-33] Lỗi làm mới sơ đồ ghế sau khi hết hạn:", err);
       }
     }
 
