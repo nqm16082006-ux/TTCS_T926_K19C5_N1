@@ -133,7 +133,7 @@ namespace EventTicketBooking.Tests
                             Id = Guid.NewGuid(),
                             ShowtimeId = showtimeId,
                             Name = "VIP",
-                            Price = 500000m
+                            Price = 500000
                         };
                         setupContext.SeatCategories.Add(category);
 

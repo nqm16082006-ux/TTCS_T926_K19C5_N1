@@ -124,9 +124,9 @@ namespace EventTicketBooking.Api.Data
                     };
                     showtime1.ChangeStatus(ShowtimeStatus.OnSale);
 
-                    var catStandard = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "Standard / Vé Thường", Price = 300000m };
-                    var catVip = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "VIP / Vé Cao Cấp", Price = 1200000m };
-                    var catVvip = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "VVIP / Vé Đặc Biệt", Price = 2500000m };
+                    var catStandard = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "Standard / Vé Thường", Price = 300000 };
+                    var catVip = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "VIP / Vé Cao Cấp", Price = 1200000 };
+                    var catVvip = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "VVIP / Vé Đặc Biệt", Price = 2500000 };
 
                     showtime1.SeatCategories.Add(catStandard);
                     showtime1.SeatCategories.Add(catVip);
@@ -158,8 +158,8 @@ namespace EventTicketBooking.Api.Data
                     };
                     showtime2.ChangeStatus(ShowtimeStatus.OnSale);
 
-                    var catFanZone = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime2.Id, Name = "Vé Fan Zone", Price = 800000m };
-                    var catPhoThong = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime2.Id, Name = "Vé Phổ Thông", Price = 200000m };
+                    var catFanZone = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime2.Id, Name = "Vé Fan Zone", Price = 800000 };
+                    var catPhoThong = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime2.Id, Name = "Vé Phổ Thông", Price = 200000 };
 
                     showtime2.SeatCategories.Add(catPhoThong);
                     showtime2.SeatCategories.Add(catFanZone);

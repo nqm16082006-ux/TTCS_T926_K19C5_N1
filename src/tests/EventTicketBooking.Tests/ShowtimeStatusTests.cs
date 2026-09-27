@@ -22,6 +22,35 @@ namespace EventTicketBooking.Tests
         {
             // Arrange
             var showtime = new Showtime { AvailableSeats = 100 };
+            showtime.SeatCategories.Add(new SeatCategory { Name = "VIP", Price = 100000 });
+
+            // Act
+            showtime.ChangeStatus(ShowtimeStatus.OnSale);
+
+            // Assert
+            Assert.Equal(ShowtimeStatus.OnSale, showtime.Status);
+        }
+
+        [Fact]
+        public void ChangeStatus_DraftToOnSale_WithCategoryMissingPrice_ShouldThrowAndKeepDraftStatus()
+        {
+            // Arrange
+            var showtime = new Showtime { AvailableSeats = 100 };
+            showtime.SeatCategories.Add(new SeatCategory { Name = "Standard", Price = 100000 });
+            showtime.SeatCategories.Add(new SeatCategory { Name = "VIP", Price = null });
+
+            // Act & Assert
+            var ex = Assert.Throws<InvalidOperationException>(() => showtime.ChangeStatus(ShowtimeStatus.OnSale));
+            Assert.Contains("VIP", ex.Message);
+            Assert.Equal(ShowtimeStatus.Draft, showtime.Status);
+        }
+
+        [Fact]
+        public void ChangeStatus_DraftToOnSale_WithFreeCategory_ShouldSucceed()
+        {
+            // Arrange
+            var showtime = new Showtime { AvailableSeats = 100 };
+            showtime.SeatCategories.Add(new SeatCategory { Name = "Free", Price = 0 });
 
             // Act
             showtime.ChangeStatus(ShowtimeStatus.OnSale);

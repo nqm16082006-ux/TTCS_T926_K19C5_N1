@@ -209,9 +209,9 @@ namespace EventTicketBooking.Tests
             var s1 = new Showtime { Id = Guid.NewGuid(), EventId = ev.Id, AvailableSeats = 100, StartTime = DateTime.UtcNow.AddDays(1), EndTime = DateTime.UtcNow.AddDays(1).AddHours(2) };
             s1.ChangeStatus(ShowtimeStatus.OnSale);
 
-            s1.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = s1.Id, Name = "Standard", Price = 200000m });
-            s1.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = s1.Id, Name = "VIP", Price = 800000m });
-            s1.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = s1.Id, Name = "VVIP", Price = 1500000m });
+            s1.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = s1.Id, Name = "Standard", Price = 200000 });
+            s1.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = s1.Id, Name = "VIP", Price = 800000 });
+            s1.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = s1.Id, Name = "VVIP", Price = 1500000 });
 
             var s2 = new Showtime { Id = Guid.NewGuid(), EventId = ev.Id, AvailableSeats = 50, StartTime = DateTime.UtcNow.AddDays(2), EndTime = DateTime.UtcNow.AddDays(2).AddHours(2) };
             s2.ChangeStatus(ShowtimeStatus.OnSale);

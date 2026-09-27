@@ -76,7 +76,7 @@ namespace EventTicketBooking.Api.Data
                 entity.ToTable("SeatCategories");
                 entity.HasKey(sc => sc.Id);
                 entity.Property(sc => sc.Name).IsRequired().HasMaxLength(100);
-                entity.Property(sc => sc.Price).HasColumnType("numeric(18,2)").IsRequired();
+                entity.Property(sc => sc.Price).HasColumnType("integer").IsRequired(false);
                 entity.HasOne(sc => sc.Showtime)
                       .WithMany(s => s.SeatCategories)
                       .HasForeignKey(sc => sc.ShowtimeId)

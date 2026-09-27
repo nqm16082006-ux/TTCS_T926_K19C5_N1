@@ -95,7 +95,7 @@ namespace EventTicketBooking.Tests
                 Id = Guid.NewGuid(),
                 ShowtimeId = showtimeId,
                 Name = "Standard",
-                Price = 200000m
+                Price = 200000
             };
             _context.SeatCategories.Add(category);
 

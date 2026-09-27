@@ -113,8 +113,8 @@ namespace EventTicketBooking.Api.Controllers
                 EndTime = s.EndTime,
                 AvailableSeats = s.AvailableSeats,
                 Status = s.Status.ToString(),
-                MinPrice = s.SeatCategories != null && s.SeatCategories.Any() ? s.SeatCategories.Min(sc => sc.Price) : 0m,
-                MaxPrice = s.SeatCategories != null && s.SeatCategories.Any() ? s.SeatCategories.Max(sc => sc.Price) : 0m
+                MinPrice = s.SeatCategories != null && s.SeatCategories.Any() ? s.SeatCategories.Min(sc => sc.Price) ?? 0 : 0m,
+                MaxPrice = s.SeatCategories != null && s.SeatCategories.Any() ? s.SeatCategories.Max(sc => sc.Price) ?? 0 : 0m
             }).ToList();
 
             string? nextCursor = null;
@@ -184,8 +184,8 @@ namespace EventTicketBooking.Api.Controllers
                 EndTime = showtime.EndTime,
                 AvailableSeats = showtime.AvailableSeats,
                 Status = showtime.Status.ToString(),
-                MinPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? showtime.SeatCategories.Min(sc => sc.Price) : 0m,
-                MaxPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? showtime.SeatCategories.Max(sc => sc.Price) : 0m
+                MinPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? showtime.SeatCategories.Min(sc => sc.Price) ?? 0 : 0m,
+                MaxPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? showtime.SeatCategories.Max(sc => sc.Price) ?? 0 : 0m
             };
 
             return Ok(ApiResponse<PublicShowtimeDto>.SuccessResult(dto, "Lấy thông tin chi tiết suất chiếu thành công."));
@@ -263,7 +263,7 @@ namespace EventTicketBooking.Api.Controllers
                             Row = seat.Row,
                             SeatNumber = seat.SeatNumber,
                             CategoryName = category.Name,
-                            Price = category.Price,
+                            Price = category.Price ?? 0,
                             Status = mockSoldSeatIds.Contains(seat.Id) ? "SOLD" :
                                     (activeHeldSeatIds.Contains(seat.Id) ? "HELD" : "AVAILABLE")
                         };

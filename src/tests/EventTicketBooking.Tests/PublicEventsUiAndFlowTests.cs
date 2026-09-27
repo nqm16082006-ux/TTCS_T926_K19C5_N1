@@ -73,8 +73,8 @@ namespace EventTicketBooking.Tests
             };
             showtime.ChangeStatus(ShowtimeStatus.OnSale);
 
-            showtime.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime.Id, Name = "GA", Price = 300000m });
-            showtime.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime.Id, Name = "VIP", Price = 1200000m });
+            showtime.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime.Id, Name = "GA", Price = 300000 });
+            showtime.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime.Id, Name = "VIP", Price = 1200000 });
 
             _context.Events.Add(ev);
             _context.Showtimes.Add(showtime);

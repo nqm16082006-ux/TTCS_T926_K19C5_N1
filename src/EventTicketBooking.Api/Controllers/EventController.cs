@@ -309,6 +309,10 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Suất diễn không tồn tại."));
             }
 
+            await _context.Entry(showtime)
+                .Collection(s => s.SeatCategories)
+                .LoadAsync();
+
             try
             {
                 showtime.ChangeStatus(ShowtimeStatus.OnSale);
