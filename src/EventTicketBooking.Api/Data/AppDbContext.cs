@@ -144,7 +144,10 @@ namespace EventTicketBooking.Api.Data
                 entity.HasIndex(sh => new { sh.Status, sh.ExpiresAt })
                     .HasDatabaseName("IX_seat_holds_status_expires_at");
 
-                entity.HasIndex(sh => sh.SeatId);
+                entity.HasIndex(sh => sh.SeatId)
+                    .IsUnique()
+                    .HasFilter("\"Status\" = 'ACTIVE'")
+                    .HasDatabaseName("IX_seat_holds_SeatId_Active");
                 entity.HasIndex(sh => sh.UserId);
             });
 

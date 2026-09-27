@@ -114,7 +114,21 @@ namespace EventTicketBooking.Api.Services.Implementations
 
                     if (res == 0)
                     {
-                        return HoldSeatsResult.ConflictResult("Một hoặc nhiều ghế đã được giữ chỗ bởi người dùng khác.");
+                        var redisConflictingSeats = await _context.SeatHold
+                            .AsNoTracking()
+                            .Where(sh => seatIds.Contains(sh.SeatId) && sh.Status == "ACTIVE" && sh.ExpiresAt > now && sh.UserId != userId)
+                            .Select(sh => sh.SeatId)
+                            .ToListAsync(cancellationToken);
+
+                        if (redisConflictingSeats.Count == 0)
+                        {
+                            redisConflictingSeats = seatIds;
+                        }
+
+                        _logger.LogWarning("Tranh chấp giữ ghế qua Redis: User {UserId} bị từ chối khi giữ các ghế [{SeatIds}]. Ghế tranh chấp: [{ConflictingSeats}].",
+                            userId, string.Join(", ", seatIds), string.Join(", ", redisConflictingSeats));
+
+                        return HoldSeatsResult.ConflictResult("Một hoặc nhiều ghế đã được giữ chỗ bởi người dùng khác.", redisConflictingSeats);
                     }
 
                     redisCheckedAndHeld = true;
@@ -125,24 +139,41 @@ namespace EventTicketBooking.Api.Services.Implementations
                 }
             }
 
-            // 5. Kiểm tra trạng thái trong Database (PostgreSQL)
-            var activeHoldsInDb = await _context.SeatHold
+            // 5. Khử các giữ chỗ cũ đã hết hạn trên các ghế được yêu cầu (đổi Status sang EXPIRED để không vi phạm ràng buộc Unique)
+            var expiredActiveHolds = await _context.SeatHold
+                .Where(sh => seatIds.Contains(sh.SeatId) && sh.Status == "ACTIVE" && sh.ExpiresAt <= now)
+                .ToListAsync(cancellationToken);
+
+            if (expiredActiveHolds.Count > 0)
+            {
+                foreach (var expiredHold in expiredActiveHolds)
+                {
+                    expiredHold.Status = "EXPIRED";
+                }
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+
+            // 6. Kiểm tra trạng thái các ghế bị giữ bởi người khác trong Database
+            var conflictingSeatsInDb = await _context.SeatHold
                 .AsNoTracking()
                 .Where(sh => seatIds.Contains(sh.SeatId) && sh.Status == "ACTIVE" && sh.ExpiresAt > now && sh.UserId != userId)
-                .AnyAsync(cancellationToken);
+                .Select(sh => sh.SeatId)
+                .ToListAsync(cancellationToken);
 
-            if (activeHoldsInDb)
+            if (conflictingSeatsInDb.Count > 0)
             {
-                // Nếu DB có ghế bị người khác giữ -> Compensation xóa CÓ ĐIỀU KIỆN các Redis keys vừa set (chỉ xóa key thuộc về user)
+                _logger.LogWarning("Tranh chấp giữ ghế (Hold Conflict): User {UserId} yêu cầu giữ các ghế [{RequestedSeatIds}], nhưng các ghế [{ConflictingSeatIds}] đang bị giữ bởi người khác.",
+                    userId, string.Join(", ", seatIds), string.Join(", ", conflictingSeatsInDb));
+
                 if (redisCheckedAndHeld)
                 {
                     await ReleaseRedisHoldConditionalAsync(redisKeys, userId);
                 }
 
-                return HoldSeatsResult.ConflictResult("Một hoặc nhiều ghế đã được giữ chỗ bởi người dùng khác.");
+                return HoldSeatsResult.ConflictResult("Một hoặc nhiều ghế đã được giữ chỗ bởi người dùng khác.", conflictingSeatsInDb);
             }
 
-            // 6. Ghi dữ liệu bền vững vào PostgreSQL seat_holds
+            // 7. Ghi dữ liệu bền vững vào PostgreSQL seat_holds
             var newHolds = seats.Select(s => new SeatHolds
             {
                 Id = Guid.NewGuid(),
@@ -158,11 +189,36 @@ namespace EventTicketBooking.Api.Services.Implementations
                 _context.SeatHold.AddRange(newHolds);
                 await _context.SaveChangesAsync(cancellationToken);
             }
+            catch (DbUpdateException ex)
+            {
+                _context.ChangeTracker.Clear();
+
+                _logger.LogWarning(ex, "Tranh chấp giữ ghế ở tầng DB (Unique Constraint Conflict T-29/T-30): User {UserId} vi phạm khóa Unique khi cố gắng giữ các ghế [{SeatIds}].",
+                    userId, string.Join(", ", seatIds));
+
+                if (redisCheckedAndHeld)
+                {
+                    await ReleaseRedisHoldConditionalAsync(redisKeys, userId);
+                }
+
+                var activeConflictingSeats = await _context.SeatHold
+                    .AsNoTracking()
+                    .Where(sh => seatIds.Contains(sh.SeatId) && sh.Status == "ACTIVE" && sh.ExpiresAt > now && sh.UserId != userId)
+                    .Select(sh => sh.SeatId)
+                    .ToListAsync(cancellationToken);
+
+                if (activeConflictingSeats.Count == 0)
+                {
+                    activeConflictingSeats = seatIds;
+                }
+
+                return HoldSeatsResult.ConflictResult("Một hoặc nhiều ghế đã được giữ chỗ bởi người dùng khác.", activeConflictingSeats);
+            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Lỗi khi lưu seat_holds vào PostgreSQL. Tiến hành hoán tác (compensation) giải phóng có điều kiện Redis keys.");
+                _context.ChangeTracker.Clear();
+                _logger.LogError(ex, "Lỗi không xác định khi lưu seat_holds vào cơ sở dữ liệu. Tiến hành hoán tác (compensation) giải phóng có điều kiện Redis keys.");
 
-                // Compensation: Xóa CÓ ĐIỀU KIỆN các key Redis vừa tạo (chỉ xóa key sở hữu bởi userId)
                 if (redisCheckedAndHeld)
                 {
                     await ReleaseRedisHoldConditionalAsync(redisKeys, userId);

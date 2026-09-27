@@ -21,6 +21,7 @@ namespace EventTicketBooking.Api.Services.Interfaces
         public HoldSeatsResultStatus Status { get; set; }
         public string Message { get; set; } = string.Empty;
         public HoldSeatsResponseDto? Data { get; set; }
+        public List<Guid>? ConflictingSeatIds { get; set; }
 
         public static HoldSeatsResult SuccessResult(HoldSeatsResponseDto data, string message = "Giữ chỗ ghế thành công.")
         {
@@ -37,9 +38,9 @@ namespace EventTicketBooking.Api.Services.Interfaces
             return new HoldSeatsResult { Status = HoldSeatsResultStatus.InvalidRequest, Message = message };
         }
 
-        public static HoldSeatsResult ConflictResult(string message)
+        public static HoldSeatsResult ConflictResult(string message, List<Guid>? conflictingSeatIds = null)
         {
-            return new HoldSeatsResult { Status = HoldSeatsResultStatus.Conflict, Message = message };
+            return new HoldSeatsResult { Status = HoldSeatsResultStatus.Conflict, Message = message, ConflictingSeatIds = conflictingSeatIds };
         }
 
         public static HoldSeatsResult ErrorResult(string message)
