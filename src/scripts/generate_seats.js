@@ -42,7 +42,7 @@ function generateSeats() {
             seats.push({
                 row: rowName,
                 seatNumber: s,
-                categoryName: CATEGORIES[categoryIndex].name
+                category: CATEGORIES[categoryIndex].name
             });
 
             currentIndex++;
