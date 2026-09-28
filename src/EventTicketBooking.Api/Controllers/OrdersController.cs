@@ -117,7 +117,7 @@ namespace EventTicketBooking.Api.Controllers
                     ExpiresAt = paymentExpiry,
                     OrderItems = orderItems
                 };
-                
+
                 order.CalculateTotal();
 
                 _context.Orders.Add(order);

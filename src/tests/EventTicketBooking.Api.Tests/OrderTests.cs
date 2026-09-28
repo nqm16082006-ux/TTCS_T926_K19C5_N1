@@ -50,7 +50,7 @@ namespace EventTicketBooking.Api.Tests
             // Arrange
             var seatCategory = new SeatCategory { Id = Guid.NewGuid(), Name = "VIP", Price = 200000 };
             var seat = new Seat { Id = Guid.NewGuid(), SeatCategory = seatCategory, Row = "A", SeatNumber = 1 };
-            
+
             // Giả lập lúc đặt đơn, lấy giá lúc đó (200k)
             var orderItem = new OrderItem { Seat = seat, SeatId = seat.Id, Price = seatCategory.Price.Value };
             var order = new Order
