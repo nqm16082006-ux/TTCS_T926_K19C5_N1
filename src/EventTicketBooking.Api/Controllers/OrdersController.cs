@@ -51,7 +51,8 @@ namespace EventTicketBooking.Api.Controllers
             // 1. Chống bấm đúp: Trả về đơn chờ hiện tại nếu đã có
             var existingOrder = await _context.Orders
                 .Include(o => o.OrderItems)
-                .ThenInclude(oi => oi.Seat)
+                    .ThenInclude(oi => oi.Seat)
+                        .ThenInclude(s => s.SeatCategory)
                 .FirstOrDefaultAsync(o => o.UserId == userId && o.ShowtimeId == showtimeId && o.Status == OrderStatus.Pending);
 
             if (existingOrder != null)
@@ -135,6 +136,37 @@ namespace EventTicketBooking.Api.Controllers
             }
         }
 
+        /// <summary>
+        /// T-39: Lấy thông tin tóm tắt đơn hàng (ghế, hạng, đơn giá, tổng tiền, thời gian còn lại)
+        /// </summary>
+        [HttpGet("{orderId:guid}")]
+        [Authorize]
+        [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetOrderSummary(Guid orderId)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+
+            var order = await _context.Orders
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Seat)
+                        .ThenInclude(s => s.SeatCategory)
+                .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
+
+            // T-39: Chỉ chủ đơn mở được (kiểm tra 403)
+            if (order.UserId != userId)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền truy cập đơn hàng này."));
+
+            return Ok(ApiResponse<OrderDto>.SuccessResult(MapToDto(order), "Lấy thông tin đơn hàng thành công."));
+        }
+
         private OrderDto MapToDto(Order order)
         {
             return new OrderDto
@@ -149,7 +181,8 @@ namespace EventTicketBooking.Api.Controllers
                     Id = oi.Id,
                     SeatId = oi.SeatId,
                     Price = oi.Price,
-                    SeatName = oi.Seat != null ? $"{oi.Seat.Row}{oi.Seat.SeatNumber}" : null
+                    SeatName = oi.Seat != null ? $"{oi.Seat.Row}{oi.Seat.SeatNumber}" : null,
+                    CategoryName = oi.Seat?.SeatCategory?.Name
                 }).ToList()
             };
         }
