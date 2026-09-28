@@ -19,5 +19,6 @@ namespace EventTicketBooking.Api.DTOs
         public Guid SeatId { get; set; }
         public int Price { get; set; }
         public string? SeatName { get; set; }
+        public string? CategoryName { get; set; }
     }
 }
