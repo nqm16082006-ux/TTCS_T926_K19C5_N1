@@ -117,5 +117,26 @@ namespace EventTicketBooking.Tests
 
             Assert.True(sw.ElapsedMilliseconds < 200, $"Query took {sw.ElapsedMilliseconds}ms, which exceeds 200ms");
         }
+
+        [Fact]
+        public async Task GetShowtimeSeats_ShouldPreserveNullPrice()
+        {
+            var eventId = Guid.NewGuid();
+            var showtimeId = Guid.NewGuid();
+
+            _context.Events.Add(new Event { Id = eventId, OwnerId = Guid.NewGuid(), Title = "Test Event", Location = "Hanoi", TotalSeats = 1 });
+            _context.Showtimes.Add(new Showtime { Id = showtimeId, EventId = eventId, StartTime = DateTime.UtcNow, EndTime = DateTime.UtcNow.AddHours(2), AvailableSeats = 1 });
+
+            var category = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtimeId, Name = "VIP", Price = null };
+            _context.SeatCategories.Add(category);
+            _context.Seats.Add(new Seat { Id = Guid.NewGuid(), ShowtimeId = showtimeId, SeatCategoryId = category.Id, Row = "A", SeatNumber = 1 });
+            await _context.SaveChangesAsync();
+
+            var result = await CreateController().GetShowtimeSeats(showtimeId);
+
+            var okResult = Assert.IsType<OkObjectResult>(result);
+            var response = Assert.IsType<ApiResponse<List<SeatStatusDto>>>(okResult.Value);
+            Assert.Null(Assert.Single(response.Data!).Price);
+        }
     }
 }

@@ -8,7 +8,7 @@ namespace EventTicketBooking.Api.DTOs
         public string Row { get; set; } = string.Empty;
         public int SeatNumber { get; set; }
         public string CategoryName { get; set; } = string.Empty;
-        public decimal Price { get; set; }
+        public int? Price { get; set; }
         public string Status { get; set; } = "AVAILABLE"; // AVAILABLE, HELD, SOLD
     }
 }

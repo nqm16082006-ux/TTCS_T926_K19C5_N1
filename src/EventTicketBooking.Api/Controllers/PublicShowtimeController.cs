@@ -263,7 +263,7 @@ namespace EventTicketBooking.Api.Controllers
                             Row = seat.Row,
                             SeatNumber = seat.SeatNumber,
                             CategoryName = category.Name,
-                            Price = category.Price ?? 0,
+                            Price = category.Price,
                             Status = mockSoldSeatIds.Contains(seat.Id) ? "SOLD" :
                                     (activeHeldSeatIds.Contains(seat.Id) ? "HELD" : "AVAILABLE")
                         };
