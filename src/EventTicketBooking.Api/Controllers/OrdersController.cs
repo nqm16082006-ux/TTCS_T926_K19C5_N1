@@ -60,7 +60,7 @@ namespace EventTicketBooking.Api.Controllers
             }
 
             var now = DateTimeOffset.UtcNow;
-            
+
             using var transaction = await _context.Database.BeginTransactionAsync();
 
             try
@@ -87,7 +87,7 @@ namespace EventTicketBooking.Api.Controllers
                 // 3. Tính tổng và tạo đơn hàng
                 int totalAmount = 0;
                 var orderItems = new List<OrderItem>();
-                
+
                 // Gia hạn giữ chỗ bằng thời hạn thanh toán (giả sử 15 phút - E-05)
                 var paymentExpiry = now.AddMinutes(15);
 
