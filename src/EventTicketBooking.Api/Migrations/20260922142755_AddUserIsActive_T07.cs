@@ -10,20 +10,14 @@ namespace EventTicketBooking.Api.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<bool>(
-                name: "IsActive",
-                table: "Users",
-                type: "boolean",
-                nullable: false,
-                defaultValue: false);
+            // Users is created by the next migration. IsActive is included there
+            // so a new database can apply migrations in timestamp order.
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "IsActive",
-                table: "Users");
+            // No operation: this migration does not create database objects.
         }
     }
 }

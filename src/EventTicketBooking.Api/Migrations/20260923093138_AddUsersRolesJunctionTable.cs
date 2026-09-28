@@ -12,37 +12,6 @@ namespace EventTicketBooking.Api.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "Roles",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    Description = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Roles", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Users",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Username = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    Email = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    PasswordHash = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
-                    FullName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Users", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "UserRoles",
                 columns: table => new
                 {
@@ -67,41 +36,76 @@ namespace EventTicketBooking.Api.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
-            migrationBuilder.CreateIndex(
-                name: "IX_Roles_Name",
-                table: "Roles",
-                column: "Name",
-                unique: true);
+            migrationBuilder.Sql(
+                """
+                INSERT INTO "UserRoles" ("UserId", "RoleId", "AssignedAt")
+                SELECT "Id", "RoleId", CURRENT_TIMESTAMP
+                FROM "Users";
+                """);
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_Users_Roles_RoleId",
+                table: "Users");
+
+            migrationBuilder.DropIndex(
+                name: "IX_Users_RoleId",
+                table: "Users");
+
+            migrationBuilder.DropColumn(
+                name: "RoleId",
+                table: "Users");
 
             migrationBuilder.CreateIndex(
                 name: "IX_UserRoles_RoleId",
                 table: "UserRoles",
                 column: "RoleId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Users_Email",
-                table: "Users",
-                column: "Email",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Users_Username",
-                table: "Users",
-                column: "Username",
-                unique: true);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<Guid>(
+                name: "RoleId",
+                table: "Users",
+                type: "uuid",
+                nullable: true);
+
+            migrationBuilder.Sql(
+                """
+                UPDATE "Users"
+                SET "RoleId" = (
+                    SELECT "RoleId"
+                    FROM "UserRoles"
+                    WHERE "UserRoles"."UserId" = "Users"."Id"
+                    ORDER BY "RoleId"
+                    LIMIT 1
+                );
+                """);
+
             migrationBuilder.DropTable(
                 name: "UserRoles");
 
-            migrationBuilder.DropTable(
-                name: "Roles");
+            migrationBuilder.AlterColumn<Guid>(
+                name: "RoleId",
+                table: "Users",
+                type: "uuid",
+                nullable: false,
+                oldClrType: typeof(Guid),
+                oldType: "uuid",
+                oldNullable: true);
 
-            migrationBuilder.DropTable(
-                name: "Users");
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_RoleId",
+                table: "Users",
+                column: "RoleId");
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_Users_Roles_RoleId",
+                table: "Users",
+                column: "RoleId",
+                principalTable: "Roles",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
         }
     }
 }
