@@ -84,8 +84,7 @@ namespace EventTicketBooking.Api.Controllers
                     return Conflict(ApiResponse<object>.FailureResult($"Các ghế sau đã hết hạn giữ chỗ: {expiredSeatNames}. Vui lòng đặt lại."));
                 }
 
-                // 3. Tính tổng và tạo đơn hàng
-                int totalAmount = 0;
+                // 3. Tính tổng và tạo đơn hàng (T-38: Tính ở máy chủ)
                 var orderItems = new List<OrderItem>();
 
                 // Gia hạn giữ chỗ bằng thời hạn thanh toán (giả sử 15 phút - E-05)
@@ -99,7 +98,6 @@ namespace EventTicketBooking.Api.Controllers
                     }
 
                     int price = hold.Seat.SeatCategory.Price.Value;
-                    totalAmount += price;
 
                     orderItems.Add(new OrderItem
                     {
@@ -116,10 +114,11 @@ namespace EventTicketBooking.Api.Controllers
                     UserId = userId,
                     ShowtimeId = showtimeId,
                     Status = OrderStatus.Pending,
-                    TotalAmount = totalAmount,
                     ExpiresAt = paymentExpiry,
                     OrderItems = orderItems
                 };
+
+                order.CalculateTotal();
 
                 _context.Orders.Add(order);
                 await _context.SaveChangesAsync();
