@@ -664,6 +664,8 @@
       border: 1px solid var(--border-color);
       border-radius: 8px;
       font: inherit;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
     }
 
     .category-price-input:focus {
@@ -1439,13 +1441,13 @@
                 <input
                   id="price-${category.id}"
                   class="category-price-input"
-                  type="number"
-                  min="0"
-                  max="2147483647"
-                  step="1"
+                  type="text"
                   inputmode="numeric"
+                  autocomplete="off"
                   data-category-id="${category.id}"
-                  value="${category.price === null ? '' : category.price}"
+                  value="${formatPriceInputValue(category.price)}"
+                  oninput="formatPriceInput(this)"
+                  onblur="formatPriceInput(this)"
                   placeholder="Chưa đặt giá">
                 <span id="price-error-${category.id}" class="category-price-error"></span>
               </div>
@@ -1456,6 +1458,39 @@
             <span id="price-status-${showtime.id}" class="category-price-status"></span>
           </div>
         </div>`;
+    }
+
+    function formatPriceInputValue(price) {
+      if (price === null || price === undefined || price === '') return '';
+
+      const digits = String(price).replace(/\D/g, '');
+      if (digits === '') return '';
+
+      const normalizedDigits = digits.replace(/^0+(?=\d)/, '');
+      return normalizedDigits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    function formatPriceInput(input) {
+      const error = document.getElementById(`price-error-${input.dataset.categoryId}`);
+
+      if (input.value.includes('-')) {
+        input.value = '';
+        if (error) error.textContent = 'Giá không được là số âm.';
+        return;
+      }
+
+      input.value = formatPriceInputValue(input.value);
+      if (error) error.textContent = '';
+    }
+
+    function parsePriceInput(value) {
+      const rawValue = value.trim();
+      if (rawValue === '') return null;
+
+      const digits = rawValue.replace(/\./g, '');
+      if (!/^\d+$/.test(digits)) return Number.NaN;
+
+      return Number(digits);
     }
 
     async function saveSeatCategoryPrices(showtimeId) {
@@ -1476,14 +1511,14 @@
           return;
         }
 
-        if (!/^\d+$/.test(rawValue)) {
+        const price = parsePriceInput(rawValue);
+        if (!Number.isInteger(price)) {
           error.textContent = 'Giá phải là số nguyên từ 0 trở lên.';
           isValid = false;
           return;
         }
 
-        const price = Number(rawValue);
-        if (!Number.isSafeInteger(price) || price > 2147483647) {
+        if (!Number.isSafeInteger(price) || price < 0 || price > 2147483647) {
           error.textContent = 'Giá vượt quá giới hạn cho phép.';
           isValid = false;
           return;
@@ -1522,7 +1557,7 @@
 
         result.data.forEach(category => {
           const input = document.getElementById(`price-${category.id}`);
-          if (input) input.value = category.price === null ? '' : category.price;
+          if (input) input.value = formatPriceInputValue(category.price);
         });
 
         status.style.color = '#059669';
@@ -1541,8 +1576,12 @@
 
     // --- Seat Import Logic ---
     function openSeatImportModal(showtimeId) {
+      const canImportSeats = isGuid(showtimeId) && !isOfflineDemo;
+      const fileInput = document.getElementById('seatFile');
+
       document.getElementById('importShowtimeId').value = showtimeId;
-      document.getElementById('seatFile').value = '';
+      fileInput.value = '';
+      fileInput.disabled = !canImportSeats;
       document.getElementById('fileNameDisplay').textContent = 'Nhấn để chọn tệp JSON';
       document.getElementById('importPreviewArea').style.display = 'none';
       document.getElementById('importPreviewArea').innerHTML = '';
@@ -1551,6 +1590,10 @@
       document.getElementById('btnConfirmImport').disabled = true;
       document.getElementById('seatImportModal').style.display = 'flex';
       closeShowtimeModal();
+
+      if (!canImportSeats) {
+        showSeatImportAlert('Không thể nạp ghế cho suất diễn demo. Vui lòng đăng nhập và chọn một suất diễn thật từ API.');
+      }
     }
 
     function closeSeatImportModal() {
@@ -1579,6 +1622,11 @@
       const showtimeId = document.getElementById('importShowtimeId').value;
       const fileInput = document.getElementById('seatFile');
       if (!fileInput.files || fileInput.files.length === 0) return;
+
+      if (!isGuid(showtimeId)) {
+        showSeatImportAlert('Mã suất diễn không hợp lệ. Vui lòng chọn một suất diễn thật từ API.');
+        return;
+      }
       
       const file = fileInput.files[0];
       const formData = new FormData();
@@ -1608,14 +1656,10 @@
         } else if (res.status === 400 && result.errors) {
           renderSeatErrors(result.errors);
         } else {
-          const alert = document.getElementById('seatImportAlert');
-          alert.textContent = result.detail || result.title || 'Lỗi định dạng tệp.';
-          alert.style.display = 'block';
+          showSeatImportAlert(getSeatImportErrorMessage(result, res.status, 'Không thể xem trước sơ đồ ghế.'));
         }
       } catch (err) {
-        const alert = document.getElementById('seatImportAlert');
-        alert.textContent = 'Lỗi kết nối máy chủ.';
-        alert.style.display = 'block';
+        showSeatImportAlert('Lỗi kết nối máy chủ.');
       } finally {
         btnPreview.innerHTML = 'Xem trước';
         btnPreview.disabled = false;
@@ -1666,6 +1710,11 @@
       const showtimeId = document.getElementById('importShowtimeId').value;
       const fileInput = document.getElementById('seatFile');
       if (!fileInput.files || fileInput.files.length === 0) return;
+
+      if (!isGuid(showtimeId)) {
+        showSeatImportAlert('Mã suất diễn không hợp lệ. Vui lòng chọn một suất diễn thật từ API.');
+        return;
+      }
       
       const file = fileInput.files[0];
       const formData = new FormData();
@@ -1690,19 +1739,39 @@
           closeSeatImportModal();
           loadEvents(); 
         } else {
-          const alert = document.getElementById('seatImportAlert');
-          alert.textContent = result.detail || result.title || 'Lỗi khi nạp tệp.';
-          alert.style.display = 'block';
+          showSeatImportAlert(getSeatImportErrorMessage(result, res.status, 'Không thể nạp sơ đồ ghế.'));
         }
       } catch (err) {
-        const alert = document.getElementById('seatImportAlert');
-        alert.textContent = 'Lỗi kết nối máy chủ.';
-        alert.style.display = 'block';
+        showSeatImportAlert('Lỗi kết nối máy chủ.');
       } finally {
         btnConfirm.innerHTML = 'Xác nhận nạp';
         btnConfirm.disabled = false;
         document.getElementById('btnPreviewSeats').disabled = false;
       }
+    }
+
+    function isGuid(value) {
+      return /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value || '');
+    }
+
+    function showSeatImportAlert(message) {
+      const alert = document.getElementById('seatImportAlert');
+      alert.textContent = message;
+      alert.style.display = 'block';
+    }
+
+    function getSeatImportErrorMessage(result, status, fallbackMessage) {
+      if (result && typeof result === 'object') {
+        if (result.detail) return result.detail;
+        if (result.message) return result.message;
+        if (result.title) return result.title;
+      }
+
+      if (status === 404) {
+        return 'Không tìm thấy endpoint hoặc mã suất diễn không hợp lệ.';
+      }
+
+      return `${fallbackMessage} (HTTP ${status})`;
     }
 
     // Helper functions

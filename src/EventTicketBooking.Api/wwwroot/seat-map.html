@@ -67,7 +67,7 @@
     /* Legend */
     .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #475569; }
     .legend-box { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; border: 1px solid rgba(0,0,0,0.1); }
-    .legend-available { background-color: #e0e7ff; color: #4f46e5; border-color: #a5b4fc; }
+    .legend-available { background-color: #ffffff; color: #334155; border: 2px dashed #94a3b8; }
     .legend-held { background-color: #fef08a; color: #ca8a04; border-color: #fde047; }
     .legend-sold { background-color: #e2e8f0; color: #64748b; border-color: #cbd5e1; }
     .legend-selected { background-color: #10b981; color: white; border-color: #059669; }
@@ -89,12 +89,35 @@
       gap: 7px;
       flex: 0 0 auto;
       padding: 6px 10px;
-      border: 1px solid #c7d2fe;
+      border: 1px solid #e2e8f0;
       border-radius: 999px;
-      background: #eef2ff;
-      color: #3730a3;
+      background: #ffffff;
+      color: #334155;
       font-size: 12px;
       font-weight: 700;
+    }
+
+    .category-color-swatch {
+      width: 22px;
+      height: 22px;
+      flex: 0 0 22px;
+      border: 2px solid;
+      border-radius: 6px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+    }
+
+    .tooltip-category-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tooltip-category-swatch {
+      width: 12px;
+      height: 12px;
+      display: inline-block;
+      border: 1px solid;
+      border-radius: 3px;
     }
 
     .seat-tooltip {
@@ -246,6 +269,18 @@
     let myHeldSeatIds = new Set();
     let seatMap = new Map();
     let seatLayout = { rows: 0, cols: 0, matrix: [] };
+    let categoryColorMap = new Map();
+
+    const CATEGORY_COLOR_PALETTE = [
+      { background: '#dbeafe', border: '#60a5fa', text: '#1d4ed8' },
+      { background: '#ede9fe', border: '#a78bfa', text: '#6d28d9' },
+      { background: '#ffe4e6', border: '#fb7185', text: '#be123c' },
+      { background: '#ffedd5', border: '#fb923c', text: '#c2410c' },
+      { background: '#ccfbf1', border: '#2dd4bf', text: '#0f766e' },
+      { background: '#ecfccb', border: '#a3e635', text: '#4d7c0f' },
+      { background: '#cffafe', border: '#22d3ee', text: '#0e7490' },
+      { background: '#fae8ff', border: '#e879f9', text: '#a21caf' }
+    ];
 
     // Canvas & Viewport state
     const canvas = document.getElementById('seatCanvas');
@@ -273,6 +308,7 @@
       
       if (json.success) {
         seats = json.data;
+        buildCategoryColorMap();
         renderCategoryPriceLegend();
         
         const processStartTime = performance.now();
@@ -372,9 +408,9 @@
       const categories = new Map();
 
       seats.forEach(seat => {
-        const key = `${seat.categoryName}\u0000${seat.price ?? 'null'}`;
-        if (!categories.has(key)) {
-          categories.set(key, { name: seat.categoryName, price: seat.price });
+        const categoryName = seat.categoryName || 'Không xác định';
+        if (!categories.has(categoryName)) {
+          categories.set(categoryName, { name: categoryName, price: seat.price });
         }
       });
 
@@ -385,12 +421,40 @@
 
       legend.innerHTML = `
         <span class="text-xs font-extrabold text-slate-600 whitespace-nowrap">Hạng ghế:</span>
-        ${Array.from(categories.values()).map(category => `
+        ${Array.from(categories.values())
+          .sort((left, right) => left.name.localeCompare(right.name, 'vi'))
+          .map(category => {
+            const color = getCategoryColor(category.name);
+            return `
           <span class="category-price-chip">
-            <i class="fa-solid fa-ticket"></i>
+            <span
+              class="category-color-swatch"
+              style="background-color: ${color.background}; border-color: ${color.border};"
+              aria-hidden="true"></span>
             ${escapeHtml(category.name)}: ${formatPrice(category.price)}
           </span>
-        `).join('')}`;
+        `;
+          }).join('')}`;
+    }
+
+    function buildCategoryColorMap() {
+      categoryColorMap = new Map();
+
+      const categoryNames = Array.from(new Set(
+        seats.map(seat => seat.categoryName || 'Không xác định')
+      )).sort((left, right) => left.localeCompare(right, 'vi'));
+
+      categoryNames.forEach((categoryName, index) => {
+        categoryColorMap.set(
+          categoryName,
+          CATEGORY_COLOR_PALETTE[index % CATEGORY_COLOR_PALETTE.length]
+        );
+      });
+    }
+
+    function getCategoryColor(categoryName) {
+      return categoryColorMap.get(categoryName || 'Không xác định')
+        || CATEGORY_COLOR_PALETTE[0];
     }
 
     // Set canvas internal resolution based on layout size
@@ -454,6 +518,7 @@
           seat.hitArea = { x, y, w: SEAT_SIZE, h: SEAT_SIZE };
 
           const isSelected = selectedSeatIds.has(seat.id);
+          const categoryColor = getCategoryColor(seat.categoryName);
           
           // Colors & Labels (Accessibility NFR: Symbols A, H, X)
           let bgColor, borderColor, textColor, symbol;
@@ -464,9 +529,9 @@
             textColor = '#ffffff';
             symbol = '✓';
           } else if (seat.status === 'AVAILABLE') {
-            bgColor = '#e0e7ff'; // Indigo 100
-            borderColor = '#a5b4fc';
-            textColor = '#4f46e5';
+            bgColor = categoryColor.background;
+            borderColor = categoryColor.border;
+            textColor = categoryColor.text;
             symbol = 'A';
           } else if (seat.status === 'HELD') {
             bgColor = '#fef08a'; // Yellow 200
@@ -689,9 +754,16 @@
     function showSeatTooltip(seat, clientX, clientY) {
       const tooltip = document.getElementById('seatTooltip');
       const workspaceRect = workspace.getBoundingClientRect();
+      const categoryColor = getCategoryColor(seat.categoryName);
       tooltip.innerHTML = `
         <strong>Ghế ${escapeHtml(seat.row)}${seat.seatNumber}</strong><br>
-        Hạng: ${escapeHtml(seat.categoryName)}<br>
+        <span class="tooltip-category-row">
+          <span
+            class="tooltip-category-swatch"
+            style="background-color: ${categoryColor.background}; border-color: ${categoryColor.border};"
+            aria-hidden="true"></span>
+          Hạng: ${escapeHtml(seat.categoryName)}
+        </span><br>
         Giá: ${formatPrice(seat.price)}`;
       tooltip.style.display = 'block';
 
