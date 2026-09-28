@@ -11,7 +11,7 @@ namespace EventTicketBooking.Api.Models
 
         public string Name { get; set; } = string.Empty;
 
-        public decimal Price { get; set; }
+        public int? Price { get; set; }
 
         [JsonIgnore]
         public Showtime Showtime { get; set; } = null!;

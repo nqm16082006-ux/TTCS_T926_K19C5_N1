@@ -130,6 +130,53 @@ namespace EventTicketBooking.Tests
         }
 
         [Fact]
+        public async Task OpenSale_ShouldReturnBadRequestWithCategoryName_WhenPriceIsMissing()
+        {
+            // Arrange
+            var ev = new Event
+            {
+                Id = Guid.NewGuid(),
+                OwnerId = _userId,
+                Title = "Test Event",
+                Location = "Location",
+                StartTime = DateTime.UtcNow.AddDays(1),
+                EndTime = DateTime.UtcNow.AddDays(2),
+                TotalSeats = 100
+            };
+            var showtime = new Showtime
+            {
+                Id = Guid.NewGuid(),
+                EventId = ev.Id,
+                AvailableSeats = 100,
+                StartTime = ev.StartTime,
+                EndTime = ev.EndTime
+            };
+            showtime.SeatCategories.Add(new SeatCategory
+            {
+                ShowtimeId = showtime.Id,
+                Name = "VIP",
+                Price = null
+            });
+            ev.Showtimes.Add(showtime);
+            _context.Events.Add(ev);
+            await _context.SaveChangesAsync();
+            _context.ChangeTracker.Clear();
+
+            // Act
+            var result = await _controller.OpenSale(ev.Id, showtime.Id);
+
+            // Assert
+            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+            var apiResponse = Assert.IsType<ApiResponse<object>>(badRequestResult.Value);
+            Assert.False(apiResponse.Success);
+            Assert.Contains("VIP", apiResponse.Message);
+
+            var showtimeInDb = await _context.Showtimes.FindAsync(showtime.Id);
+            Assert.NotNull(showtimeInDb);
+            Assert.Equal(ShowtimeStatus.Draft, showtimeInDb.Status);
+        }
+
+        [Fact]
         public async Task OpenSale_ShouldReturnForbidden_WhenNotOwner()
         {
             // Arrange

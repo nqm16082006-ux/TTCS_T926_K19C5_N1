@@ -50,7 +50,7 @@ namespace EventTicketBooking.Tests
             _context.Events.Add(new Event { Id = eventId, OwnerId = Guid.NewGuid(), Title = "Test Event", Location = "Hanoi", TotalSeats = 100 });
             _context.Showtimes.Add(new Showtime { Id = showtimeId, EventId = eventId, StartTime = DateTime.UtcNow, EndTime = DateTime.UtcNow.AddHours(2), AvailableSeats = 100 });
 
-            var category = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtimeId, Name = "VIP", Price = 500000m };
+            var category = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtimeId, Name = "VIP", Price = 500000 };
             _context.SeatCategories.Add(category);
 
             var availableSeat = new Seat { Id = Guid.NewGuid(), ShowtimeId = showtimeId, SeatCategoryId = category.Id, Row = "A", SeatNumber = 1 };
@@ -85,7 +85,7 @@ namespace EventTicketBooking.Tests
             _context.Events.Add(new Event { Id = eventId, OwnerId = Guid.NewGuid(), Title = "Mega Event", Location = "Stadium", TotalSeats = 2000 });
             _context.Showtimes.Add(new Showtime { Id = showtimeId, EventId = eventId, StartTime = DateTime.UtcNow, EndTime = DateTime.UtcNow.AddHours(2), AvailableSeats = 2000 });
 
-            var category = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtimeId, Name = "Standard", Price = 100000m };
+            var category = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtimeId, Name = "Standard", Price = 100000 };
             _context.SeatCategories.Add(category);
 
             var seats = new List<Seat>(2000);
@@ -116,6 +116,27 @@ namespace EventTicketBooking.Tests
             Assert.Equal(2000, response.Data.Count(s => s.Status == "AVAILABLE"));
 
             Assert.True(sw.ElapsedMilliseconds < 200, $"Query took {sw.ElapsedMilliseconds}ms, which exceeds 200ms");
+        }
+
+        [Fact]
+        public async Task GetShowtimeSeats_ShouldPreserveNullPrice()
+        {
+            var eventId = Guid.NewGuid();
+            var showtimeId = Guid.NewGuid();
+
+            _context.Events.Add(new Event { Id = eventId, OwnerId = Guid.NewGuid(), Title = "Test Event", Location = "Hanoi", TotalSeats = 1 });
+            _context.Showtimes.Add(new Showtime { Id = showtimeId, EventId = eventId, StartTime = DateTime.UtcNow, EndTime = DateTime.UtcNow.AddHours(2), AvailableSeats = 1 });
+
+            var category = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtimeId, Name = "VIP", Price = null };
+            _context.SeatCategories.Add(category);
+            _context.Seats.Add(new Seat { Id = Guid.NewGuid(), ShowtimeId = showtimeId, SeatCategoryId = category.Id, Row = "A", SeatNumber = 1 });
+            await _context.SaveChangesAsync();
+
+            var result = await CreateController().GetShowtimeSeats(showtimeId);
+
+            var okResult = Assert.IsType<OkObjectResult>(result);
+            var response = Assert.IsType<ApiResponse<List<SeatStatusDto>>>(okResult.Value);
+            Assert.Null(Assert.Single(response.Data!).Price);
         }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace EventTicketBooking.Api.Models
 {
@@ -37,6 +38,18 @@ namespace EventTicketBooking.Api.Models
                 {
                     throw new InvalidOperationException("Không thể chuyển sang trạng thái Đang bán vì suất diễn chưa có ghế.");
                 }
+
+                var categoriesWithoutPrice = SeatCategories
+                    .Where(category => category.Price is null)
+                    .Select(category => category.Name)
+                    .ToList();
+
+                if (categoriesWithoutPrice.Count > 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Không thể chuyển sang trạng thái Đang bán vì các hạng ghế chưa có giá: {string.Join(", ", categoriesWithoutPrice)}.");
+                }
+
                 Status = ShowtimeStatus.OnSale;
                 return;
             }
