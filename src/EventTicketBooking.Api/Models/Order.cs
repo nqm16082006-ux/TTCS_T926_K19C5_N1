@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace EventTicketBooking.Api.Models
 {
@@ -25,5 +26,10 @@ namespace EventTicketBooking.Api.Models
         public User User { get; set; } = null!;
         public Showtime Showtime { get; set; } = null!;
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
+
+        public void CalculateTotal()
+        {
+            TotalAmount = OrderItems?.Sum(oi => oi.Price) ?? 0;
+        }
     }
 }
