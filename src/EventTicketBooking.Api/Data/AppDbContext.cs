@@ -15,6 +15,8 @@ namespace EventTicketBooking.Api.Data
         public DbSet<Seat> Seats { get; set; } = null!;
         public DbSet<SeatCategory> SeatCategories { get; set; } = null!;
         public DbSet<SeatHolds> SeatHold { get; set; } = null!;
+        public DbSet<Order> Orders { get; set; } = null!;
+        public DbSet<OrderItem> OrderItems { get; set; } = null!;
         public DbSet<Role> Roles { get; set; } = null!;
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<UserRole> UserRoles { get; set; } = null!;
@@ -26,6 +28,7 @@ namespace EventTicketBooking.Api.Data
             if (Database.IsNpgsql())
             {
                 modelBuilder.HasPostgresEnum<ShowtimeStatus>();
+                modelBuilder.HasPostgresEnum<OrderStatus>();
             }
 
             modelBuilder.Entity<Event>(entity =>
@@ -196,6 +199,68 @@ namespace EventTicketBooking.Api.Data
                       .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasIndex(ur => ur.RoleId);
+            });
+
+            // Cấu hình bảng Orders
+            modelBuilder.Entity<Order>(entity =>
+            {
+                entity.ToTable("orders");
+                entity.HasKey(o => o.Id);
+
+                entity.Property(o => o.TotalAmount).IsRequired();
+                entity.Property(o => o.ExpiresAt).IsRequired();
+                entity.Property(o => o.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(o => o.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                if (Database.IsNpgsql())
+                {
+                    entity.Property(o => o.Status)
+                          .HasColumnType("order_status")
+                          .HasDefaultValue(OrderStatus.Pending);
+                }
+                else
+                {
+                    entity.Property(o => o.Status)
+                          .HasConversion<string>()
+                          .HasDefaultValue(OrderStatus.Pending);
+                }
+
+                entity.HasOne(o => o.User)
+                      .WithMany()
+                      .HasForeignKey(o => o.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(o => o.Showtime)
+                      .WithMany()
+                      .HasForeignKey(o => o.ShowtimeId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // Chống bấm đúp bằng ràng buộc "một đơn chờ cho mỗi người mỗi suất"
+                entity.HasIndex(o => new { o.UserId, o.ShowtimeId })
+                      .IsUnique()
+                      .HasFilter(Database.IsNpgsql() ? "\"Status\" = 'Pending'" : "\"Status\" = 'Pending'")
+                      .HasDatabaseName("IX_orders_UserId_ShowtimeId_Pending");
+            });
+
+            // Cấu hình bảng OrderItems
+            modelBuilder.Entity<OrderItem>(entity =>
+            {
+                entity.ToTable("order_items");
+                entity.HasKey(oi => oi.Id);
+
+                entity.Property(oi => oi.Price).IsRequired();
+
+                entity.HasOne(oi => oi.Order)
+                      .WithMany(o => o.OrderItems)
+                      .HasForeignKey(oi => oi.OrderId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(oi => oi.Seat)
+                      .WithMany()
+                      .HasForeignKey(oi => oi.SeatId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(oi => new { oi.OrderId, oi.SeatId }).IsUnique();
             });
         }
     }

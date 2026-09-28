@@ -251,8 +251,12 @@ namespace EventTicketBooking.Api.Controllers
                 .Select(sh => sh.SeatId)
                 .ToListAsync();
 
-            // Mock data: Giả lập danh sách các ID ghế đã được bán thành vé (Cho Epic E-06)
-            var mockSoldSeatIds = new List<Guid>();
+            // Lấy danh sách ghế của các đơn hàng đã thanh toán (Task T-36)
+            var paidSeatIds = await _context.OrderItems
+                .AsNoTracking()
+                .Where(oi => oi.Order.ShowtimeId == showtimeId && oi.Order.Status == OrderStatus.Paid)
+                .Select(oi => oi.SeatId)
+                .ToListAsync();
 
             var query = from seat in _context.Seats.AsNoTracking().Where(s => s.ShowtimeId == showtimeId)
                         join category in _context.SeatCategories.AsNoTracking() on seat.SeatCategoryId equals category.Id
@@ -264,7 +268,7 @@ namespace EventTicketBooking.Api.Controllers
                             SeatNumber = seat.SeatNumber,
                             CategoryName = category.Name,
                             Price = category.Price,
-                            Status = mockSoldSeatIds.Contains(seat.Id) ? "SOLD" :
+                            Status = paidSeatIds.Contains(seat.Id) ? "SOLD" :
                                     (activeHeldSeatIds.Contains(seat.Id) ? "HELD" : "AVAILABLE")
                         };
 
