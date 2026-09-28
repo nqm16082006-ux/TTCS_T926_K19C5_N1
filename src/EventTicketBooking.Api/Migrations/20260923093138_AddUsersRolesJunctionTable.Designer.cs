@@ -116,6 +116,11 @@ namespace EventTicketBooking.Api.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -130,6 +135,12 @@ namespace EventTicketBooking.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<string>("VerificationCode")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("VerificationCodeExpiresAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 

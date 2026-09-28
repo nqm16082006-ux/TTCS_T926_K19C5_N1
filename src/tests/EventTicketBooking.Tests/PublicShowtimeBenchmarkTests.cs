@@ -82,9 +82,9 @@ namespace EventTicketBooking.Tests
                 };
                 s.ChangeStatus(ShowtimeStatus.OnSale);
 
-                s.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = s.Id, Name = "Standard", Price = 100000m + (i * 100) });
-                s.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = s.Id, Name = "VIP", Price = 500000m + (i * 100) });
-                s.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = s.Id, Name = "VVIP", Price = 2000000m + (i * 100) });
+                s.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = s.Id, Name = "Standard", Price = 100000 + (i * 100) });
+                s.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = s.Id, Name = "VIP", Price = 500000 + (i * 100) });
+                s.SeatCategories.Add(new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = s.Id, Name = "VVIP", Price = 2000000 + (i * 100) });
 
                 showtimes.Add(s);
             }

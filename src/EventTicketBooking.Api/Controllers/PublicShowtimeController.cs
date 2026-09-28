@@ -113,8 +113,8 @@ namespace EventTicketBooking.Api.Controllers
                 EndTime = s.EndTime,
                 AvailableSeats = s.AvailableSeats,
                 Status = s.Status.ToString(),
-                MinPrice = s.SeatCategories != null && s.SeatCategories.Any() ? s.SeatCategories.Min(sc => sc.Price) : 0m,
-                MaxPrice = s.SeatCategories != null && s.SeatCategories.Any() ? s.SeatCategories.Max(sc => sc.Price) : 0m
+                MinPrice = s.SeatCategories != null && s.SeatCategories.Any() ? s.SeatCategories.Min(sc => sc.Price) ?? 0 : 0m,
+                MaxPrice = s.SeatCategories != null && s.SeatCategories.Any() ? s.SeatCategories.Max(sc => sc.Price) ?? 0 : 0m
             }).ToList();
 
             string? nextCursor = null;
@@ -184,8 +184,8 @@ namespace EventTicketBooking.Api.Controllers
                 EndTime = showtime.EndTime,
                 AvailableSeats = showtime.AvailableSeats,
                 Status = showtime.Status.ToString(),
-                MinPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? showtime.SeatCategories.Min(sc => sc.Price) : 0m,
-                MaxPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? showtime.SeatCategories.Max(sc => sc.Price) : 0m
+                MinPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? showtime.SeatCategories.Min(sc => sc.Price) ?? 0 : 0m,
+                MaxPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? showtime.SeatCategories.Max(sc => sc.Price) ?? 0 : 0m
             };
 
             return Ok(ApiResponse<PublicShowtimeDto>.SuccessResult(dto, "Lấy thông tin chi tiết suất chiếu thành công."));
@@ -251,8 +251,12 @@ namespace EventTicketBooking.Api.Controllers
                 .Select(sh => sh.SeatId)
                 .ToListAsync();
 
-            // Mock data: Giả lập danh sách các ID ghế đã được bán thành vé (Cho Epic E-06)
-            var mockSoldSeatIds = new List<Guid>();
+            // Lấy danh sách ghế của các đơn hàng đã thanh toán (Task T-36)
+            var paidSeatIds = await _context.OrderItems
+                .AsNoTracking()
+                .Where(oi => oi.Order.ShowtimeId == showtimeId && oi.Order.Status == OrderStatus.Paid)
+                .Select(oi => oi.SeatId)
+                .ToListAsync();
 
             var query = from seat in _context.Seats.AsNoTracking().Where(s => s.ShowtimeId == showtimeId)
                         join category in _context.SeatCategories.AsNoTracking() on seat.SeatCategoryId equals category.Id
@@ -264,7 +268,7 @@ namespace EventTicketBooking.Api.Controllers
                             SeatNumber = seat.SeatNumber,
                             CategoryName = category.Name,
                             Price = category.Price,
-                            Status = mockSoldSeatIds.Contains(seat.Id) ? "SOLD" :
+                            Status = paidSeatIds.Contains(seat.Id) ? "SOLD" :
                                     (activeHeldSeatIds.Contains(seat.Id) ? "HELD" : "AVAILABLE")
                         };
 

@@ -244,6 +244,7 @@ namespace EventTicketBooking.Api.Controllers
             var ev = await _context.Events
                 .AsNoTracking()
                 .Include(e => e.Showtimes)
+                    .ThenInclude(s => s.SeatCategories)
                 .FirstOrDefaultAsync(e => e.Id == id);
 
             if (ev == null)
@@ -264,10 +265,117 @@ namespace EventTicketBooking.Api.Controllers
                 EndTime = s.EndTime,
                 AvailableSeats = s.AvailableSeats,
                 Status = s.Status,
+                SeatCategories = s.SeatCategories
+                    .OrderBy(category => category.Name)
+                    .Select(category => new SeatCategoryPriceDto
+                    {
+                        Id = category.Id,
+                        Name = category.Name,
+                        Price = category.Price
+                    })
+                    .ToList(),
                 StatusActionMessage = GetShowtimeStatusActionMessage(s)
             }).ToList();
 
             return Ok(ApiResponse<List<ShowtimeResponseDto>>.SuccessResult(showtimesDto, "Lấy danh sách suất diễn thành công."));
+        }
+
+        /// <summary>
+        /// Cập nhật giá các hạng ghế của một suất diễn (Task T-35).
+        /// PUT /api/events/{eventId}/showtimes/{showtimeId}/seat-categories/prices
+        /// </summary>
+        [HttpPut("{eventId:guid}/showtimes/{showtimeId:guid}/seat-categories/prices")]
+        [RequireRole("Organizer", "Admin")]
+        [ProducesResponseType(typeof(ApiResponse<List<SeatCategoryPriceDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UpdateSeatCategoryPrices(
+            Guid eventId,
+            Guid showtimeId,
+            [FromBody] UpdateSeatCategoryPricesDto dto)
+        {
+            var currentUserId = GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return StatusCode(StatusCodes.Status401Unauthorized, ApiResponse<object>.FailureResult("Vui lòng đăng nhập để thực hiện thao tác này."));
+            }
+
+            var ev = await _context.Events
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => e.Id == eventId);
+
+            if (ev == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
+            }
+
+            if (ev.OwnerId != currentUserId.Value)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền cập nhật giá cho sự kiện này."));
+            }
+
+            var showtimeExists = await _context.Showtimes
+                .AsNoTracking()
+                .AnyAsync(s => s.Id == showtimeId && s.EventId == eventId);
+
+            if (!showtimeExists)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Suất diễn không tồn tại trong sự kiện này."));
+            }
+
+            if (dto.Categories == null || dto.Categories.Count == 0)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Danh sách hạng ghế cần cập nhật không được để trống."));
+            }
+
+            if (dto.Categories.Any(item => item.Price < 0))
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Giá hạng ghế không được là số âm."));
+            }
+
+            var requestedCategoryIds = dto.Categories
+                .Select(item => item.SeatCategoryId)
+                .ToList();
+
+            if (requestedCategoryIds.Any(id => id == Guid.Empty) ||
+                requestedCategoryIds.Distinct().Count() != requestedCategoryIds.Count)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Danh sách hạng ghế không hợp lệ hoặc bị trùng."));
+            }
+
+            var categories = await _context.SeatCategories
+                .Where(category => requestedCategoryIds.Contains(category.Id))
+                .ToListAsync();
+
+            if (categories.Count != requestedCategoryIds.Count ||
+                categories.Any(category => category.ShowtimeId != showtimeId))
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Có hạng ghế không thuộc suất diễn được chọn."));
+            }
+
+            var requestedPrices = dto.Categories
+                .ToDictionary(item => item.SeatCategoryId, item => item.Price);
+
+            foreach (var category in categories)
+            {
+                category.Price = requestedPrices[category.Id];
+            }
+
+            await _context.SaveChangesAsync();
+
+            var response = categories
+                .OrderBy(category => category.Name)
+                .Select(category => new SeatCategoryPriceDto
+                {
+                    Id = category.Id,
+                    Name = category.Name,
+                    Price = category.Price
+                })
+                .ToList();
+
+            return Ok(ApiResponse<List<SeatCategoryPriceDto>>.SuccessResult(response, "Cập nhật giá hạng ghế thành công."));
         }
 
         /// <summary>
@@ -308,6 +416,10 @@ namespace EventTicketBooking.Api.Controllers
             {
                 return NotFound(ApiResponse<object>.FailureResult("Suất diễn không tồn tại."));
             }
+
+            await _context.Entry(showtime)
+                .Collection(s => s.SeatCategories)
+                .LoadAsync();
 
             try
             {

@@ -3,6 +3,7 @@ using System;
 using EventTicketBooking.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EventTicketBooking.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260927130150_ChangeSeatCategoryPriceToNullableInteger")]
+    partial class ChangeSeatCategoryPriceToNullableInteger
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.2");
@@ -63,77 +66,6 @@ namespace EventTicketBooking.Api.Migrations
                     b.HasIndex("OwnerId");
 
                     b.ToTable("Events", (string)null);
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.Order", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("ShowtimeId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
-                        .HasDefaultValue("Pending");
-
-                    b.Property<int>("TotalAmount")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ShowtimeId");
-
-                    b.HasIndex("UserId", "ShowtimeId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_orders_UserId_ShowtimeId_Pending")
-                        .HasFilter("\"Status\" = 'Pending'");
-
-                    b.ToTable("orders", (string)null);
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.OrderItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("OrderId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("Price")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<Guid>("SeatId")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SeatId");
-
-                    b.HasIndex("OrderId", "SeatId")
-                        .IsUnique();
-
-                    b.ToTable("order_items", (string)null);
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.Role", b =>
@@ -388,44 +320,6 @@ namespace EventTicketBooking.Api.Migrations
                     b.Navigation("Owner");
                 });
 
-            modelBuilder.Entity("EventTicketBooking.Api.Models.Order", b =>
-                {
-                    b.HasOne("EventTicketBooking.Api.Models.Showtime", "Showtime")
-                        .WithMany()
-                        .HasForeignKey("ShowtimeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("EventTicketBooking.Api.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Showtime");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.OrderItem", b =>
-                {
-                    b.HasOne("EventTicketBooking.Api.Models.Order", "Order")
-                        .WithMany("OrderItems")
-                        .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("EventTicketBooking.Api.Models.Seat", "Seat")
-                        .WithMany()
-                        .HasForeignKey("SeatId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Order");
-
-                    b.Navigation("Seat");
-                });
-
             modelBuilder.Entity("EventTicketBooking.Api.Models.Seat", b =>
                 {
                     b.HasOne("EventTicketBooking.Api.Models.SeatCategory", "SeatCategory")
@@ -508,11 +402,6 @@ namespace EventTicketBooking.Api.Migrations
             modelBuilder.Entity("EventTicketBooking.Api.Models.Event", b =>
                 {
                     b.Navigation("Showtimes");
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.Order", b =>
-                {
-                    b.Navigation("OrderItems");
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.Role", b =>

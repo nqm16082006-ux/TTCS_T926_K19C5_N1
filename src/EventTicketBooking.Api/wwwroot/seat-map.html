@@ -67,11 +67,75 @@
     /* Legend */
     .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #475569; }
     .legend-box { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; border: 1px solid rgba(0,0,0,0.1); }
-    .legend-available { background-color: #e0e7ff; color: #4f46e5; border-color: #a5b4fc; }
+    .legend-available { background-color: #ffffff; color: #334155; border: 2px dashed #94a3b8; }
     .legend-my-held { background-color: #fef3c7; color: #b45309; border-color: #f59e0b; }
     .legend-other-held { background-color: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
     .legend-sold { background-color: #e2e8f0; color: #64748b; border-color: #cbd5e1; }
     .legend-selected { background-color: #10b981; color: white; border-color: #059669; }
+
+    .category-price-legend {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 8px 16px;
+      background: #ffffff;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .category-price-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      flex: 0 0 auto;
+      padding: 6px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 999px;
+      background: #ffffff;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .category-color-swatch {
+      width: 22px;
+      height: 22px;
+      flex: 0 0 22px;
+      border: 2px solid;
+      border-radius: 6px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+    }
+
+    .tooltip-category-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tooltip-category-swatch {
+      width: 12px;
+      height: 12px;
+      display: inline-block;
+      border: 1px solid;
+      border-radius: 3px;
+    }
+
+    .seat-tooltip {
+      position: absolute;
+      z-index: 20;
+      display: none;
+      pointer-events: none;
+      min-width: 170px;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.96);
+      color: #ffffff;
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.25);
+      font-size: 12px;
+      line-height: 1.5;
+    }
 
     /* Controls overlay */
     .controls-overlay {
@@ -124,6 +188,8 @@
     </div>
   </header>
 
+  <div id="categoryPriceLegend" class="category-price-legend" aria-label="Giá theo hạng ghế"></div>
+
   <!-- Hold Countdown Banner & Card (Task T-24 / T-33) -->
   <div id="hold-timer-banner" class="hidden bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 font-bold text-sm shadow-md z-40 relative transition-all duration-300">
     <div class="flex items-center gap-3">
@@ -175,6 +241,7 @@
     <div id="canvas-container">
       <canvas id="seatCanvas"></canvas>
     </div>
+    <div id="seatTooltip" class="seat-tooltip" role="status"></div>
 
     <!-- Zoom Controls -->
     <div class="controls-overlay">
@@ -233,6 +300,18 @@
     let myHeldSeatIds = new Set();
     let seatMap = new Map();
     let seatLayout = { rows: 0, cols: 0, matrix: [] };
+    let categoryColorMap = new Map();
+
+    const CATEGORY_COLOR_PALETTE = [
+      { background: '#dbeafe', border: '#60a5fa', text: '#1d4ed8' },
+      { background: '#ede9fe', border: '#a78bfa', text: '#6d28d9' },
+      { background: '#ffe4e6', border: '#fb7185', text: '#be123c' },
+      { background: '#ffedd5', border: '#fb923c', text: '#c2410c' },
+      { background: '#ccfbf1', border: '#2dd4bf', text: '#0f766e' },
+      { background: '#ecfccb', border: '#a3e635', text: '#4d7c0f' },
+      { background: '#cffafe', border: '#22d3ee', text: '#0e7490' },
+      { background: '#fae8ff', border: '#e879f9', text: '#a21caf' }
+    ];
 
     // Canvas & Viewport state
     const canvas = document.getElementById('seatCanvas');
@@ -260,6 +339,8 @@
       
       if (json.success) {
         seats = json.data;
+        buildCategoryColorMap();
+        renderCategoryPriceLegend();
         
         const processStartTime = performance.now();
         processSeatLayout();
@@ -346,6 +427,75 @@
       };
     }
 
+    function formatPrice(price) {
+      if (price === null || price === undefined) return 'Chưa đặt giá';
+      if (price === 0) return '0 ₫';
+      return `${new Intl.NumberFormat('vi-VN').format(price)} ₫`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function renderCategoryPriceLegend() {
+      const legend = document.getElementById('categoryPriceLegend');
+      const categories = new Map();
+
+      seats.forEach(seat => {
+        const categoryName = seat.categoryName || 'Không xác định';
+        if (!categories.has(categoryName)) {
+          categories.set(categoryName, { name: categoryName, price: seat.price });
+        }
+      });
+
+      if (categories.size === 0) {
+        legend.innerHTML = '<span class="text-xs font-semibold text-slate-500">Chưa có thông tin hạng ghế</span>';
+        return;
+      }
+
+      legend.innerHTML = `
+        <span class="text-xs font-extrabold text-slate-600 whitespace-nowrap">Hạng ghế:</span>
+        ${Array.from(categories.values())
+          .sort((left, right) => left.name.localeCompare(right.name, 'vi'))
+          .map(category => {
+            const color = getCategoryColor(category.name);
+            return `
+          <span class="category-price-chip">
+            <span
+              class="category-color-swatch"
+              style="background-color: ${color.background}; border-color: ${color.border};"
+              aria-hidden="true"></span>
+            ${escapeHtml(category.name)}: ${formatPrice(category.price)}
+          </span>
+        `;
+          }).join('')}`;
+    }
+
+    function buildCategoryColorMap() {
+      categoryColorMap = new Map();
+
+      const categoryNames = Array.from(new Set(
+        seats.map(seat => seat.categoryName || 'Không xác định')
+      )).sort((left, right) => left.localeCompare(right, 'vi'));
+
+      categoryNames.forEach((categoryName, index) => {
+        categoryColorMap.set(
+          categoryName,
+          CATEGORY_COLOR_PALETTE[index % CATEGORY_COLOR_PALETTE.length]
+        );
+      });
+    }
+
+    function getCategoryColor(categoryName) {
+      return categoryColorMap.get(categoryName || 'Không xác định')
+        || CATEGORY_COLOR_PALETTE[0];
+    }
+
     // Set canvas internal resolution based on layout size
     function setupCanvas() {
       const width = MARGIN * 2 + (seatLayout.cols * SEAT_SIZE) + ((seatLayout.cols - 1) * SEAT_GAP) + 60; // +60 for row labels
@@ -408,6 +558,7 @@
 
           const isSelected = selectedSeatIds.has(seat.id);
           const isMyHeld = myHeldSeatIds.has(seat.id);
+          const categoryColor = getCategoryColor(seat.categoryName);
           
           // Colors & Labels (Accessibility NFR: Symbols A, ✓, ★, H, X)
           let bgColor, borderColor, textColor, symbol;
@@ -424,9 +575,9 @@
             textColor = '#b45309'; // Amber 700
             symbol = '★';
           } else if (seat.status === 'AVAILABLE') {
-            bgColor = '#e0e7ff'; // Indigo 100
-            borderColor = '#a5b4fc';
-            textColor = '#4f46e5';
+            bgColor = categoryColor.background;
+            borderColor = categoryColor.border;
+            textColor = categoryColor.text;
             symbol = 'A';
           } else if (seat.status === 'HELD') {
             // HELD BY OTHER USER (Task T-33)
@@ -463,6 +614,7 @@
     // --- Pan & Zoom Logic (Transforming CSS instead of redrawing Canvas is 60fps smooth) ---
     
     function applyTransform() {
+      hideSeatTooltip();
       container.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
     }
 
@@ -504,7 +656,11 @@
     });
 
     window.addEventListener('mousemove', (e) => {
-      if (!isDragging) return;
+      if (!isDragging) {
+        updateSeatTooltipForPointer(e.clientX, e.clientY);
+        return;
+      }
+      hideSeatTooltip();
       translateX = e.clientX - dragStartX;
       translateY = e.clientY - dragStartY;
       applyTransform();
@@ -592,7 +748,7 @@
       const x = (e.clientX - rect.left) / scale;
       const y = (e.clientY - rect.top) / scale;
 
-      handleCanvasClick(x, y);
+      handleCanvasClick(x, y, e.clientX, e.clientY);
     });
 
     // Accessibility Hover Tooltip (Task T-33)
@@ -666,19 +822,70 @@
         const x = (touch.clientX - rect.left) / scale;
         const y = (touch.clientY - rect.top) / scale;
 
-        handleCanvasClick(x, y);
+        handleCanvasClick(x, y, touch.clientX, touch.clientY);
       }
     });
 
-    function handleCanvasClick(x, y) {
-      // Find which seat was clicked
-      for (const seat of seats) {
+    function findSeatAt(x, y) {
+      return seats.find(seat => {
         const h = seat.hitArea;
-        if (h && x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) {
-          toggleSeat(seat);
-          break;
-        }
+        return h && x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h;
+      });
+    }
+
+    function updateSeatTooltipForPointer(clientX, clientY) {
+      const rect = container.getBoundingClientRect();
+      if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+        hideSeatTooltip();
+        return;
       }
+
+      const x = (clientX - rect.left) / scale;
+      const y = (clientY - rect.top) / scale;
+      const seat = findSeatAt(x, y);
+
+      if (seat) {
+        showSeatTooltip(seat, clientX, clientY);
+      } else {
+        hideSeatTooltip();
+      }
+    }
+
+    function showSeatTooltip(seat, clientX, clientY) {
+      const tooltip = document.getElementById('seatTooltip');
+      const workspaceRect = workspace.getBoundingClientRect();
+      const categoryColor = getCategoryColor(seat.categoryName);
+      tooltip.innerHTML = `
+        <strong>Ghế ${escapeHtml(seat.row)}${seat.seatNumber}</strong><br>
+        <span class="tooltip-category-row">
+          <span
+            class="tooltip-category-swatch"
+            style="background-color: ${categoryColor.background}; border-color: ${categoryColor.border};"
+            aria-hidden="true"></span>
+          Hạng: ${escapeHtml(seat.categoryName)}
+        </span><br>
+        Giá: ${formatPrice(seat.price)}`;
+      tooltip.style.display = 'block';
+
+      const maxLeft = Math.max(8, workspace.clientWidth - tooltip.offsetWidth - 8);
+      const maxTop = Math.max(8, workspace.clientHeight - tooltip.offsetHeight - 8);
+      tooltip.style.left = `${Math.min(clientX - workspaceRect.left + 14, maxLeft)}px`;
+      tooltip.style.top = `${Math.min(clientY - workspaceRect.top + 14, maxTop)}px`;
+    }
+
+    function hideSeatTooltip() {
+      document.getElementById('seatTooltip').style.display = 'none';
+    }
+
+    function handleCanvasClick(x, y, clientX, clientY) {
+      const seat = findSeatAt(x, y);
+      if (!seat) {
+        hideSeatTooltip();
+        return;
+      }
+
+      showSeatTooltip(seat, clientX, clientY);
+      toggleSeat(seat);
     }
 
     function toggleSeat(seat) {
@@ -777,13 +984,15 @@
       countEl.textContent = totalCount;
       
       let total = 0;
+      let hasMissingPrice = false;
       let listHtml = '';
 
       // Hiển thị các ghế đang chọn nháp (Màu xanh Emerald)
       selectedSeatIds.forEach(id => {
         const seat = seatMap.get(id);
         if (seat) {
-          total += seat.price;
+          if (seat.price === null || seat.price === undefined) hasMissingPrice = true;
+          else total += seat.price;
           const seatLabel = `${seat.row}${seat.seatNumber}`;
           listHtml += `
             <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-full text-xs font-bold shadow-sm transition hover:bg-emerald-100">
@@ -799,7 +1008,8 @@
       myHeldSeatIds.forEach(id => {
         const seat = seatMap.get(id);
         if (seat) {
-          total += seat.price;
+          if (seat.price === null || seat.price === undefined) hasMissingPrice = true;
+          else total += seat.price;
           const seatLabel = `${seat.row}${seat.seatNumber}`;
           listHtml += `
             <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded-full text-xs font-bold shadow-sm transition hover:bg-amber-100">
@@ -812,7 +1022,7 @@
         }
       });
 
-      priceEl.textContent = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(total);
+      priceEl.textContent = hasMissingPrice ? 'Chưa đặt giá' : formatPrice(total);
 
       if (listEl) listEl.innerHTML = listHtml;
 
