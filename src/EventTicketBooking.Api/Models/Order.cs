@@ -9,7 +9,8 @@ namespace EventTicketBooking.Api.Models
         Pending,
         Paid,
         Cancelled,
-        Expired
+        Expired,
+        NeedsAttention
     }
 
     public class Order
