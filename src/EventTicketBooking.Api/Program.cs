@@ -110,6 +110,11 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IEmailServ
 // Đăng ký dịch vụ Giữ ghế (T-23 / S-10)
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ISeatHoldService, EventTicketBooking.Api.Services.Implementations.SeatHoldService>();
 
+// Đăng ký Cổng thanh toán và Dịch vụ Thanh toán (Task T-40)
+builder.Services.Configure<EventTicketBooking.Api.Options.PayOSOptions>(builder.Configuration.GetSection(EventTicketBooking.Api.Options.PayOSOptions.SectionName));
+builder.Services.AddHttpClient<EventTicketBooking.Api.Services.Interfaces.IPaymentGateway, EventTicketBooking.Api.Services.Implementations.Payment.PayOSPaymentGateway>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IPaymentService, EventTicketBooking.Api.Services.Implementations.PaymentService>();
+
 
 // Add Controllers, CORS & Swagger
 builder.Services.AddCors(options =>
