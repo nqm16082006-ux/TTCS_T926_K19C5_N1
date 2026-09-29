@@ -110,6 +110,17 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IEmailServ
 // Đăng ký dịch vụ Giữ ghế (T-23 / S-10)
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ISeatHoldService, EventTicketBooking.Api.Services.Implementations.SeatHoldService>();
 
+// T-44 (S-19): Đọc cấu hình cổng thanh toán từ biến môi trường hoặc appsettings
+var paymentProvider = builder.Configuration["PaymentSettings:Provider"]
+                     ?? builder.Configuration["PAYMENT_PROVIDER"]
+                     ?? "Mock";
+
+// Nếu môi trường là Production mà cấu hình dùng cổng giả lập (Mock) -> Từ chối khởi động
+if (builder.Environment.IsProduction() && paymentProvider.Equals("Mock", StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException("CRITICAL CONFIGURATION ERROR: Mock Payment Gateway ('Mock') is strictly prohibited in Production environment!");
+}
+
 // Đăng ký Cổng thanh toán và Dịch vụ Thanh toán (Task T-40)
 builder.Services.Configure<EventTicketBooking.Api.Options.PayOSOptions>(builder.Configuration.GetSection(EventTicketBooking.Api.Options.PayOSOptions.SectionName));
 builder.Services.AddHttpClient<EventTicketBooking.Api.Services.Interfaces.IPaymentGateway, EventTicketBooking.Api.Services.Implementations.Payment.PayOSPaymentGateway>();
