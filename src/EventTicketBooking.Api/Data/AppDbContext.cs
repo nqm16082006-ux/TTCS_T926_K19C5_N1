@@ -17,6 +17,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<SeatHolds> SeatHold { get; set; } = null!;
         public DbSet<Order> Orders { get; set; } = null!;
         public DbSet<OrderItem> OrderItems { get; set; } = null!;
+        public DbSet<PaymentTransaction> PaymentTransactions { get; set; } = null!;
         public DbSet<Role> Roles { get; set; } = null!;
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<UserRole> UserRoles { get; set; } = null!;
@@ -261,6 +262,30 @@ namespace EventTicketBooking.Api.Data
                       .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasIndex(oi => new { oi.OrderId, oi.SeatId }).IsUnique();
+            });
+
+            // Cấu hình bảng PaymentTransactions (Task T-41)
+            modelBuilder.Entity<PaymentTransaction>(entity =>
+            {
+                entity.ToTable("payment_transactions");
+                entity.HasKey(pt => pt.Id);
+
+                entity.Property(pt => pt.OrderCode).IsRequired();
+                entity.Property(pt => pt.Amount).IsRequired();
+                entity.Property(pt => pt.Status).IsRequired().HasMaxLength(20);
+                entity.Property(pt => pt.PaymentUrl).HasMaxLength(1000);
+                entity.Property(pt => pt.TransactionId).HasMaxLength(100);
+                entity.Property(pt => pt.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(pt => pt.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(pt => pt.Order)
+                      .WithOne(o => o.PaymentTransaction)
+                      .HasForeignKey<PaymentTransaction>(pt => pt.OrderId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // Chống duplicate: 1 Order chỉ có duy nhất 1 giao dịch thanh toán
+                entity.HasIndex(pt => pt.OrderId).IsUnique().HasDatabaseName("IX_payment_transactions_OrderId_Unique");
+                entity.HasIndex(pt => pt.OrderCode).IsUnique().HasDatabaseName("IX_payment_transactions_OrderCode_Unique");
             });
         }
     }

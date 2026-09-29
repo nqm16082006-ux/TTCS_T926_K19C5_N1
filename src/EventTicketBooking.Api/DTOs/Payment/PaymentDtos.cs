@@ -31,17 +31,19 @@ namespace EventTicketBooking.Api.DTOs.Payment
         public bool Success { get; set; }
         public string? PaymentUrl { get; set; }
         public string? TransactionId { get; set; }
+        public long? OrderCode { get; set; }
         public string? QrCode { get; set; }
         public string? ErrorMessage { get; set; }
 
-        public static PaymentCreationResult CreateSuccess(string paymentUrl, string? transactionId = null, string? qrCode = null)
+        public static PaymentCreationResult CreateSuccess(string paymentUrl, string? transactionId = null, string? qrCode = null, long? orderCode = null)
         {
             return new PaymentCreationResult
             {
                 Success = true,
                 PaymentUrl = paymentUrl,
                 TransactionId = transactionId,
-                QrCode = qrCode
+                QrCode = qrCode,
+                OrderCode = orderCode
             };
         }
 

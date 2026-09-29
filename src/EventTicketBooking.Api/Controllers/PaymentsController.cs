@@ -30,13 +30,15 @@ namespace EventTicketBooking.Api.Controllers
         }
 
         /// <summary>
-        /// Tạo link thanh toán cho đơn hàng (Task T-40).
+        /// Tạo link thanh toán cho đơn hàng (Task T-40 & T-41).
         /// </summary>
         [HttpPost("orders/{orderId:guid}")]
         [Authorize]
         [ProducesResponseType(typeof(ApiResponse<PaymentCreationResult>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> CreatePayment(Guid orderId)
         {
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -46,6 +48,12 @@ namespace EventTicketBooking.Api.Controllers
             var result = await _paymentService.CreatePaymentForOrderAsync(orderId, userId, HttpContext.RequestAborted);
             if (!result.Success)
             {
+                if (result.ErrorMessage == "Không tìm thấy đơn hàng.")
+                    return NotFound(ApiResponse<object>.FailureResult(result.ErrorMessage));
+
+                if (result.ErrorMessage == "Bạn không có quyền thanh toán cho đơn hàng này.")
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult(result.ErrorMessage));
+
                 return BadRequest(ApiResponse<object>.FailureResult(result.ErrorMessage ?? "Không thể tạo yêu cầu thanh toán."));
             }
 

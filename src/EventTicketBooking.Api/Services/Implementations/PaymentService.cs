@@ -49,6 +49,11 @@ namespace EventTicketBooking.Api.Services.Implementations
                 return PaymentCreationResult.CreateFailure("Bạn không có quyền thanh toán cho đơn hàng này.");
             }
 
+            if (order.Status == OrderStatus.Paid)
+            {
+                return PaymentCreationResult.CreateFailure("Đơn hàng đã được thanh toán thành công.");
+            }
+
             if (order.Status != OrderStatus.Pending)
             {
                 return PaymentCreationResult.CreateFailure($"Đơn hàng không ở trạng thái chờ thanh toán (Trạng thái: {order.Status}).");
@@ -64,6 +69,32 @@ namespace EventTicketBooking.Api.Services.Implementations
             if (order.TotalAmount <= 0)
             {
                 order.CalculateTotal();
+            }
+
+            if (order.TotalAmount <= 0)
+            {
+                return PaymentCreationResult.CreateFailure("Số tiền thanh toán của đơn hàng không hợp lệ.");
+            }
+
+            // T-41: Kiểm tra giao dịch thanh toán hiện tại của Order (Idempotency - chống duplicate giao dịch)
+            var existingTransaction = await _context.PaymentTransactions
+                .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
+
+            if (existingTransaction != null)
+            {
+                if (existingTransaction.Status == "PAID")
+                {
+                    return PaymentCreationResult.CreateFailure("Đơn hàng đã được thanh toán thành công.");
+                }
+
+                _logger.LogInformation("Tái sử dụng giao dịch thanh toán hiện có cho đơn hàng {OrderId}, OrderCode: {OrderCode}", order.Id, existingTransaction.OrderCode);
+
+                return PaymentCreationResult.CreateSuccess(
+                    existingTransaction.PaymentUrl ?? string.Empty,
+                    existingTransaction.TransactionId,
+                    null,
+                    existingTransaction.OrderCode
+                );
             }
 
             // Tạo mã số đơn hàng dạng số (thích hợp với các cổng như PayOS/VNPay)
@@ -85,8 +116,54 @@ namespace EventTicketBooking.Api.Services.Implementations
 
             _logger.LogInformation("Đang gọi cổng thanh toán {Provider} cho đơn hàng {OrderId}", _paymentGateway.ProviderName, order.Id);
 
-            // Giao tiếp qua interface IPaymentGateway
-            return await _paymentGateway.CreatePaymentAsync(request, cancellationToken);
+            // Giao tiếp qua abstraction IPaymentGateway (Task T-40 & T-41)
+            var gatewayResult = await _paymentGateway.CreatePaymentAsync(request, cancellationToken);
+            if (!gatewayResult.Success)
+            {
+                return gatewayResult;
+            }
+
+            gatewayResult.OrderCode = numericOrderCode;
+
+            // Lưu giao dịch thanh toán vào cơ sở dữ liệu với unique constraint trên OrderId
+            try
+            {
+                var transaction = new PaymentTransaction
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    OrderCode = numericOrderCode,
+                    Amount = order.TotalAmount,
+                    PaymentUrl = gatewayResult.PaymentUrl,
+                    TransactionId = gatewayResult.TransactionId,
+                    Status = "PENDING",
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                };
+
+                _context.PaymentTransactions.Add(transaction);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                // Xử lý race condition (người dùng double click hoặc mở 2 tab thanh toán đồng thời)
+                _context.ChangeTracker.Clear();
+                var concurrentTx = await _context.PaymentTransactions
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
+
+                if (concurrentTx != null)
+                {
+                    return PaymentCreationResult.CreateSuccess(
+                        concurrentTx.PaymentUrl ?? string.Empty,
+                        concurrentTx.TransactionId,
+                        null,
+                        concurrentTx.OrderCode
+                    );
+                }
+            }
+
+            return gatewayResult;
         }
 
         public async Task<bool> ProcessPaymentWebhookAsync(string webhookPayload, string signature, CancellationToken cancellationToken = default)
@@ -120,7 +197,21 @@ namespace EventTicketBooking.Api.Services.Implementations
 
             if (order == null && parseResult.OrderCode.HasValue)
             {
-                // Tìm kiếm theo số tiền và trạng thái Pending nếu không lưu mã orderCode trực tiếp
+                // Tìm kiếm theo bảng PaymentTransaction
+                var paymentTx = await _context.PaymentTransactions
+                    .Include(pt => pt.Order)
+                        .ThenInclude(o => o.OrderItems)
+                    .FirstOrDefaultAsync(pt => pt.OrderCode == parseResult.OrderCode.Value, cancellationToken);
+
+                if (paymentTx != null)
+                {
+                    order = paymentTx.Order;
+                }
+            }
+
+            if (order == null && parseResult.OrderCode.HasValue)
+            {
+                // Fallback tìm kiếm theo số tiền và trạng thái Pending
                 order = await _context.Orders
                     .Include(o => o.OrderItems)
                     .FirstOrDefaultAsync(o => o.Status == OrderStatus.Pending && o.TotalAmount == parseResult.Amount, cancellationToken);
@@ -137,7 +228,17 @@ namespace EventTicketBooking.Api.Services.Implementations
                 order.Status = OrderStatus.Paid;
                 order.UpdatedAt = DateTimeOffset.UtcNow;
 
-                // Cập nhật trạng thái các giữ chỗ liên quan sang hoàn tất/xóa nếu cần
+                // Cập nhật trạng thái PaymentTransaction
+                var paymentTx = await _context.PaymentTransactions
+                    .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
+
+                if (paymentTx != null)
+                {
+                    paymentTx.Status = "PAID";
+                    paymentTx.UpdatedAt = DateTimeOffset.UtcNow;
+                }
+
+                // Cập nhật trạng thái các giữ chỗ liên quan sang hoàn tất
                 var seatIds = order.OrderItems.Select(oi => oi.SeatId).ToList();
                 var holds = await _context.SeatHold
                     .Where(sh => seatIds.Contains(sh.SeatId) && sh.UserId == order.UserId)
@@ -155,6 +256,16 @@ namespace EventTicketBooking.Api.Services.Implementations
             {
                 order.Status = OrderStatus.Cancelled;
                 order.UpdatedAt = DateTimeOffset.UtcNow;
+
+                var paymentTx = await _context.PaymentTransactions
+                    .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
+
+                if (paymentTx != null)
+                {
+                    paymentTx.Status = parseResult.Status == PaymentStatus.Cancelled ? "CANCELLED" : "FAILED";
+                    paymentTx.UpdatedAt = DateTimeOffset.UtcNow;
+                }
+
                 await _context.SaveChangesAsync(cancellationToken);
                 _logger.LogInformation("Đơn hàng {OrderId} thanh toán thất bại/đã bị hủy", order.Id);
             }

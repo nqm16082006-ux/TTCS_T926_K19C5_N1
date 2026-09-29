@@ -85,7 +85,7 @@ namespace EventTicketBooking.Api.Services.Implementations.Payment
                     // Chế độ mô phỏng khi chưa điền thông tin cổng thật trong môi trường dev/local
                     _logger.LogInformation("PayOS options chưa được cấu hình ClientId/ApiKey. Tự động trả về link thanh toán mô phỏng.");
                     string simulatedUrl = $"{_options.BaseUrl}/payment-link/{orderCode}?signature={signature}";
-                    return PaymentCreationResult.CreateSuccess(simulatedUrl, $"TXN_{orderCode}");
+                    return PaymentCreationResult.CreateSuccess(simulatedUrl, $"TXN_{orderCode}", null, orderCode);
                 }
 
                 // Gửi request thực tế sang PayOS
@@ -113,7 +113,7 @@ namespace EventTicketBooking.Api.Services.Implementations.Payment
                     string? qrCode = dataEl.TryGetProperty("qrCode", out var qr) ? qr.GetString() : null;
                     string? paymentLinkId = dataEl.TryGetProperty("paymentLinkId", out var plId) ? plId.GetString() : null;
 
-                    return PaymentCreationResult.CreateSuccess(checkoutUrl ?? string.Empty, paymentLinkId ?? $"TXN_{orderCode}", qrCode);
+                    return PaymentCreationResult.CreateSuccess(checkoutUrl ?? string.Empty, paymentLinkId ?? $"TXN_{orderCode}", qrCode, orderCode);
                 }
 
                 string? desc = root.TryGetProperty("desc", out var d) ? d.GetString() : "Không thể tạo link thanh toán";

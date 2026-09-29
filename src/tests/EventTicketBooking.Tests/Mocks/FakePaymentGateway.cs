@@ -30,7 +30,7 @@ namespace EventTicketBooking.Tests.Mocks
 
             if (ShouldSucceed)
             {
-                return Task.FromResult(PaymentCreationResult.CreateSuccess(SimulatedPaymentUrl, SimulatedTransactionId));
+                return Task.FromResult(PaymentCreationResult.CreateSuccess(SimulatedPaymentUrl, SimulatedTransactionId, null, request.OrderCode));
             }
             else
             {
