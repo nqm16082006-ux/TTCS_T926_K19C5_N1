@@ -18,6 +18,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<Order> Orders { get; set; } = null!;
         public DbSet<OrderItem> OrderItems { get; set; } = null!;
         public DbSet<PaymentTransaction> PaymentTransactions { get; set; } = null!;
+        public DbSet<PaymentEvent> PaymentEvents { get; set; } = null!;
         public DbSet<Role> Roles { get; set; } = null!;
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<UserRole> UserRoles { get; set; } = null!;
@@ -286,6 +287,21 @@ namespace EventTicketBooking.Api.Data
                 // Chống duplicate: 1 Order chỉ có duy nhất 1 giao dịch thanh toán
                 entity.HasIndex(pt => pt.OrderId).IsUnique().HasDatabaseName("IX_payment_transactions_OrderId_Unique");
                 entity.HasIndex(pt => pt.OrderCode).IsUnique().HasDatabaseName("IX_payment_transactions_OrderCode_Unique");
+            });
+
+            // Cấu hình bảng PaymentEvents (Task T-45)
+            modelBuilder.Entity<PaymentEvent>(entity =>
+            {
+                entity.ToTable("payment_events");
+                entity.HasKey(pe => pe.Id);
+
+                entity.Property(pe => pe.TransactionId).IsRequired().HasMaxLength(100);
+                entity.Property(pe => pe.RawPayload).IsRequired();
+                entity.Property(pe => pe.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasIndex(pe => pe.TransactionId)
+                      .IsUnique()
+                      .HasDatabaseName("IX_payment_events_TransactionId_Unique");
             });
         }
     }
