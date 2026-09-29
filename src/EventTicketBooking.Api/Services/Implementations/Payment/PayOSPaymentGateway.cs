@@ -247,6 +247,71 @@ namespace EventTicketBooking.Api.Services.Implementations.Payment
             }
         }
 
+        public async Task<PaymentResultDto?> QueryPaymentStatusAsync(long orderCode, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                if (orderCode <= 0)
+                    return null;
+
+                if (string.IsNullOrWhiteSpace(_options.ApiKey) || string.IsNullOrWhiteSpace(_options.ClientId))
+                {
+                    _logger.LogInformation("PayOS options chưa được cấu hình ClientId/ApiKey. Bỏ qua truy vấn trực tiếp cổng.");
+                    return null;
+                }
+
+                using var httpRequest = new HttpRequestMessage(HttpMethod.Get, $"{_options.BaseUrl.TrimEnd('/')}/v2/payment-requests/{orderCode}");
+                httpRequest.Headers.Add("x-client-id", _options.ClientId);
+                httpRequest.Headers.Add("x-api-key", _options.ApiKey);
+
+                var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+                var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Không thể truy vấn trạng thái từ PayOS: {StatusCode}, Response: {Content}", response.StatusCode, responseContent);
+                    return null;
+                }
+
+                using var doc = JsonDocument.Parse(responseContent);
+                var root = doc.RootElement;
+                string? code = root.TryGetProperty("code", out var c) ? c.GetString() : null;
+
+                if (code == "00" && root.TryGetProperty("data", out var dataEl))
+                {
+                    string? statusStr = dataEl.TryGetProperty("status", out var s) ? s.GetString() : null;
+                    int amount = dataEl.TryGetProperty("amount", out var a) ? a.GetInt32() : 0;
+                    int amountPaid = dataEl.TryGetProperty("amountPaid", out var ap) ? ap.GetInt32() : 0;
+                    string? id = dataEl.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+
+                    var status = statusStr switch
+                    {
+                        "PAID" => PaymentStatus.Success,
+                        "CANCELLED" => PaymentStatus.Cancelled,
+                        "PENDING" => PaymentStatus.Pending,
+                        _ => PaymentStatus.Failed
+                    };
+
+                    return new PaymentResultDto
+                    {
+                        Success = status == PaymentStatus.Success,
+                        OrderCode = orderCode,
+                        Amount = amountPaid > 0 ? amountPaid : amount,
+                        Status = status,
+                        TransactionId = id,
+                        PaidAt = DateTimeOffset.UtcNow
+                    };
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ngoại lệ khi truy vấn trạng thái thanh toán từ PayOS cho OrderCode {OrderCode}", orderCode);
+                return null;
+            }
+        }
+
         private static string ComputeHmacSha256(string data, string secretKey)
         {
             if (string.IsNullOrEmpty(secretKey))

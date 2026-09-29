@@ -29,5 +29,11 @@ namespace EventTicketBooking.Api.Services.Interfaces
         /// Trích xuất và chuẩn hóa kết quả thanh toán từ payload webhook sang model chung của ứng dụng.
         /// </summary>
         WebhookParseResult ParseWebhookData(string webhookPayload);
+
+        /// <summary>
+        /// Truy vấn trạng thái thanh toán trực tiếp từ cổng thanh toán (Task T-42).
+        /// Phục vụ đối soát server-side, không tin tưởng dữ liệu client tự gửi lên.
+        /// </summary>
+        Task<PaymentResultDto?> QueryPaymentStatusAsync(long orderCode, CancellationToken cancellationToken = default);
     }
 }
