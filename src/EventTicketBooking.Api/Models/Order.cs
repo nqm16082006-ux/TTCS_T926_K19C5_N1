@@ -26,6 +26,7 @@ namespace EventTicketBooking.Api.Models
         public User User { get; set; } = null!;
         public Showtime Showtime { get; set; } = null!;
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
+        public PaymentTransaction? PaymentTransaction { get; set; }
 
         public void CalculateTotal()
         {

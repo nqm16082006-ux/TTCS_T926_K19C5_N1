@@ -30,13 +30,15 @@ namespace EventTicketBooking.Api.Controllers
         }
 
         /// <summary>
-        /// Tạo link thanh toán cho đơn hàng (Task T-40).
+        /// Tạo link thanh toán cho đơn hàng (Task T-40 & T-41).
         /// </summary>
         [HttpPost("orders/{orderId:guid}")]
         [Authorize]
         [ProducesResponseType(typeof(ApiResponse<PaymentCreationResult>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> CreatePayment(Guid orderId)
         {
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -46,6 +48,12 @@ namespace EventTicketBooking.Api.Controllers
             var result = await _paymentService.CreatePaymentForOrderAsync(orderId, userId, HttpContext.RequestAborted);
             if (!result.Success)
             {
+                if (result.ErrorMessage == "Không tìm thấy đơn hàng.")
+                    return NotFound(ApiResponse<object>.FailureResult(result.ErrorMessage));
+
+                if (result.ErrorMessage == "Bạn không có quyền thanh toán cho đơn hàng này.")
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult(result.ErrorMessage));
+
                 return BadRequest(ApiResponse<object>.FailureResult(result.ErrorMessage ?? "Không thể tạo yêu cầu thanh toán."));
             }
 
@@ -114,6 +122,46 @@ namespace EventTicketBooking.Api.Controllers
                 _logger.LogError(ex, "Ngoại lệ khi nhận webhook thanh toán");
                 return StatusCode(StatusCodes.Status500InternalServerError, ApiResponse<object>.FailureResult("Lỗi hệ thống khi xử lý webhook."));
             }
+        }
+
+        /// <summary>
+        /// Tiếp nhận chuyển hướng quay về từ cổng thanh toán (Task T-42).
+        /// Không tin tưởng query string từ client, thực hiện đối soát server-side với gateway trước khi cập nhật.
+        /// </summary>
+        [HttpGet("return")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(ApiResponse<PaymentExecutionResult>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> HandlePaymentReturn([FromQuery] PaymentReturnQueryDto query)
+        {
+            var cancellationToken = HttpContext?.RequestAborted ?? default;
+            var result = await _paymentService.VerifyAndProcessPaymentReturnAsync(query, cancellationToken);
+            if (!result.Success)
+            {
+                return BadRequest(ApiResponse<PaymentExecutionResult>.FailureResult(result.Message ?? "Xác minh kết quả thanh toán thất bại.", result));
+            }
+
+            return Ok(ApiResponse<PaymentExecutionResult>.SuccessResult(result, result.Message ?? "Xác minh kết quả thanh toán thành công."));
+        }
+
+        /// <summary>
+        /// Truy vấn và đối soát trạng thái thanh toán của đơn hàng (Task T-42).
+        /// Dành cho trang thanh toán frontend kiểm tra trạng thái thực tế từ máy chủ.
+        /// </summary>
+        [HttpGet("orders/{orderId:guid}/status")]
+        [Authorize]
+        [ProducesResponseType(typeof(ApiResponse<PaymentExecutionResult>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetAndVerifyPaymentStatus(Guid orderId)
+        {
+            var cancellationToken = HttpContext?.RequestAborted ?? default;
+            var result = await _paymentService.VerifyAndProcessPaymentReturnAsync(new PaymentReturnQueryDto { OrderId = orderId }, cancellationToken);
+            if (!result.Success && result.Message == "Không tìm thấy đơn hàng cần xác minh.")
+            {
+                return NotFound(ApiResponse<object>.FailureResult(result.Message));
+            }
+
+            return Ok(ApiResponse<PaymentExecutionResult>.SuccessResult(result, result.Message ?? "Trạng thái thanh toán của đơn hàng."));
         }
     }
 }

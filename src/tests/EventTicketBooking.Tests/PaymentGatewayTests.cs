@@ -257,7 +257,7 @@ namespace EventTicketBooking.Tests
             };
 
             var userId = Guid.NewGuid();
-            var order = new Order
+            var order1 = new Order
             {
                 Id = Guid.NewGuid(),
                 UserId = userId,
@@ -266,16 +266,25 @@ namespace EventTicketBooking.Tests
                 TotalAmount = 200000,
                 ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15)
             };
-            _context.Orders.Add(order);
+            var order2 = new Order
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                ShowtimeId = Guid.NewGuid(),
+                Status = OrderStatus.Pending,
+                TotalAmount = 300000,
+                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15)
+            };
+            _context.Orders.AddRange(order1, order2);
             await _context.SaveChangesAsync();
 
-            // Act 1: Dùng Gateway 1
+            // Act 1: Dùng Gateway 1 cho Order 1
             var serviceWithGateway1 = new PaymentService(_context, fakeGateway1, NullLogger<PaymentService>.Instance);
-            var res1 = await serviceWithGateway1.CreatePaymentForOrderAsync(order.Id, userId);
+            var res1 = await serviceWithGateway1.CreatePaymentForOrderAsync(order1.Id, userId);
 
-            // Act 2: Đổi sang Gateway 2 mà KHÔNG đổi một dòng code nào trong PaymentService
+            // Act 2: Đổi sang Gateway 2 cho Order 2 mà KHÔNG đổi một dòng code nào trong PaymentService
             var serviceWithGateway2 = new PaymentService(_context, fakeGateway2, NullLogger<PaymentService>.Instance);
-            var res2 = await serviceWithGateway2.CreatePaymentForOrderAsync(order.Id, userId);
+            var res2 = await serviceWithGateway2.CreatePaymentForOrderAsync(order2.Id, userId);
 
             // Assert
             Assert.Equal("https://gateway-one.vn/pay", res1.PaymentUrl);

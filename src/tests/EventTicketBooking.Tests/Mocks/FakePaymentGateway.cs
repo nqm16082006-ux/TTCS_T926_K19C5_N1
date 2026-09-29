@@ -21,6 +21,7 @@ namespace EventTicketBooking.Tests.Mocks
         public string SimulatedErrorMessage { get; set; } = "Thanh toán mô phỏng thất bại.";
         public bool ShouldVerifySignature { get; set; } = true;
         public WebhookParseResult? CustomWebhookParseResult { get; set; }
+        public PaymentResultDto? SimulatedQueryResult { get; set; }
 
         public List<PaymentCreationRequest> RecordedCreationRequests { get; } = new();
 
@@ -30,7 +31,7 @@ namespace EventTicketBooking.Tests.Mocks
 
             if (ShouldSucceed)
             {
-                return Task.FromResult(PaymentCreationResult.CreateSuccess(SimulatedPaymentUrl, SimulatedTransactionId));
+                return Task.FromResult(PaymentCreationResult.CreateSuccess(SimulatedPaymentUrl, SimulatedTransactionId, null, request.OrderCode));
             }
             else
             {
@@ -57,6 +58,14 @@ namespace EventTicketBooking.Tests.Mocks
                 transactionId: SimulatedTransactionId,
                 paidAt: DateTimeOffset.UtcNow
             );
+        }
+
+        public Task<PaymentResultDto?> QueryPaymentStatusAsync(long orderCode, CancellationToken cancellationToken = default)
+        {
+            if (SimulatedQueryResult != null)
+                return Task.FromResult<PaymentResultDto?>(SimulatedQueryResult);
+
+            return Task.FromResult<PaymentResultDto?>(null);
         }
     }
 }

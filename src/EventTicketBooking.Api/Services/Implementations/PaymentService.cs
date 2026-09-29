@@ -49,6 +49,11 @@ namespace EventTicketBooking.Api.Services.Implementations
                 return PaymentCreationResult.CreateFailure("Bạn không có quyền thanh toán cho đơn hàng này.");
             }
 
+            if (order.Status == OrderStatus.Paid)
+            {
+                return PaymentCreationResult.CreateFailure("Đơn hàng đã được thanh toán thành công.");
+            }
+
             if (order.Status != OrderStatus.Pending)
             {
                 return PaymentCreationResult.CreateFailure($"Đơn hàng không ở trạng thái chờ thanh toán (Trạng thái: {order.Status}).");
@@ -64,6 +69,32 @@ namespace EventTicketBooking.Api.Services.Implementations
             if (order.TotalAmount <= 0)
             {
                 order.CalculateTotal();
+            }
+
+            if (order.TotalAmount <= 0)
+            {
+                return PaymentCreationResult.CreateFailure("Số tiền thanh toán của đơn hàng không hợp lệ.");
+            }
+
+            // T-41: Kiểm tra giao dịch thanh toán hiện tại của Order (Idempotency - chống duplicate giao dịch)
+            var existingTransaction = await _context.PaymentTransactions
+                .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
+
+            if (existingTransaction != null)
+            {
+                if (existingTransaction.Status == "PAID")
+                {
+                    return PaymentCreationResult.CreateFailure("Đơn hàng đã được thanh toán thành công.");
+                }
+
+                _logger.LogInformation("Tái sử dụng giao dịch thanh toán hiện có cho đơn hàng {OrderId}, OrderCode: {OrderCode}", order.Id, existingTransaction.OrderCode);
+
+                return PaymentCreationResult.CreateSuccess(
+                    existingTransaction.PaymentUrl ?? string.Empty,
+                    existingTransaction.TransactionId,
+                    null,
+                    existingTransaction.OrderCode
+                );
             }
 
             // Tạo mã số đơn hàng dạng số (thích hợp với các cổng như PayOS/VNPay)
@@ -85,8 +116,54 @@ namespace EventTicketBooking.Api.Services.Implementations
 
             _logger.LogInformation("Đang gọi cổng thanh toán {Provider} cho đơn hàng {OrderId}", _paymentGateway.ProviderName, order.Id);
 
-            // Giao tiếp qua interface IPaymentGateway
-            return await _paymentGateway.CreatePaymentAsync(request, cancellationToken);
+            // Giao tiếp qua abstraction IPaymentGateway (Task T-40 & T-41)
+            var gatewayResult = await _paymentGateway.CreatePaymentAsync(request, cancellationToken);
+            if (!gatewayResult.Success)
+            {
+                return gatewayResult;
+            }
+
+            gatewayResult.OrderCode = numericOrderCode;
+
+            // Lưu giao dịch thanh toán vào cơ sở dữ liệu với unique constraint trên OrderId
+            try
+            {
+                var transaction = new PaymentTransaction
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    OrderCode = numericOrderCode,
+                    Amount = order.TotalAmount,
+                    PaymentUrl = gatewayResult.PaymentUrl,
+                    TransactionId = gatewayResult.TransactionId,
+                    Status = "PENDING",
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                };
+
+                _context.PaymentTransactions.Add(transaction);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                // Xử lý race condition (người dùng double click hoặc mở 2 tab thanh toán đồng thời)
+                _context.ChangeTracker.Clear();
+                var concurrentTx = await _context.PaymentTransactions
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
+
+                if (concurrentTx != null)
+                {
+                    return PaymentCreationResult.CreateSuccess(
+                        concurrentTx.PaymentUrl ?? string.Empty,
+                        concurrentTx.TransactionId,
+                        null,
+                        concurrentTx.OrderCode
+                    );
+                }
+            }
+
+            return gatewayResult;
         }
 
         public async Task<bool> ProcessPaymentWebhookAsync(string webhookPayload, string signature, CancellationToken cancellationToken = default)
@@ -109,57 +186,278 @@ namespace EventTicketBooking.Api.Services.Implementations
                 return false;
             }
 
-            // 3. Cập nhật trạng thái đơn hàng trong DB
+            // 3. Chuẩn hóa dữ liệu sang DTO dùng chung và gọi handler thống nhất (Task T-42)
+            var resultDto = PaymentResultDto.FromWebhookParseResult(parseResult);
+            var executionResult = await HandlePaymentResultAsync(resultDto, cancellationToken);
+
+            return executionResult.Success;
+        }
+
+        public async Task<PaymentExecutionResult> HandlePaymentResultAsync(PaymentResultDto result, CancellationToken cancellationToken = default)
+        {
+            if (result == null)
+            {
+                return PaymentExecutionResult.CreateFailure("Kết quả thanh toán không hợp lệ.");
+            }
+
+            // 1. Xác định đơn hàng từ OrderId hoặc OrderCode
             Order? order = null;
-            if (!string.IsNullOrEmpty(parseResult.OrderId) && Guid.TryParse(parseResult.OrderId, out var orderGuid))
+            if (!string.IsNullOrEmpty(result.OrderId) && Guid.TryParse(result.OrderId, out var orderGuid))
             {
                 order = await _context.Orders
                     .Include(o => o.OrderItems)
+                    .Include(o => o.PaymentTransaction)
                     .FirstOrDefaultAsync(o => o.Id == orderGuid, cancellationToken);
             }
 
-            if (order == null && parseResult.OrderCode.HasValue)
+            if (order == null && result.OrderCode.HasValue)
             {
-                // Tìm kiếm theo số tiền và trạng thái Pending nếu không lưu mã orderCode trực tiếp
-                order = await _context.Orders
-                    .Include(o => o.OrderItems)
-                    .FirstOrDefaultAsync(o => o.Status == OrderStatus.Pending && o.TotalAmount == parseResult.Amount, cancellationToken);
+                var paymentTx = await _context.PaymentTransactions
+                    .Include(pt => pt.Order)
+                        .ThenInclude(o => o.OrderItems)
+                    .FirstOrDefaultAsync(pt => pt.OrderCode == result.OrderCode.Value, cancellationToken);
+
+                if (paymentTx != null)
+                {
+                    order = paymentTx.Order;
+                }
             }
 
             if (order == null)
             {
-                _logger.LogWarning("Không tìm thấy đơn hàng tương ứng với webhook. OrderCode: {OrderCode}, OrderId: {OrderId}", parseResult.OrderCode, parseResult.OrderId);
-                return false;
+                _logger.LogWarning("Không tìm thấy đơn hàng tương ứng với kết quả thanh toán. OrderId: {OrderId}, OrderCode: {OrderCode}", result.OrderId, result.OrderCode);
+                return PaymentExecutionResult.CreateFailure("Không tìm thấy đơn hàng tương ứng với kết quả thanh toán.", null, result.OrderCode);
             }
 
-            if (parseResult.Status == PaymentStatus.Success)
+            if (order.OrderItems == null || !order.OrderItems.Any())
             {
+                order.OrderItems = await _context.OrderItems
+                    .Where(oi => oi.OrderId == order.Id)
+                    .ToListAsync(cancellationToken);
+            }
+
+            // 2. Kiểm tra tính Idempotent: Nếu đơn đã được xác nhận thanh toán trước đó
+            if (order.Status == OrderStatus.Paid)
+            {
+                _logger.LogInformation("Đơn hàng {OrderId} đã được ghi nhận thanh toán thành công trước đó (Idempotent). Bỏ qua xử lý trùng.", order.Id);
+                return PaymentExecutionResult.CreateSuccess(
+                    order.Id,
+                    result.OrderCode ?? order.PaymentTransaction?.OrderCode,
+                    "Đơn hàng đã được thanh toán thành công trước đó.",
+                    isAlreadyProcessed: true
+                );
+            }
+
+            // 3. Xử lý trường hợp thanh toán thất bại hoặc bị hủy từ cổng
+            if (result.Status == PaymentStatus.Cancelled || result.Status == PaymentStatus.Failed)
+            {
+                order.Status = OrderStatus.Cancelled;
+                order.UpdatedAt = DateTimeOffset.UtcNow;
+
+                var paymentTx = await _context.PaymentTransactions
+                    .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
+
+                if (paymentTx != null)
+                {
+                    paymentTx.Status = result.Status == PaymentStatus.Cancelled ? "CANCELLED" : "FAILED";
+                    paymentTx.UpdatedAt = DateTimeOffset.UtcNow;
+                }
+
+                await _context.SaveChangesAsync(cancellationToken);
+                _logger.LogInformation("Đơn hàng {OrderId} thanh toán thất bại/bị hủy (Status: {Status}).", order.Id, result.Status);
+                return PaymentExecutionResult.CreateFailure($"Thanh toán không thành công ({result.Status}).", order.Id, result.OrderCode, order.Status.ToString());
+            }
+
+            if (result.Status != PaymentStatus.Success)
+            {
+                return PaymentExecutionResult.CreateFailure($"Giao dịch chưa hoàn tất (Trạng thái: {result.Status}).", order.Id, result.OrderCode, order.Status.ToString());
+            }
+
+            // 4. Đối chiếu số tiền thanh toán (Payment amount) với Order.TotalAmount từ backend
+            if (order.TotalAmount <= 0)
+            {
+                order.CalculateTotal();
+            }
+
+            if (result.Amount != order.TotalAmount)
+            {
+                _logger.LogWarning("Số tiền thanh toán ({PaymentAmount}) KHÔNG khớp với số tiền đơn hàng {OrderId} ({OrderAmount}). Giao dịch bị từ chối.",
+                    result.Amount, order.Id, order.TotalAmount);
+                return PaymentExecutionResult.CreateFailure(
+                    $"Số tiền thanh toán ({result.Amount}) không khớp với giá trị đơn hàng ({order.TotalAmount}).",
+                    order.Id,
+                    result.OrderCode,
+                    order.Status.ToString()
+                );
+            }
+
+            // 5. Cập nhật trạng thái đơn hàng, đánh dấu ghế đã bán, xoá giữ chỗ trong cùng MỘT Database Transaction duy nhất
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? dbTransaction = null;
+            if (_context.Database.IsRelational())
+            {
+                dbTransaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            }
+            else
+            {
+                try
+                {
+                    dbTransaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Nhà cung cấp InMemory có thể cảnh báo/ném lỗi nếu chưa bật bỏ qua cảnh báo giao dịch
+                }
+            }
+
+            try
+            {
+                // A. Cập nhật Order -> Paid
                 order.Status = OrderStatus.Paid;
                 order.UpdatedAt = DateTimeOffset.UtcNow;
 
-                // Cập nhật trạng thái các giữ chỗ liên quan sang hoàn tất/xóa nếu cần
-                var seatIds = order.OrderItems.Select(oi => oi.SeatId).ToList();
+                // B. Cập nhật PaymentTransaction -> PAID
+                var paymentTx = await _context.PaymentTransactions
+                    .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
+                if (paymentTx != null)
+                {
+                    paymentTx.Status = "PAID";
+                    paymentTx.UpdatedAt = DateTimeOffset.UtcNow;
+                    if (!string.IsNullOrEmpty(result.TransactionId))
+                    {
+                        paymentTx.TransactionId = result.TransactionId;
+                    }
+                }
+
+                // C. Đánh dấu ghế tương ứng chuyển Status = "SOLD"
+                var seatIds = order.OrderItems.Select(oi => oi.SeatId).Distinct().ToList();
+                var seats = await _context.Seats
+                    .Where(s => seatIds.Contains(s.Id))
+                    .ToListAsync(cancellationToken);
+
+                foreach (var seat in seats)
+                {
+                    seat.Status = "SOLD";
+                }
+
+                // D. Cập nhật SeatHold tương ứng sang Status = "CONVERTED" (xoá/giải phóng giữ chỗ)
                 var holds = await _context.SeatHold
                     .Where(sh => seatIds.Contains(sh.SeatId) && sh.UserId == order.UserId)
                     .ToListAsync(cancellationToken);
 
                 foreach (var hold in holds)
                 {
-                    hold.Status = "PAID";
+                    hold.Status = "CONVERTED";
                 }
 
                 await _context.SaveChangesAsync(cancellationToken);
-                _logger.LogInformation("Đơn hàng {OrderId} đã được thanh toán thành công", order.Id);
+
+                if (dbTransaction != null)
+                {
+                    await dbTransaction.CommitAsync(cancellationToken);
+                }
+
+                _logger.LogInformation("Giao dịch thanh toán thành công cho đơn hàng {OrderId}. Số ghế đã bán: {SeatsCount}, Giữ chỗ đã chuyển đổi: {HoldsCount}.",
+                    order.Id, seats.Count, holds.Count);
+
+                return PaymentExecutionResult.CreateSuccess(
+                    order.Id,
+                    paymentTx?.OrderCode ?? result.OrderCode,
+                    "Thanh toán thành công và đã xuất vé."
+                );
             }
-            else if (parseResult.Status == PaymentStatus.Cancelled || parseResult.Status == PaymentStatus.Failed)
+            catch (Exception ex)
             {
-                order.Status = OrderStatus.Cancelled;
-                order.UpdatedAt = DateTimeOffset.UtcNow;
-                await _context.SaveChangesAsync(cancellationToken);
-                _logger.LogInformation("Đơn hàng {OrderId} thanh toán thất bại/đã bị hủy", order.Id);
+                if (dbTransaction != null)
+                {
+                    await dbTransaction.RollbackAsync(cancellationToken);
+                }
+                _logger.LogError(ex, "Lỗi xảy ra trong giao dịch cập nhật thanh toán đơn hàng {OrderId}. Toàn bộ giao dịch đã được rollback.", order.Id);
+                throw;
+            }
+            finally
+            {
+                if (dbTransaction != null)
+                {
+                    await dbTransaction.DisposeAsync();
+                }
+            }
+        }
+
+        public async Task<PaymentExecutionResult> VerifyAndProcessPaymentReturnAsync(PaymentReturnQueryDto query, CancellationToken cancellationToken = default)
+        {
+            if (query == null || (!query.OrderId.HasValue && !query.OrderCode.HasValue))
+            {
+                return PaymentExecutionResult.CreateFailure("Thiếu thông tin mã đơn hàng để đối soát.");
             }
 
-            return true;
+            // 1. Tìm Order trong cơ sở dữ liệu
+            Order? order = null;
+            if (query.OrderId.HasValue)
+            {
+                order = await _context.Orders
+                    .Include(o => o.OrderItems)
+                    .Include(o => o.PaymentTransaction)
+                    .FirstOrDefaultAsync(o => o.Id == query.OrderId.Value, cancellationToken);
+            }
+            else if (query.OrderCode.HasValue)
+            {
+                var pt = await _context.PaymentTransactions
+                    .Include(p => p.Order)
+                        .ThenInclude(o => o.OrderItems)
+                    .FirstOrDefaultAsync(p => p.OrderCode == query.OrderCode.Value, cancellationToken);
+
+                if (pt != null)
+                {
+                    order = pt.Order;
+                }
+            }
+
+            if (order == null)
+            {
+                return PaymentExecutionResult.CreateFailure("Không tìm thấy đơn hàng cần xác minh.");
+            }
+
+            // 2. Nếu đơn đã ở trạng thái Paid (ví dụ webhook đã đến và xử lý trước), trả về kết quả thành công ngay (Idempotent)
+            if (order.Status == OrderStatus.Paid)
+            {
+                _logger.LogInformation("Đơn hàng {OrderId} đã được xác nhận thanh toán trước đó (Idempotent).", order.Id);
+                return PaymentExecutionResult.CreateSuccess(
+                    order.Id,
+                    query.OrderCode ?? order.PaymentTransaction?.OrderCode,
+                    "Đơn hàng đã được xác nhận thanh toán thành công.",
+                    isAlreadyProcessed: true
+                );
+            }
+
+            // 3. KHÔNG TIN TƯỞNG query.Status từ client! Phải truy vấn trực tiếp cổng thanh toán server-side
+            long? orderCodeToQuery = query.OrderCode;
+            if (!orderCodeToQuery.HasValue)
+            {
+                var pt = await _context.PaymentTransactions
+                    .FirstOrDefaultAsync(p => p.OrderId == order.Id, cancellationToken);
+                orderCodeToQuery = pt?.OrderCode;
+            }
+
+            if (!orderCodeToQuery.HasValue)
+            {
+                return PaymentExecutionResult.CreateFailure("Không tìm thấy mã giao dịch thanh toán để đối soát với cổng.", order.Id, null, order.Status.ToString());
+            }
+
+            _logger.LogInformation("Đang đối soát trạng thái giao dịch với cổng thanh toán cho đơn hàng {OrderId}, OrderCode: {OrderCode}", order.Id, orderCodeToQuery.Value);
+
+            var gatewayStatus = await _paymentGateway.QueryPaymentStatusAsync(orderCodeToQuery.Value, cancellationToken);
+
+            if (gatewayStatus == null)
+            {
+                _logger.LogWarning("Không thể đối soát với cổng thanh toán hoặc giao dịch chưa được xác nhận trên gateway cho OrderCode: {OrderCode}", orderCodeToQuery.Value);
+                return PaymentExecutionResult.CreateFailure("Không thể xác minh trạng thái thanh toán từ cổng thanh toán.", order.Id, orderCodeToQuery, order.Status.ToString());
+            }
+
+            gatewayStatus.OrderId = order.Id.ToString();
+            gatewayStatus.OrderCode = orderCodeToQuery.Value;
+
+            // 4. Ủy thác cho Payment Result Handler dùng chung thực hiện đối chiếu số tiền và cập nhật DB trong 1 transaction
+            return await HandlePaymentResultAsync(gatewayStatus, cancellationToken);
         }
     }
 }
