@@ -1,0 +1,189 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Cổng Thanh Toán Giả Lập</title>
+	<style>
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+			font-family: 'Segoe UI', Arial, sans-serif;
+		}
+
+		body {
+			background-color: #f8fafc;
+			color: #1e293b;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			min-height: 100vh;
+			padding: 20px;
+		}
+
+		.card {
+			background: #ffffff;
+			border-radius: 12px;
+			box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+			width: 100%;
+			max-width: 440px;
+			padding: 32px;
+			border: 1px solid #e2e8f0;
+		}
+
+		.header {
+			text-align: center;
+			margin-bottom: 24px;
+		}
+
+		.badge {
+			display: inline-block;
+			background-color: #e0f2fe;
+			color: #0284c7;
+			font-size: 12px;
+			font-weight: 700;
+			padding: 4px 12px;
+			border-radius: 999px;
+			margin-bottom: 8px;
+		}
+
+		.header h2 {
+			color: #0f172a;
+			font-size: 22px;
+		}
+
+		.info-box {
+			background-color: #f1f5f9;
+			border-radius: 8px;
+			padding: 16px;
+			margin-bottom: 24px;
+		}
+
+		.row {
+			display: flex;
+			justify-content: space-between;
+			margin-bottom: 10px;
+			font-size: 14px;
+		}
+
+			.row:last-child {
+				margin-bottom: 0;
+			}
+
+		.label {
+			color: #64748b;
+		}
+
+		.value {
+			font-weight: 600;
+			color: #0f172a;
+		}
+
+		.price {
+			color: #2563eb;
+			font-size: 18px;
+			font-weight: 700;
+		}
+
+		.actions {
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+		}
+
+		.btn {
+			width: 100%;
+			padding: 14px;
+			border: none;
+			border-radius: 8px;
+			font-size: 15px;
+			font-weight: 600;
+			cursor: pointer;
+			transition: all 0.2s;
+		}
+
+		.btn-success {
+			background-color: #16a34a;
+			color: #fff;
+		}
+
+			.btn-success:hover {
+				background-color: #15803d;
+			}
+
+		.btn-danger {
+			background-color: #dc2626;
+			color: #fff;
+		}
+
+			.btn-danger:hover {
+				background-color: #b91c1c;
+			}
+
+		.note {
+			text-align: center;
+			font-size: 12px;
+			color: #94a3b8;
+			margin-top: 20px;
+		}
+	</style>
+</head>
+<body>
+	<div class="card">
+		<div class="header">
+			<span class="badge">TEST ENVIRONMENT</span>
+			<h2>Cổng Thanh Toán Giả Lập</h2>
+		</div>
+
+		<div class="info-box">
+			<div class="row">
+				<span class="label">Mã đơn hàng:</span>
+				<span class="value" id="orderId">--</span>
+			</div>
+			<div class="row">
+				<span class="label">Số tiền:</span>
+				<span class="value price" id="amount">0 VNĐ</span>
+			</div>
+		</div>
+
+		<div class="actions">
+			<button class="btn btn-success" onclick="processPayment(true)">Thanh toán Thành Công</button>
+			<button class="btn btn-danger" onclick="processPayment(false)">Thanh toán Thất Bại</button>
+		</div>
+	</div>
+
+	<script>
+        const params = new URLSearchParams(window.location.search);
+        const orderId = params.get('orderId') || 'ORD-' + Math.floor(Math.random() * 10000);
+        const amount = params.get('amount') || '100000';
+
+        document.getElementById('orderId').textContent = orderId;
+        document.getElementById('amount').textContent = parseInt(amount).toLocaleString('vi-VN') + ' VNĐ';
+
+        async function processPayment(isSuccess) {
+            try {
+                const response = await fetch('/api/mock-payment/callback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderId: orderId,
+                        status: isSuccess ? 'SUCCESS' : 'FAILED'
+                    })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    alert(result.message);
+                    // Dẫn truyền về đúng trang theo yêu cầu S-24 / S-19
+                    window.location.href = result.data.redirectUrl || '/events.html';
+                } else {
+                    alert(result.message || 'Có lỗi xảy ra!');
+                }
+            } catch (e) {
+                alert('Không thể kết nối đến máy chủ.');
+            }
+        }
+	</script>
+</body>
+</html>
