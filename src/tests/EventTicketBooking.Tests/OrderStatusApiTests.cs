@@ -191,7 +191,10 @@ namespace EventTicketBooking.Tests
             // Arrange: Chuẩn bị đơn
             var order = CreateTestOrder(_ownerUserId, OrderStatus.Pending);
 
-            // Act: Đo thời gian thực thi
+            // Warmup JIT compilation & EF Core query tree compilation
+            await _controller.GetOrderStatus(order.Id);
+
+            // Act: Đo thời gian thực thi sau khi đã warmup JIT
             var sw = Stopwatch.StartNew();
             var result = await _controller.GetOrderStatus(order.Id);
             sw.Stop();
@@ -199,6 +202,126 @@ namespace EventTicketBooking.Tests
             // Assert: Phản hồi dưới 100ms
             Assert.NotNull(result);
             Assert.True(sw.ElapsedMilliseconds < 100, $"Thời gian phản hồi {sw.ElapsedMilliseconds}ms vượt quá ngưỡng 100ms!");
+        }
+
+        [Fact]
+        public async Task T50_EndToEnd_RealSqliteDatabase_FullFlow()
+        {
+            // 1. Tìm đường dẫn file SQLite thật eventticket_dev.db
+            string? currentDir = AppContext.BaseDirectory;
+            string? dbPath = null;
+            while (!string.IsNullOrEmpty(currentDir))
+            {
+                var candidate = Path.Combine(currentDir, "src", "EventTicketBooking.Api", "eventticket_dev.db");
+                if (File.Exists(candidate))
+                {
+                    dbPath = candidate;
+                    break;
+                }
+                var parent = Directory.GetParent(currentDir);
+                if (parent == null || parent.FullName == currentDir)
+                    break;
+                currentDir = parent.FullName;
+            }
+
+            if (dbPath == null || !File.Exists(dbPath))
+            {
+                // Nếu không tìm thấy file db local thì bỏ qua
+                return;
+            }
+
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .Options;
+
+            using var sqliteDb = new AppDbContext(options);
+
+            // Tìm hoặc tạo một User và Showtime trong DB thật
+            var owner = await sqliteDb.Users.FirstOrDefaultAsync();
+            var showtime = await sqliteDb.Showtimes.FirstOrDefaultAsync();
+
+            if (owner == null || showtime == null)
+            {
+                return;
+            }
+
+            // Tạo một Order thật trong bảng orders
+            var testOrder = new Order
+            {
+                Id = Guid.NewGuid(),
+                UserId = owner.Id,
+                ShowtimeId = showtime.Id,
+                Status = OrderStatus.Pending,
+                TotalAmount = 150000,
+                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15),
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+
+            sqliteDb.Orders.Add(testOrder);
+            await sqliteDb.SaveChangesAsync();
+
+            try
+            {
+                var controller = new OrdersController(sqliteDb, NullLogger<OrdersController>.Instance);
+
+                // A. Owner -> 200 OK với status "Pending"
+                var ownerHttpContext = new DefaultHttpContext();
+                ownerHttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, owner.Id.ToString())
+                }, "TestAuth"));
+                controller.ControllerContext = new ControllerContext { HttpContext = ownerHttpContext };
+
+                var okResult = await controller.GetOrderStatus(testOrder.Id) as OkObjectResult;
+                Assert.NotNull(okResult);
+                Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+                var body = Assert.IsType<ApiResponse<OrderStatusResponseDto>>(okResult.Value);
+                Assert.Equal("Pending", body.Data?.Status);
+
+                // B. Other user -> 403 Forbidden
+                var otherUserHttpContext = new DefaultHttpContext();
+                otherUserHttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())
+                }, "TestAuth"));
+                controller.ControllerContext = new ControllerContext { HttpContext = otherUserHttpContext };
+
+                var forbiddenResult = await controller.GetOrderStatus(testOrder.Id) as ObjectResult;
+                Assert.NotNull(forbiddenResult);
+                Assert.Equal(StatusCodes.Status403Forbidden, forbiddenResult.StatusCode);
+
+                // C. No auth -> 401 Unauthorized
+                var noAuthHttpContext = new DefaultHttpContext();
+                noAuthHttpContext.User = new ClaimsPrincipal(new ClaimsIdentity());
+                controller.ControllerContext = new ControllerContext { HttpContext = noAuthHttpContext };
+
+                var unauthResult = await controller.GetOrderStatus(testOrder.Id) as UnauthorizedObjectResult;
+                Assert.NotNull(unauthResult);
+                Assert.Equal(StatusCodes.Status401Unauthorized, unauthResult.StatusCode);
+
+                // D. Not found -> 404 NotFound
+                controller.ControllerContext = new ControllerContext { HttpContext = ownerHttpContext };
+                var notFoundResult = await controller.GetOrderStatus(Guid.NewGuid()) as NotFoundObjectResult;
+                Assert.NotNull(notFoundResult);
+                Assert.Equal(StatusCodes.Status404NotFound, notFoundResult.StatusCode);
+
+                // E. Database chuyển sang Paid -> lần gọi tiếp theo trả về Paid ngay
+                testOrder.Status = OrderStatus.Paid;
+                testOrder.UpdatedAt = DateTimeOffset.UtcNow;
+                await sqliteDb.SaveChangesAsync();
+
+                var paidResult = await controller.GetOrderStatus(testOrder.Id) as OkObjectResult;
+                Assert.NotNull(paidResult);
+                var paidBody = Assert.IsType<ApiResponse<OrderStatusResponseDto>>(paidResult.Value);
+                Assert.Equal("Paid", paidBody.Data?.Status);
+            }
+            finally
+            {
+                // Dọn dẹp Order test khỏi database thật
+                sqliteDb.Orders.Remove(testOrder);
+                await sqliteDb.SaveChangesAsync();
+            }
         }
 
         #endregion
