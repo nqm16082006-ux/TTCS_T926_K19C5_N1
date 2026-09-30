@@ -564,7 +564,7 @@ namespace EventTicketBooking.Tests
             };
 
             var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance);
-            var controller = new PaymentsController(paymentService, NullLogger<PaymentsController>.Instance);
+            var controller = new PaymentsController(paymentService, fakeGateway, NullLogger<PaymentsController>.Instance);
 
             var query = new PaymentReturnQueryDto
             {
@@ -594,7 +594,7 @@ namespace EventTicketBooking.Tests
             };
 
             var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance);
-            var controller = new PaymentsController(paymentService, NullLogger<PaymentsController>.Instance);
+            var controller = new PaymentsController(paymentService, fakeGateway, NullLogger<PaymentsController>.Instance);
 
             var query = new PaymentReturnQueryDto
             {
@@ -627,7 +627,7 @@ namespace EventTicketBooking.Tests
             };
 
             var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance);
-            var controller = new PaymentsController(paymentService, NullLogger<PaymentsController>.Instance);
+            var controller = new PaymentsController(paymentService, fakeGateway, NullLogger<PaymentsController>.Instance);
 
             var userPrincipal = new ClaimsPrincipal(new ClaimsIdentity(new[]
             {
