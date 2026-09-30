@@ -19,13 +19,16 @@ namespace EventTicketBooking.Api.Controllers
     public class PaymentsController : ControllerBase
     {
         private readonly IPaymentService _paymentService;
+        private readonly IPaymentGateway _paymentGateway;
         private readonly ILogger<PaymentsController> _logger;
 
         public PaymentsController(
             IPaymentService paymentService,
+            IPaymentGateway paymentGateway,
             ILogger<PaymentsController> logger)
         {
             _paymentService = paymentService;
+            _paymentGateway = paymentGateway;
             _logger = logger;
         }
 
@@ -105,14 +108,34 @@ namespace EventTicketBooking.Api.Controllers
 
                 if (string.IsNullOrEmpty(signature))
                 {
-                    _logger.LogWarning("Webhook thiếu chữ ký xác thực.");
-                    return BadRequest(ApiResponse<object>.FailureResult("Webhook thiếu chữ ký xác thực."));
+                    _logger.LogWarning(
+                        "Webhook rejected. StatusCode={StatusCode}, SourceAddress={SourceAddress}, OrderCode={OrderCode}, Timestamp={Timestamp}, Reason={Reason}",
+                        StatusCodes.Status401Unauthorized,
+                        HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        null,
+                        DateTimeOffset.UtcNow,
+                        "MissingSignature");
+                    return Unauthorized(ApiResponse<object>.FailureResult("Webhook thiếu chữ ký xác thực."));
+                }
+
+                // Kiểm tra chữ ký ngay tại đầu handler theo yêu cầu T-48
+                bool isSignatureValid = _paymentGateway.VerifyWebhookSignature(payload, signature);
+                if (!isSignatureValid)
+                {
+                    _logger.LogWarning(
+                        "Webhook rejected. StatusCode={StatusCode}, SourceAddress={SourceAddress}, OrderCode={OrderCode}, Timestamp={Timestamp}, Reason={Reason}",
+                        StatusCodes.Status401Unauthorized,
+                        HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        null,
+                        DateTimeOffset.UtcNow,
+                        "InvalidSignature");
+                    return Unauthorized(ApiResponse<object>.FailureResult("Chữ ký webhook không hợp lệ."));
                 }
 
                 bool isProcessed = await _paymentService.ProcessPaymentWebhookAsync(payload, signature, HttpContext.RequestAborted);
                 if (!isProcessed)
                 {
-                    return BadRequest(ApiResponse<object>.FailureResult("Xử lý webhook thất bại hoặc chữ ký không hợp lệ."));
+                    return BadRequest(ApiResponse<object>.FailureResult("Xử lý webhook thất bại."));
                 }
 
                 return Ok(new { success = true, message = "Webhook đã được xử lý thành công." });
