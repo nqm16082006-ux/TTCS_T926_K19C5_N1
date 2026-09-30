@@ -122,11 +122,11 @@ namespace EventTicketBooking.Tests
 
             var okResult = Assert.IsType<OkObjectResult>(response);
             Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
-            
+
             // Check order status changed
             var updatedOrder = await _context.Orders.FindAsync(order.Id);
             Assert.Equal(OrderStatus.Paid, updatedOrder!.Status);
-            
+
             // Should NOT have rejection logs
             Assert.DoesNotContain(logger.Logs, l => l.Message.Contains("Webhook rejected"));
         }
@@ -185,7 +185,7 @@ namespace EventTicketBooking.Tests
             var (order, tx) = await SeedPendingOrderAsync(123456, 100000);
             string dataSignString = "amount=100000&orderCode=123456";
             string validSignature = ComputeHmacSha256(dataSignString, _testChecksumKey);
-            
+
             // Tampered payload amount to 999999
             string tamperedPayload = $"{{\"code\":\"00\",\"desc\":\"success\",\"data\":{{\"orderCode\":123456,\"amount\":999999}},\"signature\":\"{validSignature}\"}}";
 
@@ -203,7 +203,7 @@ namespace EventTicketBooking.Tests
             Assert.Contains("StatusCode=401", log.Message);
             Assert.Contains("SourceAddress=203.0.113.10", log.Message);
             Assert.Contains("Reason=InvalidSignature", log.Message);
-            
+
             // Ensure no sensitive info logged
             Assert.DoesNotContain(tamperedPayload, log.Message);
             Assert.DoesNotContain(_testChecksumKey, log.Message);
