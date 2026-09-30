@@ -21,4 +21,12 @@ namespace EventTicketBooking.Api.DTOs
         public string? SeatName { get; set; }
         public string? CategoryName { get; set; }
     }
+
+    /// <summary>
+    /// DTO tối giản cho Task T-50 (trả về trạng thái đơn hàng để polling nhẹ dưới 100ms)
+    /// </summary>
+    public class OrderStatusResponseDto
+    {
+        public string Status { get; set; } = null!;
+    }
 }

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kết quả thanh toán - EventTicket Booking</title>
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- FontAwesome 6 CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <style>
+    /* Ambient glow elements */
+    .ambient-bg {
+      background: radial-gradient(circle at 15% 20%, rgba(99, 102, 241, 0.12) 0%, transparent 45%),
+                  radial-gradient(circle at 85% 80%, rgba(59, 130, 246, 0.12) 0%, transparent 45%);
+    }
+
+    /* Subtle pulse animation for status indicator */
+    @keyframes subtlePulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.85; }
+    }
+    .status-pulse {
+      animation: subtlePulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col justify-between items-center p-4 sm:p-6 lg:p-10 ambient-bg">
+
+  <!-- Navigation Header -->
+  <header class="w-full max-w-xl flex items-center justify-between py-4">
+    <a href="/public-events.html" class="flex items-center gap-3 group">
+      <div class="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white text-base shadow-md shadow-indigo-200 group-hover:scale-105 transition-transform">
+        <i class="fa-solid fa-ticket"></i>
+      </div>
+      <div>
+        <span class="text-lg font-extrabold text-slate-900 tracking-tight">EventTicket <span class="text-indigo-600">Booking</span></span>
+      </div>
+    </a>
+    <span class="text-xs font-semibold px-3 py-1 rounded-full bg-slate-200/80 text-slate-600">Trạng thái giao dịch</span>
+  </header>
+
+  <!-- Main Card -->
+  <main class="w-full max-w-xl bg-white border border-slate-200/90 rounded-3xl shadow-xl shadow-slate-200/60 p-8 sm:p-10 my-auto text-center relative overflow-hidden">
+    
+    <!-- Status Icon Container -->
+    <div id="status-icon-wrapper" class="w-20 h-20 mx-auto mb-6 rounded-3xl flex items-center justify-center text-3xl shadow-lg bg-indigo-50 text-indigo-600 border border-indigo-100 status-pulse">
+      <i id="status-icon" class="fa-solid fa-circle-notch fa-spin"></i>
+    </div>
+
+    <!-- Badge -->
+    <div class="mb-3">
+      <span id="status-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">
+        <span class="w-2 h-2 rounded-full bg-indigo-600 animate-ping"></span>
+        Đang xử lý
+      </span>
+    </div>
+
+    <!-- Title & Description -->
+    <h1 id="status-title" class="text-2xl font-extrabold text-slate-900 tracking-tight mb-3">
+      Đang xác nhận thanh toán
+    </h1>
+    <p id="status-message" class="text-sm text-slate-600 leading-relaxed max-w-md mx-auto mb-6">
+      Hệ thống đang kết nối với máy chủ để xác thực kết quả thanh toán. Vui lòng giữ màn hình và đợi trong giây lát...
+    </p>
+
+    <!-- Order Info Card -->
+    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left mb-6 space-y-2 text-xs">
+      <div class="flex justify-between items-center text-slate-500">
+        <span>Mã đơn hàng:</span>
+        <span id="order-id-display" class="font-mono font-semibold text-slate-800">--</span>
+      </div>
+      <div class="flex justify-between items-center text-slate-500">
+        <span>Thời gian chờ:</span>
+        <span id="timer-display" class="font-mono text-slate-600">Đang theo dõi (tối đa 60s)</span>
+      </div>
+    </div>
+
+    <!-- Action Buttons Container -->
+    <div id="action-container" class="space-y-3">
+      <!-- Dynamic action links inserted via JS -->
+      <a href="/public-events.html" id="btn-secondary" class="inline-flex items-center justify-center w-full px-5 py-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-all">
+        <i class="fa-solid fa-arrow-left mr-2"></i> Quay lại danh sách sự kiện
+      </a>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="w-full max-w-xl text-center py-4 text-xs text-slate-400">
+    &copy; 2026 EventTicket Booking Platform. Bảo mật xác thực máy chủ.
+  </footer>
+
+  <!-- Script logic T-51 -->
+  <script>
+    (function () {
+      // 1. Chỉ đọc duy nhất orderId từ URL, HOÀN TOÀN BỎ QUA mọi tham số khác (status, code, result...)
+      const urlParams = new URLSearchParams(window.location.search);
+      const orderId = urlParams.get('orderId');
+
+      // Các DOM elements
+      const iconWrapper = document.getElementById('status-icon-wrapper');
+      const icon = document.getElementById('status-icon');
+      const badge = document.getElementById('status-badge');
+      const title = document.getElementById('status-title');
+      const message = document.getElementById('status-message');
+      const orderIdDisplay = document.getElementById('order-id-display');
+      const timerDisplay = document.getElementById('timer-display');
+      const actionContainer = document.getElementById('action-container');
+
+      if (orderId) {
+        orderIdDisplay.textContent = orderId;
+      } else {
+        orderIdDisplay.textContent = 'Không xác định';
+      }
+
+      // Biến điều khiển polling
+      const POLL_INTERVAL_MS = 2000; // 2 giây
+      const MAX_TIMEOUT_MS = 60000;   // 60 giây
+      let startTime = Date.now();
+      let pollTimerId = null;
+      let abortController = null;
+      let isTerminalStateReached = false;
+
+      // Đọc auth token từ localStorage theo quy ước chung của hệ thống
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+
+      // Nếu không có orderId, hiển thị thông báo lỗi tham số
+      if (!orderId) {
+        setTerminalUI({
+          badgeClass: 'bg-rose-100 text-rose-700 border-rose-200',
+          badgeText: 'Lỗi đường dẫn',
+          iconWrapperClass: 'bg-rose-50 text-rose-600 border-rose-100',
+          iconClass: 'fa-solid fa-circle-exclamation',
+          titleText: 'Thiếu mã đơn hàng',
+          messageText: 'Đường dẫn không chứa thông tin mã đơn hàng hợp lệ. Vui lòng quay lại kiểm tra.',
+          buttons: `
+            <a href="/public-events.html" class="inline-flex items-center justify-center w-full px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all">
+              <i class="fa-solid fa-arrow-left mr-2"></i> Quay lại danh sách sự kiện
+            </a>
+          `
+        });
+        return;
+      }
+
+      // Đăng ký dọn dẹp khi người dùng rời trang (pagehide / beforeunload)
+      function cleanup() {
+        if (pollTimerId) {
+          clearTimeout(pollTimerId);
+          pollTimerId = null;
+        }
+        if (abortController) {
+          abortController.abort();
+          abortController = null;
+        }
+      }
+
+      window.addEventListener('pagehide', cleanup);
+      window.addEventListener('beforeunload', cleanup);
+
+      // Cập nhật giao diện theo trạng thái cuối
+      function setTerminalUI({ badgeClass, badgeText, iconWrapperClass, iconClass, titleText, messageText, buttons }) {
+        isTerminalStateReached = true;
+        cleanup();
+
+        if (iconWrapper) {
+          iconWrapper.className = `w-20 h-20 mx-auto mb-6 rounded-3xl flex items-center justify-center text-3xl shadow-lg border ${iconWrapperClass}`;
+        }
+        if (icon) {
+          icon.className = iconClass;
+        }
+        if (badge) {
+          badge.className = `inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${badgeClass}`;
+          badge.innerHTML = badgeText;
+        }
+        if (title) {
+          title.textContent = titleText;
+        }
+        if (message) {
+          message.textContent = messageText;
+        }
+        if (actionContainer && buttons) {
+          actionContainer.innerHTML = buttons;
+        }
+      }
+
+      // Xử lý khi đơn hàng Paid (Thành công)
+      function handlePaidStatus() {
+        setTerminalUI({
+          badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+          badgeText: '<i class="fa-solid fa-check mr-1"></i> Thành công',
+          iconWrapperClass: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+          iconClass: 'fa-solid fa-circle-check',
+          titleText: 'Thanh toán thành công!',
+          messageText: 'Giao dịch của bạn đã được xác nhận. Vé của bạn đã được giữ chỗ và thanh toán thành công.',
+          buttons: `
+            <a href="/public-events.html" class="inline-flex items-center justify-center w-full px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-md shadow-emerald-200 transition-all">
+              <i class="fa-solid fa-ticket mr-2"></i> Khám phá thêm sự kiện
+            </a>
+          `
+        });
+        if (timerDisplay) {
+          timerDisplay.textContent = 'Giao dịch đã xác nhận';
+        }
+      }
+
+      // Xử lý khi chạm mốc 60 giây mà chưa nhận được xác nhận
+      function handleTimeoutStatus() {
+        setTerminalUI({
+          badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+          badgeText: '<i class="fa-solid fa-clock mr-1"></i> Chờ xử lý',
+          iconWrapperClass: 'bg-amber-50 text-amber-600 border-amber-100',
+          iconClass: 'fa-solid fa-clock-rotate-left',
+          titleText: 'Chưa nhận được xác nhận',
+          messageText: 'Hệ thống chưa nhận được xác nhận từ cổng thanh toán. Giao dịch của bạn có thể mất thêm ít phút để cập nhật. Vui lòng kiểm tra lại trong lịch sử đơn hàng sau ít phút.',
+          buttons: `
+            <a href="/public-events.html" class="inline-flex items-center justify-center w-full px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all">
+              <i class="fa-solid fa-arrow-left mr-2"></i> Quay lại danh sách sự kiện
+            </a>
+          `
+        });
+        if (timerDisplay) {
+          timerDisplay.textContent = 'Đã hết thời gian chờ tự động (60s)';
+        }
+      }
+
+      // Xử lý các trạng thái trung tính khác (Cancelled, Expired, NeedsAttention)
+      function handleNeutralStatus(statusValue) {
+        setTerminalUI({
+          badgeClass: 'bg-slate-100 text-slate-800 border-slate-200',
+          badgeText: `<i class="fa-solid fa-info-circle mr-1"></i> ${statusValue}`,
+          iconWrapperClass: 'bg-slate-50 text-slate-600 border-slate-200',
+          iconClass: 'fa-solid fa-circle-info',
+          titleText: 'Thông tin trạng thái đơn hàng',
+          messageText: `Đơn hàng hiện đang ở trạng thái: ${statusValue}. Vui lòng kiểm tra lại chi tiết trong lịch sử đơn hàng của bạn.`,
+          buttons: `
+            <a href="/public-events.html" class="inline-flex items-center justify-center w-full px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all">
+              <i class="fa-solid fa-arrow-left mr-2"></i> Quay lại danh sách sự kiện
+            </a>
+          `
+        });
+        if (timerDisplay) {
+          timerDisplay.textContent = `Trạng thái: ${statusValue}`;
+        }
+      }
+
+      // Hàm thăm dò (Poll) đệ quy bằng setTimeout nối tiếp
+      async function pollOrderStatus() {
+        if (isTerminalStateReached) return;
+
+        const elapsedTime = Date.now() - startTime;
+        if (elapsedTime >= MAX_TIMEOUT_MS) {
+          handleTimeoutStatus();
+          return;
+        }
+
+        // Cập nhật số giây còn lại trên timer display
+        const remainingSeconds = Math.max(0, Math.ceil((MAX_TIMEOUT_MS - elapsedTime) / 1000));
+        if (timerDisplay) {
+          timerDisplay.textContent = `Đang theo dõi (còn lại ~${remainingSeconds}s)`;
+        }
+
+        abortController = new AbortController();
+
+        try {
+          const headers = {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          };
+          if (token) {
+            headers['Authorization'] = 'Bearer ' + token;
+          }
+
+          const response = await fetch(`/api/v1/orders/${encodeURIComponent(orderId)}/status`, {
+            method: 'GET',
+            headers: headers,
+            signal: abortController.signal
+          });
+
+          if (response.ok) {
+            const body = await response.json();
+            // Lấy status từ body.data.status (theo chuẩn ApiResponse<OrderStatusResponseDto>) hoặc body.status
+            const status = (body && body.data && body.data.status) || (body && body.status);
+
+            if (status === 'Paid') {
+              handlePaidStatus();
+              return;
+            } else if (status === 'Cancelled' || status === 'Expired' || status === 'NeedsAttention') {
+              handleNeutralStatus(status);
+              return;
+            }
+            // Nếu status là 'Pending' -> Tiếp tục polling
+          } else if (response.status === 401) {
+            setTerminalUI({
+              badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+              badgeText: 'Yêu cầu đăng nhập',
+              iconWrapperClass: 'bg-amber-50 text-amber-600 border-amber-100',
+              iconClass: 'fa-solid fa-lock',
+              titleText: 'Phiên làm việc hết hạn',
+              messageText: 'Vui lòng đăng nhập để kiểm tra trạng thái đơn hàng của bạn.',
+              buttons: `
+                <a href="/login.html" class="inline-flex items-center justify-center w-full px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all">
+                  <i class="fa-solid fa-right-to-bracket mr-2"></i> Đăng nhập lại
+                </a>
+              `
+            });
+            return;
+          } else if (response.status === 403) {
+            setTerminalUI({
+              badgeClass: 'bg-rose-100 text-rose-800 border-rose-200',
+              badgeText: 'Từ chối truy cập',
+              iconWrapperClass: 'bg-rose-50 text-rose-600 border-rose-100',
+              iconClass: 'fa-solid fa-ban',
+              titleText: 'Không có quyền truy cập',
+              messageText: 'Bạn không có quyền xem trạng thái của đơn hàng này.',
+              buttons: `
+                <a href="/public-events.html" class="inline-flex items-center justify-center w-full px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all">
+                  <i class="fa-solid fa-arrow-left mr-2"></i> Về trang chủ
+                </a>
+              `
+            });
+            return;
+          } else if (response.status === 404) {
+            setTerminalUI({
+              badgeClass: 'bg-slate-100 text-slate-800 border-slate-200',
+              badgeText: 'Không tìm thấy',
+              iconWrapperClass: 'bg-slate-50 text-slate-600 border-slate-200',
+              iconClass: 'fa-solid fa-question',
+              titleText: 'Đơn hàng không tồn tại',
+              messageText: 'Mã đơn hàng không tồn tại trên hệ thống.',
+              buttons: `
+                <a href="/public-events.html" class="inline-flex items-center justify-center w-full px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all">
+                  <i class="fa-solid fa-arrow-left mr-2"></i> Về trang chủ
+                </a>
+              `
+            });
+            return;
+          }
+          // Các mã lỗi 500 hoặc tạm thời khác: KHÔNG đổi UI thành payment failed, tiếp tục poll cho đến timeout
+        } catch (err) {
+          if (err.name === 'AbortError') {
+            // Request bị hủy do người dùng rời trang, không làm gì
+            return;
+          }
+          // Network error: Không kết luận thất bại, giữ nguyên UI đang xác nhận và tiếp tục poll
+        } finally {
+          abortController = null;
+        }
+
+        // Lên lịch lần thăm dò kế tiếp sau POLL_INTERVAL_MS
+        if (!isTerminalStateReached) {
+          pollTimerId = setTimeout(pollOrderStatus, POLL_INTERVAL_MS);
+        }
+      }
+
+      // Bắt đầu chu trình polling đầu tiên
+      pollOrderStatus();
+    })();
+  </script>
+</body>
+</html>

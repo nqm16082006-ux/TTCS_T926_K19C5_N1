@@ -167,6 +167,46 @@ namespace EventTicketBooking.Api.Controllers
             return Ok(ApiResponse<OrderDto>.SuccessResult(MapToDto(order), "Lấy thông tin đơn hàng thành công."));
         }
 
+        /// <summary>
+        /// T-50: API trạng thái đơn để trình duyệt hỏi lại định kỳ (nhẹ, dưới 100ms, không cache)
+        /// </summary>
+        [HttpGet("{orderId:guid}/status")]
+        [Authorize]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        [ProducesResponseType(typeof(ApiResponse<OrderStatusResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetOrderStatus(Guid orderId)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+
+            var order = await _context.Orders
+                .AsNoTracking()
+                .Where(o => o.Id == orderId)
+                .Select(o => new { o.UserId, o.Status })
+                .FirstOrDefaultAsync();
+
+            if (order == null)
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
+
+            if (order.UserId != userId)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền truy cập đơn hàng này."));
+
+            Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+            Response.Headers["Pragma"] = "no-cache";
+            Response.Headers["Expires"] = "0";
+
+            var result = new OrderStatusResponseDto
+            {
+                Status = order.Status.ToString()
+            };
+
+            return Ok(ApiResponse<OrderStatusResponseDto>.SuccessResult(result, "Lấy trạng thái đơn hàng thành công."));
+        }
+
         private OrderDto MapToDto(Order order)
         {
             return new OrderDto
