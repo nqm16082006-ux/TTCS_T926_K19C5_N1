@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.DTOs.Common;
+using EventTicketBooking.Api.Middlewares;
 using EventTicketBooking.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -171,7 +172,7 @@ namespace EventTicketBooking.Api.Controllers
         /// T-50: API trạng thái đơn để trình duyệt hỏi lại định kỳ (nhẹ, dưới 100ms, không cache)
         /// </summary>
         [HttpGet("{orderId:guid}/status")]
-        [Authorize]
+        [RequireRole]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         [ProducesResponseType(typeof(ApiResponse<OrderStatusResponseDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -179,7 +180,9 @@ namespace EventTicketBooking.Api.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetOrderStatus(Guid orderId)
         {
-            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                            ?? User.FindFirst("id")?.Value
+                            ?? User.FindFirst("sub")?.Value;
             if (!Guid.TryParse(userIdStr, out var userId))
                 return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
 

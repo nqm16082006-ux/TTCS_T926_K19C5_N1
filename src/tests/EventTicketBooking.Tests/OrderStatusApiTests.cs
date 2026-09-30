@@ -4,7 +4,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using System.Reflection;
 using EventTicketBooking.Api.Controllers;
+using EventTicketBooking.Api.Middlewares;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.DTOs.Common;
@@ -322,6 +324,16 @@ namespace EventTicketBooking.Tests
                 sqliteDb.Orders.Remove(testOrder);
                 await sqliteDb.SaveChangesAsync();
             }
+        }
+
+        [Fact]
+        public void T50_HasRequireRoleAttribute_InsteadOfDefaultAuthorize()
+        {
+            var method = typeof(OrdersController).GetMethod(nameof(OrdersController.GetOrderStatus));
+            Assert.NotNull(method);
+
+            var requireRoleAttr = method.GetCustomAttribute<RequireRoleAttribute>();
+            Assert.NotNull(requireRoleAttr);
         }
 
         #endregion
