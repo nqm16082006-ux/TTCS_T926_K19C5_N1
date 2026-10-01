@@ -182,12 +182,16 @@ namespace EventTicketBooking.Api.Services.Implementations.Payment
         private static bool FixedTimeEquals(string expectedSignature, string signature)
         {
             if (string.IsNullOrEmpty(expectedSignature) || string.IsNullOrEmpty(signature))
+            {
                 return false;
+            }
 
             byte[] expectedBytes = Encoding.UTF8.GetBytes(expectedSignature.ToLowerInvariant());
-            byte[] signatureBytes = Encoding.UTF8.GetBytes(signature.ToLowerInvariant());
+            byte[] actualBytes = Encoding.UTF8.GetBytes(signature.ToLowerInvariant());
 
-            return CryptographicOperations.FixedTimeEquals(expectedBytes, signatureBytes);
+            return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                expectedBytes,
+                actualBytes);
         }
 
         public WebhookParseResult ParseWebhookData(string webhookPayload)
