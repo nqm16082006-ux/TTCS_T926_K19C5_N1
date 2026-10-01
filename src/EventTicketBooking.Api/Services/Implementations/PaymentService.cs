@@ -376,6 +376,45 @@ namespace EventTicketBooking.Api.Services.Implementations
 
             try
             {
+                if (_context.Database.IsNpgsql())
+                {
+                    // Khoá dòng đơn hàng trong PostgreSQL (FOR UPDATE) để giải quyết tranh chấp với background job huỷ đơn
+                    await _context.Orders
+                        .FromSqlRaw("SELECT * FROM orders WHERE \"Id\" = {0} FOR UPDATE", order.Id)
+                        .FirstOrDefaultAsync(cancellationToken);
+                }
+
+                // Đảm bảo Re-check trạng thái nếu Job vừa huỷ đơn ngay trước khi lấy được lock (S-23 AC3)
+                if (order.Status == OrderStatus.Expired || order.Status == OrderStatus.Cancelled)
+                {
+                    var paymentTxExpired = await _context.PaymentTransactions
+                        .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
+                    if (paymentTxExpired != null)
+                    {
+                        paymentTxExpired.Status = "REFUND_REQUIRED";
+                        paymentTxExpired.UpdatedAt = DateTimeOffset.UtcNow;
+                        if (!string.IsNullOrEmpty(result.TransactionId))
+                        {
+                            paymentTxExpired.TransactionId = result.TransactionId;
+                        }
+                        await _context.SaveChangesAsync(cancellationToken);
+                    }
+
+                    if (dbTransaction != null)
+                    {
+                        await dbTransaction.CommitAsync(cancellationToken);
+                    }
+
+                    _logger.LogWarning("Đơn hàng {OrderId} đã bị hết hạn/huỷ trước khi webhook thanh toán thành công tới. Đã đánh dấu giao dịch cần hoàn tiền (REFUND_REQUIRED).", order.Id);
+
+                    return PaymentExecutionResult.CreateFailure(
+                        "Đơn hàng đã hết hạn. Giao dịch thanh toán được ghi nhận và đánh dấu cần hoàn tiền (REFUND_REQUIRED).",
+                        order.Id,
+                        result.OrderCode,
+                        order.Status.ToString()
+                    );
+                }
+
                 // A. Cập nhật Order -> Paid
                 order.Status = OrderStatus.Paid;
                 order.UpdatedAt = DateTimeOffset.UtcNow;

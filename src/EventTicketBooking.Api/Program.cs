@@ -142,6 +142,10 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// T-52 (S-23): Dịch vụ & Job nền quét huỷ đơn quá hạn và nhả ghế trong một giao dịch
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IExpiredOrderCleanupService, EventTicketBooking.Api.Services.Implementations.ExpiredOrderCleanupService>();
+builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.ExpiredOrderCleanupWorker>();
+
 //T-27 Job nền quét và nhả ghế quá hạn, chạy lặp lại được
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.SeatHoldCleanupWorker>();
 
