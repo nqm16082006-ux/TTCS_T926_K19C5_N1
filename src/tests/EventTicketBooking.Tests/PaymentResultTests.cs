@@ -366,7 +366,7 @@ namespace EventTicketBooking.Tests
 
             var updatedSeats = await _context.Seats.Where(s => seats.Select(x => x.Id).Contains(s.Id)).ToListAsync();
             Assert.All(updatedSeats, s => Assert.Equal("AVAILABLE", s.Status));
-            
+
             var updatedHolds = await _context.SeatHold.Where(h => holds.Select(x => x.Id).Contains(h.Id)).ToListAsync();
             Assert.All(updatedHolds, h => Assert.Equal("ACTIVE", h.Status));
         }
