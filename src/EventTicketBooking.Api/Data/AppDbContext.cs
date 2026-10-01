@@ -10,6 +10,11 @@ namespace EventTicketBooking.Api.Data
         {
         }
 
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            optionsBuilder.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+        }
+
         public DbSet<Event> Events { get; set; } = null!;
         public DbSet<Showtime> Showtimes { get; set; } = null!;
         public DbSet<Seat> Seats { get; set; } = null!;
@@ -18,6 +23,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<Order> Orders { get; set; } = null!;
         public DbSet<OrderItem> OrderItems { get; set; } = null!;
         public DbSet<PaymentTransaction> PaymentTransactions { get; set; } = null!;
+        public DbSet<PaymentEvent> PaymentEvents { get; set; } = null!;
         public DbSet<Role> Roles { get; set; } = null!;
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<UserRole> UserRoles { get; set; } = null!;
@@ -28,8 +34,6 @@ namespace EventTicketBooking.Api.Data
 
             if (Database.IsNpgsql())
             {
-                modelBuilder.HasPostgresEnum<ShowtimeStatus>();
-                modelBuilder.HasPostgresEnum<OrderStatus>();
             }
 
             modelBuilder.Entity<Event>(entity =>
@@ -56,18 +60,8 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(s => s.StartTime).IsRequired();
                 entity.Property(s => s.EndTime).IsRequired();
                 entity.Property(s => s.AvailableSeats).IsRequired();
-                if (Database.IsNpgsql())
-                {
-                    entity.Property(s => s.Status)
-                          .HasColumnType("showtime_status")
-                          .HasDefaultValue(ShowtimeStatus.Draft);
-                }
-                else
-                {
-                    entity.Property(s => s.Status)
-                          .HasConversion<string>()
-                          .HasDefaultValue(ShowtimeStatus.Draft);
-                }
+                entity.Property(s => s.Status)
+                      .HasConversion<string>();
 
                 entity.HasOne(s => s.Event)
                     .WithMany(e => e.Showtimes)
@@ -213,18 +207,8 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(o => o.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.Property(o => o.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                if (Database.IsNpgsql())
-                {
-                    entity.Property(o => o.Status)
-                          .HasColumnType("order_status")
-                          .HasDefaultValue(OrderStatus.Pending);
-                }
-                else
-                {
-                    entity.Property(o => o.Status)
-                          .HasConversion<string>()
-                          .HasDefaultValue(OrderStatus.Pending);
-                }
+                entity.Property(o => o.Status)
+                      .HasConversion<string>();
 
                 entity.HasOne(o => o.User)
                       .WithMany()
@@ -286,6 +270,21 @@ namespace EventTicketBooking.Api.Data
                 // Chống duplicate: 1 Order chỉ có duy nhất 1 giao dịch thanh toán
                 entity.HasIndex(pt => pt.OrderId).IsUnique().HasDatabaseName("IX_payment_transactions_OrderId_Unique");
                 entity.HasIndex(pt => pt.OrderCode).IsUnique().HasDatabaseName("IX_payment_transactions_OrderCode_Unique");
+            });
+
+            // Cấu hình bảng PaymentEvents (Task T-45)
+            modelBuilder.Entity<PaymentEvent>(entity =>
+            {
+                entity.ToTable("payment_events");
+                entity.HasKey(pe => pe.Id);
+
+                entity.Property(pe => pe.TransactionId).IsRequired().HasMaxLength(100);
+                entity.Property(pe => pe.RawPayload).IsRequired();
+                entity.Property(pe => pe.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasIndex(pe => pe.TransactionId)
+                      .IsUnique()
+                      .HasDatabaseName("IX_payment_events_TransactionId_Unique");
             });
         }
     }

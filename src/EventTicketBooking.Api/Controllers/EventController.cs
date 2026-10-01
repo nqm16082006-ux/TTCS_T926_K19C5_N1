@@ -23,7 +23,7 @@ namespace EventTicketBooking.Api.Controllers
     /// </summary>
     [ApiController]
     [Route("api/events")]
-    [RequireRole]
+    [RequireRole("Organizer", "Admin")]
     public class EventController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -48,10 +48,20 @@ namespace EventTicketBooking.Api.Controllers
                 return StatusCode(StatusCodes.Status401Unauthorized, ApiResponse<object>.FailureResult("Vui lòng đăng nhập để thực hiện thao tác này."));
             }
 
-            var events = await _context.Events
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+
+            var query = _context.Events
                 .AsNoTracking()
+                .Include(e => e.Owner)
                 .Include(e => e.Showtimes)
-                .Where(e => e.OwnerId == currentUserId.Value)
+                .AsQueryable();
+
+            if (!isAdmin)
+            {
+                query = query.Where(e => e.OwnerId == currentUserId.Value);
+            }
+
+            var events = await query
                 .OrderByDescending(e => e.CreatedAt)
                 .ToListAsync();
 
@@ -144,6 +154,7 @@ namespace EventTicketBooking.Api.Controllers
 
             var ev = await _context.Events
                 .AsNoTracking()
+                .Include(e => e.Owner)
                 .Include(e => e.Showtimes)
                 .FirstOrDefaultAsync(e => e.Id == id);
 
@@ -152,7 +163,8 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
             }
 
-            if (ev.OwnerId != currentUserId.Value)
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền truy cập sự kiện này."));
             }
@@ -189,7 +201,8 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
             }
 
-            if (ev.OwnerId != currentUserId.Value)
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền chỉnh sửa sự kiện này."));
             }
@@ -252,7 +265,8 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
             }
 
-            if (ev.OwnerId != currentUserId.Value)
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền truy cập suất diễn của sự kiện này."));
             }
@@ -311,7 +325,8 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
             }
 
-            if (ev.OwnerId != currentUserId.Value)
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền cập nhật giá cho sự kiện này."));
             }
@@ -406,7 +421,8 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
             }
 
-            if (ev.OwnerId != currentUserId.Value)
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền thao tác trên sự kiện này."));
             }
@@ -472,7 +488,8 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
             }
 
-            if (ev.OwnerId != currentUserId.Value)
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền thao tác trên sự kiện này."));
             }
@@ -545,12 +562,28 @@ namespace EventTicketBooking.Api.Controllers
             return null;
         }
 
+        private async Task<bool> IsCurrentUserAdminAsync(Guid userId)
+        {
+            if (User.IsInRole("Admin") ||
+                User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") &&
+                                   string.Equals(c.Value, "Admin", StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+
+            return await _context.UserRoles
+                .AsNoTracking()
+                .AnyAsync(ur => ur.UserId == userId && ur.Role.Name == "Admin");
+        }
+
         private static EventResponseDto MapToEventResponseDto(Event ev)
         {
             return new EventResponseDto
             {
                 Id = ev.Id,
                 OwnerId = ev.OwnerId,
+                OwnerName = ev.Owner != null ? (!string.IsNullOrWhiteSpace(ev.Owner.FullName) ? ev.Owner.FullName : ev.Owner.Username) : null,
+                OwnerEmail = ev.Owner?.Email,
                 Title = ev.Title,
                 Description = ev.Description,
                 Location = ev.Location,

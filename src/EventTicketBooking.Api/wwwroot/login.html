@@ -500,7 +500,7 @@
       const savedUser = localStorage.getItem('user_info');
       if (savedToken && savedUser) {
         try {
-          renderLoggedIn(savedToken, JSON.parse(savedUser));
+          window.location.href = './events.html';
         } catch {
           localStorage.clear();
         }
@@ -541,7 +541,14 @@
             window.location.href = returnUrl;
             return;
           }
-          renderLoggedIn(data.accessToken, data.user);
+          
+          const userRoles = data.user.roles || [];
+          const isAdminOrOrganizer = userRoles.some(r => r.toLowerCase() === 'admin' || r.toLowerCase() === 'organizer');
+          if (isAdminOrOrganizer) {
+            window.location.href = './events.html';
+          } else {
+            window.location.href = './public-events.html';
+          }
         } else if (response.status === 423 || data.isLocked) {
           // HTTP 423: Tài khoản bị khóa tạm thời 15 phút trên Redis
           triggerLockoutState(900);

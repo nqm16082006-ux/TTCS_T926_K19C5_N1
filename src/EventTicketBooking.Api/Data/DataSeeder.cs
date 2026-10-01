@@ -26,6 +26,35 @@ namespace EventTicketBooking.Api.Data
             try
             {
                 await context.Database.EnsureCreatedAsync();
+                
+                if (context.Database.IsNpgsql())
+                {
+                    var conn = (Npgsql.NpgsqlConnection)context.Database.GetDbConnection();
+                    if (conn.State != System.Data.ConnectionState.Open)
+                        await conn.OpenAsync();
+                    await conn.ReloadTypesAsync();
+                    
+                    try {
+                        using var cmd = conn.CreateCommand();
+                        cmd.CommandText = @"
+                            CREATE OR REPLACE FUNCTION text_to_showtime_status(text) RETURNS showtime_status AS $$ SELECT $1::showtime_status $$ LANGUAGE SQL IMMUTABLE;
+                            CREATE OR REPLACE FUNCTION text_to_order_status(text) RETURNS order_status AS $$ SELECT $1::order_status $$ LANGUAGE SQL IMMUTABLE;
+                            
+                            DO $$ BEGIN
+                                IF NOT EXISTS (SELECT 1 FROM pg_cast WHERE castsource = 'text'::regtype AND casttarget = 'showtime_status'::regtype) THEN
+                                    CREATE CAST (text AS showtime_status) WITH FUNCTION text_to_showtime_status(text) AS IMPLICIT;
+                                    CREATE CAST (character varying AS showtime_status) WITH FUNCTION text_to_showtime_status(text) AS IMPLICIT;
+                                END IF;
+                                IF NOT EXISTS (SELECT 1 FROM pg_cast WHERE castsource = 'text'::regtype AND casttarget = 'order_status'::regtype) THEN
+                                    CREATE CAST (text AS order_status) WITH FUNCTION text_to_order_status(text) AS IMPLICIT;
+                                    CREATE CAST (character varying AS order_status) WITH FUNCTION text_to_order_status(text) AS IMPLICIT;
+                                END IF;
+                            END $$;";
+                        await cmd.ExecuteNonQueryAsync();
+                    } catch (Exception ex) {
+                        logger?.LogError(ex, "Error creating implicit cast!");
+                    }
+                }
 
                 // 1. Kiểm tra nếu bảng Roles chưa có dữ liệu thì seed 5 roles
                 if (!await context.Roles.AnyAsync())

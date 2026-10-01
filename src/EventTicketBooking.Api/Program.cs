@@ -48,8 +48,13 @@ catch
 
 if (isPgAvailable)
 {
+    var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(pgConnection);
+    dataSourceBuilder.MapEnum<EventTicketBooking.Api.Models.ShowtimeStatus>("showtime_status");
+    dataSourceBuilder.MapEnum<EventTicketBooking.Api.Models.OrderStatus>("order_status");
+    var dataSource = dataSourceBuilder.Build();
+
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(pgConnection));
+        options.UseNpgsql(dataSource));
 }
 else
 {

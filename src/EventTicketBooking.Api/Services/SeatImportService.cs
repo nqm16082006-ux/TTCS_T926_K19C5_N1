@@ -85,7 +85,8 @@ namespace EventTicketBooking.Api.Services
                         category = new SeatCategory
                         {
                             ShowtimeId = showtimeId,
-                            Name = item.Category
+                            Name = item.Category,
+                            Price = 0
                         };
 
                         categoriesByName.Add(item.Category, category);

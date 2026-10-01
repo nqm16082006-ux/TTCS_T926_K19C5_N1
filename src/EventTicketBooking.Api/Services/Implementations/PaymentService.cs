@@ -186,11 +186,44 @@ namespace EventTicketBooking.Api.Services.Implementations
                 return false;
             }
 
-            // 3. Chuẩn hóa dữ liệu sang DTO dùng chung và gọi handler thống nhất (Task T-42)
-            var resultDto = PaymentResultDto.FromWebhookParseResult(parseResult);
-            var executionResult = await HandlePaymentResultAsync(resultDto, cancellationToken);
+            // Trích xuất mã giao dịch từ cổng để kiểm tra trùng trong payment_events (Task T-45 & T-46)
+            string transactionId = !string.IsNullOrWhiteSpace(parseResult.TransactionId)
+                ? parseResult.TransactionId
+                : (parseResult.OrderCode?.ToString() ?? parseResult.OrderId ?? Guid.NewGuid().ToString());
 
-            return executionResult.Success;
+            // 3. Chèn vào payment_events để kiểm tra tính unique và khóa theo mã giao dịch
+            var paymentEvent = new PaymentEvent
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transactionId,
+                RawPayload = SanitizeRawPayload(webhookPayload),
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+
+            try
+            {
+                _context.PaymentEvents.Add(paymentEvent);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                // Chèn bị từ chối vì trùng mã giao dịch -> Trả true (200 OK) và dừng, không gọi T-42
+                _context.ChangeTracker.Clear();
+                _logger.LogInformation("Webhook với mã giao dịch {TransactionId} đã được ghi nhận trong payment_events trước đó. Trả 200 OK và dừng.", transactionId);
+                return true;
+            }
+
+            // 4. Chèn được thì gọi T-42 handler
+            var resultDto = PaymentResultDto.FromWebhookParseResult(parseResult);
+            await HandlePaymentResultAsync(resultDto, cancellationToken);
+
+            return true;
+        }
+
+        private static string SanitizeRawPayload(string rawPayload)
+        {
+            if (string.IsNullOrEmpty(rawPayload)) return string.Empty;
+            return System.Text.RegularExpressions.Regex.Replace(rawPayload, @"\b(?:\d[ -]*?){13,19}\b", "****-****-****-****");
         }
 
         public async Task<PaymentExecutionResult> HandlePaymentResultAsync(PaymentResultDto result, CancellationToken cancellationToken = default)
@@ -245,6 +278,32 @@ namespace EventTicketBooking.Api.Services.Implementations
                     result.OrderCode ?? order.PaymentTransaction?.OrderCode,
                     "Đơn hàng đã được thanh toán thành công trước đó.",
                     isAlreadyProcessed: true
+                );
+            }
+
+            // 2.5 Kiểm tra đơn hàng đã bị hủy vì hết hạn hay không (Task T-46 & S-20)
+            if (order.Status == OrderStatus.Expired || (order.Status == OrderStatus.Pending && order.ExpiresAt <= DateTimeOffset.UtcNow))
+            {
+                order.Status = OrderStatus.NeedsAttention;
+                order.UpdatedAt = DateTimeOffset.UtcNow;
+
+                var paymentTx = await _context.PaymentTransactions
+                    .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
+
+                if (paymentTx != null)
+                {
+                    paymentTx.Status = "NEEDS_ATTENTION";
+                    paymentTx.UpdatedAt = DateTimeOffset.UtcNow;
+                }
+
+                await _context.SaveChangesAsync(cancellationToken);
+                _logger.LogWarning("Webhook thanh toán tới cho đơn hàng đã hết hạn {OrderId}. Đã đánh dấu đơn cần kiểm tra để hoàn tiền.", order.Id);
+
+                return PaymentExecutionResult.CreateFailure(
+                    "Đơn hàng đã hết hạn. Đã đánh dấu đơn cần kiểm tra để hoàn tiền.",
+                    order.Id,
+                    result.OrderCode,
+                    order.Status.ToString()
                 );
             }
 

@@ -7,7 +7,7 @@ using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.DTOs.Common;
 using EventTicketBooking.Api.Models;
-using Microsoft.AspNetCore.Authorization;
+using EventTicketBooking.Api.Middlewares;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -32,14 +32,14 @@ namespace EventTicketBooking.Api.Controllers
         /// T-37: Tạo đơn hàng từ giữ chỗ và gia hạn giữ chỗ
         /// </summary>
         [HttpPost("showtimes/{showtimeId:guid}")]
-        [Authorize]
+        [RequireRole]
         [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> CreateOrderFromHolds(Guid showtimeId)
         {
-            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
             if (!Guid.TryParse(userIdStr, out var userId))
                 return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
 
@@ -140,14 +140,14 @@ namespace EventTicketBooking.Api.Controllers
         /// T-39: Lấy thông tin tóm tắt đơn hàng (ghế, hạng, đơn giá, tổng tiền, thời gian còn lại)
         /// </summary>
         [HttpGet("{orderId:guid}")]
-        [Authorize]
+        [RequireRole]
         [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetOrderSummary(Guid orderId)
         {
-            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
             if (!Guid.TryParse(userIdStr, out var userId))
                 return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
 
@@ -188,3 +188,5 @@ namespace EventTicketBooking.Api.Controllers
         }
     }
 }
+
+

@@ -368,7 +368,7 @@
         } else {
           // HTTP 400: Lỗi (Ví dụ: Email trùng lặp)
           const errorMessage = data.message || (data.errors && Object.values(data.errors).flat()[0]) || 'Lỗi khi đăng ký tài khoản.';
-          showAlert(<i class="fa-solid fa-circle-exclamation mr-1.5"></i> , 'error');
+          showAlert(`<i class="fa-solid fa-circle-exclamation mr-1.5"></i> ${errorMessage}`, 'error');
         }
       } catch (err) {
         showAlert('<i class="fa-solid fa-wifi mr-1.5"></i> Không thể kết nối tới máy chủ. Vui lòng kiểm tra lại đường truyền.', 'error');
