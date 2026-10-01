@@ -152,6 +152,9 @@ namespace EventTicketBooking.Api.Controllers
                 return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
 
             var order = await _context.Orders
+                .Include(o => o.User)
+                .Include(o => o.Showtime)
+                    .ThenInclude(st => st.Event)
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Seat)
                         .ThenInclude(s => s.SeatCategory)
@@ -160,11 +163,44 @@ namespace EventTicketBooking.Api.Controllers
             if (order == null)
                 return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
 
-            // T-39: Chỉ chủ đơn mở được (kiểm tra 403)
-            if (order.UserId != userId)
+            // T-39: Chỉ chủ đơn hoặc Admin mở được
+            var isAdmin = User.IsInRole("Admin") || User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && c.Value == "Admin");
+            if (!isAdmin && order.UserId != userId)
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền truy cập đơn hàng này."));
 
             return Ok(ApiResponse<OrderDto>.SuccessResult(MapToDto(order), "Lấy thông tin đơn hàng thành công."));
+        }
+
+        /// <summary>
+        /// T-50: API kiểm tra trạng thái đơn hàng (polling)
+        /// GET /api/v1/orders/{orderId}/status
+        /// </summary>
+        [HttpGet("{orderId:guid}/status")]
+        [RequireRole]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        public async Task<IActionResult> GetOrderStatus(Guid orderId)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+
+            var order = await _context.Orders
+                .AsNoTracking()
+                .Where(o => o.Id == orderId)
+                .Select(o => new { o.UserId, o.Status })
+                .FirstOrDefaultAsync();
+
+            if (order == null)
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
+
+            var isAdmin = User.IsInRole("Admin") || User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && c.Value == "Admin");
+            if (!isAdmin && order.UserId != userId)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền truy cập đơn hàng này."));
+
+            Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+            Response.Headers["Pragma"] = "no-cache";
+
+            return Ok(ApiResponse<OrderStatusResponseDto>.SuccessResult(new OrderStatusResponseDto { Status = order.Status.ToString() }, "Lấy trạng thái thành công."));
         }
 
         private OrderDto MapToDto(Order order)
@@ -173,8 +209,15 @@ namespace EventTicketBooking.Api.Controllers
             {
                 Id = order.Id,
                 ShowtimeId = order.ShowtimeId,
+                EventTitle = order.Showtime?.Event?.Title,
+                EventLocation = order.Showtime?.Event?.Location,
+                ShowtimeStartTime = order.Showtime?.StartTime,
+                ShowtimeEndTime = order.Showtime?.EndTime,
+                CustomerName = order.User != null ? (!string.IsNullOrWhiteSpace(order.User.FullName) ? order.User.FullName : order.User.Username) : null,
+                CustomerEmail = order.User?.Email,
                 Status = order.Status.ToString(),
                 TotalAmount = order.TotalAmount,
+                CreatedAt = order.CreatedAt,
                 ExpiresAt = order.ExpiresAt,
                 Items = order.OrderItems.Select(oi => new OrderItemDto
                 {

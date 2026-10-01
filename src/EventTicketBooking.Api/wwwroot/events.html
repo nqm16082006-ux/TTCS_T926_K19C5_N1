@@ -798,6 +798,7 @@
       <span class="brand-badge">Quản lý</span>
     </a>
     <div class="user-menu">
+      <a href="./admin-users.html" id="btnAdminUsersNav" style="display:none; text-decoration:none; font-size:13px; font-weight:700; color:var(--primary); padding:8px 14px; background:var(--primary-light); border-radius:10px; border:1px solid #c7d2fe; align-items:center; gap:6px;">👥 Quản lý người dùng</a>
       <div class="user-chip">
         <div class="user-avatar" id="userAvatar">O</div>
         <span class="user-name" id="userName">Ban tổ chức Demo</span>
@@ -1029,6 +1030,9 @@
 
           const isAdmin = (user.roles || []).some(r => r.toLowerCase() === 'admin');
           if (isAdmin) {
+            const btnNav = document.getElementById('btnAdminUsersNav');
+            if (btnNav) btnNav.style.display = 'inline-flex';
+
             const badge = document.querySelector('.brand-badge');
             if (badge) {
               badge.textContent = '👑 Admin Portal (Xem tất cả)';
