@@ -347,9 +347,9 @@ namespace EventTicketBooking.Api.Services.Implementations
                 // 4.5. Re-check đơn hàng đã bị hết hạn hoặc bị hủy chưa (ExpiresAt <= UtcNow)
                 if (order.Status == OrderStatus.Expired || order.Status == OrderStatus.Cancelled || (order.Status == OrderStatus.Pending && order.ExpiresAt <= DateTimeOffset.UtcNow))
                 {
-                    order.Status = OrderStatus.NeedsAttention;
-                    order.UpdatedAt = DateTimeOffset.UtcNow;
-
+                    // Đơn hàng đã bị huỷ hoặc quá hạn thanh toán.
+                    // Đánh dấu giao dịch cần hoàn tiền (REFUND_REQUIRED) và giữ nguyên trạng thái đơn hàng hiện tại
+                    // để Job dọn dẹp quét (nếu là Pending) hoặc giữ nguyên trạng thái đã huỷ (nếu Job đã chạy).
                     var paymentTxExpired = await _context.PaymentTransactions
                         .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
                     if (paymentTxExpired != null)
@@ -365,7 +365,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                     await _context.SaveChangesAsync(cancellationToken);
                     if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
 
-                    _logger.LogWarning("Webhook thanh toán tới cho đơn hàng đã hết hạn hoặc bị hủy {OrderId}. Đã đánh dấu đơn cần kiểm tra để hoàn tiền (REFUND_REQUIRED).", order.Id);
+                    _logger.LogWarning("Webhook thanh toán tới cho đơn hàng đã hết hạn hoặc bị hủy {OrderId}. Đã đánh dấu giao dịch cần hoàn tiền (REFUND_REQUIRED).", order.Id);
                     return PaymentExecutionResult.CreateFailure(
                         "Đơn hàng đã hết hạn hoặc bị huỷ. Giao dịch thanh toán được ghi nhận và đánh dấu cần hoàn tiền (REFUND_REQUIRED).",
                         order.Id,
