@@ -189,7 +189,9 @@ namespace EventTicketBooking.Api.Services.Implementations.Payment
             byte[] expectedBytes = Encoding.UTF8.GetBytes(expectedSignature.ToLowerInvariant());
             byte[] actualBytes = Encoding.UTF8.GetBytes(signature.ToLowerInvariant());
 
-            return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
+            return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                expectedBytes,
+                actualBytes);
         }
 
         public WebhookParseResult ParseWebhookData(string webhookPayload)
