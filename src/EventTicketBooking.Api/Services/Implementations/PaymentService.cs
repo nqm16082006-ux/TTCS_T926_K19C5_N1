@@ -364,7 +364,7 @@ namespace EventTicketBooking.Api.Services.Implementations
 
                     await _context.SaveChangesAsync(cancellationToken);
                     if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
-                    
+
                     _logger.LogWarning("Webhook thanh toán tới cho đơn hàng đã hết hạn hoặc bị hủy {OrderId}. Đã đánh dấu đơn cần kiểm tra để hoàn tiền (REFUND_REQUIRED).", order.Id);
                     return PaymentExecutionResult.CreateFailure(
                         "Đơn hàng đã hết hạn hoặc bị huỷ. Giao dịch thanh toán được ghi nhận và đánh dấu cần hoàn tiền (REFUND_REQUIRED).",
@@ -394,7 +394,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                 }
 
                 // Bước 5: Cập nhật trạng thái (Paid) và Commit Transaction
-                
+
                 // A. Cập nhật Order -> Paid
                 order.Status = OrderStatus.Paid;
                 order.UpdatedAt = DateTimeOffset.UtcNow;
