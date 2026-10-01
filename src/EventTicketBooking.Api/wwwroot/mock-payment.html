@@ -1,189 +1,355 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Cổng Thanh Toán Giả Lập</title>
-	<style>
-		* {
-			box-sizing: border-box;
-			margin: 0;
-			padding: 0;
-			font-family: 'Segoe UI', Arial, sans-serif;
-		}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cổng Thanh Toán Giả Lập - Mock Payment Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-app: #f1f5f9;
+      --bg-surface: #ffffff;
+      --border-color: #e2e8f0;
+      --primary: #4f46e5;
+      --text-heading: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+    }
 
-		body {
-			background-color: #f8fafc;
-			color: #1e293b;
-			display: flex;
-			justify-content: center;
-			align-items: center;
-			min-height: 100vh;
-			padding: 20px;
-		}
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-		.card {
-			background: #ffffff;
-			border-radius: 12px;
-			box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
-			width: 100%;
-			max-width: 440px;
-			padding: 32px;
-			border: 1px solid #e2e8f0;
-		}
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-app);
+      color: var(--text-body);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+    }
 
-		.header {
-			text-align: center;
-			margin-bottom: 24px;
-		}
+    .card {
+      background: var(--bg-surface);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 500px;
+      padding: 32px;
+      border: 1px solid var(--border-color);
+    }
 
-		.badge {
-			display: inline-block;
-			background-color: #e0f2fe;
-			color: #0284c7;
-			font-size: 12px;
-			font-weight: 700;
-			padding: 4px 12px;
-			border-radius: 999px;
-			margin-bottom: 8px;
-		}
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
 
-		.header h2 {
-			color: #0f172a;
-			font-size: 22px;
-		}
+    .badge-test {
+      display: inline-block;
+      background: #e0f2fe;
+      color: #0284c7;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 12px;
+      border-radius: 999px;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+      border: 1px solid #bae6fd;
+    }
 
-		.info-box {
-			background-color: #f1f5f9;
-			border-radius: 8px;
-			padding: 16px;
-			margin-bottom: 24px;
-		}
+    .header h2 {
+      color: var(--text-heading);
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
 
-		.row {
-			display: flex;
-			justify-content: space-between;
-			margin-bottom: 10px;
-			font-size: 14px;
-		}
+    .header p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
 
-			.row:last-child {
-				margin-bottom: 0;
-			}
+    .order-box {
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 24px;
+    }
 
-		.label {
-			color: #64748b;
-		}
+    .event-title-banner {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-		.value {
-			font-weight: 600;
-			color: #0f172a;
-		}
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
 
-		.price {
-			color: #2563eb;
-			font-size: 18px;
-			font-weight: 700;
-		}
+    .row:last-child {
+      margin-bottom: 0;
+      padding-top: 10px;
+      border-top: 1px dashed var(--border-color);
+    }
 
-		.actions {
-			display: flex;
-			flex-direction: column;
-			gap: 12px;
-		}
+    .label {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
 
-		.btn {
-			width: 100%;
-			padding: 14px;
-			border: none;
-			border-radius: 8px;
-			font-size: 15px;
-			font-weight: 600;
-			cursor: pointer;
-			transition: all 0.2s;
-		}
+    .value {
+      font-weight: 700;
+      color: var(--text-heading);
+      text-align: right;
+    }
 
-		.btn-success {
-			background-color: #16a34a;
-			color: #fff;
-		}
+    .seats-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-end;
+    }
 
-			.btn-success:hover {
-				background-color: #15803d;
-			}
+    .seat-tag {
+      background: #eef2ff;
+      color: #4338ca;
+      border: 1px solid #c7d2fe;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+    }
 
-		.btn-danger {
-			background-color: #dc2626;
-			color: #fff;
-		}
+    .price-total {
+      color: #2563eb;
+      font-size: 20px;
+      font-weight: 800;
+    }
 
-			.btn-danger:hover {
-				background-color: #b91c1c;
-			}
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
 
-		.note {
-			text-align: center;
-			font-size: 12px;
-			color: #94a3b8;
-			margin-top: 20px;
-		}
-	</style>
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
+    }
+
+    .btn-success:hover {
+      background: #15803d;
+      transform: translateY(-1px);
+    }
+
+    .btn-danger {
+      background: #ffffff;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+    }
+
+    .btn-danger:hover {
+      background: #fef2f2;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .note {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 18px;
+      line-height: 1.5;
+    }
+  </style>
 </head>
 <body>
-	<div class="card">
-		<div class="header">
-			<span class="badge">TEST ENVIRONMENT</span>
-			<h2>Cổng Thanh Toán Giả Lập</h2>
-		</div>
 
-		<div class="info-box">
-			<div class="row">
-				<span class="label">Mã đơn hàng:</span>
-				<span class="value" id="orderId">--</span>
-			</div>
-			<div class="row">
-				<span class="label">Số tiền:</span>
-				<span class="value price" id="amount">0 VNĐ</span>
-			</div>
-		</div>
+  <div class="card">
+    <div class="header">
+      <span class="badge-test">MOCK ENVIRONMENT</span>
+      <h2>Cổng Thanh Toán Giả Lập</h2>
+      <p>Mô phỏng quy trình xử lý giao dịch thanh toán vé trực tuyến</p>
+    </div>
 
-		<div class="actions">
-			<button class="btn btn-success" onclick="processPayment(true)">Thanh toán Thành Công</button>
-			<button class="btn btn-danger" onclick="processPayment(false)">Thanh toán Thất Bại</button>
-		</div>
-	</div>
+    <div class="order-box">
+      <div class="event-title-banner" id="eventTitleBanner">
+        <span>🎸</span> <span id="eventTitle">Đại Nhạc Hội 2026</span>
+      </div>
 
-	<script>
-        const params = new URLSearchParams(window.location.search);
-        const orderId = params.get('orderId') || 'ORD-' + Math.floor(Math.random() * 10000);
-        const amount = params.get('amount') || '100000';
+      <div class="row" id="rowLocation">
+        <span class="label">Địa điểm:</span>
+        <span class="value" id="eventLocation">Hà Nội</span>
+      </div>
 
-        document.getElementById('orderId').textContent = orderId;
-        document.getElementById('amount').textContent = parseInt(amount).toLocaleString('vi-VN') + ' VNĐ';
+      <div class="row" id="rowCustomer">
+        <span class="label">Người đặt vé:</span>
+        <span class="value" id="customerInfo">Khách hàng</span>
+      </div>
 
-        async function processPayment(isSuccess) {
-            try {
-                const response = await fetch('/api/mock-payment/callback', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        orderId: orderId,
-                        status: isSuccess ? 'SUCCESS' : 'FAILED'
-                    })
-                });
+      <div class="row">
+        <span class="label">Mã đơn hàng:</span>
+        <span class="value" id="orderIdText" style="font-family: monospace; font-size: 12px;">--</span>
+      </div>
 
-                const result = await response.json();
-                if (response.ok) {
-                    alert(result.message);
-                    // Dẫn truyền về đúng trang theo yêu cầu S-24 / S-19
-                    window.location.href = result.data.redirectUrl || '/events.html';
-                } else {
-                    alert(result.message || 'Có lỗi xảy ra!');
-                }
-            } catch (e) {
-                alert('Không thể kết nối đến máy chủ.');
+      <div class="row">
+        <span class="label">Ghế đã chọn:</span>
+        <div class="seats-tags" id="seatsList">
+          <span class="seat-tag">Đang tải...</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <span class="label">Tổng tiền thanh toán:</span>
+        <span class="value price-total" id="amountDisplay">0 VNĐ</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-success" id="btnPaySuccess" onclick="processPayment(true)">
+        <span>💳</span> Xác nhận Thanh toán Thành Công
+      </button>
+      <button class="btn btn-danger" id="btnPayFail" onclick="processPayment(false)">
+        <span>✕</span> Báo lỗi Thanh toán Thất Bại
+      </button>
+    </div>
+
+    <p class="note">
+      Môi trường Sandbox / Mock dùng để kiểm thử luồng đặt vé và đối soát giao dịch tự động.
+    </p>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get('orderId') || '';
+    const initialAmount = params.get('amount') || '0';
+    const token = localStorage.getItem('access_token');
+
+    document.getElementById('orderIdText').textContent = orderId || 'Chưa có mã đơn';
+    document.getElementById('amountDisplay').textContent = parseInt(initialAmount).toLocaleString('vi-VN') + ' VNĐ';
+
+    // Nạp chi tiết đơn hàng
+    async function loadOrderDetails() {
+      if (!orderId) return;
+
+      try {
+        const headers = {};
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+
+        const res = await fetch(`${API_BASE}/api/v1/orders/${orderId}`, { headers });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data) {
+            const o = json.data;
+            if (o.eventTitle) document.getElementById('eventTitle').textContent = o.eventTitle;
+            if (o.eventLocation) document.getElementById('eventLocation').textContent = o.eventLocation;
+            if (o.customerName || o.customerEmail) {
+              document.getElementById('customerInfo').textContent = `${o.customerName || ''} (${o.customerEmail || ''})`.trim();
             }
+            if (o.totalAmount) {
+              document.getElementById('amountDisplay').textContent = o.totalAmount.toLocaleString('vi-VN') + ' VNĐ';
+            }
+
+            if (o.items && o.items.length > 0) {
+              document.getElementById('seatsList').innerHTML = o.items.map(item => 
+                `<span class="seat-tag">Ghế ${escapeHtml(item.seatName || 'N/A')}${item.categoryName ? ' - ' + escapeHtml(item.categoryName) : ''}</span>`
+              ).join('');
+            }
+          }
         }
-	</script>
+      } catch (err) {
+        console.warn('Could not load rich order summary, falling back to URL params', err);
+      }
+    }
+
+    async function processPayment(isSuccess) {
+      const btnSuccess = document.getElementById('btnPaySuccess');
+      const btnFail = document.getElementById('btnPayFail');
+      btnSuccess.disabled = true;
+      btnFail.disabled = true;
+
+      if (isSuccess) {
+        btnSuccess.innerHTML = '⌛ Đang xử lý giao dịch...';
+      } else {
+        btnFail.innerHTML = '⌛ Đang ghi nhận...';
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/mock-payment/callback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: orderId,
+            status: isSuccess ? 'SUCCESS' : 'FAILED'
+          })
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (response.ok) {
+          const redirectUrl = (result.data && result.data.redirectUrl) || `/order-success.html?orderId=${encodeURIComponent(orderId)}`;
+          window.location.href = redirectUrl;
+        } else {
+          alert(result.message || 'Xử lý thanh toán thất bại.');
+          btnSuccess.disabled = false;
+          btnFail.disabled = false;
+          btnSuccess.innerHTML = '<span>💳</span> Xác nhận Thanh toán Thành Công';
+          btnFail.innerHTML = '<span>✕</span> Báo lỗi Thanh toán Thất Bại';
+        }
+      } catch (e) {
+        alert('Không thể kết nối đến máy chủ.');
+        btnSuccess.disabled = false;
+        btnFail.disabled = false;
+        btnSuccess.innerHTML = '<span>💳</span> Xác nhận Thanh toán Thành Công';
+        btnFail.innerHTML = '<span>✕</span> Báo lỗi Thanh toán Thất Bại';
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    loadOrderDetails();
+  </script>
 </body>
 </html>
