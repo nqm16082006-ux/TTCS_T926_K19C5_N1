@@ -308,7 +308,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             }
 
             // 3. Xử lý trường hợp thanh toán thất bại hoặc bị hủy từ cổng
-            if (result.Status == PaymentStatus.Cancelled || result.Status == PaymentStatus.Failed)
+            if (result.Status == PaymentStatus.Cancelled)
             {
                 order.Status = OrderStatus.Cancelled;
                 order.UpdatedAt = DateTimeOffset.UtcNow;
@@ -318,12 +318,18 @@ namespace EventTicketBooking.Api.Services.Implementations
 
                 if (paymentTx != null)
                 {
-                    paymentTx.Status = result.Status == PaymentStatus.Cancelled ? "CANCELLED" : "FAILED";
+                    paymentTx.Status = "CANCELLED";
                     paymentTx.UpdatedAt = DateTimeOffset.UtcNow;
                 }
 
                 await _context.SaveChangesAsync(cancellationToken);
-                _logger.LogInformation("Đơn hàng {OrderId} thanh toán thất bại/bị hủy (Status: {Status}).", order.Id, result.Status);
+                _logger.LogInformation("Đơn hàng {OrderId} thanh toán bị hủy (Status: {Status}).", order.Id, result.Status);
+                return PaymentExecutionResult.CreateFailure($"Thanh toán không thành công ({result.Status}).", order.Id, result.OrderCode, order.Status.ToString());
+            }
+
+            if (result.Status == PaymentStatus.Failed)
+            {
+                _logger.LogInformation("Đơn hàng {OrderId} thanh toán thất bại (Status: {Status}). Giữ nguyên trạng thái đơn hàng.", order.Id, result.Status);
                 return PaymentExecutionResult.CreateFailure($"Thanh toán không thành công ({result.Status}).", order.Id, result.OrderCode, order.Status.ToString());
             }
 
