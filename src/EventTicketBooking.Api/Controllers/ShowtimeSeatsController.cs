@@ -9,6 +9,7 @@ using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.DTOs.Common;
 using EventTicketBooking.Api.Services;
 using EventTicketBooking.Api.Services.Interfaces;
+using EventTicketBooking.Api.Middlewares;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +40,7 @@ namespace EventTicketBooking.Api.Controllers
         /// POST /api/showtimes/{showtimeId}/seats/hold
         /// </summary>
         [HttpPost("hold")]
+        [RequireRole]
         [ProducesResponseType(typeof(ApiResponse<HoldSeatsResponseDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
@@ -77,6 +79,7 @@ namespace EventTicketBooking.Api.Controllers
         /// DELETE /api/showtimes/{showtimeId}/seats/{seatId}/hold
         /// </summary>
         [HttpDelete("{seatId:guid}/hold")]
+        [RequireRole]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
@@ -115,6 +118,7 @@ namespace EventTicketBooking.Api.Controllers
         /// </summary>
         [HttpGet("my-holds")]
         [HttpGet("holds")]
+        [RequireRole]
         [ProducesResponseType(typeof(ApiResponse<HoldSeatsResponseDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -293,3 +297,4 @@ namespace EventTicketBooking.Api.Controllers
         #endregion
     }
 }
+

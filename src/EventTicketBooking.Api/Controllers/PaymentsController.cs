@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using EventTicketBooking.Api.DTOs.Common;
 using EventTicketBooking.Api.DTOs.Payment;
 using EventTicketBooking.Api.Services.Interfaces;
+using EventTicketBooking.Api.Middlewares;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -33,7 +34,7 @@ namespace EventTicketBooking.Api.Controllers
         /// Tạo link thanh toán cho đơn hàng (Task T-40 & T-41).
         /// </summary>
         [HttpPost("orders/{orderId:guid}")]
-        [Authorize]
+        [RequireRole]
         [ProducesResponseType(typeof(ApiResponse<PaymentCreationResult>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -41,7 +42,7 @@ namespace EventTicketBooking.Api.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> CreatePayment(Guid orderId)
         {
-            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
             if (!Guid.TryParse(userIdStr, out var userId))
                 return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
 
@@ -149,7 +150,7 @@ namespace EventTicketBooking.Api.Controllers
         /// Dành cho trang thanh toán frontend kiểm tra trạng thái thực tế từ máy chủ.
         /// </summary>
         [HttpGet("orders/{orderId:guid}/status")]
-        [Authorize]
+        [RequireRole]
         [ProducesResponseType(typeof(ApiResponse<PaymentExecutionResult>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetAndVerifyPaymentStatus(Guid orderId)
@@ -165,3 +166,6 @@ namespace EventTicketBooking.Api.Controllers
         }
     }
 }
+
+
+

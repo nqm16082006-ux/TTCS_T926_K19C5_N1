@@ -10,6 +10,11 @@ namespace EventTicketBooking.Api.Data
         {
         }
 
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            optionsBuilder.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+        }
+
         public DbSet<Event> Events { get; set; } = null!;
         public DbSet<Showtime> Showtimes { get; set; } = null!;
         public DbSet<Seat> Seats { get; set; } = null!;
@@ -29,8 +34,6 @@ namespace EventTicketBooking.Api.Data
 
             if (Database.IsNpgsql())
             {
-                modelBuilder.HasPostgresEnum<ShowtimeStatus>();
-                modelBuilder.HasPostgresEnum<OrderStatus>();
             }
 
             modelBuilder.Entity<Event>(entity =>
@@ -57,18 +60,8 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(s => s.StartTime).IsRequired();
                 entity.Property(s => s.EndTime).IsRequired();
                 entity.Property(s => s.AvailableSeats).IsRequired();
-                if (Database.IsNpgsql())
-                {
-                    entity.Property(s => s.Status)
-                          .HasColumnType("showtime_status")
-                          .HasDefaultValue(ShowtimeStatus.Draft);
-                }
-                else
-                {
-                    entity.Property(s => s.Status)
-                          .HasConversion<string>()
-                          .HasDefaultValue(ShowtimeStatus.Draft);
-                }
+                entity.Property(s => s.Status)
+                      .HasConversion<string>();
 
                 entity.HasOne(s => s.Event)
                     .WithMany(e => e.Showtimes)
@@ -214,18 +207,8 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(o => o.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.Property(o => o.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                if (Database.IsNpgsql())
-                {
-                    entity.Property(o => o.Status)
-                          .HasColumnType("order_status")
-                          .HasDefaultValue(OrderStatus.Pending);
-                }
-                else
-                {
-                    entity.Property(o => o.Status)
-                          .HasConversion<string>()
-                          .HasDefaultValue(OrderStatus.Pending);
-                }
+                entity.Property(o => o.Status)
+                      .HasConversion<string>();
 
                 entity.HasOne(o => o.User)
                       .WithMany()

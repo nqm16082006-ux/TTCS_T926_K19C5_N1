@@ -1026,6 +1026,17 @@
           const name = user.fullName || user.username || user.email;
           document.getElementById('userName').textContent = name;
           document.getElementById('userAvatar').textContent = name.charAt(0).toUpperCase();
+
+          const isAdmin = (user.roles || []).some(r => r.toLowerCase() === 'admin');
+          if (isAdmin) {
+            const badge = document.querySelector('.brand-badge');
+            if (badge) {
+              badge.textContent = '👑 Admin Portal (Xem tất cả)';
+              badge.style.background = '#fef3c7';
+              badge.style.color = '#b45309';
+              badge.style.borderColor = '#fde68a';
+            }
+          }
         } catch (e) {}
       }
       loadEvents();
@@ -1151,6 +1162,10 @@
               <div class="event-meta-item">
                 <span class="meta-icon">🪑</span> <span><strong>Số ghế:</strong> <span class="badge-seats-card">${e.totalSeats} ghế phát hành</span></span>
               </div>
+              ${(e.ownerName || e.ownerEmail) ? `
+              <div class="event-meta-item">
+                <span class="meta-icon">👤</span> <span><strong>Ban tổ chức:</strong> <span style="color: var(--primary); font-weight: 600;">${escapeHtml(e.ownerName || e.ownerEmail)}</span></span>
+              </div>` : ''}
             </div>
           </div>
           <div class="event-actions">
@@ -1415,16 +1430,54 @@
           <tbody>
             ${showtimes.map(s => `
               <tr>
-                <td>${formatDateTime(s.startTime)}</td>
-                <td>${formatDateTime(s.endTime)}</td>
-                <td><span class="badge-seats">${s.availableSeats} ghế</span></td>
+                <td>
+                  <div style="font-weight:600">${formatDateTime(s.startTime)}</div>
+                  <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Tới: ${formatDateTime(s.endTime)}</div>
+                </td>
+                <td>
+                  <span class="badge-seats">${s.availableSeats} ghế</span>
+                  <div style="font-size:11px; margin-top:4px; font-weight:bold; color:${s.status === 2 || s.status === 'OnSale' ? '#10b981' : s.status === 3 || s.status === 'Closed' ? '#f43f5e' : '#64748b'}">
+                    ${s.status === 2 || s.status === 'OnSale' ? 'Đang mở bán' : s.status === 3 || s.status === 'Closed' ? 'Đã đóng bán' : 'Bản nháp'}
+                  </div>
+                </td>
                 <td>${renderSeatCategoryPriceEditor(s)}</td>
-                <td><button class="btn-action-sm" onclick="openSeatImportModal('${s.id}')">Nạp ghế</button></td>
+                <td>
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <button class="btn-action-sm" onclick="openSeatImportModal('${s.id}')">Nạp ghế</button>
+                    ${s.status === 1 || s.status === 'Draft' ? `<button class="btn-action-sm" style="background:var(--success-text); color:white; border-color:var(--success-text);" onclick="changeShowtimeStatus('${s.id}', 'open-sale')">Mở bán</button>` : ''}
+                    ${s.status === 2 || s.status === 'OnSale' ? `<button class="btn-action-sm" style="background:var(--danger-text); color:white; border-color:var(--danger-text);" onclick="changeShowtimeStatus('${s.id}', 'close-sale')">Đóng bán</button>` : ''}
+                  </div>
+                </td>
               </tr>
             `).join('')}
           </tbody>
         </table>
       `;
+    }
+
+    async function changeShowtimeStatus(showtimeId, action) {
+      if (!activeShowtimeEventId || !showtimeId) return;
+      if (!confirm(`Bạn có chắc chắn muốn ${action === 'open-sale' ? 'mở bán' : 'đóng bán'} suất diễn này không?`)) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/events/${activeShowtimeEventId}/showtimes/${showtimeId}/${action}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token
+          }
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (response.ok) {
+          showAlert(result.message || 'Thay đổi trạng thái thành công.', 'success');
+          loadEvents();
+          closeShowtimeModal();
+        } else {
+          showAlert(result.message || result.detail || 'Không thể thay đổi trạng thái suất diễn.', 'error');
+        }
+      } catch (err) {
+        showAlert('Lỗi kết nối máy chủ API.', 'error');
+      }
     }
 
     function renderSeatCategoryPriceEditor(showtime) {
@@ -1796,3 +1849,4 @@
   </script>
 </body>
 </html>
+

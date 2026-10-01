@@ -48,8 +48,11 @@ catch
 
 if (isPgAvailable)
 {
+    var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(pgConnection);
+    var dataSource = dataSourceBuilder.Build();
+
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(pgConnection));
+        options.UseNpgsql(dataSource));
 }
 else
 {

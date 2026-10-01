@@ -330,6 +330,24 @@
     let dragStartX = 0;
     let dragStartY = 0;
 
+    async function fetchEventDetails() {
+      try {
+        const response = await fetch(`/api/public/events/${eventId}/showtimes/${showtimeId}`);
+        const json = await response.json();
+        if (json.success && json.data) {
+          const st = json.data;
+          document.getElementById('headerTitle').textContent = st.eventTitle || 'Sơ đồ ghế';
+          
+          const startDate = new Date(st.startTime).toLocaleString('vi-VN', {
+            hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'
+          });
+          document.getElementById('headerSubtitle').textContent = `Suất chiếu: ${startDate}`;
+        }
+      } catch (err) {
+        console.warn("Không thể tải thông tin sự kiện chi tiết:", err);
+      }
+    }
+
     // Fetch seats from T-20 API
     async function fetchSeats() {
       const fetchStartTime = performance.now();
@@ -355,7 +373,7 @@
         console.log(`Số lượng ghế xử lý: ${seats.length}`);
         console.log(`Thời gian gọi API: ${(fetchEndTime - fetchStartTime).toFixed(2)} ms`);
         console.log(`Thời gian tính toán và vẽ Canvas: ${(processEndTime - processStartTime).toFixed(2)} ms`);
-        console.log(`%cTổng thời gian hiển thị: ${(renderEndTime - renderStartTime).toFixed(2)} ms`, 'color: #3b82f6; font-weight: bold;');
+        console.log(`%cTổng thời gian hiển thị: ${(renderEndTime - fetchStartTime).toFixed(2)} ms`, 'color: #3b82f6; font-weight: bold;');
         console.groupEnd();
       } else {
         alert("Lỗi tải sơ đồ ghế: " + json.message);
@@ -377,6 +395,8 @@
       if (loadingOverlay) loadingOverlay.classList.remove('hidden');
 
       try {
+        await fetchEventDetails();
+        
         // Bước 1 (T-33): Tải sơ đồ ghế
         await fetchSeats();
 
@@ -384,7 +404,7 @@
         await restoreHeldSeats();
       } catch (e) {
         console.error("[Init Error]", e);
-        alert("Không thể kết nối máy chủ");
+        alert("Lỗi tải trang: " + e.message + "\n" + (e.stack ? e.stack.split('\\n')[0] : ''));
       } finally {
         if (loadingOverlay) loadingOverlay.classList.add('hidden');
       }
@@ -933,7 +953,7 @@
       if (!seat) return;
 
       try {
-        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+        const token = localStorage.getItem('access_token') || localStorage.getItem('token');
         const headers = { 'Content-Type': 'application/json' };
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
@@ -1058,7 +1078,7 @@
       const errBanner = document.getElementById('errorBanner');
       if (errBanner) errBanner.classList.add('hidden');
 
-      const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       // Nếu user chưa đăng nhập thì không có giữ chỗ cá nhân nào
       if (!token) {
         myHeldSeatIds.clear();
@@ -1320,7 +1340,34 @@
     // --- Tiến hành Giữ Ghế (Tích hợp API T-23 & T-24) ---
     async function proceedToBooking() {
       if (selectedSeatIds.size === 0 && myHeldSeatIds.size > 0) {
-        alert("Các ghế của bạn đã được giữ chỗ thành công. Tiến hành thanh toán!");
+        const btnEl = document.getElementById('btnBook');
+        const originalText = btnEl.innerHTML;
+        btnEl.disabled = true;
+        btnEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Đang khởi tạo đơn hàng...</span>`;
+
+        try {
+          const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+          const headers = { 'Content-Type': 'application/json' };
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+
+          const response = await fetch(`/api/v1/orders/showtimes/${showtimeId}`, {
+            method: 'POST',
+            headers: headers
+          });
+          const json = await response.json();
+          if (response.ok && json.success) {
+            window.location.href = `./mock-payment.html?orderId=${json.data.id}&amount=${json.data.totalAmount}`;
+          } else {
+            alert(json.message || "Không thể tạo đơn hàng. Vui lòng thử lại.");
+            btnEl.disabled = false;
+            btnEl.innerHTML = originalText;
+          }
+        } catch (e) {
+          console.error(e);
+          alert("Lỗi kết nối khi tạo đơn hàng.");
+          btnEl.disabled = false;
+          btnEl.innerHTML = originalText;
+        }
         return;
       }
 
@@ -1333,7 +1380,7 @@
       btnEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Đang giữ ghế...</span>`;
 
       try {
-        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+        const token = localStorage.getItem('access_token') || localStorage.getItem('token');
         const headers = { 'Content-Type': 'application/json' };
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
@@ -1400,3 +1447,4 @@
   </script>
 </body>
 </html>
+
