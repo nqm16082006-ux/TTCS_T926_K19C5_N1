@@ -10,6 +10,8 @@ namespace EventTicketBooking.Api.DTOs
         public string Status { get; set; } = null!;
         public int TotalAmount { get; set; }
         public DateTimeOffset ExpiresAt { get; set; }
+        public bool HasFailedPayment { get; set; }
+        public bool IsPaymentProcessing { get; set; }
         public List<OrderItemDto> Items { get; set; } = new();
     }
 

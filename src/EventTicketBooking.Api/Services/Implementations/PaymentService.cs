@@ -87,6 +87,15 @@ namespace EventTicketBooking.Api.Services.Implementations
                     return PaymentCreationResult.CreateFailure("Đơn hàng đã được thanh toán thành công.");
                 }
 
+                if (existingTransaction.Status == "FAILED" || existingTransaction.Status == "CANCELLED")
+                {
+                    var oldStatus = existingTransaction.Status;
+                    existingTransaction.Status = "PENDING";
+                    existingTransaction.UpdatedAt = DateTimeOffset.UtcNow;
+                    await _context.SaveChangesAsync(cancellationToken);
+                    _logger.LogInformation("Cập nhật lại giao dịch thanh toán từ {OldStatus} sang PENDING cho đơn hàng {OrderId}", oldStatus, order.Id);
+                }
+
                 _logger.LogInformation("Tái sử dụng giao dịch thanh toán hiện có cho đơn hàng {OrderId}, OrderCode: {OrderCode}", order.Id, existingTransaction.OrderCode);
 
                 return PaymentCreationResult.CreateSuccess(
