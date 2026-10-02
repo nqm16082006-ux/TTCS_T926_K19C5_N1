@@ -25,7 +25,7 @@ namespace EventTicketBooking.Api.Data
 
             try
             {
-                await context.Database.EnsureCreatedAsync();
+                await context.Database.MigrateAsync();
                 
                 if (context.Database.IsNpgsql())
                 {

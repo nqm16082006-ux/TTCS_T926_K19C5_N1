@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -13,7 +13,7 @@ namespace EventTicketBooking.Api.Migrations
             migrationBuilder.AddColumn<string>(
                 name: "Status",
                 table: "Seats",
-                type: "TEXT",
+                type: "text",
                 nullable: false,
                 defaultValue: "AVAILABLE");
         }
