@@ -107,6 +107,7 @@ namespace EventTicketBooking.Api.Controllers
                 HoldSeatsResultStatus.Success => Ok(ApiResponse<object>.SuccessResult(new { }, result.Message)),
                 HoldSeatsResultStatus.NotFound => NotFound(ApiResponse<object>.FailureResult(result.Message)),
                 HoldSeatsResultStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult(result.Message)),
+                HoldSeatsResultStatus.Conflict => Conflict(ApiResponse<object>.FailureResult(result.Message)),
                 _ => StatusCode(StatusCodes.Status500InternalServerError, ApiResponse<object>.FailureResult(result.Message))
             };
         }
@@ -149,6 +150,8 @@ namespace EventTicketBooking.Api.Controllers
         }
 
         [HttpPost("import")]
+        [RequireRole("Organizer", "Admin")]
+        [RequestSizeLimit(6 * 1024 * 1024)]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(SeatImportResultDto), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -160,6 +163,14 @@ namespace EventTicketBooking.Api.Controllers
             [FromForm] IFormFile? file,
             CancellationToken cancellationToken)
         {
+            var db = HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+            var showtime = await db.Showtimes.AsNoTracking().Include(s => s.Event)
+                .FirstOrDefaultAsync(s => s.Id == showtimeId, cancellationToken);
+            if (showtime == null) return NotFound();
+            if (!User.IsInRole("Admin") && showtime.Event.OwnerId != GetCurrentUserId())
+                return StatusCode(StatusCodes.Status403Forbidden);
+            if (file?.Length > 5 * 1024 * 1024)
+                return BadRequest(new { message = "Tệp JSON không được vượt quá 5MB." });
             if (file is null || file.Length == 0)
             {
                 return Problem(
@@ -211,6 +222,8 @@ namespace EventTicketBooking.Api.Controllers
         }
 
         [HttpPost("preview")]
+        [RequireRole("Organizer", "Admin")]
+        [RequestSizeLimit(6 * 1024 * 1024)]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(List<SeatImportItemDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -219,6 +232,8 @@ namespace EventTicketBooking.Api.Controllers
             [FromForm] IFormFile? file,
             CancellationToken cancellationToken)
         {
+            if (file?.Length > 5 * 1024 * 1024)
+                return BadRequest(new { message = "Tệp JSON không được vượt quá 5MB." });
             if (file is null || file.Length == 0)
             {
                 return Problem(
@@ -266,15 +281,15 @@ namespace EventTicketBooking.Api.Controllers
             [FromServices] AppDbContext context)
         {
             // Cho phép nhận thời điểm giả lập từ query string để viết Test không phải chờ thật
-            var currentTime = nowOverride ?? DateTime.UtcNow;
+            var currentTime = DateTime.UtcNow;
 
             // LINQ: Lấy ghế AVAILABLE hoặc ghế đang ACTIVE hold nhưng đã hết hạn
             var availableSeats = await context.Seats
                 .Where(s => s.ShowtimeId == showtimeId)
-                .Where(s => s.Status == "AVAILABLE" ||
-                            context.SeatHold.Any(h => h.SeatId == s.Id &&
+                .Where(s => s.Status != "SOLD" &&
+                            !context.SeatHold.Any(h => h.SeatId == s.Id &&
                                                         h.Status == "ACTIVE" &&
-                                                        h.ExpiresAt <= currentTime))
+                                                        h.ExpiresAt > currentTime))
                 .ToListAsync();
 
             return Ok(ApiResponse<object>.SuccessResult(availableSeats, "Lấy danh sách ghế trống thành công."));

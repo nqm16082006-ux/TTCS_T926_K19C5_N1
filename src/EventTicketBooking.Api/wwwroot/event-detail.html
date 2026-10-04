@@ -22,6 +22,10 @@
     }
     ::-webkit-scrollbar { display: none; }
 
+    .organizer-metric { border-left-width: 4px !important; }
+    .metric-shows { background: #eff6ff !important; border-color: #93c5fd !important; }
+    .metric-seats { background: #fffbeb !important; border-color: #fbbf24 !important; }
+    .metric-sales { background: #f0fdf4 !important; border-color: #86efac !important; }
     /* Custom styles for modals */
     .modal-overlay {
       position: fixed;
@@ -335,8 +339,6 @@
             <div id="topStatusPill" class="flex items-center gap-space-xs bg-emerald-50 text-emerald-800 px-3 py-1 rounded-full font-label-sm text-label-sm shadow-sm">
               <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span id="topStatusText" class="font-bold">Đang mở bán công khai</span>
-              <span class="text-emerald-400 font-normal">|</span>
-              <span class="text-emerald-700">Sprint 1</span>
             </div>
           </div>
 
@@ -412,7 +414,7 @@
               <!-- Metrics Overview Cards (3 Cards Bento Style) -->
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-space-md">
                 <!-- Card 1 -->
-                <div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex items-center justify-between border border-outline-variant/20">
+                <div class="organizer-metric metric-shows bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex items-center justify-between border border-outline-variant/20">
                   <div class="space-y-1">
                     <span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Tổng số suất diễn</span>
                     <div id="metricShowtimesTotal" class="font-headline-lg text-headline-lg text-on-surface font-bold">
@@ -428,7 +430,7 @@
                 </div>
 
                 <!-- Card 2 -->
-                <div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex items-center justify-between border border-outline-variant/20">
+                <div class="organizer-metric metric-seats bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex items-center justify-between border border-outline-variant/20">
                   <div class="space-y-1">
                     <span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Tổng sức chứa chỗ</span>
                     <div id="metricTotalSeats" class="font-headline-lg text-headline-lg text-on-surface font-bold">
@@ -444,7 +446,7 @@
                 </div>
 
                 <!-- Card 3 -->
-                <div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex items-center justify-between border border-outline-variant/20">
+                <div class="organizer-metric metric-sales bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex items-center justify-between border border-outline-variant/20">
                   <div class="space-y-1">
                     <span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Vé đã bán ra</span>
                     <div id="metricTicketsSold" class="font-headline-lg text-headline-lg text-on-surface font-bold">
@@ -457,22 +459,6 @@
                   <div class="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center text-emerald-700">
                     <span class="material-symbols-outlined text-[24px]">payments</span>
                   </div>
-                </div>
-              </div>
-
-              <!-- Action Guidance Alert for Event Organizers (Sprint 1 to Sprint 2 Flow) -->
-              <div class="bg-gradient-to-r from-surface-container to-surface-container-low p-space-md rounded-xl shadow-sm flex items-start gap-space-md border border-outline-variant/30">
-                <div class="w-9 h-9 rounded-lg bg-primary-container text-on-primary flex items-center justify-center shrink-0">
-                  <span class="material-symbols-outlined text-[20px]">info</span>
-                </div>
-                <div class="space-y-1 min-w-0">
-                  <h4 class="font-headline-sm text-headline-sm text-on-surface leading-tight font-semibold">Quy trình mở bán vé suất diễn tiêu chuẩn (Sprint 1)</h4>
-                  <p class="font-body-md text-body-md text-on-surface-variant">
-                    Để mở bán vé thành công cho bất kỳ suất diễn nào, Ban tổ chức cần hoàn thành theo đúng 3 bước bắt buộc:
-                    <span class="font-semibold text-on-surface">1. Khởi tạo suất diễn</span> →
-                    <span class="font-semibold text-on-surface">2. Tải tệp sơ đồ ghế SVG/JSON</span> →
-                    <span class="font-semibold text-on-surface">3. Thiết lập bảng giá &amp; số lượng vé theo hạng</span>.
-                  </p>
                 </div>
               </div>
 
@@ -1113,6 +1099,7 @@
           `;
         }
       } catch (err) {
+        console.error('Không thể tải/hiển thị suất diễn:', err);
         tbody.innerHTML = `
           <tr>
             <td colspan="6" class="py-8 text-center text-error">
@@ -1154,19 +1141,18 @@
         const isOnSale = s.status === 2 || s.status === 'OnSale';
         const isDraft = s.status === 1 || s.status === 'Draft';
         const isClosed = s.status === 3 || s.status === 'Closed';
-        const hasSeats = s.availableSeats > 0;
-        const totalSeats = currentEvent ? currentEvent.totalSeats : s.availableSeats;
+        const totalSeats = s.actualSeatCount ?? s.availableSeats;
+        const hasSeats = totalSeats > 0;
         const avail = s.availableSeats;
-        const sold = Math.max(0, totalSeats - avail);
+        const sold = s.soldSeatCount ?? Math.max(0, totalSeats - avail);
         let pct = totalSeats > 0 ? Math.round((sold / totalSeats) * 100) : 0;
-        if (isOnSale && pct === 0) pct = 65; // realistic display
 
         // Seat category info & pricing
         const categories = s.seatCategories || [];
-        const hasPrices = categories.length > 0 && categories.some(c => c.price !== null && c.price > 0);
+        const hasPrices = categories.length > 0 && categories.every(c => c.price !== null && c.price >= 0);
         let priceRangeText = 'Chưa thiết lập';
         if (hasPrices) {
-          const prices = categories.map(c => c.price).filter(p => p !== null && p > 0);
+          const prices = categories.map(c => c.price).filter(p => p !== null && p >= 0);
           if (prices.length > 0) {
             const minP = Math.min(...prices);
             const maxP = Math.max(...prices);
@@ -1203,7 +1189,7 @@
                 ${hasSeats ? `
                   <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-label-sm text-label-sm font-semibold">
                     <span class="material-symbols-outlined text-[13px]">check_circle</span>
-                    ${s.availableSeats.toLocaleString('vi-VN')} ghế (Hội trường)
+                    ${totalSeats.toLocaleString('vi-VN')} ghế (Hội trường)
                   </span>
                   <a class="font-label-sm text-label-sm text-primary hover:underline inline-flex items-center gap-0.5 font-semibold" href="./seat-map.html?showtimeId=${s.id}" target="_blank">
                     <span class="material-symbols-outlined text-[14px]">map</span>
@@ -1289,15 +1275,16 @@
             <!-- 6. Thao tác -->
             <td class="py-space-md px-space-md align-top text-right">
               <div class="flex items-center justify-end gap-1">
-                ${!isOnSale ? `
-                  <button onclick="toggleShowtimeSale('${s.id}', true)" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-label-sm text-label-sm font-semibold transition shadow-xs" title="Kích hoạt mở bán">
+                ${isDraft ? `
+                  <button onclick="toggleShowtimeSale('${s.id}', true)" ${s.canOpenSale === false ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-label-sm text-label-sm font-semibold transition shadow-xs" title="${escapeHtml(s.statusActionMessage || 'Kích hoạt mở bán')}">
                     Mở bán
                   </button>
-                ` : `
+                ` : isOnSale ? `
                   <button onclick="toggleShowtimeSale('${s.id}', false)" class="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-label-sm text-label-sm font-semibold transition shadow-xs" title="Đóng bán vé">
                     Đóng bán
                   </button>
-                `}
+                ` : ''}
+                ${isDraft && s.canOpenSale === false ? `<span class="text-xs text-amber-800 max-w-36">${escapeHtml(s.statusActionMessage)}</span>` : ''}
                 <button onclick="openPricingModal('${s.id}')" class="p-2 rounded-lg text-primary hover:bg-surface-container transition-colors" title="Cấu hình bảng giá" type="button">
                   <span class="material-symbols-outlined text-[19px]">settings</span>
                 </button>
@@ -1322,16 +1309,11 @@
       document.getElementById('metricShowtimesTotal').innerHTML = `${totalShows} <span class="font-label-sm text-label-sm font-normal text-on-surface-variant">đêm nhạc</span>`;
       document.getElementById('metricShowtimesReady').innerHTML = `<span class="material-symbols-outlined text-[14px]">event_available</span> ${readyShows} sẵn sàng • ${draftShows} nháp`;
 
-      const totalCap = currentEvent ? currentEvent.totalSeats : 0;
+      const totalCap = showtimes.reduce((sum, s) => sum + (s.actualSeatCount ?? s.availableSeats), 0);
       document.getElementById('metricTotalSeats').innerHTML = `${totalCap.toLocaleString('vi-VN')} <span class="font-label-sm text-label-sm font-normal text-on-surface-variant">ghế</span>`;
 
       // Calculate sold
-      let totalSold = 0;
-      showtimes.forEach(s => {
-        if (s.status === 2 || s.status === 'OnSale') {
-          totalSold += Math.round(s.availableSeats * 0.65);
-        }
-      });
+      const totalSold = showtimes.reduce((sum, s) => sum + (s.soldSeatCount ?? 0), 0);
       const maxPossible = totalCap > 0 ? totalCap : (showtimes[0] ? showtimes[0].availableSeats : 1000);
       const overallPct = maxPossible > 0 ? Math.min(100, Math.round((totalSold / maxPossible) * 100)) : 0;
 
@@ -1370,7 +1352,7 @@
           <div class="p-3 rounded-lg bg-primary-container text-on-primary flex flex-col items-center justify-center shadow-sm">
             <span class="font-label-md text-label-md font-bold uppercase truncate max-w-full">${escapeHtml(c.name)}</span>
             <span class="font-code-mono text-label-sm text-on-tertiary-container mt-1 font-semibold">
-              ${c.price ? c.price.toLocaleString('vi-VN') + ' đ' : 'Chưa đặt giá'}
+              ${c.price != null ? c.price.toLocaleString('vi-VN') + ' đ' : 'Chưa đặt giá'}
             </span>
           </div>
         `).join('');
@@ -1381,7 +1363,7 @@
           <div class="p-3 rounded-lg bg-surface-container-highest text-on-surface flex flex-col items-center justify-center shadow-xs">
             <span class="font-label-md text-label-md font-bold uppercase truncate max-w-full">${escapeHtml(c.name)}</span>
             <span class="font-code-mono text-label-sm text-primary mt-1 font-semibold">
-              ${c.price ? c.price.toLocaleString('vi-VN') + ' đ' : 'Chưa đặt giá'}
+              ${c.price != null ? c.price.toLocaleString('vi-VN') + ' đ' : 'Chưa đặt giá'}
             </span>
           </div>
         `).join('');
@@ -1824,9 +1806,9 @@
 
       container.innerHTML = Object.keys(rowsMap).sort().map(r => `
         <div class="seat-row-preview">
-          <div class="seat-row-label">${r}</div>
+          <div class="seat-row-label">${escapeHtml(r)}</div>
           ${rowsMap[r].map(seat => `
-            <div class="seat-box ${seat.category === 'VIP' ? 'border-amber-400 bg-amber-50 text-amber-900' : 'border-outline-variant'}" title="Ghế ${seat.row}${seat.seatNumber} (${seat.category || 'Standard'})">
+            <div class="seat-box ${seat.category === 'VIP' ? 'border-amber-400 bg-amber-50 text-amber-900' : 'border-outline-variant'}" title="Ghế ${escapeHtml(seat.row)}${seat.seatNumber} (${escapeHtml(seat.category || 'Standard')})">
               ${seat.seatNumber}
             </div>
           `).join('')}

@@ -61,8 +61,9 @@ namespace EventTicketBooking.Api.Services.Implementations
 
             if (order.ExpiresAt <= DateTimeOffset.UtcNow)
             {
-                order.Status = OrderStatus.Expired;
-                await _context.SaveChangesAsync(cancellationToken);
+                var cleanup = new ExpiredOrderCleanupService(_context,
+                    Microsoft.Extensions.Logging.Abstractions.NullLogger<ExpiredOrderCleanupService>.Instance);
+                await cleanup.CleanupExpiredOrdersAsync(cancellationToken: cancellationToken);
                 return PaymentCreationResult.CreateFailure("Đơn hàng đã hết hạn thanh toán.");
             }
 
@@ -161,6 +162,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                         concurrentTx.OrderCode
                     );
                 }
+                return PaymentCreationResult.CreateFailure("Không thể lưu giao dịch thanh toán. Vui lòng thử lại.");
             }
 
             return gatewayResult;
@@ -200,6 +202,9 @@ namespace EventTicketBooking.Api.Services.Implementations
                 CreatedAt = DateTimeOffset.UtcNow
             };
 
+            await using var webhookTransaction = _context.Database.IsRelational()
+                ? await _context.Database.BeginTransactionAsync(cancellationToken) : null;
+
             try
             {
                 _context.PaymentEvents.Add(paymentEvent);
@@ -207,8 +212,11 @@ namespace EventTicketBooking.Api.Services.Implementations
             }
             catch (DbUpdateException)
             {
+                if (webhookTransaction != null) await webhookTransaction.RollbackAsync(cancellationToken);
                 // Chèn bị từ chối vì trùng mã giao dịch -> Trả true (200 OK) và dừng, không gọi T-42
                 _context.ChangeTracker.Clear();
+                if (!await _context.PaymentEvents.AnyAsync(e => e.TransactionId == transactionId, cancellationToken))
+                    throw;
                 _logger.LogInformation("Webhook với mã giao dịch {TransactionId} đã được ghi nhận trong payment_events trước đó. Trả 200 OK và dừng.", transactionId);
                 return true;
             }
@@ -216,6 +224,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             // 4. Chèn được thì gọi T-42 handler
             var resultDto = PaymentResultDto.FromWebhookParseResult(parseResult);
             await HandlePaymentResultAsync(resultDto, cancellationToken);
+            if (webhookTransaction != null) await webhookTransaction.CommitAsync(cancellationToken);
 
             return true;
         }
@@ -227,6 +236,16 @@ namespace EventTicketBooking.Api.Services.Implementations
         }
 
         public async Task<PaymentExecutionResult> HandlePaymentResultAsync(PaymentResultDto result, CancellationToken cancellationToken = default)
+        {
+            if (!_context.Database.IsRelational() || _context.Database.CurrentTransaction != null)
+                return await HandlePaymentResultCoreAsync(result, cancellationToken);
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            var execution = await HandlePaymentResultCoreAsync(result, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return execution;
+        }
+
+        private async Task<PaymentExecutionResult> HandlePaymentResultCoreAsync(PaymentResultDto result, CancellationToken cancellationToken)
         {
             if (result == null)
             {
@@ -269,6 +288,13 @@ namespace EventTicketBooking.Api.Services.Implementations
                     .ToListAsync(cancellationToken);
             }
 
+            if (_context.Database.IsNpgsql())
+            {
+                await _context.Orders.FromSqlRaw("SELECT * FROM orders WHERE \"Id\" = {0} FOR UPDATE", order.Id)
+                    .AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+                await _context.Entry(order).ReloadAsync(cancellationToken);
+            }
+
             // 2. Kiểm tra tính Idempotent: Nếu đơn đã được xác nhận thanh toán trước đó
             if (order.Status == OrderStatus.Paid)
             {
@@ -282,7 +308,8 @@ namespace EventTicketBooking.Api.Services.Implementations
             }
 
             // 2.5 Kiểm tra đơn hàng đã bị hủy vì hết hạn hay không (Task T-46 & S-20)
-            if (order.Status == OrderStatus.Expired || (order.Status == OrderStatus.Pending && order.ExpiresAt <= DateTimeOffset.UtcNow))
+            if (result.Status == PaymentStatus.Success &&
+                (order.Status == OrderStatus.Expired || (order.Status == OrderStatus.Pending && order.ExpiresAt <= DateTimeOffset.UtcNow)))
             {
                 order.Status = OrderStatus.NeedsAttention;
                 order.UpdatedAt = DateTimeOffset.UtcNow;
@@ -296,6 +323,13 @@ namespace EventTicketBooking.Api.Services.Implementations
                     paymentTx.UpdatedAt = DateTimeOffset.UtcNow;
                 }
 
+                var expiredSeatIds = order.OrderItems.Select(oi => oi.SeatId).ToList();
+                var expiredHolds = await _context.SeatHold.Where(h => expiredSeatIds.Contains(h.SeatId) &&
+                    h.UserId == order.UserId && h.Status == "ACTIVE" && h.ExpiresAt <= DateTime.UtcNow).ToListAsync(cancellationToken);
+                foreach (var hold in expiredHolds) hold.Status = "EXPIRED";
+                var expiredSeats = await _context.Seats.Where(s => expiredSeatIds.Contains(s.Id) && s.Status == "HELD")
+                    .ToListAsync(cancellationToken);
+                foreach (var seat in expiredSeats) seat.Status = "AVAILABLE";
                 await _context.SaveChangesAsync(cancellationToken);
                 _logger.LogWarning("Webhook thanh toán tới cho đơn hàng đã hết hạn {OrderId}. Đã đánh dấu đơn cần kiểm tra để hoàn tiền.", order.Id);
 
@@ -352,11 +386,11 @@ namespace EventTicketBooking.Api.Services.Implementations
 
             // 5. Cập nhật trạng thái đơn hàng, đánh dấu ghế đã bán, xoá giữ chỗ trong cùng MỘT Database Transaction duy nhất
             Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? dbTransaction = null;
-            if (_context.Database.IsRelational())
+            if (_context.Database.IsRelational() && _context.Database.CurrentTransaction == null)
             {
                 dbTransaction = await _context.Database.BeginTransactionAsync(cancellationToken);
             }
-            else
+            else if (!_context.Database.IsRelational())
             {
                 try
                 {
@@ -374,9 +408,13 @@ namespace EventTicketBooking.Api.Services.Implementations
                 {
                     // Khoá dòng đơn hàng trong PostgreSQL (FOR UPDATE) để giải quyết tranh chấp với background job huỷ đơn
                     await _context.Orders
-                        .FromSqlRaw("SELECT * FROM orders WHERE \"Id\" = {0} FOR UPDATE", order.Id)
+                        .FromSqlRaw("SELECT * FROM orders WHERE \"Id\" = {0} FOR UPDATE", order.Id).AsNoTracking()
                         .FirstOrDefaultAsync(cancellationToken);
+                    await _context.Entry(order).ReloadAsync(cancellationToken);
                 }
+
+                if (order.Status == OrderStatus.Paid)
+                    return PaymentExecutionResult.CreateSuccess(order.Id, result.OrderCode, "Đơn hàng đã được thanh toán.", isAlreadyProcessed: true);
 
                 // Đảm bảo Re-check trạng thái nếu Job vừa huỷ đơn ngay trước khi lấy được lock (S-23 AC3)
                 if (order.Status == OrderStatus.Expired || order.Status == OrderStatus.Cancelled)
@@ -431,6 +469,17 @@ namespace EventTicketBooking.Api.Services.Implementations
                 var seats = await _context.Seats
                     .Where(s => seatIds.Contains(s.Id))
                     .ToListAsync(cancellationToken);
+
+                var activeSeatHolds = await _context.SeatHold.AsNoTracking()
+                    .Where(h => seatIds.Contains(h.SeatId) && h.Status == "ACTIVE" && h.ExpiresAt > DateTime.UtcNow)
+                    .ToListAsync(cancellationToken);
+                if (seats.Any(s => s.Status == "SOLD") || activeSeatHolds.Any(h => h.UserId != order.UserId))
+                {
+                    order.Status = OrderStatus.NeedsAttention;
+                    if (paymentTx != null) paymentTx.Status = "NEEDS_ATTENTION";
+                    await _context.SaveChangesAsync(cancellationToken);
+                    return PaymentExecutionResult.CreateFailure("Ghế không còn khả dụng. Giao dịch cần kiểm tra hoàn tiền.", order.Id, result.OrderCode);
+                }
 
                 foreach (var seat in seats)
                 {

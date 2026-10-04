@@ -285,9 +285,10 @@ namespace EventTicketBooking.Tests
                             finalSeat.Status == "SOLD" &&
                             finalTx.Status == "PAID";
 
-            bool isStateB = finalOrder.Status == OrderStatus.Expired &&
+            // A verified payment received after expiry requires reconciliation; it must never sell the released seat.
+            bool isStateB = finalOrder.Status == OrderStatus.NeedsAttention &&
                             finalSeat.Status == "AVAILABLE" &&
-                            finalTx.Status == "REFUND_REQUIRED";
+                            finalTx.Status == "NEEDS_ATTENTION";
 
             // Bắt buộc phải khớp chính xác 1 trong 2 trạng thái hợp lệ, tuyệt đối không có trạng thái lai/lửng
             Assert.True(isStateA || isStateB, $"Phát hiện trạng thái lửng không hợp lệ! OrderStatus: {finalOrder.Status}, SeatStatus: {finalSeat.Status}, TxStatus: {finalTx.Status}");

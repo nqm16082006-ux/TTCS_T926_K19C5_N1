@@ -59,3 +59,10 @@ obj/
 *.db
 *.db-shm
 *.db-wal
+
+# Local audit artifacts and test output (may contain pre-fix configuration)
+**/TestResults/
+audit-initial.patch
+audit-fix-frontend.cjs
+demo-*.jpg
+artifacts/

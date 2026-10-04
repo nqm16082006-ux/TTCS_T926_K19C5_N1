@@ -151,8 +151,10 @@
 
   <script>
     const params = new URLSearchParams(window.location.search);
-    const orderId = params.get('orderId') || '';
-    const status = (params.get('status') || 'PAID').toUpperCase();
+    let orderId = params.get('orderId') || '';
+    const orderCode = params.get('orderCode');
+    let actualStatus = null;
+    let actualShowtimeId = null;
 
     const successPanel = document.getElementById('successPanel');
     const failedPanel = document.getElementById('failedPanel');
@@ -160,33 +162,60 @@
     document.getElementById('resOrderId').textContent = `#ORD-${orderId.substring(0, 8).toUpperCase()}`;
     document.getElementById('resTime').textContent = new Date().toLocaleString('vi-VN');
 
-    if (status === 'PAID' || status === 'SUCCESS') {
-      successPanel.classList.remove('hidden');
-      failedPanel.classList.add('hidden');
-    } else {
-      successPanel.classList.add('hidden');
-      failedPanel.classList.remove('hidden');
-    }
+    successPanel.classList.add('hidden');
+    failedPanel.classList.add('hidden');
 
     async function loadOrder() {
-      if (!orderId) return;
       try {
+        if (!orderId && !orderCode) throw new Error('Thiếu mã đơn hàng.');
+        const query = orderId ? `orderId=${encodeURIComponent(orderId)}` : `orderCode=${encodeURIComponent(orderCode)}`;
+        const verification = await fetch(`/api/v1/payments/return?${query}`);
+        const verified = await verification.json();
+        const result = verified.data || verified.errors;
+        if (!orderId && result?.orderId) orderId = result.orderId;
+        if (!orderId) throw new Error(verified.message || 'Không thể xác minh thanh toán.');
         const token = localStorage.getItem('access_token');
         const headers = {};
         if (token) headers['Authorization'] = 'Bearer ' + token;
 
         const res = await fetch(`/api/v1/orders/${orderId}`, { headers });
+        if (!res.ok) throw new Error('Không thể tải đơn hàng. Vui lòng đăng nhập và thử lại.');
         if (res.ok) {
           const json = await res.json();
+          if (!json.success || !json.data) throw new Error(json.message || 'Không thể tải đơn hàng.');
+          actualStatus = json.data.status;
+          actualShowtimeId = json.data.showtimeId;
+          successPanel.classList.toggle('hidden', actualStatus !== 'Paid');
+          failedPanel.classList.toggle('hidden', actualStatus === 'Paid');
+          document.getElementById('resOrderId').textContent = `#ORD-${orderId.substring(0, 8).toUpperCase()}`;
+          if (actualStatus !== 'Paid') failedPanel.querySelector('p').textContent =
+            actualStatus === 'Pending' ? 'Đơn hàng đang chờ xác nhận thanh toán. Bạn có thể kiểm tra lại.' :
+            'Đơn hàng chưa được thanh toán thành công. Vui lòng kiểm tra trạng thái đơn hàng trước khi đặt lại.';
           if (json.data && json.data.totalAmount) {
             document.getElementById('resAmount').textContent = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(json.data.totalAmount);
           }
         }
-      } catch (err) {}
+      } catch (err) {
+        failedPanel.classList.remove('hidden');
+        failedPanel.querySelector('p').textContent = err.message || 'Không thể xác minh kết quả thanh toán.';
+      }
     }
 
-    function retryPayment() {
-      window.location.href = `./mock-payment.html?orderId=${encodeURIComponent(orderId)}`;
+    async function retryPayment() {
+      if (actualStatus !== 'Pending') {
+        window.location.href = actualShowtimeId ? `./seat-map.html?showtimeId=${encodeURIComponent(actualShowtimeId)}` : './login.html';
+        return;
+      }
+      try {
+        const res = await fetch(`/api/v1/payments/orders/${orderId}`, {
+          method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('access_token') || ''}` }
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success || !json.data?.paymentUrl) throw new Error(json.message || 'Không thể tạo thanh toán.');
+        window.location.href = json.data.paymentUrl;
+      } catch (err) {
+        failedPanel.querySelector('p').textContent = err.message;
+      }
     }
 
     loadOrder();

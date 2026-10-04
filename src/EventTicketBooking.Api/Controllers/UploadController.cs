@@ -19,12 +19,14 @@ namespace EventTicketBooking.Api.Controllers
     public class UploadController : ControllerBase
     {
         private readonly IWebHostEnvironment _environment;
+        private readonly IConfiguration? _configuration;
         private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
         private const long MaxFileSize = 10 * 1024 * 1024; // 10MB
 
-        public UploadController(IWebHostEnvironment environment)
+        public UploadController(IWebHostEnvironment environment, IConfiguration? configuration = null)
         {
             _environment = environment;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -55,7 +57,7 @@ namespace EventTicketBooking.Api.Controllers
             }
 
             var webRoot = _environment.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-            var uploadsDir = Path.Combine(webRoot, "uploads", "events");
+            var uploadsDir = Path.Combine(_configuration?["Uploads:Path"] ?? Path.Combine(webRoot, "uploads"), "events");
 
             if (!Directory.Exists(uploadsDir))
             {

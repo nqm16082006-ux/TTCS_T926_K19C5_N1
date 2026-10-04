@@ -43,14 +43,16 @@ namespace EventTicketBooking.Api.Services
 
             try
             {
-                var showtimeExists = await _dbContext.Showtimes
-                    .AsNoTracking()
-                    .AnyAsync(showtime => showtime.Id == showtimeId, cancellationToken);
+                var showtime = await _dbContext.Showtimes
+                    .FirstOrDefaultAsync(showtime => showtime.Id == showtimeId, cancellationToken);
 
-                if (!showtimeExists)
+                if (showtime == null)
                 {
                     throw new KeyNotFoundException("The requested showtime does not exist.");
                 }
+
+                if (showtime.Status != ShowtimeStatus.Draft)
+                    throw new InvalidOperationException("Chỉ được nhập ghế cho suất diễn nháp.");
 
                 var existingCategories = await _dbContext.SeatCategories
                     .Where(category => category.ShowtimeId == showtimeId)
@@ -86,7 +88,7 @@ namespace EventTicketBooking.Api.Services
                         {
                             ShowtimeId = showtimeId,
                             Name = item.Category,
-                            Price = 0
+                            Price = null
                         };
 
                         categoriesByName.Add(item.Category, category);
@@ -104,6 +106,7 @@ namespace EventTicketBooking.Api.Services
 
                 _dbContext.SeatCategories.AddRange(newCategories);
                 _dbContext.Seats.AddRange(seats);
+                showtime.AvailableSeats = existingSeatRows.Count + seats.Count;
 
                 await _dbContext.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);

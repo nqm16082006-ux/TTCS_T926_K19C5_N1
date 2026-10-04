@@ -100,7 +100,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                 {
                     // 1. Chuyển giữ chỗ của các ghế tương ứng sang EXPIRED
                     var activeHolds = await _dbContext.SeatHold
-                        .Where(sh => seatIdsToRelease.Contains(sh.SeatId) && sh.Status == "ACTIVE")
+                        .Where(sh => seatIdsToRelease.Contains(sh.SeatId) && sh.Status == "ACTIVE" && sh.ExpiresAt <= now.UtcDateTime)
                         .ToListAsync(cancellationToken);
 
                     foreach (var hold in activeHolds)

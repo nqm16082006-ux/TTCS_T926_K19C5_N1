@@ -96,16 +96,20 @@ namespace EventTicketBooking.Api.Controllers
         /// Endpoint hỗ trợ sinh test token nhanh theo email.
         /// </summary>
         [HttpPost("dev-token")]
+        [RequireRole("Admin")]
         public async Task<IActionResult> GenerateDevToken(
             [FromQuery] string email,
             [FromServices] AppDbContext dbContext)
         {
+            var environment = HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>();
+            if (!environment.IsDevelopment()) return NotFound();
+            if (string.IsNullOrWhiteSpace(email)) return BadRequest();
             var user = await dbContext.Users
                 .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
                 .FirstOrDefaultAsync(u => u.Email.ToLower() == email.Trim().ToLower());
 
-            if (user == null)
+            if (user == null || !user.IsActive)
             {
                 return NotFound(new { message = $"Không tìm thấy user với email: {email}" });
             }
@@ -125,7 +129,8 @@ namespace EventTicketBooking.Api.Controllers
                 claims.Add(new Claim("role", ur.Role.Name));
             }
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("EventTicketBooking_Super_Secret_Key_For_Jwt_Security_2026_!"));
+            var configuration = HttpContext.RequestServices.GetRequiredService<IConfiguration>();
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(EventTicketBooking.Api.Services.JwtValidation.Secret(configuration)));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(

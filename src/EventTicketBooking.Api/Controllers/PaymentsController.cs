@@ -21,13 +21,16 @@ namespace EventTicketBooking.Api.Controllers
     {
         private readonly IPaymentService _paymentService;
         private readonly ILogger<PaymentsController> _logger;
+        private readonly EventTicketBooking.Api.Data.AppDbContext _context;
 
         public PaymentsController(
             IPaymentService paymentService,
-            ILogger<PaymentsController> logger)
+            ILogger<PaymentsController> logger,
+            EventTicketBooking.Api.Data.AppDbContext context)
         {
             _paymentService = paymentService;
             _logger = logger;
+            _context = context;
         }
 
         /// <summary>
@@ -155,6 +158,11 @@ namespace EventTicketBooking.Api.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetAndVerifyPaymentStatus(Guid orderId)
         {
+            var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value;
+            if (!Guid.TryParse(userIdValue, out var userId)) return Unauthorized();
+            var order = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(_context.Orders, o => o.Id == orderId);
+            if (order == null) return NotFound();
+            if (order.UserId != userId && !User.IsInRole("Admin")) return StatusCode(403);
             var cancellationToken = HttpContext?.RequestAborted ?? default;
             var result = await _paymentService.VerifyAndProcessPaymentReturnAsync(new PaymentReturnQueryDto { OrderId = orderId }, cancellationToken);
             if (!result.Success && result.Message == "Không tìm thấy đơn hàng cần xác minh.")

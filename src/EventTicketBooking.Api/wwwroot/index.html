@@ -58,6 +58,7 @@
       }
     };
   </script>
+<script src="./security.js"></script>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between">
   <!-- Top Navigation Header -->
@@ -73,7 +74,6 @@
         <nav class="hidden md:flex items-center gap-space-lg">
           <a class="font-label-lg text-label-lg text-primary font-bold border-b-2 border-primary py-space-sm" href="./public-events.html">Trang chủ</a>
           <a class="font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface transition-colors py-space-sm" href="#events-section">Sự kiện</a>
-          <a class="font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface transition-colors py-space-sm" href="./swagger" target="_blank">Swagger API</a>
         </nav>
       </div>
 
@@ -304,7 +304,6 @@
       <div class="pt-space-lg flex flex-col sm:flex-row items-center justify-between gap-space-md text-on-surface-variant font-body-sm text-body-sm border-t border-surface-container-high">
         <p>© 2026 EventPulse System. Tất cả các quyền được bảo lưu.</p>
         <div class="flex gap-space-md font-label-sm text-label-sm">
-          <a class="hover:text-on-surface transition-colors" href="./swagger">API Docs</a>
           <a class="hover:text-on-surface transition-colors" href="./login.html">Quản trị</a>
         </div>
       </div>
@@ -341,8 +340,8 @@
                 <span class="material-symbols-outlined text-[18px]">person</span>
               </div>
               <div class="text-left hidden sm:block">
-                <div class="text-xs font-bold text-on-surface leading-tight">${user.fullName || user.username}</div>
-                <div class="text-[11px] text-outline">${roles[0] || 'Khách hàng'}</div>
+                <div class="text-xs font-bold text-on-surface leading-tight">${escapeHtml(user.fullName || user.username)}</div>
+                <div class="text-[11px] text-outline">${escapeHtml(roles[0] || 'Khách hàng')}</div>
               </div>
               <button onclick="handleLogout()" title="Đăng xuất" class="p-1.5 text-on-surface-variant hover:text-error transition rounded-lg hover:bg-surface-container-high ml-1">
                 <span class="material-symbols-outlined text-[18px]">logout</span>
@@ -407,38 +406,15 @@
         const res = await fetch('/api/public/showtimes?limit=50');
         const json = await res.json().catch(() => ({}));
 
+        if (!res.ok || !json.success) throw new Error(json.message || "Không thể tải sự kiện.");
         let items = (json.success && json.data && json.data.items) ? json.data.items : [];
-
-        // Nếu database chưa có showtime OnSale, thử gọi API /api/events để xem có event nào không
-        if (items.length === 0) {
-          const resEvents = await fetch('/api/events').catch(() => null);
-          if (resEvents && resEvents.ok) {
-            const eventsData = await resEvents.json().catch(() => []);
-            if (Array.isArray(eventsData) && eventsData.length > 0) {
-              items = eventsData.map(ev => ({
-                id: (ev.showtimes && ev.showtimes[0]) ? ev.showtimes[0].id : ev.id,
-                eventId: ev.id,
-                eventTitle: ev.title,
-                eventDescription: ev.description,
-                imageUrl: ev.imageUrl,
-                eventLocation: ev.location,
-                organizerName: ev.organizerName || 'Ban Tổ Chức',
-                startTime: ev.startTime,
-                endTime: ev.endTime,
-                availableSeats: ev.totalSeats || 50,
-                status: "OnSale",
-                minPrice: 300000,
-                maxPrice: 2500000
-              }));
-            }
-          }
-        }
 
         allShowtimes = items;
         renderEventsGrid(items);
       } catch (err) {
         console.warn("Lỗi tải sự kiện từ API, hiển thị giao diện mẫu dự phòng:", err);
         renderEventsGrid([]);
+        emptyState.querySelector("h3").textContent = "Không thể tải sự kiện";
       } finally {
         loadingGrid.classList.add('hidden');
         refreshIcon.classList.remove('animate-spin');
@@ -475,7 +451,7 @@
         card.innerHTML = `
           <!-- Image Container with Hover Overlay -->
           <div class="relative w-full h-52 overflow-hidden bg-surface-container cursor-pointer" onclick="window.location.href='${eventDetailUrl}'">
-            <img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" src="${imageUrl}" alt="${item.eventTitle}">
+            <img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.eventTitle)}">
             
             <!-- Live Badges -->
             <div class="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-tertiary font-label-sm text-label-sm shadow-sm font-bold">
@@ -501,7 +477,7 @@
               <div class="flex items-center justify-between text-xs text-outline mb-1.5 font-medium">
                 <span class="truncate max-w-[200px] flex items-center gap-1 text-on-surface-variant">
                   <span class="material-symbols-outlined text-[14px] text-tertiary">verified</span>
-                  ${item.organizerName || 'Ban Tổ Chức'}
+                  ${escapeHtml(item.organizerName || 'Ban Tổ Chức')}
                 </span>
                 <a href="${eventDetailUrl}" class="text-primary hover:underline font-bold flex items-center gap-0.5 group-hover:text-primary-container transition-colors">
                   <span>Xem chi tiết</span>
@@ -509,8 +485,8 @@
                 </a>
               </div>
 
-              <h3 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors line-clamp-2 mb-space-sm font-bold cursor-pointer" title="${item.eventTitle}">
-                <a href="${eventDetailUrl}" class="hover:underline">${item.eventTitle}</a>
+              <h3 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors line-clamp-2 mb-space-sm font-bold cursor-pointer" title="${escapeHtml(item.eventTitle)}">
+                <a href="${eventDetailUrl}" class="hover:underline">${escapeHtml(item.eventTitle)}</a>
               </h3>
 
               <div class="space-y-space-xs mb-space-md text-on-surface-variant font-body-sm text-body-sm">
@@ -520,11 +496,11 @@
                 </div>
                 <div class="flex items-start gap-space-xs">
                   <span class="material-symbols-outlined text-outline text-[18px] shrink-0 mt-0.5">location_on</span>
-                  <span class="line-clamp-1">${item.eventLocation || 'Hà Nội'}</span>
+                  <span class="line-clamp-1">${escapeHtml(item.eventLocation || 'Hà Nội')}</span>
                 </div>
                 <div class="flex items-center gap-space-xs text-primary font-semibold">
                   <span class="material-symbols-outlined text-[18px]">event_seat</span>
-                  <span>Còn lại: <strong>${item.availableSeats} ghế</strong></span>
+                  <span>Còn lại: <strong>${item.remainingSeats ?? item.availableSeats} ghế</strong></span>
                 </div>
               </div>
             </div>

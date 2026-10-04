@@ -143,6 +143,55 @@ namespace EventTicketBooking.Api.Controllers
         /// GET /api/events/{id}
         /// Kiểm tra phân quyền sở hữu: trả 404 nếu không tồn tại, trả 403 nếu thuộc về user khác.
         /// </summary>
+        [HttpPost("{id:guid}/duplicate")]
+        public async Task<IActionResult> DuplicateEvent(Guid id)
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue) return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+            var source = await _context.Events.AsNoTracking()
+                .Include(e => e.Showtimes).ThenInclude(s => s.SeatCategories)
+                .FirstOrDefaultAsync(e => e.Id == id);
+            if (source == null) return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
+            if (source.OwnerId != userId && !await IsCurrentUserAdminAsync(userId.Value))
+                return StatusCode(403, ApiResponse<object>.FailureResult("Bạn không có quyền nhân bản sự kiện này."));
+
+            var showtimeIds = source.Showtimes.Select(s => s.Id).ToList();
+            var seats = await _context.Seats.AsNoTracking().Where(s => showtimeIds.Contains(s.ShowtimeId)).ToListAsync();
+            const string suffix = " (Bản sao)";
+            var copy = new Event
+            {
+                OwnerId = userId.Value,
+                Title = source.Title[..Math.Min(source.Title.Length, 250 - suffix.Length)] + suffix,
+                Description = source.Description, ImageUrl = source.ImageUrl, Location = source.Location,
+                StartTime = source.StartTime, EndTime = source.EndTime, TotalSeats = source.TotalSeats
+            };
+            foreach (var original in source.Showtimes)
+            {
+                var originalSeats = seats.Where(s => s.ShowtimeId == original.Id).ToList();
+                var show = new Showtime
+                {
+                    EventId = copy.Id, StartTime = original.StartTime, EndTime = original.EndTime,
+                    AvailableSeats = originalSeats.Count > 0 ? originalSeats.Count : original.AvailableSeats
+                };
+                var categories = original.SeatCategories.ToDictionary(c => c.Id, c => new SeatCategory
+                {
+                    ShowtimeId = show.Id, Name = c.Name, Price = c.Price
+                });
+                show.SeatCategories = categories.Values.ToList();
+                copy.Showtimes.Add(show);
+                foreach (var seat in originalSeats)
+                    _context.Seats.Add(new Seat
+                    {
+                        ShowtimeId = show.Id, SeatCategoryId = categories[seat.SeatCategoryId].Id,
+                        Row = seat.Row, SeatNumber = seat.SeatNumber, Status = "AVAILABLE"
+                    });
+            }
+            _context.Events.Add(copy);
+            await _context.SaveChangesAsync();
+            return StatusCode(201, ApiResponse<EventResponseDto>.SuccessResult(MapToEventResponseDto(copy),
+                "Đã nhân bản sự kiện thành bản nháp. Hãy kiểm tra lịch diễn trước khi mở bán."));
+        }
+
         [HttpGet("{id:guid}")]
         [ProducesResponseType(typeof(ApiResponse<EventResponseDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -277,6 +326,9 @@ namespace EventTicketBooking.Api.Controllers
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền xóa sự kiện này."));
             }
 
+            var showtimeIds = ev.Showtimes.Select(s => s.Id).ToList();
+            if (await _context.Orders.AnyAsync(o => showtimeIds.Contains(o.ShowtimeId)))
+                return Conflict(ApiResponse<object>.FailureResult("Không thể xóa sự kiện đã có đơn hàng."));
             _context.Events.Remove(ev);
             await _context.SaveChangesAsync();
 
@@ -317,6 +369,10 @@ namespace EventTicketBooking.Api.Controllers
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền truy cập suất diễn của sự kiện này."));
             }
 
+            var ids = ev.Showtimes.Select(s => s.Id).ToList();
+            var seatCounts = await _context.Seats.AsNoTracking().Where(s => ids.Contains(s.ShowtimeId))
+                .GroupBy(s => s.ShowtimeId).Select(g => new { Id = g.Key, Total = g.Count(), Sold = g.Count(s => s.Status == "SOLD") })
+                .ToDictionaryAsync(g => g.Id);
             var showtimesDto = ev.Showtimes.Select(s => new ShowtimeResponseDto
             {
                 Id = s.Id,
@@ -324,6 +380,8 @@ namespace EventTicketBooking.Api.Controllers
                 StartTime = s.StartTime,
                 EndTime = s.EndTime,
                 AvailableSeats = s.AvailableSeats,
+                ActualSeatCount = seatCounts.TryGetValue(s.Id, out var counts) ? counts.Total : 0,
+                SoldSeatCount = seatCounts.TryGetValue(s.Id, out var soldCounts) ? soldCounts.Sold : 0,
                 Status = s.Status,
                 SeatCategories = s.SeatCategories
                     .OrderBy(category => category.Name)
@@ -334,7 +392,10 @@ namespace EventTicketBooking.Api.Controllers
                         Price = category.Price
                     })
                     .ToList(),
-                StatusActionMessage = GetShowtimeStatusActionMessage(s)
+                StatusActionMessage = s.Status != ShowtimeStatus.Draft ? GetShowtimeStatusActionMessage(s) :
+                    !seatCounts.ContainsKey(s.Id) ? "Tải sơ đồ ghế trước khi mở bán." :
+                    s.SeatCategories.Count == 0 || s.SeatCategories.Any(c => c.Price is null or < 0) ? "Thiết lập giá cho tất cả hạng ghế trước khi mở bán." :
+                    GetShowtimeStatusActionMessage(s)
             }).ToList();
 
             return Ok(ApiResponse<List<ShowtimeResponseDto>>.SuccessResult(showtimesDto, "Lấy danh sách suất diễn thành công."));
@@ -530,7 +591,7 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(ApiResponse<object>.FailureResult("Không thể xóa suất diễn đang trong trạng thái mở bán. Vui lòng đóng bán trước khi xóa."));
             }
 
-            var hasOrders = await _context.Orders.AnyAsync(o => o.ShowtimeId == showtimeId && o.Status != OrderStatus.Cancelled);
+            var hasOrders = await _context.Orders.AnyAsync(o => o.ShowtimeId == showtimeId);
             if (hasOrders)
             {
                 return BadRequest(ApiResponse<object>.FailureResult("Không thể xóa suất diễn đã có đơn đặt vé."));
@@ -580,11 +641,11 @@ namespace EventTicketBooking.Api.Controllers
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền cập nhật giá cho sự kiện này."));
             }
 
-            var showtimeExists = await _context.Showtimes
+            var pricingShowtime = await _context.Showtimes
                 .AsNoTracking()
-                .AnyAsync(s => s.Id == showtimeId && s.EventId == eventId);
+                .FirstOrDefaultAsync(s => s.Id == showtimeId && s.EventId == eventId);
 
-            if (!showtimeExists)
+            if (pricingShowtime == null)
             {
                 return NotFound(ApiResponse<object>.FailureResult("Suất diễn không tồn tại trong sự kiện này."));
             }
@@ -594,10 +655,13 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(ApiResponse<object>.FailureResult("Danh sách hạng ghế cần cập nhật không được để trống."));
             }
 
-            if (dto.Categories.Any(item => item.Price < 0))
+            if (dto.Categories.Any(item => item == null || item.Price < 0))
             {
                 return BadRequest(ApiResponse<object>.FailureResult("Giá hạng ghế không được là số âm."));
             }
+
+            if (pricingShowtime.Status == ShowtimeStatus.OnSale && dto.Categories.Any(item => item.Price == null))
+                return BadRequest(ApiResponse<object>.FailureResult("Không thể xóa giá ghế của suất diễn đang mở bán."));
 
             var requestedCategoryIds = dto.Categories
                 .Select(item => item.SeatCategoryId)
@@ -688,6 +752,13 @@ namespace EventTicketBooking.Api.Controllers
 
             try
             {
+                if (showtime.AvailableSeats <= 0)
+                    return BadRequest(ApiResponse<object>.FailureResult("Không thể chuyển sang trạng thái Đang bán vì suất diễn chưa có ghế."));
+                if (showtime.SeatCategories.Count == 0)
+                    return BadRequest(ApiResponse<object>.FailureResult("Suất diễn chưa có hạng ghế để mở bán."));
+                if (showtime.SeatCategories.All(c => c.Price.HasValue && c.Price.Value >= 0) &&
+                    !await _context.Seats.AnyAsync(s => s.ShowtimeId == showtimeId))
+                    return BadRequest(ApiResponse<object>.FailureResult("Suất diễn chưa có sơ đồ ghế để mở bán."));
                 showtime.ChangeStatus(ShowtimeStatus.OnSale);
                 await _context.SaveChangesAsync();
 

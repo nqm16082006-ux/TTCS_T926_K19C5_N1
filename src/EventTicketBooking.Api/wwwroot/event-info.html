@@ -75,6 +75,7 @@
     };
   </script>
 </head>
+<script src="./security.js"></script>
 <body class="bg-background font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between">
 
   <!-- Top Navigation Header -->
@@ -90,7 +91,6 @@
         <nav class="hidden md:flex items-center gap-space-lg">
           <a class="font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface transition-colors py-space-sm" href="./public-events.html">Trang chủ</a>
           <a class="font-label-lg text-label-lg text-primary font-bold border-b-2 border-primary py-space-sm" href="./public-events.html#events-section">Sự kiện</a>
-          <a class="font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface transition-colors py-space-sm" href="./swagger" target="_blank">Swagger API</a>
         </nav>
       </div>
 
@@ -567,7 +567,6 @@
         <p>© 2026 EventPulse Platform JSC. Bảo lưu mọi quyền.</p>
         <div class="flex gap-space-md font-label-sm text-label-sm">
           <a class="hover:text-on-surface transition-colors" href="./public-events.html">Trang chủ</a>
-          <a class="hover:text-on-surface transition-colors" href="./swagger">API Docs</a>
           <a class="hover:text-on-surface transition-colors" href="./login.html">Quản trị</a>
         </div>
       </div>
@@ -581,7 +580,7 @@
   </div>
 
   <script>
-    const API_BASE = (window.location.protocol === 'file:' || (window.location.port && window.location.port !== '5012')) ? 'http://localhost:5012' : '';
+    const API_BASE = (window.location.protocol === 'file:' || (['localhost', '127.0.0.1'].includes(window.location.hostname) && ['5500', '5501'].includes(window.location.port))) ? 'http://localhost:5012' : '';
     let currentEvent = null;
 
     // Toast helper
@@ -662,8 +661,8 @@
                 <span class="material-symbols-outlined text-[18px]">person</span>
               </div>
               <div class="text-left hidden sm:block">
-                <div class="text-xs font-bold text-on-surface leading-tight">${user.fullName || user.username}</div>
-                <div class="text-[11px] text-outline">${roles[0] || 'Khách hàng'}</div>
+                <div class="text-xs font-bold text-on-surface leading-tight">${escapeHtml(user.fullName || user.username)}</div>
+                <div class="text-[11px] text-outline">${escapeHtml(roles[0] || 'Khách hàng')}</div>
               </div>
               <button onclick="handleLogout()" title="Đăng xuất" class="p-1.5 text-on-surface-variant hover:text-error transition rounded-lg hover:bg-surface-container-high ml-1">
                 <span class="material-symbols-outlined text-[18px]">logout</span>
@@ -835,8 +834,8 @@
       }
 
       // 4. Giá vé tiêu chuẩn
-      const minP = ev.minPrice && ev.minPrice > 0 ? ev.minPrice : 600000;
-      const maxP = ev.maxPrice && ev.maxPrice > 0 ? ev.maxPrice : 1500000;
+      const minP = ev.minPrice ?? 0;
+      const maxP = ev.maxPrice ?? 0;
       document.getElementById('eventPriceRange').innerText = `${formatCurrency(minP)} - ${formatCurrency(maxP)}`;
 
       // 5. Bento Info
@@ -851,33 +850,28 @@
       const descEl = document.getElementById('eventDescription');
       if (ev.description && ev.description.trim()) {
         // Nếu có thẻ HTML hoặc text thuần
-        if (ev.description.includes('<p') || ev.description.includes('<div') || ev.description.includes('<br')) {
-          descEl.innerHTML = ev.description;
-        } else {
-          descEl.innerHTML = `<p class="leading-relaxed">${ev.description.replace(/\n\n/g, '</p><p class="leading-relaxed">').replace(/\n/g, '<br>')}</p>`;
-        }
+        descEl.innerHTML = `<p class="leading-relaxed">${escapeHtml(ev.description).replace(/\n\n/g, '</p><p class="leading-relaxed">').replace(/\n/g, '<br>')}</p>`;
       } else {
         descEl.innerHTML = `
-          <p>Hòa nhạc đỉnh cao <strong class="text-on-surface">"${ev.title}"</strong> quy tụ những giọng ca và nghệ sĩ hàng đầu. Khán giả sẽ được đắm chìm trong không gian nghệ thuật âm thanh đa tầng với dàn dựng sân khấu hiện đại cùng hiệu ứng thị giác mãn nhãn.</p>
+          <p>Chưa có thông tin giới thiệu sự kiện.</p>
         `;
       }
 
       // 7. Quy mô & Sơ đồ ghế
-      const totalSeats = ev.totalSeats || 3500;
+      const totalSeats = ev.totalSeats ?? 0;
       document.getElementById('totalSeatsBadge').innerText = `Quy mô: ${totalSeats.toLocaleString('vi-VN')} ghế`;
       document.getElementById('legendVip').innerText = `VIP: ${formatCurrency(maxP)}`;
       document.getElementById('legendStandard').innerText = `Standard: ${formatCurrency(minP)}`;
-      const platinumPrice = Math.round((minP + maxP) / 2 / 50000) * 50000;
-      document.getElementById('legendPlatinum').innerText = `Platinum: ${formatCurrency(platinumPrice)}`;
+      document.getElementById('legendPlatinum').innerText = 'Giá từng hạng ghế được hiển thị tại sơ đồ ghế';
 
       // 8. Địa điểm & Bản đồ
       document.getElementById('locationTitle').innerHTML = `
         <span class="material-symbols-outlined text-primary text-[20px]">apartment</span>
-        <span>${locText.split('-')[0].trim()}</span>
+        <span>${escapeHtml(locText.split('-')[0].trim())}</span>
       `;
       document.getElementById('locationFullAddress').innerHTML = `
         <span class="material-symbols-outlined text-outline text-[16px]">place</span>
-        <span>${locText}</span>
+        <span>${escapeHtml(locText)}</span>
       `;
       document.getElementById('mapBadgeLocation').innerText = locText.split('-')[0].trim();
 
@@ -909,12 +903,12 @@
 
       showtimes.forEach((st, idx) => {
         const dt = formatDateTime(st.startTime);
-        const isOnSale = (st.status === 'OnSale' || !st.status);
-        const available = st.availableSeats !== undefined ? st.availableSeats : 50;
+        const isOnSale = st.status === 'OnSale';
+        const available = st.remainingSeats ?? st.availableSeats ?? 0;
         const isSoldOut = available <= 0;
 
-        const minP = st.minPrice && st.minPrice > 0 ? st.minPrice : defaultMin;
-        const maxP = st.maxPrice && st.maxPrice > 0 ? st.maxPrice : defaultMax;
+        const minP = st.minPrice ?? defaultMin;
+        const maxP = st.maxPrice ?? defaultMax;
         const priceText = `${formatCurrency(minP)} - ${formatCurrency(maxP)}`;
 
         const seatMapUrl = `./seat-map.html?showtimeId=${st.id}&eventId=${eventId}`;

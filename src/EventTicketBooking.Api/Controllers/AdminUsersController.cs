@@ -111,7 +111,7 @@ namespace EventTicketBooking.Api.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> UpdateUserRoles(Guid id, [FromBody] UpdateUserRolesDto dto)
         {
-            if (dto.Roles == null || dto.Roles.Count == 0)
+            if (dto.Roles == null || dto.Roles.Count == 0 || dto.Roles.Any(string.IsNullOrWhiteSpace))
             {
                 return BadRequest(ApiResponse<object>.FailureResult("Người dùng phải có ít nhất một vai trò."));
             }
@@ -153,10 +153,12 @@ namespace EventTicketBooking.Api.Controllers
             }
 
             // Cập nhật quan hệ UserRoles
-            _context.UserRoles.RemoveRange(user.UserRoles);
+            var targetRoleIds = matchedRoles.Select(r => r.Id).ToHashSet();
+            _context.UserRoles.RemoveRange(user.UserRoles.Where(ur => !targetRoleIds.Contains(ur.RoleId)).ToList());
 
             foreach (var role in matchedRoles)
             {
+                if (user.UserRoles.Any(ur => ur.RoleId == role.Id)) continue;
                 _context.UserRoles.Add(new UserRole
                 {
                     UserId = user.Id,
@@ -270,6 +272,8 @@ namespace EventTicketBooking.Api.Controllers
             }
 
             _context.UserRoles.RemoveRange(user.UserRoles);
+            if (await _context.Orders.AnyAsync(o => o.UserId == id))
+                return BadRequest(ApiResponse<object>.FailureResult("Không thể xóa tài khoản đã có đơn hàng. Vui lòng khóa tài khoản."));
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();
 

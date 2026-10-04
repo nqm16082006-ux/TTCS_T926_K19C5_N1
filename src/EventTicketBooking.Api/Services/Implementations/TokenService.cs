@@ -24,10 +24,7 @@ namespace EventTicketBooking.Api.Services.Implementations
 
         public string GenerateAccessToken(User user, IEnumerable<string> roles)
         {
-            var secretKey = _configuration["JwtSettings:SecretKey"]
-                            ?? _configuration["Jwt:Key"]
-                            ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
-                            ?? "EventTicketBooking_Super_Secret_Key_For_Jwt_Security_2026_!";
+            var secretKey = EventTicketBooking.Api.Services.JwtValidation.Secret(_configuration);
 
             var issuer = _configuration["JwtSettings:Issuer"]
                          ?? _configuration["Jwt:Issuer"]

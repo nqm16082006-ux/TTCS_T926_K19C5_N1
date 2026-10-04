@@ -42,7 +42,7 @@ public class EmailService : IEmailService
 
         message.Body = new TextPart("html")
         {
-            Text = BuildEmailBody(toName, confirmationLink)
+            Text = BuildEmailBody(System.Net.WebUtility.HtmlEncode(toName), System.Net.WebUtility.HtmlEncode(confirmationLink))
         };
 
         await SendEmailInternalAsync(message, toEmail, $"Link: {confirmationLink}");
@@ -63,7 +63,7 @@ public class EmailService : IEmailService
 
         message.Body = new TextPart("html")
         {
-            Text = BuildOtpEmailBody(toName, otpCode)
+            Text = BuildOtpEmailBody(System.Net.WebUtility.HtmlEncode(toName), otpCode)
         };
 
         await SendEmailInternalAsync(message, toEmail, $"Mã OTP: {otpCode}");
@@ -84,7 +84,7 @@ public class EmailService : IEmailService
 
         message.Body = new TextPart("html")
         {
-            Text = BuildWelcomeEmailBody(toName, toEmail, registrationMethod)
+            Text = BuildWelcomeEmailBody(System.Net.WebUtility.HtmlEncode(toName), System.Net.WebUtility.HtmlEncode(toEmail), System.Net.WebUtility.HtmlEncode(registrationMethod))
         };
 
         await SendEmailInternalAsync(message, toEmail, $"Chào mừng thành viên mới ({registrationMethod})");
@@ -99,8 +99,12 @@ public class EmailService : IEmailService
         // Nếu chưa cấu hình mật khẩu SMTP thì ghi log mô phỏng (cho môi trường test)
         if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(pass))
         {
-            _logger.LogInformation("🛠️ [SIMULATED] Email tới {Email} ({Detail})", toEmail, logDetail);
-            return;
+            if (_env.IsDevelopment())
+            {
+                _logger.LogInformation("[SIMULATED] Email tới {Email}", toEmail);
+                return;
+            }
+            throw new InvalidOperationException("SMTP credentials must be configured.");
         }
 
         try
@@ -110,7 +114,6 @@ public class EmailService : IEmailService
 
             using var client = new SmtpClient();
             // Bỏ qua chứng chỉ SSL nếu chạy localhost debug
-            client.ServerCertificateValidationCallback = (s, c, h, e) => true;
 
             await client.ConnectAsync(host, port, SecureSocketOptions.StartTls);
             await client.AuthenticateAsync(user, pass);
@@ -123,7 +126,7 @@ public class EmailService : IEmailService
         {
             _logger.LogError(ex, "❌ Lỗi khi gửi email qua SMTP đến {Email}: {Message}", toEmail, ex.Message);
             // Vẫn log chi tiết để nhà phát triển có thể kiểm tra nếu SMTP gặp sự cố mạng
-            _logger.LogWarning("⚠️ Dữ liệu email dự phòng cho {Email}: {Detail}", toEmail, logDetail);
+            throw;
         }
     }
 
@@ -262,7 +265,7 @@ public class EmailService : IEmailService
         """;
 
     // ─── Template email Chào mừng đăng ký thành công ─────────────────────────
-    private static string BuildWelcomeEmailBody(string name, string email, string method) => $"""
+    private string BuildWelcomeEmailBody(string name, string email, string method) => $"""
         <!DOCTYPE html>
         <html lang="vi">
         <head>
@@ -327,7 +330,7 @@ public class EmailService : IEmailService
 
                       <!-- Action Button -->
                       <div style="text-align: center; margin: 0 0 16px 0;">
-                        <a href="http://localhost:5012/public-events.html"
+                        <a href="{System.Net.WebUtility.HtmlEncode((_configuration["App:PublicBaseUrl"] ?? "http://localhost:5012").TrimEnd('/') + "/public-events.html")}"
                            style="background: #3525cd; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 800; display: inline-block; box-shadow: 0 4px 12px rgba(53,37,205,0.25);">
                           Khám Phá Sự Kiện Ngay →
                         </a>

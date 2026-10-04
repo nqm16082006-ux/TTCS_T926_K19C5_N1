@@ -40,7 +40,7 @@ namespace EventTicketBooking.Api.Models
                 }
 
                 var categoriesWithoutPrice = SeatCategories
-                    .Where(category => category.Price is null)
+                    .Where(category => category.Price is null or < 0)
                     .Select(category => category.Name)
                     .ToList();
 

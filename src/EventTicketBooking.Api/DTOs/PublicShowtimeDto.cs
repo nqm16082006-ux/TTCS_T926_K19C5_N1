@@ -27,6 +27,11 @@ namespace EventTicketBooking.Api.DTOs
 
         public int TotalSeats { get; set; }
 
+        /// <summary>
+        /// Số ghế thực tế còn có thể mua: loại trừ ghế SOLD và ghế đang có active hold chưa hết hạn.
+        /// </summary>
+        public int RemainingSeats { get; set; }
+
         public string Status { get; set; } = string.Empty;
 
         public decimal MinPrice { get; set; }

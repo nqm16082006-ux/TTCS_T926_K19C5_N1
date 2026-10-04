@@ -26,20 +26,37 @@ namespace EventTicketBooking.Api.Data
             try
             {
                 await context.Database.MigrateAsync();
-                
+
                 if (context.Database.IsNpgsql())
                 {
                     var conn = (Npgsql.NpgsqlConnection)context.Database.GetDbConnection();
                     if (conn.State != System.Data.ConnectionState.Open)
                         await conn.OpenAsync();
                     await conn.ReloadTypesAsync();
-                    
+
                     try {
                         using var cmd = conn.CreateCommand();
                         cmd.CommandText = @"
-                            CREATE OR REPLACE FUNCTION text_to_showtime_status(text) RETURNS showtime_status AS $$ SELECT $1::showtime_status $$ LANGUAGE SQL IMMUTABLE;
-                            CREATE OR REPLACE FUNCTION text_to_order_status(text) RETURNS order_status AS $$ SELECT $1::order_status $$ LANGUAGE SQL IMMUTABLE;
-                            
+                            CREATE OR REPLACE FUNCTION text_to_showtime_status(text) RETURNS showtime_status AS $$
+                            SELECT CASE LOWER(REPLACE($1, ' ', ''))
+                                WHEN 'draft' THEN 'draft'::showtime_status
+                                WHEN 'onsale' THEN 'on_sale'::showtime_status
+                                WHEN 'closed' THEN 'closed'::showtime_status
+                                ELSE LOWER($1)::showtime_status
+                            END;
+                            $$ LANGUAGE SQL IMMUTABLE;
+
+                            CREATE OR REPLACE FUNCTION text_to_order_status(text) RETURNS order_status AS $$
+                            SELECT CASE LOWER(REPLACE($1, ' ', ''))
+                                WHEN 'pending' THEN 'pending'::order_status
+                                WHEN 'paid' THEN 'paid'::order_status
+                                WHEN 'cancelled' THEN 'cancelled'::order_status
+                                WHEN 'expired' THEN 'expired'::order_status
+                                WHEN 'needsattention' THEN 'needs_attention'::order_status
+                                ELSE LOWER($1)::order_status
+                            END;
+                            $$ LANGUAGE SQL IMMUTABLE;
+
                             DO $$ BEGIN
                                 IF NOT EXISTS (SELECT 1 FROM pg_cast WHERE castsource = 'text'::regtype AND casttarget = 'showtime_status'::regtype) THEN
                                     CREATE CAST (text AS showtime_status) WITH FUNCTION text_to_showtime_status(text) AS IMPLICIT;
@@ -54,6 +71,33 @@ namespace EventTicketBooking.Api.Data
                     } catch (Exception ex) {
                         logger?.LogError(ex, "Error creating implicit cast!");
                     }
+
+                    var enumAlterStatements = new[]
+                    {
+                        "ALTER TYPE showtime_status ADD VALUE IF NOT EXISTS 'Draft';",
+                        "ALTER TYPE showtime_status ADD VALUE IF NOT EXISTS 'OnSale';",
+                        "ALTER TYPE showtime_status ADD VALUE IF NOT EXISTS 'Closed';",
+                        "ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'Pending';",
+                        "ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'Paid';",
+                        "ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'Cancelled';",
+                        "ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'Expired';",
+                        "ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'NeedsAttention';"
+                    };
+
+                    foreach (var stmt in enumAlterStatements)
+                    {
+                        try
+                        {
+                            using var alterCmd = conn.CreateCommand();
+                            alterCmd.CommandText = stmt;
+                            await alterCmd.ExecuteNonQueryAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            logger?.LogWarning(ex, "Could not alter enum value: {Stmt}", stmt);
+                        }
+                    }
+                    await conn.ReloadTypesAsync();
                 }
 
                 // 1. Kiểm tra nếu bảng Roles chưa có dữ liệu thì seed 5 roles
@@ -85,6 +129,7 @@ namespace EventTicketBooking.Api.Data
                         Email = "admin@eventticket.com",
                         PasswordHash = passwordHasher.Hash("Admin@123456"),
                         FullName = "System Administrator",
+                        IsActive = true,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
                     };
@@ -96,6 +141,7 @@ namespace EventTicketBooking.Api.Data
                         Email = "organizer@eventticket.com",
                         PasswordHash = passwordHasher.Hash("Organizer@123456"),
                         FullName = "Event Organizer",
+                        IsActive = true,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
                     };

@@ -60,6 +60,7 @@
       }
     };
   </script>
+<script src="./security.js"></script>
 </head>
 <body class="bg-surface font-body-md text-body-md text-on-surface min-h-screen flex flex-col">
   <!-- Header -->
@@ -338,8 +339,9 @@
       setTimeout(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const returnUrl = urlParams.get('returnUrl') || urlParams.get('redirect');
-        if (returnUrl) {
-          window.location.href = decodeURIComponent(returnUrl);
+        const safeReturn = safeLocalReturnUrl(returnUrl);
+        if (returnUrl && safeReturn) {
+          window.location.href = safeReturn;
           return;
         }
 

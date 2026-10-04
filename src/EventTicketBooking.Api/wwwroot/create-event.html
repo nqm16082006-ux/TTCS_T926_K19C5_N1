@@ -1037,8 +1037,19 @@
           showAlert(data.message || 'Không thể tải thông tin sự kiện cần sửa.', 'error');
         }
       } catch (err) {
+        console.error('Lỗi khi tải thông tin sự kiện:', err);
         showAlert('Lỗi kết nối máy chủ API.', 'error');
       }
+    }
+
+    function formatInputDate(d) {
+      if (!d || isNaN(d.getTime())) return '';
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${mins}`;
     }
 
     function initDefaultDates() {
@@ -1049,15 +1060,6 @@
 
       // Kết thúc sau 4 tiếng lúc 23:00
       const end = new Date(start.getTime() + 4 * 60 * 60 * 1000);
-
-      const formatInputDate = (d) => {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const hours = String(d.getHours()).padStart(2, '0');
-        const mins = String(d.getMinutes()).padStart(2, '0');
-        return `${year}-${month}-${day}T${hours}:${mins}`;
-      };
 
       document.getElementById('eventStartTime').value = formatInputDate(start);
       document.getElementById('eventEndTime').value = formatInputDate(end);

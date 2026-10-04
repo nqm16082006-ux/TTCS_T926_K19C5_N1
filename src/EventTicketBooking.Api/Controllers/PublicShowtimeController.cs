@@ -80,10 +80,11 @@ namespace EventTicketBooking.Api.Controllers
             }
 
             // 2. Cache Miss -> Query Database
+            var now = DateTime.UtcNow;
+
             var query = _context.Showtimes
                 .AsNoTracking()
                 .Include(s => s.Event)
-                    .ThenInclude(e => e.Owner)
                 .Include(s => s.SeatCategories)
                 .Where(s => s.Status == ShowtimeStatus.OnSale);
 
@@ -103,22 +104,68 @@ namespace EventTicketBooking.Api.Controllers
             bool hasMore = rawList.Count > limit;
             var itemsToReturn = hasMore ? rawList.Take(limit).ToList() : rawList;
 
-            var dtoList = itemsToReturn.Select(s => new PublicShowtimeDto
+            // Tính RemainingSeats cho tất cả showtime trong 1 query aggregate (tránh N+1)
+            var showtimeIds = itemsToReturn.Select(s => s.Id).ToList();
+
+            // Số ghế đang bị hold active (chưa hết hạn), group theo ShowtimeId
+            // Dùng join tường minh để tương thích cả PostgreSQL và InMemory test provider
+            var activeHeldCountByShowtime = await (
+                from sh in _context.SeatHold.AsNoTracking()
+                join seat in _context.Seats.AsNoTracking() on sh.SeatId equals seat.Id
+                where sh.Status == "ACTIVE" && sh.ExpiresAt > now && showtimeIds.Contains(seat.ShowtimeId)
+                group sh by seat.ShowtimeId into g
+                select new { ShowtimeId = g.Key, Count = g.Count() }
+            ).ToDictionaryAsync(x => x.ShowtimeId, x => x.Count);
+
+            // Số ghế đã bán (paid orders), group theo ShowtimeId
+            var paidSeatCountByShowtime = await (
+                from oi in _context.OrderItems.AsNoTracking()
+                join o in _context.Orders.AsNoTracking() on oi.OrderId equals o.Id
+                where o.Status == OrderStatus.Paid && showtimeIds.Contains(o.ShowtimeId)
+                group oi by o.ShowtimeId into g
+                select new { ShowtimeId = g.Key, Count = g.Count() }
+            ).ToDictionaryAsync(x => x.ShowtimeId, x => x.Count);
+
+            // Tổng số ghế thực tế trong DB theo showtime
+            var totalSeatCountByShowtime = await _context.Seats
+                .AsNoTracking()
+                .Where(s => showtimeIds.Contains(s.ShowtimeId))
+                .GroupBy(s => s.ShowtimeId)
+                .Select(g => new { ShowtimeId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.ShowtimeId, x => x.Count);
+
+
+            var ownerIds = itemsToReturn.Where(s => s.Event != null).Select(s => s.Event.OwnerId).Distinct().ToList();
+            var ownerNames = await _context.Users.AsNoTracking().Where(u => ownerIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => u.FullName ?? u.Username);
+            var dtoList = itemsToReturn.Select(s =>
             {
-                Id = s.Id,
-                EventId = s.EventId,
-                EventTitle = s.Event?.Title ?? string.Empty,
-                EventDescription = s.Event?.Description,
-                ImageUrl = s.Event?.ImageUrl,
-                EventLocation = s.Event?.Location ?? string.Empty,
-                OrganizerName = s.Event?.Owner?.FullName ?? s.Event?.Owner?.Username ?? "Ban Tổ Chức",
-                StartTime = s.StartTime,
-                EndTime = s.EndTime,
-                AvailableSeats = s.AvailableSeats,
-                TotalSeats = s.Event?.TotalSeats ?? 0,
-                Status = s.Status.ToString(),
-                MinPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Min(sc => sc.Price) ?? 0) : 0m,
-                MaxPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Max(sc => sc.Price) ?? 0) : 0m
+                int totalSeats = s.Event?.TotalSeats ?? 0;
+                int heldCount = activeHeldCountByShowtime.GetValueOrDefault(s.Id, 0);
+                int soldCount = paidSeatCountByShowtime.GetValueOrDefault(s.Id, 0);
+                int actualTotalSeats = totalSeatCountByShowtime.GetValueOrDefault(s.Id, 0);
+                // Nếu đã import ghế thì dùng số ghế thực tế; chưa import thì dùng totalSeats event
+                int baseSeatCount = actualTotalSeats > 0 ? actualTotalSeats : totalSeats;
+                int remaining = Math.Max(0, baseSeatCount - heldCount - soldCount);
+
+                return new PublicShowtimeDto
+                {
+                    Id = s.Id,
+                    EventId = s.EventId,
+                    EventTitle = s.Event?.Title ?? string.Empty,
+                    EventDescription = s.Event?.Description,
+                    ImageUrl = s.Event?.ImageUrl,
+                    EventLocation = s.Event?.Location ?? string.Empty,
+                    OrganizerName = s.Event != null ? ownerNames.GetValueOrDefault(s.Event.OwnerId, "Ban Tổ Chức") : "Ban Tổ Chức",
+                    StartTime = s.StartTime,
+                    EndTime = s.EndTime,
+                    AvailableSeats = s.AvailableSeats,
+                    TotalSeats = totalSeats,
+                    RemainingSeats = remaining,
+                    Status = s.Status.ToString(),
+                    MinPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Min(sc => sc.Price) ?? 0) : 0m,
+                    MaxPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Max(sc => sc.Price) ?? 0) : 0m
+                };
             }).ToList();
 
             string? nextCursor = null;
@@ -156,6 +203,7 @@ namespace EventTicketBooking.Api.Controllers
 
             return Ok(response);
         }
+
 
         /// <summary>
         /// Lấy thông tin chi tiết Sự kiện công khai kèm danh sách Suất chiếu.
@@ -239,7 +287,6 @@ namespace EventTicketBooking.Api.Controllers
             var showtime = await _context.Showtimes
                 .AsNoTracking()
                 .Include(s => s.Event)
-                    .ThenInclude(e => e.Owner)
                 .Include(s => s.SeatCategories)
                 .FirstOrDefaultAsync(s => s.EventId == eventId && s.Id == showtimeId);
 
@@ -248,6 +295,8 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy suất chiếu."));
             }
 
+            var ownerName = showtime.Event != null ? await _context.Users.AsNoTracking()
+                .Where(u => u.Id == showtime.Event.OwnerId).Select(u => u.FullName ?? u.Username).FirstOrDefaultAsync() : null;
             var dto = new PublicShowtimeDto
             {
                 Id = showtime.Id,
@@ -256,7 +305,7 @@ namespace EventTicketBooking.Api.Controllers
                 EventDescription = showtime.Event?.Description,
                 ImageUrl = showtime.Event?.ImageUrl,
                 EventLocation = showtime.Event?.Location ?? string.Empty,
-                OrganizerName = showtime.Event?.Owner?.FullName ?? showtime.Event?.Owner?.Username ?? "Ban Tổ Chức",
+                OrganizerName = ownerName ?? "Ban Tổ Chức",
                 StartTime = showtime.StartTime,
                 EndTime = showtime.EndTime,
                 AvailableSeats = showtime.AvailableSeats,
@@ -346,7 +395,7 @@ namespace EventTicketBooking.Api.Controllers
                             SeatNumber = seat.SeatNumber,
                             CategoryName = category.Name,
                             Price = category.Price,
-                            Status = paidSeatIds.Contains(seat.Id) ? "SOLD" :
+                            Status = seat.Status == "SOLD" || paidSeatIds.Contains(seat.Id) ? "SOLD" :
                                     (activeHeldSeatIds.Contains(seat.Id) ? "HELD" : "AVAILABLE")
                         };
 

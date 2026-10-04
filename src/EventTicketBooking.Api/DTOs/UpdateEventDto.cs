@@ -11,6 +11,7 @@ namespace EventTicketBooking.Api.DTOs
         public string Title { get; set; } = string.Empty;
 
         public string? Description { get; set; }
+        [MaxLength(2000)]
         public string? ImageUrl { get; set; }
 
         [Required(ErrorMessage = "Địa điểm là bắt buộc.")]

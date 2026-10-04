@@ -42,7 +42,7 @@ namespace EventTicketBooking.Api.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Title).IsRequired().HasMaxLength(250);
                 entity.Property(e => e.Location).IsRequired().HasMaxLength(500);
-                entity.Property(e => e.ImageUrl).HasMaxLength(2000);
+                entity.Property(e => e.ImageUrl).HasColumnType("text").HasMaxLength(2000);
                 entity.Property(e => e.TotalSeats).IsRequired();
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");

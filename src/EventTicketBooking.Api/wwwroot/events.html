@@ -580,6 +580,9 @@
       <span>Trang mua vé công khai</span>
     </a>
     <div class="h-px bg-surface-container my-1"></div>
+    <button onclick="handleMenuAction('duplicate')" class="w-full flex items-center gap-2 px-3.5 py-2.5 text-on-surface hover:bg-surface-container transition-colors text-left">
+      <span class="material-symbols-outlined text-[18px]">content_copy</span> Nhân bản sự kiện
+    </button>
     <button onclick="handleMenuAction('delete')" class="w-full flex items-center gap-2 px-3.5 py-2.5 text-error hover:bg-error-container hover:text-on-error-container transition-colors text-left">
       <span class="material-symbols-outlined text-[18px]">delete</span>
       <span>Xóa sự kiện</span>
@@ -1139,7 +1142,7 @@
             <td class="pl-6 pr-4 py-3">
               <div class="flex items-center gap-space-md">
                 <div class="relative w-14 h-14 rounded-lg overflow-hidden shrink-0 shadow-sm bg-surface-container">
-                  <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${status === 'closed' ? 'grayscale group-hover:grayscale-0' : ''}" src="${imageInfo.url}" alt="${escapeHtml(e.title)}">
+                  <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${status === 'closed' ? 'grayscale group-hover:grayscale-0' : ''}" src="${escapeHtml(imageInfo.url)}" alt="${escapeHtml(e.title)}">
                   <div class="absolute top-1 left-1 bg-surface-container-lowest/80 backdrop-blur-sm rounded px-1 text-[10px] font-code-mono ${imageInfo.tagColor} font-semibold">
                     ${status === 'closed' ? 'CLOSED' : (status === 'draft' ? 'DRAFT' : imageInfo.tag)}
                   </div>
@@ -1229,7 +1232,7 @@
             <div>
               <!-- Card Image Banner -->
               <div class="relative h-44 w-full overflow-hidden bg-surface-container">
-                <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${status === 'closed' ? 'grayscale' : ''}" src="${imageInfo.url}" alt="${escapeHtml(e.title)}">
+                <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${status === 'closed' ? 'grayscale' : ''}" src="${escapeHtml(imageInfo.url)}" alt="${escapeHtml(e.title)}">
                 <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
                 <div class="absolute top-3 left-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-md px-2 py-0.5 text-xs font-code-mono ${imageInfo.tagColor} font-bold shadow-sm">
                   ${status === 'closed' ? 'CLOSED' : (status === 'draft' ? 'DRAFT' : imageInfo.tag)}
@@ -1283,14 +1286,43 @@
     // Context Menu Logic
     function toggleRowMenu(e, eventId) {
       e.stopPropagation();
-      activeMenuEventId = eventId;
       const menu = document.getElementById('row-context-menu');
+
+      // Nếu đang mở cùng event thì toggle đóng lại
+      if (activeMenuEventId === eventId && !menu.classList.contains('hidden')) {
+        menu.classList.add('hidden');
+        activeMenuEventId = null;
+        return;
+      }
+
+      activeMenuEventId = eventId;
       const publicLink = document.getElementById('menu-public-link');
       publicLink.href = `./booking.html?eventId=${eventId}`;
 
+      // Tính vị trí dựa trên viewport (position: fixed, không cộng scrollY)
       const rect = e.currentTarget.getBoundingClientRect();
-      menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
-      menu.style.left = `${Math.min(window.innerWidth - 240, rect.right - 200)}px`;
+      menu.classList.remove('hidden');
+      const MENU_WIDTH = 224;  // w-56 = 14rem = 224px
+      const MENU_HEIGHT = menu.offsetHeight;
+      const MARGIN = 4;
+
+      // Tính left: ưu tiên căn phải nút, nhưng không ra ngoài viewport
+      let left = rect.right - MENU_WIDTH;
+      if (left < 8) left = 8;
+      if (left + MENU_WIDTH > window.innerWidth - 8) left = window.innerWidth - MENU_WIDTH - 8;
+
+      // Collision detection: flip lên trên nếu không đủ chỗ phía dưới
+      let top;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      if (spaceBelow >= MENU_HEIGHT + MARGIN) {
+        top = rect.bottom + MARGIN;
+      } else {
+        top = rect.top - MENU_HEIGHT - MARGIN;
+        if (top < 8) top = rect.bottom + MARGIN; // fallback xuống nếu cả trên cũng hết
+      }
+
+      menu.style.top = `${top}px`;
+      menu.style.left = `${left}px`;
       menu.classList.remove('hidden');
     }
 
@@ -1307,17 +1339,54 @@
         window.location.href = `./event-detail.html?id=${activeMenuEventId}`;
       } else if (action === 'edit') {
         window.location.href = `./create-event.html?id=${activeMenuEventId}`;
+      } else if (action === 'duplicate') {
+        duplicateEvent(activeMenuEventId);
       } else if (action === 'delete') {
         confirmDeleteEvent(activeMenuEventId);
       }
+    }
+
+    let duplicateInProgress = false;
+    async function duplicateEvent(eventId) {
+      if (duplicateInProgress) return;
+      duplicateInProgress = true;
+      try {
+        const response = await fetch(`${API_BASE}/api/events/${eventId}/duplicate`, {
+          method: 'POST', headers: { Authorization: 'Bearer ' + token }
+        });
+        const result = await response.json();
+        if (!response.ok || !result.data) throw new Error(result.message || 'Không thể nhân bản sự kiện.');
+        window.location.href = `./event-detail.html?id=${result.data.id}`;
+      } catch (error) {
+        alert(error.message || 'Không thể kết nối máy chủ.');
+      } finally { duplicateInProgress = false; }
     }
 
     document.addEventListener('click', (e) => {
       const menu = document.getElementById('row-context-menu');
       if (menu && !menu.contains(e.target)) {
         menu.classList.add('hidden');
+        activeMenuEventId = null;
       }
     });
+
+    // Đóng menu khi nhấn ESC
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const menu = document.getElementById('row-context-menu');
+        if (menu) menu.classList.add('hidden');
+        activeMenuEventId = null;
+      }
+    });
+
+    // Đóng menu khi scroll (vì position fixed sẽ lệch với nút gốc)
+    window.addEventListener('scroll', () => {
+      const menu = document.getElementById('row-context-menu');
+      if (menu && !menu.classList.contains('hidden')) {
+        menu.classList.add('hidden');
+        activeMenuEventId = null;
+      }
+    }, { passive: true });
 
     // Event Listeners setup
     function setupEventListeners() {

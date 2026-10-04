@@ -119,6 +119,9 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(new { message = "Email này đã được đăng ký và kích hoạt trong hệ thống. Vui lòng đăng nhập." });
             }
 
+            if (existingUser != null && string.IsNullOrEmpty(existingUser.VerificationCode))
+                return StatusCode(StatusCodes.Status423Locked, new { message = "Tài khoản đã bị khóa bởi Quản trị viên." });
+
             // Lấy Role "Customer" từ Database
             var customerRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Customer");
             if (customerRole == null)
@@ -144,7 +147,7 @@ namespace EventTicketBooking.Api.Controllers
             if (existingUser != null)
             {
                 // Người dùng đã đăng ký trước đó nhưng chưa xác thực OTP -> cập nhật lại thông tin & mã mới
-                existingUser.FullName = request.FullName.Trim();
+                existingUser.FullName = request.FullName?.Trim();
                 existingUser.PasswordHash = hashedPassword;
                 existingUser.VerificationCode = otpCode;
                 existingUser.VerificationCodeExpiresAt = expiresAt;
@@ -155,6 +158,7 @@ namespace EventTicketBooking.Api.Controllers
             {
                 // Dùng phần trước @ của Email để làm Username
                 string baseUsername = normalizedEmail.Split('@')[0];
+                if (baseUsername.Length > 40) baseUsername = baseUsername[..40];
                 string username = baseUsername;
                 int counter = 1;
                 while (await _context.Users.AnyAsync(u => u.Username == username))
@@ -166,7 +170,7 @@ namespace EventTicketBooking.Api.Controllers
                 targetUser = new User
                 {
                     Id = Guid.NewGuid(),
-                    FullName = request.FullName.Trim(),
+                    FullName = request.FullName?.Trim(),
                     Email = normalizedEmail,
                     Username = username,
                     PasswordHash = hashedPassword,
@@ -325,6 +329,9 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(new { message = "Tài khoản này đã được kích hoạt, bạn có thể đăng nhập ngay." });
             }
 
+            if (string.IsNullOrEmpty(user.VerificationCode))
+                return StatusCode(StatusCodes.Status423Locked, new { message = "Tài khoản đã bị khóa bởi Quản trị viên." });
+
             // Sinh mã OTP 6 số mới
             string newOtp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
             user.VerificationCode = newOtp;
@@ -364,7 +371,7 @@ namespace EventTicketBooking.Api.Controllers
             {
                 var client = _httpClientFactory.CreateClient();
                 // Gọi API xác thực Google tokeninfo chuẩn
-                var response = await client.GetAsync($"https://oauth2.googleapis.com/tokeninfo?id_token={request.Credential}");
+                var response = await client.GetAsync($"https://oauth2.googleapis.com/tokeninfo?id_token={Uri.EscapeDataString(request.Credential)}");
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -379,7 +386,8 @@ namespace EventTicketBooking.Api.Controllers
 
                 // Kiểm tra Audience (Client ID)
                 var expectedClientId = _configuration["GoogleAuth:ClientId"];
-                if (!string.IsNullOrEmpty(expectedClientId) && !string.Equals(payload.Aud, expectedClientId, StringComparison.OrdinalIgnoreCase))
+                if (string.IsNullOrWhiteSpace(expectedClientId) || !string.Equals(payload.Aud, expectedClientId, StringComparison.Ordinal) ||
+                    !string.Equals(payload.EmailVerified, "true", StringComparison.OrdinalIgnoreCase))
                 {
                     _logger.LogWarning("Google Token Aud '{Aud}' không khớp cấu hình '{Expected}'", payload.Aud, expectedClientId);
                     return BadRequest(new { message = "Google Client ID không khớp với hệ thống." });
@@ -410,6 +418,7 @@ namespace EventTicketBooking.Api.Controllers
                     }
 
                     string baseUsername = normalizedEmail.Split('@')[0];
+                    if (baseUsername.Length > 40) baseUsername = baseUsername[..40];
                     string username = baseUsername;
                     int counter = 1;
                     while (await _context.Users.AnyAsync(u => u.Username == username))
@@ -446,7 +455,7 @@ namespace EventTicketBooking.Api.Controllers
 
                     // Gửi email chứa nút bấm xác nhận kích hoạt tài khoản
                     string scheme = Request.Scheme;
-                    string host = Request.Host.Value;
+                    string host = Request.Host.Value ?? "localhost";
                     string confirmationLink = $"{scheme}://{host}/activate.html?email={Uri.EscapeDataString(user.Email)}&token={verificationToken}";
 
                     _ = Task.Run(async () =>
@@ -484,7 +493,7 @@ namespace EventTicketBooking.Api.Controllers
 
                     // Nếu là Đăng ký (Mode == "register") HOẶC tài khoản chưa được kích hoạt:
                     // Bắt buộc gửi email chứa nút bấm xác nhận và yêu cầu người dùng bấm nút
-                    if (string.Equals(request.Mode, "register", StringComparison.OrdinalIgnoreCase) || !user.IsActive)
+                    if (!user.IsActive)
                     {
                         user.IsActive = false;
                         string verificationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -500,7 +509,7 @@ namespace EventTicketBooking.Api.Controllers
                         await _context.SaveChangesAsync();
 
                         string scheme = Request.Scheme;
-                        string host = Request.Host.Value;
+                        string host = Request.Host.Value ?? "localhost";
                         string confirmationLink = $"{scheme}://{host}/activate.html?email={Uri.EscapeDataString(user.Email)}&token={verificationToken}";
 
                         _ = Task.Run(async () =>
@@ -599,13 +608,11 @@ namespace EventTicketBooking.Api.Controllers
 
             if (user.IsActive)
             {
-                var existingToken = _tokenService.GenerateAccessToken(user, roles);
                 return Ok(new
                 {
                     success = true,
                     isAlreadyActive = true,
                     message = "Tài khoản của bạn đã được xác nhận và kích hoạt từ trước.",
-                    accessToken = existingToken,
                     user = new UserDto
                     {
                         Id = user.Id,
@@ -690,6 +697,9 @@ namespace EventTicketBooking.Api.Controllers
                 return Ok(new { success = true, isAlreadyActive = true, message = "Tài khoản này đã được kích hoạt trước đó. Bạn có thể đăng nhập ngay." });
             }
 
+            if (string.IsNullOrEmpty(user.VerificationCode))
+                return StatusCode(StatusCodes.Status423Locked, new { message = "Tài khoản đã bị khóa bởi Quản trị viên." });
+
             string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
             user.VerificationCode = token;
             user.VerificationCodeExpiresAt = DateTime.UtcNow.AddHours(24);
@@ -697,7 +707,7 @@ namespace EventTicketBooking.Api.Controllers
             await _context.SaveChangesAsync();
 
             string scheme = Request.Scheme;
-            string host = Request.Host.Value;
+            string host = Request.Host.Value ?? "localhost";
             string confirmationLink = $"{scheme}://{host}/activate.html?email={Uri.EscapeDataString(user.Email)}&token={token}";
 
             _ = Task.Run(async () =>

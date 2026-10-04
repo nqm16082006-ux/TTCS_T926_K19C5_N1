@@ -20,6 +20,11 @@ namespace EventTicketBooking.Api.Services
             for (int i = 0; i < items.Count; i++)
             {
                 var item = items[i];
+                if (item == null)
+                {
+                    errors.Add(new SeatImportError { SeatIndex = i, ErrorMessage = "Thông tin ghế không được là null." });
+                    continue;
+                }
                 var row = item.Row?.Trim();
                 var categoryName = item.Category?.Trim();
 
