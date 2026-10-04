@@ -695,8 +695,8 @@
   <!-- Navbar -->
   <nav class="navbar">
     <a href="./admin-users.html" class="brand">
-      <div class="brand-icon">👑</div>
-      <span>Event Ticket Booking</span>
+      <div class="brand-icon" style="background: linear-gradient(135deg, #3525cd 0%, #4f46e5 100%);">👑</div>
+      <span>EventPulse</span>
       <span class="brand-badge">Admin Portal</span>
     </a>
     <div class="nav-links">
@@ -866,10 +866,15 @@
           document.getElementById('navUsername').textContent = name;
           document.getElementById('navAvatar').textContent = name.charAt(0).toUpperCase();
 
-          const isAdmin = (user.roles || []).some(r => r.toLowerCase() === 'admin');
+          const roles = (user.roles || []).map(r => (r || '').toLowerCase());
+          const isAdmin = roles.includes('admin');
           if (!isAdmin) {
-            alert('Bạn không có quyền truy cập trang Quản trị Người dùng (Chỉ dành cho Admin).');
-            window.location.href = './events.html';
+            alert('Bạn không có quyền truy cập trang Quản trị Người dùng (Chỉ dành riêng cho Admin).');
+            if (roles.includes('organizer') || roles.includes('staff')) {
+              window.location.href = './events.html';
+            } else {
+              window.location.href = './public-events.html';
+            }
             return;
           }
         } catch (e) {}

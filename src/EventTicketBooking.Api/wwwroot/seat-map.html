@@ -1,1186 +1,1475 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html class="h-full" lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-  <title>Sơ đồ Ghế - EventTicket Booking</title>
-
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title id="pageTitle">Chọn Ghế - EventPulse</title>
   
-  <!-- FontAwesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  
+  <style>
+    @layer base {
+      html, body { margin: 0; padding: 0; }
+      body { overscroll-behavior: none; }
+      main > :first-child { margin-top: 0 !important; }
+      main > :last-child { margin-bottom: 0 !important; }
+    }
+    ::-webkit-scrollbar { display: none; }
+    
+    /* Seat Grid Smooth Scale */
+    #seatMatrixWrapper {
+      transform-origin: top center;
+      transition: transform 0.25s ease-out;
+    }
+  </style>
 
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
+  <script id="tailwind-config">
     tailwind.config = {
+      darkMode: "class",
       theme: {
         extend: {
-          fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] }
+          colors: {
+            "surface-container-highest": "#dae2fd", "on-tertiary": "#ffffff", "on-primary-container": "#dad7ff",
+            "tertiary-fixed": "#89f5e7", "on-primary": "#ffffff", "on-secondary": "#ffffff",
+            "secondary-fixed": "#eaddff", "tertiary-container": "#006c63", "surface-container": "#eaedff",
+            "outline": "#777587", "inverse-surface": "#283044", "on-tertiary-fixed-variant": "#005049",
+            "secondary-container": "#8a4cfc", "on-error-container": "#93000a", "primary-fixed": "#e2dfff",
+            "primary": "#3525cd", "on-primary-fixed-variant": "#3323cc", "on-tertiary-fixed": "#00201d",
+            "surface-container-high": "#e2e7ff", "outline-variant": "#c7c4d8", "inverse-primary": "#c3c0ff",
+            "surface-dim": "#d2d9f4", "secondary-fixed-dim": "#d2bbff", "on-secondary-container": "#fffbff",
+            "surface-bright": "#faf8ff", "tertiary": "#00524b", "surface-variant": "#dae2fd",
+            "primary-fixed-dim": "#c3c0ff", "secondary": "#712ae2", "surface-container-lowest": "#ffffff",
+            "on-tertiary-container": "#81eddf", "error-container": "#ffdad6", "on-surface": "#131b2e",
+            "on-primary-fixed": "#0f0069", "surface-container-low": "#f2f3ff", "on-error": "#ffffff",
+            "background": "#faf8ff", "surface": "#faf8ff", "surface-tint": "#4d44e3",
+            "tertiary-fixed-dim": "#6bd8cb", "on-surface-variant": "#464555", "on-secondary-fixed": "#25005a",
+            "on-background": "#131b2e", "error": "#ba1a1a", "on-secondary-fixed-variant": "#5a00c6",
+            "primary-container": "#4f46e5", "inverse-on-surface": "#eef0ff"
+          },
+          borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+          spacing: {
+            "margin-lg": "2.5rem", "gutter": "1.5rem", "space-xl": "2rem", "margin": "1.5rem",
+            "space-xs": "0.25rem", "space-sm": "0.5rem", "space-2xl": "3rem", "gutter-sm": "0.75rem",
+            "space-lg": "1.5rem", "margin-sm": "1rem", "gutter-lg": "2rem", "space-md": "1rem"
+          },
+          fontFamily: {
+            "display-lg-mobile": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"], "label-md": ["Plus Jakarta Sans"], "headline-xl-mobile": ["Plus Jakarta Sans"],
+            "display-lg": ["Plus Jakarta Sans"], "body-sm": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"],
+            "label-sm": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"],
+            "headline-xl": ["Plus Jakarta Sans"], "code-mono": ["JetBrains Mono"]
+          },
+          fontSize: {
+            "display-lg-mobile": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+            "label-lg": ["14px", {"lineHeight": "20px", "fontWeight": "600"}],
+            "headline-lg": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+            "body-md": ["14px", {"lineHeight": "22px", "fontWeight": "400"}],
+            "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+            "headline-xl-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.015em", "fontWeight": "700"}],
+            "display-lg": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+            "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+            "headline-md": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.005em", "fontWeight": "600"}],
+            "label-sm": ["11px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+            "headline-sm": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+            "body-lg": ["16px", {"lineHeight": "26px", "fontWeight": "400"}],
+            "headline-xl": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.015em", "fontWeight": "700"}],
+            "code-mono": ["13px", {"lineHeight": "18px", "fontWeight": "500"}]
+          }
         }
       }
-    }
+    };
   </script>
-
-  <style>
-    body {
-      background-color: #f8fafc;
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    
-    /* Header & Footer */
-    header { flex-shrink: 0; z-index: 50; }
-    #bottom-bar { flex-shrink: 0; z-index: 50; }
-    
-    /* Workspace for Canvas */
-    .workspace {
-      flex: 1;
-      position: relative;
-      background-color: #e2e8f0;
-      overflow: hidden; /* We will use custom mouse drag to pan */
-      background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-      background-size: 20px 20px;
-    }
-
-    /* Container that gets moved and scaled */
-    #canvas-container {
-      position: absolute;
-      transform-origin: 0 0;
-      cursor: grab;
-      box-shadow: 0 20px 40px -10px rgba(0,0,0,0.15);
-      border-radius: 12px;
-      background: white;
-    }
-
-    #canvas-container:active {
-      cursor: grabbing;
-    }
-
-    /* Legend */
-    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #475569; }
-    .legend-box { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; border: 1px solid rgba(0,0,0,0.1); }
-    .legend-available { background-color: #ffffff; color: #334155; border: 2px dashed #94a3b8; }
-    .legend-my-held { background-color: #fef3c7; color: #b45309; border-color: #f59e0b; }
-    .legend-other-held { background-color: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
-    .legend-sold { background-color: #e2e8f0; color: #64748b; border-color: #cbd5e1; }
-    .legend-selected { background-color: #10b981; color: white; border-color: #059669; }
-
-    .category-price-legend {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      overflow-x: auto;
-      padding: 8px 16px;
-      background: #ffffff;
-      border-bottom: 1px solid #e2e8f0;
-    }
-
-    .category-price-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      flex: 0 0 auto;
-      padding: 6px 10px;
-      border: 1px solid #e2e8f0;
-      border-radius: 999px;
-      background: #ffffff;
-      color: #334155;
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .category-color-swatch {
-      width: 22px;
-      height: 22px;
-      flex: 0 0 22px;
-      border: 2px solid;
-      border-radius: 6px;
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-    }
-
-    .tooltip-category-row {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .tooltip-category-swatch {
-      width: 12px;
-      height: 12px;
-      display: inline-block;
-      border: 1px solid;
-      border-radius: 3px;
-    }
-
-    .seat-tooltip {
-      position: absolute;
-      z-index: 20;
-      display: none;
-      pointer-events: none;
-      min-width: 170px;
-      padding: 10px 12px;
-      border: 1px solid #cbd5e1;
-      border-radius: 10px;
-      background: rgba(15, 23, 42, 0.96);
-      color: #ffffff;
-      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.25);
-      font-size: 12px;
-      line-height: 1.5;
-    }
-
-    /* Controls overlay */
-    .controls-overlay {
-      position: absolute;
-      bottom: 24px;
-      right: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      z-index: 10;
-    }
-    .btn-control {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      background: white;
-      color: #334155;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-      border: 1px solid #e2e8f0;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-control:hover { background: #f8fafc; color: #4f46e5; }
-  </style>
 </head>
-<body>
+<body class="bg-background font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between">
 
-  <!-- Header -->
-  <header class="bg-white border-b border-slate-200 shadow-sm relative">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-4">
-        <a href="./public-events.html" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition" title="Quay lại danh sách sự kiện">
-          <i class="fa-solid fa-arrow-left"></i>
+  <!-- Top Navigation Header (Kính mờ sang trọng) -->
+  <header class="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+    <div class="h-16 max-w-7xl mx-auto px-margin flex items-center justify-between gap-space-md">
+      <div class="flex items-center gap-space-lg">
+        <a class="flex items-center gap-space-sm" href="./public-events.html">
+          <div class="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center shadow-sm">
+            <span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+          </div>
+          <span class="font-headline-sm text-headline-sm text-primary tracking-tight font-extrabold">EventPulse</span>
         </a>
-        <div>
-          <h1 class="text-base font-extrabold text-slate-900 leading-tight" id="headerTitle">Đang tải sơ đồ...</h1>
-          <p class="text-xs text-slate-500 font-medium" id="headerSubtitle">Vui lòng chờ trong giây lát</p>
-        </div>
+        <nav class="hidden md:flex items-center gap-space-lg">
+          <a class="font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface transition-colors py-space-sm" href="./public-events.html">Trang chủ</a>
+          <a class="font-label-lg text-label-lg text-primary font-bold border-b-2 border-primary py-space-sm" href="./public-events.html#events-section">Sự kiện</a>
+          <a class="font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface transition-colors py-space-sm" href="./swagger" target="_blank">Swagger API</a>
+        </nav>
       </div>
-      <div class="hidden md:flex items-center gap-4 lg:gap-6 p-2 bg-slate-50 rounded-xl border border-slate-200">
-        <div class="legend-item"><div class="legend-box legend-available">A</div>Trống</div>
-        <div class="legend-item"><div class="legend-box legend-selected"><i class="fa-solid fa-check"></i></div>Đang chọn</div>
-        <div class="legend-item"><div class="legend-box legend-my-held">★</div>Bạn đang giữ</div>
-        <div class="legend-item"><div class="legend-box legend-other-held">H</div>Người khác giữ</div>
-        <div class="legend-item"><div class="legend-box legend-sold">X</div>Đã bán</div>
+
+      <div class="flex items-center gap-space-md">
+        <div class="relative hidden sm:block">
+          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
+          <input id="quickSearchInput" class="w-48 lg:w-64 h-10 pl-9 pr-3 rounded-lg bg-surface-container-low text-body-sm font-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20 transition-all" placeholder="Tìm kiếm ca sĩ, sự kiện..." type="text">
+        </div>
+
+        <a id="organizerPortalLink" class="hidden xl:flex items-center gap-space-xs px-3 py-1.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm hover:bg-secondary-fixed-dim transition-colors" href="./events.html">
+          <span class="material-symbols-outlined text-[16px]">storefront</span>
+          <span>Chuyển sang Ban Tổ Chức</span>
+        </a>
+
+        <!-- Dynamic Auth Box -->
+        <div id="navAuthContainer" class="flex items-center gap-space-sm">
+          <a href="./login.html" class="px-4 py-2 rounded-lg text-sm font-semibold text-primary bg-primary-fixed/40 hover:bg-primary-fixed transition">
+            Đăng nhập
+          </a>
+          <a href="./register.html" class="px-4 py-2 rounded-lg text-sm font-bold text-white bg-primary hover:bg-on-primary-fixed-variant transition shadow-sm">
+            Đăng ký
+          </a>
+        </div>
       </div>
     </div>
   </header>
 
-  <div id="categoryPriceLegend" class="category-price-legend" aria-label="Giá theo hạng ghế"></div>
+  <!-- Main Workspace -->
+  <main class="w-full pt-16 bg-surface min-h-[calc(100vh-16rem)] flex-1">
+    <div class="flex flex-col w-full">
 
-  <!-- Hold Countdown Banner & Card (Task T-24 / T-33) -->
-  <div id="hold-timer-banner" class="hidden bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 font-bold text-sm shadow-md z-40 relative transition-all duration-300">
-    <div class="flex items-center gap-3">
-      <div id="timerIconBox" class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-white text-base shadow-inner">
-        <i class="fa-solid fa-clock text-lg"></i>
-      </div>
-      <div>
-        <div class="flex items-center gap-2">
-          <p class="text-[11px] text-amber-100 font-bold uppercase tracking-wider">GHẾ BẠN ĐANG GIỮ</p>
-          <span id="heldCountBadge" class="px-2 py-0.5 bg-black/25 text-white text-[11px] rounded-full font-black">0 ghế</span>
+      <!-- Conflict Toast Notification (Hiển thị khi có ghế vừa bị chọn trước hoặc cảnh báo) -->
+      <div id="conflict-toast-wrapper" class="max-w-7xl mx-auto px-margin w-full pt-space-md hidden transition-all duration-300">
+        <div class="flex items-center justify-between gap-space-md p-space-md rounded-xl bg-error-container text-on-error-container shadow-md" id="conflict-toast">
+          <div class="flex items-center gap-space-sm min-w-0">
+            <span class="material-symbols-outlined text-error flex-shrink-0" style="font-variation-settings: 'FILL' 1;">warning</span>
+            <p class="font-body-md text-body-md font-semibold text-on-surface truncate" id="conflict-toast-msg">
+              Ghế vừa được khán giả khác nhanh tay chọn trước. Vui lòng chọn vị trí khác!
+            </p>
+          </div>
+          <button class="p-1 rounded-lg hover:bg-on-error-container/10 transition-colors flex-shrink-0 text-on-surface-variant hover:text-on-surface" onclick="hideConflictToast()">
+            <span class="material-symbols-outlined text-[20px]">close</span>
+          </button>
         </div>
-        <div class="flex items-center gap-2">
-          <span id="countdownDisplay" class="text-2xl font-black font-mono tracking-widest text-white drop-shadow">00:00</span>
-          <span id="timerSubtext" class="text-xs font-medium text-amber-100">(Đồng bộ máy chủ)</span>
+      </div>
+
+      <!-- Success Toast Notification -->
+      <div id="success-toast-wrapper" class="max-w-7xl mx-auto px-margin w-full pt-space-md hidden transition-all duration-300">
+        <div class="flex items-center justify-between gap-space-md p-space-md rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-200 shadow-md">
+          <div class="flex items-center gap-space-sm min-w-0">
+            <span class="material-symbols-outlined text-emerald-600 flex-shrink-0">check_circle</span>
+            <p class="font-body-md text-body-md font-semibold text-emerald-900 truncate" id="success-toast-msg">
+              Thao tác thành công!
+            </p>
+          </div>
+          <button class="p-1 rounded-lg hover:bg-emerald-200/50 transition-colors flex-shrink-0 text-emerald-700" onclick="hideSuccessToast()">
+            <span class="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Header Event Context (Băng thông tin sự kiện trên đỉnh) -->
+      <div class="max-w-7xl mx-auto px-margin w-full py-space-lg">
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-space-md">
+          <div class="space-y-space-xs">
+            <div class="flex items-center gap-space-xs text-primary font-label-sm text-label-sm uppercase tracking-wider font-bold">
+              <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+              <span>Đang mở cổng giữ chỗ trực tuyến</span>
+            </div>
+            <h1 class="font-headline-xl text-headline-xl text-on-surface font-extrabold tracking-tight" id="eventContextTitle">
+              Đang tải thông tin sự kiện...
+            </h1>
+            <div class="flex flex-wrap items-center gap-x-space-md gap-y-space-xs text-on-surface-variant font-body-sm text-body-sm">
+              <span class="flex items-center gap-1">
+                <span class="material-symbols-outlined text-[18px] text-primary">calendar_today</span>
+                <span id="eventContextDate">Đang cập nhật lịch diễn</span>
+              </span>
+              <span class="hidden sm:inline text-outline-variant">•</span>
+              <span class="flex items-center gap-1">
+                <span class="material-symbols-outlined text-[18px] text-primary">location_on</span>
+                <span id="eventContextLocation">Đang cập nhật địa điểm</span>
+              </span>
+              <span class="hidden sm:inline text-outline-variant">•</span>
+              <span class="flex items-center gap-1">
+                <span class="material-symbols-outlined text-[18px] text-primary">verified_user</span>
+                <span>Hệ thống đặt chỗ thời gian thực (Zero Latency)</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Quick Session Status Badges -->
+          <div class="flex items-center gap-space-sm flex-shrink-0">
+            <div class="flex items-center gap-2 px-space-md py-space-xs rounded-full bg-surface-container-high text-on-surface font-label-md text-label-md font-medium shadow-sm">
+              <span class="material-symbols-outlined text-[18px] text-secondary">group</span>
+              <span id="onlineViewersCount">1.482 người đang xem sơ đồ</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Workspace: 2-Column Responsive Layout (8 Cols left + 4 Cols right) -->
+      <div class="max-w-7xl mx-auto px-margin w-full pb-space-2xl">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
+
+          <!-- LEFT COLUMN: Stage, Controls, Dynamic Seat Map (8 Cols) -->
+          <div class="lg:col-span-8 flex flex-col gap-space-lg">
+            
+            <!-- Sơ đồ ghế card -->
+            <div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg relative overflow-hidden border border-surface-container-high/60">
+              
+              <!-- Top Toolstrip / Zoom controls -->
+              <div class="flex items-center justify-between pb-space-md mb-space-md bg-surface-container-low/50 -mx-space-lg -mt-space-lg px-space-lg pt-space-md border-b border-surface-container-high/40">
+                <div class="flex items-center gap-space-xs">
+                  <span class="material-symbols-outlined text-primary text-[20px]">airline_seat_recline_extra</span>
+                  <span class="font-headline-sm text-headline-sm text-on-surface font-bold" id="hallName">Khán phòng Tầng 1</span>
+                  <span class="px-2 py-0.5 rounded-full bg-surface-container-highest text-primary font-code-mono text-label-sm font-semibold">Block Central</span>
+                </div>
+
+                <!-- Zoom & Pan Buttons -->
+                <div class="flex items-center gap-1 bg-surface-container-high rounded-lg p-1 shadow-inner">
+                  <button onclick="zoomIn()" class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container-lowest transition-colors" title="Phóng to sơ đồ (+)">
+                    <span class="material-symbols-outlined text-[18px]">zoom_in</span>
+                  </button>
+                  <button onclick="zoomOut()" class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container-lowest transition-colors" title="Thu nhỏ sơ đồ (-)">
+                    <span class="material-symbols-outlined text-[18px]">zoom_out</span>
+                  </button>
+                  <button onclick="resetZoom()" class="px-2.5 h-8 rounded-lg flex items-center gap-1 font-label-sm text-label-sm text-on-surface hover:bg-surface-container-lowest transition-colors font-medium" title="Căn vừa màn hình (Fit)">
+                    <span class="material-symbols-outlined text-[16px]">aspect_ratio</span>
+                    <span class="hidden sm:inline">Vừa khung</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Loading Overlay for Seat Grid -->
+              <div id="seatGridLoading" class="flex flex-col items-center justify-center py-20 text-center">
+                <div class="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-3"></div>
+                <p class="font-label-lg text-on-surface-variant font-medium">Đang tải cấu trúc ghế và trạng thái giữ chỗ...</p>
+              </div>
+
+              <!-- Content Area when seats are loaded -->
+              <div id="seatGridLoadedArea" class="hidden flex-col">
+                
+                <!-- Stage Visualization (Sân khấu chính uốn cong đổ bóng) -->
+                <div class="w-full flex flex-col items-center justify-center my-space-md relative">
+                  <div class="w-4/5 max-w-lg h-14 rounded-b-[70px] bg-gradient-to-b from-primary via-primary-container to-secondary flex items-center justify-center shadow-lg relative overflow-hidden">
+                    <div class="absolute inset-0 bg-white/10 [background:radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/30 via-transparent to-transparent"></div>
+                    <div class="flex items-center gap-2 text-on-primary">
+                      <span class="material-symbols-outlined text-[18px]">podium</span>
+                      <span class="font-headline-sm text-headline-sm tracking-widest uppercase font-extrabold text-sm sm:text-base">
+                        SÂN KHẤU CHÍNH / MAIN STAGE
+                      </span>
+                    </div>
+                  </div>
+                  <!-- Stage Light Cone Projection FX -->
+                  <div class="w-3/5 h-6 bg-gradient-to-b from-primary/15 to-transparent blur-sm -mt-1 pointer-events-none rounded-b-full"></div>
+                  <p class="font-label-sm text-label-sm text-outline mt-1 uppercase tracking-wider font-semibold">Tầm nhìn trực diện sân khấu</p>
+                </div>
+
+                <!-- Seat Grid Matrix Scroll Container -->
+                <div class="overflow-x-auto py-space-md -mx-space-md px-space-md select-none">
+                  <div id="seatMatrixWrapper" class="min-w-[680px] flex flex-col gap-y-3 items-center">
+                    <!-- Column Header Index Numbers -->
+                    <div id="columnHeaderIndex" class="flex items-center gap-1.5 pl-9 mb-1">
+                      <!-- Rendered by JS -->
+                    </div>
+
+                    <!-- Seat Matrix Rows & Section Banners -->
+                    <div id="seatMatrixRows" class="w-full flex flex-col gap-y-2 items-center">
+                      <!-- Rendered dynamically by JS -->
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Interactive Seat Legend Bar -->
+                <div class="mt-space-lg pt-space-md border-t-0 bg-surface-container-low -mx-space-lg -mb-space-lg p-space-lg flex flex-col gap-space-md rounded-b-xl border-t border-surface-container-high/40">
+                  <!-- Seat Statuses -->
+                  <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-on-surface-variant font-label-md text-label-md">
+                    <div class="flex items-center gap-2">
+                      <span class="w-4 h-4 rounded bg-emerald-50 shadow-[inset_0_0_0_1.5px_#0d9488]"></span>
+                      <span>Còn trống (Available)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="w-4 h-4 rounded bg-primary text-on-primary flex items-center justify-center text-[10px] shadow-[0_0_0_2px_#ffffff,0_0_0_3px_#4f46e5] font-bold">✓</span>
+                      <span class="font-bold text-on-surface">Đang chọn (Selected)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="w-4 h-4 rounded bg-amber-100 shadow-[inset_0_0_0_1.5px_#f59e0b] flex items-center justify-center text-[10px] text-amber-900 font-bold">★</span>
+                      <span class="text-amber-900 font-bold">Bạn đang giữ (Held)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="w-4 h-4 rounded bg-[repeating-linear-gradient(45deg,#fef3c7,#fef3c7_2px,#fde68a_2px,#fde68a_4px)]"></span>
+                      <span>Người khác giữ</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="w-4 h-4 rounded bg-surface-container-high text-outline text-[10px] flex items-center justify-center">✕</span>
+                      <span>Đã bán (Sold out)</span>
+                    </div>
+                  </div>
+
+                  <!-- Ticket Tiers Summary Pill -->
+                  <div id="ticketTiersSummaryPills" class="flex flex-wrap items-center justify-around gap-2 p-2 rounded-xl bg-surface-container-lowest shadow-sm font-label-sm text-label-sm">
+                    <!-- Injected dynamically -->
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+            <!-- Venue Atmosphere & Experience note -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+              <div class="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex items-start gap-space-sm border border-surface-container-high/50">
+                <span class="material-symbols-outlined text-primary text-[24px]">volume_up</span>
+                <div>
+                  <h4 class="font-headline-sm text-headline-sm text-on-surface font-bold">Acoustic Chuẩn Quốc Tế</h4>
+                  <p class="font-body-sm text-body-sm text-on-surface-variant">Dàn âm thanh L-Acoustics được cân chỉnh tối ưu cho mọi hàng ghế trong khán phòng.</p>
+                </div>
+              </div>
+              <div class="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex items-start gap-space-sm border border-surface-container-high/50">
+                <span class="material-symbols-outlined text-secondary text-[24px]">verified</span>
+                <div>
+                  <h4 class="font-headline-sm text-headline-sm text-on-surface font-bold">Vé Điện Tử Tức Thì</h4>
+                  <p class="font-body-sm text-body-sm text-on-surface-variant">Mã QR Check-in được gửi thẳng tới Email &amp; SMS ngay sau khi xác nhận thanh toán.</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RIGHT COLUMN: Booking Summary & Realtime Hold Timer (4 Cols Sticky) -->
+          <div class="lg:col-span-4 flex flex-col gap-space-lg sticky top-20">
+            
+            <!-- Timer Card (Hiển thị khi đang giữ chỗ hoặc có ghế giữ) -->
+            <div id="holdTimerCard" class="rounded-xl p-space-md bg-amber-50 shadow-sm relative overflow-hidden border border-amber-200/80 transition-all duration-300">
+              <div class="flex items-center justify-between mb-space-xs">
+                <div class="flex items-center gap-2 text-amber-900 font-label-md text-label-md">
+                  <span class="material-symbols-outlined text-amber-600 animate-spin" id="timerIconSpin" style="animation-duration: 4s;">timer</span>
+                  <span class="font-bold">Thời gian giữ vé còn lại:</span>
+                </div>
+                <div class="font-code-mono font-extrabold text-headline-md text-amber-900 tracking-wider" id="countdown-clock">
+                  10:00
+                </div>
+              </div>
+              
+              <!-- Progress bar -->
+              <div class="w-full bg-amber-200/60 rounded-full h-1.5 overflow-hidden">
+                <div class="bg-amber-600 h-1.5 rounded-full transition-all duration-1000" id="timer-progress" style="width: 100%;"></div>
+              </div>
+              
+              <p class="font-body-sm text-[11px] text-amber-800/80 mt-2 font-medium" id="timerWarningText">
+                ⚠️ Chỗ ngồi sẽ tự động trả về hệ thống nếu không hoàn tất thanh toán trước khi đồng hồ kết thúc.
+              </p>
+            </div>
+
+            <!-- Selected Seats Detail Panel -->
+            <div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg flex flex-col gap-space-md border border-surface-container-high/60">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-primary">shopping_bag</span>
+                  <h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">
+                    Ghế Đã Chọn (<span class="text-primary font-code-mono" id="selectedSeatsCountText">0</span>)
+                  </h3>
+                </div>
+                <button onclick="clearAllSelections()" id="btnClearAll" class="font-label-sm text-label-sm text-error hover:underline flex items-center gap-0.5 font-semibold transition-opacity opacity-50 cursor-not-allowed">
+                  <span class="material-symbols-outlined text-[14px]">delete_sweep</span>
+                  <span>Bỏ tất cả</span>
+                </button>
+              </div>
+
+              <!-- Seat Items List Container -->
+              <div class="flex flex-col gap-space-sm min-h-[100px] max-h-80 overflow-y-auto pr-1" id="selectedSeatsListContainer">
+                <div class="text-center py-8 text-on-surface-variant text-sm font-medium flex flex-col items-center justify-center">
+                  <span class="material-symbols-outlined text-outline text-3xl mb-1">airline_seat_recline_extra</span>
+                  <span>Vui lòng nhấp chọn ghế trên sơ đồ</span>
+                </div>
+              </div>
+
+              <!-- Fee Breakdown / Calculations -->
+              <div class="pt-space-sm space-y-space-xs font-body-sm text-body-sm border-t border-surface-container-high/60">
+                <div class="flex justify-between text-on-surface-variant font-medium">
+                  <span id="subtotalLabel">Tạm tính (0 vé):</span>
+                  <span class="font-code-mono text-on-surface font-bold" id="subtotalPrice">0 ₫</span>
+                </div>
+                <div class="flex justify-between text-on-surface-variant font-medium">
+                  <span class="flex items-center gap-1">
+                    Phí nền tảng &amp; dịch vụ:
+                    <span class="material-symbols-outlined text-[14px] text-outline cursor-help" title="Miễn phí dịch vụ bảo mật giao dịch">info</span>
+                  </span>
+                  <span class="font-code-mono text-tertiary font-bold">0 ₫ (Miễn phí)</span>
+                </div>
+                <div class="pt-space-xs mt-space-xs flex justify-between items-baseline bg-surface-container-high/40 p-space-sm rounded-lg">
+                  <span class="font-headline-sm text-headline-sm text-on-surface font-bold">Tổng thanh toán:</span>
+                  <span class="font-headline-lg text-headline-lg font-extrabold text-primary font-code-mono" id="totalPaymentPrice">0 ₫</span>
+                </div>
+              </div>
+
+              <!-- Checkout Security guarantee -->
+              <div class="flex items-center gap-2 p-2 rounded-lg bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm">
+                <span class="material-symbols-outlined text-primary text-[18px]">lock</span>
+                <span>Giao dịch bảo mật chuẩn Quốc tế 256-Bit SSL</span>
+              </div>
+
+              <!-- Primary Actions -->
+              <div class="flex flex-col gap-space-xs pt-space-xs">
+                <button onclick="handlePrimaryAction()" id="btnPrimaryAction" disabled class="w-full h-12 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
+                  <span id="btnPrimaryActionText">Tiến hành giữ vé &amp; thanh toán</span>
+                  <span class="material-symbols-outlined text-[20px]" id="btnPrimaryActionIcon">arrow_forward</span>
+                </button>
+                <a id="btnBackToEvent" class="w-full h-10 rounded-lg bg-transparent hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm flex items-center justify-center transition-colors font-semibold" href="./public-events.html">
+                  Quay lại thông tin sự kiện
+                </a>
+              </div>
+            </div>
+
+            <!-- Organizer / Venue mini card -->
+            <div class="p-space-md rounded-xl bg-surface-container-low flex items-center gap-space-md border border-surface-container-high/40">
+              <div class="w-12 h-12 rounded-lg bg-surface-container-highest flex items-center justify-center text-primary flex-shrink-0">
+                <span class="material-symbols-outlined text-[24px]">theater_comedy</span>
+              </div>
+              <div class="min-w-0">
+                <h4 class="font-label-lg text-label-lg text-on-surface font-bold truncate" id="organizerNameMini">EventPulse Platform</h4>
+                <p class="font-body-sm text-body-sm text-on-surface-variant truncate">Đơn vị phát hành vé chính hãng</p>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Modal: Yêu cầu đăng nhập để giữ chỗ -->
+    <div id="loginRequiredModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4">
+      <div class="bg-surface-container-lowest rounded-2xl shadow-2xl max-w-md w-full p-6 border border-surface-container-high transform transition-all scale-100 animate-in fade-in duration-200">
+        <div class="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4">
+          <span class="material-symbols-outlined text-[28px]">lock</span>
+        </div>
+        <h3 class="font-headline-sm text-lg font-bold text-on-surface mb-2">Đăng nhập để giữ chỗ</h3>
+        <p class="font-body-md text-sm text-on-surface-variant mb-6" id="loginModalMsg">
+          Để hệ thống khóa chỗ và giữ vé trong 10 phút, quý khách vui lòng đăng nhập tài khoản. Vị trí ghế bạn đã chọn sẽ được lưu tạm tự động!
+        </p>
+        <div class="flex flex-col gap-2.5">
+          <button onclick="goToLoginWithPendingSeats()" class="w-full h-11 rounded-xl bg-primary hover:bg-primary-container text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md transition">
+            <span class="material-symbols-outlined text-[18px]">login</span>
+            <span>Đăng nhập ngay</span>
+          </button>
+          <button onclick="goToRegisterWithPendingSeats()" class="w-full h-11 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-semibold text-sm transition">
+            Chưa có tài khoản? Đăng ký
+          </button>
+          <button onclick="closeLoginModal()" class="w-full h-9 text-outline hover:text-on-surface text-xs font-medium transition">
+            Để sau / Tiếp tục xem sơ đồ
+          </button>
         </div>
       </div>
     </div>
-    <div class="flex items-center gap-3">
-      <div id="heldSeatsQuickList" class="hidden md:flex items-center gap-1.5 max-w-md overflow-x-auto py-1"></div>
-      <div id="timerStatusBadge" class="flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/20">
-        <i class="fa-solid fa-shield-halved text-xs text-amber-200"></i>
-        <span class="text-xs font-semibold">Ghế của bạn đã được khóa an toàn</span>
-      </div>
-    </div>
-  </div>
 
-  <!-- Error State Banner (Task T-33) -->
-  <div id="errorBanner" class="hidden bg-rose-50 border-b border-rose-200 px-4 py-2.5 flex items-center justify-between text-rose-800 text-xs font-semibold shadow-sm z-40 relative">
-    <div class="flex items-center gap-2">
-      <i class="fa-solid fa-circle-exclamation text-rose-600 text-sm"></i>
-      <span id="errorMessage">Không thể tải trạng thái ghế đang giữ.</span>
-    </div>
-    <button onclick="retryRestoreHolds()" class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold transition flex items-center gap-1 shadow-sm">
-      <i class="fa-solid fa-rotate-right"></i> Thử lại
-    </button>
-  </div>
-
-  <!-- Workspace area (Canvas) -->
-  <div class="workspace" id="workspace">
-    <!-- Loading Overlay (Task T-33) -->
-    <div id="loadingOverlay" class="absolute inset-0 bg-white/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center transition-opacity duration-300">
-      <div class="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-3"></div>
-      <p class="text-sm font-bold text-slate-700">Đang tải sơ đồ ghế...</p>
-    </div>
-
-    <!-- Seat Tooltip (Accessibility T-33) -->
-    <div id="seatTooltip" class="hidden absolute pointer-events-none z-20 px-2.5 py-1.5 bg-slate-900/90 text-white text-xs font-medium rounded-lg shadow-lg border border-slate-700 backdrop-blur-sm whitespace-nowrap transition-opacity duration-150"></div>
-
-    <div id="canvas-container">
-      <canvas id="seatCanvas"></canvas>
-    </div>
-    <div id="seatTooltip" class="seat-tooltip" role="status"></div>
-
-    <!-- Zoom Controls -->
-    <div class="controls-overlay">
-      <button class="btn-control" onclick="zoomIn()" title="Phóng to"><i class="fa-solid fa-plus"></i></button>
-      <button class="btn-control" onclick="zoomOut()" title="Thu nhỏ"><i class="fa-solid fa-minus"></i></button>
-      <button class="btn-control" onclick="resetView()" title="Mặc định"><i class="fa-solid fa-expand"></i></button>
-    </div>
-  </div>
-
-  <!-- Bottom Bar (Cart) -->
-  <div id="bottom-bar" class="bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-      <!-- Selected & Held Seats Chips List Container (Task T-26 / T-33) -->
-      <div id="selectedSeatsContainer" class="hidden mb-2 pb-2 border-b border-slate-100 flex flex-wrap items-center gap-2">
-        <span class="text-xs font-bold text-slate-500 mr-1 flex items-center gap-1">
-          <i class="fa-solid fa-list-check text-indigo-500"></i> Ghế của bạn:
-        </span>
-        <div id="selectedSeatsList" class="flex flex-wrap gap-2 items-center"></div>
-      </div>
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Đã chọn: <span id="selectedCount" class="text-indigo-600 font-extrabold">0</span> ghế</p>
-          <p class="text-xl font-extrabold text-slate-900" id="totalPrice">0 ₫</p>
+    <!-- Modal: Hết thời gian giữ vé (10 phút) -->
+    <div id="holdExpiredModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4">
+      <div class="bg-surface-container-lowest rounded-2xl shadow-2xl max-w-md w-full p-6 border border-surface-container-high text-center transform transition-all scale-100 animate-in fade-in duration-200">
+        <div class="w-14 h-14 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-4">
+          <span class="material-symbols-outlined text-[32px]">timer_off</span>
         </div>
-        <button onclick="proceedToBooking()" id="btnBook" disabled class="px-6 py-3 rounded-xl font-bold text-sm bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-200 transition flex items-center gap-2">
-          <span>Tiếp tục thanh toán</span>
-          <i class="fa-solid fa-arrow-right"></i>
+        <h3 class="font-headline-sm text-lg font-bold text-on-surface mb-2">Hết thời gian giữ vé (10 phút)</h3>
+        <p class="font-body-md text-sm text-on-surface-variant mb-6">
+          Thời gian giữ chỗ 10 phút của quý khách đã kết thúc. Để đảm bảo cơ hội cho mọi khán giả, các ghế đã được tự động nhả về hệ thống. Quý khách vui lòng chọn lại ghế nếu muốn tiếp tục đặt vé.
+        </p>
+        <button onclick="closeExpiredModal()" class="w-full h-11 rounded-xl bg-primary hover:bg-primary-container text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md transition">
+          <span>Đã hiểu, chọn lại ghế</span>
         </button>
       </div>
     </div>
-  </div>
+  </main>
 
-  <!-- Mobile Legend (Visible only on small screens) -->
-  <div class="md:hidden bg-slate-50 border-b border-slate-200 px-4 py-2 flex justify-between overflow-x-auto gap-4">
-    <div class="legend-item whitespace-nowrap"><div class="legend-box legend-available">A</div>Trống</div>
-    <div class="legend-item whitespace-nowrap"><div class="legend-box legend-selected"><i class="fa-solid fa-check"></i></div>Đang chọn</div>
-    <div class="legend-item whitespace-nowrap"><div class="legend-box legend-my-held">★</div>Bạn đang giữ</div>
-    <div class="legend-item whitespace-nowrap"><div class="legend-box legend-other-held">H</div>Người khác giữ</div>
-    <div class="legend-item whitespace-nowrap"><div class="legend-box legend-sold">X</div>Đã bán</div>
-  </div>
+  <!-- Footer -->
+  <footer class="w-full bg-surface-container-low shadow-[0_-1px_6px_rgba(0,0,0,0.02)] mt-auto">
+    <div class="max-w-7xl mx-auto px-margin py-space-2xl">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-space-xl mb-space-2xl">
+        <div class="space-y-space-sm">
+          <div class="flex items-center gap-space-sm">
+            <div class="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center">
+              <span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+            </div>
+            <span class="font-headline-sm text-headline-sm text-primary font-bold">EventPulse</span>
+          </div>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">Nền tảng đặt vé trực tuyến &amp; quản trị suất diễn hàng đầu. Hệ thống giữ chỗ tức thì không độ trễ cho mọi quy mô sự kiện.</p>
+        </div>
+        <div class="space-y-space-sm">
+          <div class="font-headline-sm text-headline-sm text-on-surface font-bold">Chính sách &amp; Hỗ trợ</div>
+          <ul class="space-y-space-xs font-body-sm text-body-sm text-on-surface-variant">
+            <li><a class="hover:text-primary transition-colors" href="#">Quy chế hoạt động sàn</a></li>
+            <li><a class="hover:text-primary transition-colors" href="#">Chính sách bảo mật thanh toán</a></li>
+            <li><a class="hover:text-primary transition-colors" href="#">Quy trình đổi / hoàn vé</a></li>
+            <li><a class="hover:text-primary transition-colors" href="#">Điều khoản cho ban tổ chức</a></li>
+          </ul>
+        </div>
+        <div class="space-y-space-sm">
+          <div class="font-headline-sm text-headline-sm text-on-surface font-bold">Tổng đài trợ giúp</div>
+          <div class="space-y-space-xs font-body-sm text-body-sm text-on-surface-variant">
+            <p class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[16px] text-primary">support_agent</span>Hotline: <strong class="text-on-surface">1900 8899</strong></p>
+            <p class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[16px] text-primary">mail</span>support@eventpulse.vn</p>
+            <p class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[16px] text-primary">schedule</span>08:00 - 22:00 hàng ngày</p>
+          </div>
+        </div>
+        <div class="space-y-space-sm">
+          <div class="font-headline-sm text-headline-sm text-on-surface font-bold">Bảo mật &amp; Chứng nhận</div>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">Tuân thủ tiêu chuẩn PCI DSS Quốc tế &amp; Mã hoá đường truyền SSL 256-bit.</p>
+          <div class="flex items-center gap-space-sm">
+            <span class="px-2.5 py-1 rounded bg-surface-container-high font-code-mono text-label-sm text-primary font-bold">PCI-DSS</span>
+            <span class="px-2.5 py-1 rounded bg-surface-container-high font-code-mono text-label-sm text-tertiary-container text-on-tertiary-container font-bold">SSL 256-BIT</span>
+          </div>
+        </div>
+      </div>
+      <div class="pt-space-lg flex flex-col sm:flex-row items-center justify-between gap-space-md text-on-surface-variant font-body-sm text-body-sm border-t border-surface-container-high">
+        <p>© 2026 EventPulse Platform JSC. Bảo lưu mọi quyền.</p>
+        <div class="flex gap-space-md font-label-sm text-label-sm">
+          <a class="hover:text-on-surface transition-colors" href="./public-events.html">Trang chủ</a>
+          <a class="hover:text-on-surface transition-colors" href="./swagger">API Docs</a>
+          <a class="hover:text-on-surface transition-colors" href="./login.html">Quản trị</a>
+        </div>
+      </div>
+    </div>
+  </footer>
 
-  <!-- Scripts -->
   <script>
-    if (window.location.protocol === 'file:') {
-      const fileName = window.location.pathname.split('/').pop() || 'seat-map.html';
-      window.location.href = 'http://localhost:5012/' + fileName + window.location.search;
+    // --- 0. API Base URL Detection (cho phép chạy mượt mà cả localhost:5012, Live Server 5500 và file://) ---
+    const API_BASE = (window.location.protocol === 'file:' || (window.location.port && window.location.port !== '5012')) ? 'http://localhost:5012' : '';
+
+    // Token Validator Helper
+    function getValidToken() {
+      const token = localStorage.getItem('access_token');
+      if (!token || token === 'null' || token === 'undefined' || token.trim() === '') {
+        return null;
+      }
+      return token.trim();
     }
 
+    // --- 1. Query Params & State ---
     const urlParams = new URLSearchParams(window.location.search);
-    const showtimeId = urlParams.get('showtimeId');
-    const eventId = urlParams.get('eventId');
+    let showtimeId = urlParams.get('showtimeId');
+    let eventId = urlParams.get('eventId') || urlParams.get('id');
 
-    // State
-    let seats = [];
-    let selectedSeatIds = new Set();
-    let myHeldSeatIds = new Set();
+    let allSeats = [];
     let seatMap = new Map();
-    let seatLayout = { rows: 0, cols: 0, matrix: [] };
-    let categoryColorMap = new Map();
-
-    const CATEGORY_COLOR_PALETTE = [
-      { background: '#dbeafe', border: '#60a5fa', text: '#1d4ed8' },
-      { background: '#ede9fe', border: '#a78bfa', text: '#6d28d9' },
-      { background: '#ffe4e6', border: '#fb7185', text: '#be123c' },
-      { background: '#ffedd5', border: '#fb923c', text: '#c2410c' },
-      { background: '#ccfbf1', border: '#2dd4bf', text: '#0f766e' },
-      { background: '#ecfccb', border: '#a3e635', text: '#4d7c0f' },
-      { background: '#cffafe', border: '#22d3ee', text: '#0e7490' },
-      { background: '#fae8ff', border: '#e879f9', text: '#a21caf' }
-    ];
-
-    // Canvas & Viewport state
-    const canvas = document.getElementById('seatCanvas');
-    const ctx = canvas.getContext('2d');
-    const container = document.getElementById('canvas-container');
-    const workspace = document.getElementById('workspace');
-
-    const SEAT_SIZE = 36;
-    const SEAT_GAP = 12;
-    const MARGIN = 40;
-
-    let scale = 1;
-    let translateX = 0;
-    let translateY = 0;
-    let isDragging = false;
-    let dragStartX = 0;
-    let dragStartY = 0;
-
-    async function fetchEventDetails() {
-      try {
-        const response = await fetch(`/api/public/events/${eventId}/showtimes/${showtimeId}`);
-        const json = await response.json();
-        if (json.success && json.data) {
-          const st = json.data;
-          document.getElementById('headerTitle').textContent = st.eventTitle || 'Sơ đồ ghế';
-          
-          const startDate = new Date(st.startTime).toLocaleString('vi-VN', {
-            hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'
-          });
-          document.getElementById('headerSubtitle').textContent = `Suất chiếu: ${startDate}`;
-        }
-      } catch (err) {
-        console.warn("Không thể tải thông tin sự kiện chi tiết:", err);
-      }
-    }
-
-    // Fetch seats from T-20 API
-    async function fetchSeats() {
-      const fetchStartTime = performance.now();
-      const response = await fetch(`/api/public/showtimes/${showtimeId}/seats`);
-      const json = await response.json();
-      const fetchEndTime = performance.now();
-      
-      if (json.success) {
-        seats = json.data;
-        buildCategoryColorMap();
-        renderCategoryPriceLegend();
-        
-        const processStartTime = performance.now();
-        processSeatLayout();
-        setupCanvas();
-        drawCanvas();
-        centerView();
-        const processEndTime = performance.now();
-
-        const renderEndTime = performance.now();
-        
-        console.group('%c[T-21 Benchmark] Performance Metrics', 'color: #10b981; font-weight: bold;');
-        console.log(`Số lượng ghế xử lý: ${seats.length}`);
-        console.log(`Thời gian gọi API: ${(fetchEndTime - fetchStartTime).toFixed(2)} ms`);
-        console.log(`Thời gian tính toán và vẽ Canvas: ${(processEndTime - processStartTime).toFixed(2)} ms`);
-        console.log(`%cTổng thời gian hiển thị: ${(renderEndTime - fetchStartTime).toFixed(2)} ms`, 'color: #3b82f6; font-weight: bold;');
-        console.groupEnd();
-      } else {
-        alert("Lỗi tải sơ đồ ghế: " + json.message);
-      }
-    }
-
-    // Initialization
-    async function init() {
-      if (!showtimeId) {
-        alert("Thiếu ShowtimeId");
-        return;
-      }
-      
-      // Update header
-      document.getElementById('headerTitle').textContent = `Sơ đồ ghế`;
-      document.getElementById('headerSubtitle').textContent = `Mã suất diễn: ${showtimeId.substring(0,8)}`;
-
-      const loadingOverlay = document.getElementById('loadingOverlay');
-      if (loadingOverlay) loadingOverlay.classList.remove('hidden');
-
-      try {
-        await fetchEventDetails();
-        
-        // Bước 1 (T-33): Tải sơ đồ ghế
-        await fetchSeats();
-
-        // Bước 2 (T-33): Khôi phục ghế đang giữ và countdown từ T-32 API
-        await restoreHeldSeats();
-      } catch (e) {
-        console.error("[Init Error]", e);
-        alert("Lỗi tải trang: " + e.message + "\n" + (e.stack ? e.stack.split('\\n')[0] : ''));
-      } finally {
-        if (loadingOverlay) loadingOverlay.classList.add('hidden');
-      }
-    }
-
-    // Process flat seat list into a visual grid
-    function processSeatLayout() {
-      // Group by row
-      const rowGroups = {};
-      seats.forEach(s => {
-        if (!rowGroups[s.row]) rowGroups[s.row] = [];
-        rowGroups[s.row].push(s);
-        seatMap.set(s.id, s);
-      });
-
-      // Sort rows alphabetically (A, B, C...)
-      const sortedRows = Object.keys(rowGroups).sort();
-      
-      let maxCols = 0;
-      const matrix = [];
-
-      sortedRows.forEach((rowKey, rIdx) => {
-        // Sort seats in row by seatNumber
-        const rowSeats = rowGroups[rowKey].sort((a,b) => a.seatNumber - b.seatNumber);
-        
-        // Find max seat number to determine columns
-        const maxNum = Math.max(...rowSeats.map(s => s.seatNumber));
-        if (maxNum > maxCols) maxCols = maxNum;
-
-        matrix.push({
-          rowName: rowKey,
-          seats: rowSeats
-        });
-      });
-
-      seatLayout = {
-        rows: sortedRows.length,
-        cols: maxCols,
-        matrix: matrix
-      };
-    }
-
-    function formatPrice(price) {
-      if (price === null || price === undefined) return 'Chưa đặt giá';
-      if (price === 0) return '0 ₫';
-      return `${new Intl.NumberFormat('vi-VN').format(price)} ₫`;
-    }
-
-    function escapeHtml(value) {
-      return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    }
-
-    function renderCategoryPriceLegend() {
-      const legend = document.getElementById('categoryPriceLegend');
-      const categories = new Map();
-
-      seats.forEach(seat => {
-        const categoryName = seat.categoryName || 'Không xác định';
-        if (!categories.has(categoryName)) {
-          categories.set(categoryName, { name: categoryName, price: seat.price });
-        }
-      });
-
-      if (categories.size === 0) {
-        legend.innerHTML = '<span class="text-xs font-semibold text-slate-500">Chưa có thông tin hạng ghế</span>';
-        return;
-      }
-
-      legend.innerHTML = `
-        <span class="text-xs font-extrabold text-slate-600 whitespace-nowrap">Hạng ghế:</span>
-        ${Array.from(categories.values())
-          .sort((left, right) => left.name.localeCompare(right.name, 'vi'))
-          .map(category => {
-            const color = getCategoryColor(category.name);
-            return `
-          <span class="category-price-chip">
-            <span
-              class="category-color-swatch"
-              style="background-color: ${color.background}; border-color: ${color.border};"
-              aria-hidden="true"></span>
-            ${escapeHtml(category.name)}: ${formatPrice(category.price)}
-          </span>
-        `;
-          }).join('')}`;
-    }
-
-    function buildCategoryColorMap() {
-      categoryColorMap = new Map();
-
-      const categoryNames = Array.from(new Set(
-        seats.map(seat => seat.categoryName || 'Không xác định')
-      )).sort((left, right) => left.localeCompare(right, 'vi'));
-
-      categoryNames.forEach((categoryName, index) => {
-        categoryColorMap.set(
-          categoryName,
-          CATEGORY_COLOR_PALETTE[index % CATEGORY_COLOR_PALETTE.length]
-        );
-      });
-    }
-
-    function getCategoryColor(categoryName) {
-      return categoryColorMap.get(categoryName || 'Không xác định')
-        || CATEGORY_COLOR_PALETTE[0];
-    }
-
-    // Set canvas internal resolution based on layout size
-    function setupCanvas() {
-      const width = MARGIN * 2 + (seatLayout.cols * SEAT_SIZE) + ((seatLayout.cols - 1) * SEAT_GAP) + 60; // +60 for row labels
-      const height = MARGIN * 2 + (seatLayout.rows * SEAT_SIZE) + ((seatLayout.rows - 1) * SEAT_GAP);
-
-      // Set internal resolution (Support Retina displays)
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      
-      // Set CSS display size
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-      container.style.width = `${width}px`;
-      container.style.height = `${height}px`;
-
-      ctx.scale(dpr, dpr);
-    }
-
-    // Main Draw Function (Only draws once per interaction, highly optimized)
-    function drawCanvas() {
-      // Clear
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // Draw screen/stage curve at top
-      ctx.beginPath();
-      ctx.moveTo(MARGIN + 60, MARGIN - 20);
-      ctx.quadraticCurveTo(
-        (canvas.style.width.replace('px','') / 2), MARGIN + 10, 
-        canvas.style.width.replace('px','') - MARGIN, MARGIN - 20
-      );
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 4;
-      ctx.stroke();
-      
-      ctx.fillStyle = '#64748b';
-      ctx.font = 'bold 14px "Plus Jakarta Sans"';
-      ctx.textAlign = 'center';
-      ctx.fillText('MÀN HÌNH / SÂN KHẤU', canvas.style.width.replace('px','') / 2 + 30, MARGIN - 25);
-
-      const startY = MARGIN + 40;
-
-      seatLayout.matrix.forEach((rowObj, rIdx) => {
-        const y = startY + rIdx * (SEAT_SIZE + SEAT_GAP);
-        
-        // Draw row label
-        ctx.fillStyle = '#64748b';
-        ctx.font = 'bold 14px "Plus Jakarta Sans"';
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(rowObj.rowName, MARGIN + 20, y + SEAT_SIZE/2);
-
-        // Draw seats
-        rowObj.seats.forEach(seat => {
-          // Calculate x position based on seatNumber (1-indexed)
-          const x = MARGIN + 50 + (seat.seatNumber - 1) * (SEAT_SIZE + SEAT_GAP);
-
-          // Save hit area to seat object for click detection
-          seat.hitArea = { x, y, w: SEAT_SIZE, h: SEAT_SIZE };
-
-          const isSelected = selectedSeatIds.has(seat.id);
-          const isMyHeld = myHeldSeatIds.has(seat.id);
-          const categoryColor = getCategoryColor(seat.categoryName);
-          
-          // Colors & Labels (Accessibility NFR: Symbols A, ✓, ★, H, X)
-          let bgColor, borderColor, textColor, symbol;
-          
-          if (isSelected) {
-            bgColor = '#10b981'; // Emerald 500
-            borderColor = '#059669';
-            textColor = '#ffffff';
-            symbol = '✓';
-          } else if (isMyHeld) {
-            // HELD BY CURRENT USER (Task T-33)
-            bgColor = '#fef3c7'; // Amber 100
-            borderColor = '#f59e0b'; // Amber 500
-            textColor = '#b45309'; // Amber 700
-            symbol = '★';
-          } else if (seat.status === 'AVAILABLE') {
-            bgColor = categoryColor.background;
-            borderColor = categoryColor.border;
-            textColor = categoryColor.text;
-            symbol = 'A';
-          } else if (seat.status === 'HELD') {
-            // HELD BY OTHER USER (Task T-33)
-            bgColor = '#fee2e2'; // Rose 100
-            borderColor = '#fca5a5'; // Rose 300
-            textColor = '#b91c1c'; // Rose 700
-            symbol = 'H';
-          } else { // SOLD
-            bgColor = '#e2e8f0'; // Slate 200
-            borderColor = '#cbd5e1';
-            textColor = '#64748b';
-            symbol = 'X';
-          }
-
-          // Draw seat rect
-          ctx.beginPath();
-          ctx.roundRect(x, y, SEAT_SIZE, SEAT_SIZE, 6);
-          ctx.fillStyle = bgColor;
-          ctx.fill();
-          ctx.lineWidth = isMyHeld ? 2 : 1;
-          ctx.strokeStyle = borderColor;
-          ctx.stroke();
-
-          // Draw symbol
-          ctx.fillStyle = textColor;
-          ctx.font = 'bold 14px "Plus Jakarta Sans"';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(symbol, x + SEAT_SIZE/2, y + SEAT_SIZE/2);
-        });
-      });
-    }
-
-    // --- Pan & Zoom Logic (Transforming CSS instead of redrawing Canvas is 60fps smooth) ---
-    
-    function applyTransform() {
-      hideSeatTooltip();
-      container.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-    }
-
-    function zoomIn() {
-      scale = Math.min(scale * 1.2, 3);
-      applyTransform();
-    }
-
-    function zoomOut() {
-      scale = Math.max(scale / 1.2, 0.3);
-      applyTransform();
-    }
-
-    function resetView() {
-      centerView();
-    }
-
-    function centerView() {
-      const wWidth = workspace.clientWidth;
-      const wHeight = workspace.clientHeight;
-      const cWidth = parseFloat(container.style.width);
-      const cHeight = parseFloat(container.style.height);
-
-      // Auto scale to fit width or height initially
-      const scaleX = (wWidth - 40) / cWidth;
-      const scaleY = (wHeight - 40) / cHeight;
-      scale = Math.min(scaleX, scaleY, 1); // Don't scale up above 1 on load
-
-      translateX = (wWidth - cWidth * scale) / 2;
-      translateY = (wHeight - cHeight * scale) / 2;
-      applyTransform();
-    }
-
-    // Mouse Events for Panning
-    workspace.addEventListener('mousedown', (e) => {
-      isDragging = true;
-      dragStartX = e.clientX - translateX;
-      dragStartY = e.clientY - translateY;
-    });
-
-    window.addEventListener('mousemove', (e) => {
-      if (!isDragging) {
-        updateSeatTooltipForPointer(e.clientX, e.clientY);
-        return;
-      }
-      hideSeatTooltip();
-      translateX = e.clientX - dragStartX;
-      translateY = e.clientY - dragStartY;
-      applyTransform();
-    });
-
-    window.addEventListener('mouseup', () => { isDragging = false; });
-    
-    // Touch Events for Mobile Panning
-    let initialPinchDistance = null;
-    let initialScale = 1;
-
-    workspace.addEventListener('touchstart', (e) => {
-      if (e.touches.length === 1) {
-        isDragging = true;
-        dragStartX = e.touches[0].clientX - translateX;
-        dragStartY = e.touches[0].clientY - translateY;
-      } else if (e.touches.length === 2) {
-        // Pinch zoom start
-        initialPinchDistance = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
-        );
-        initialScale = scale;
-      }
-    });
-
-    workspace.addEventListener('touchmove', (e) => {
-      e.preventDefault(); // prevent native scroll
-      if (e.touches.length === 1 && isDragging) {
-        translateX = e.touches[0].clientX - dragStartX;
-        translateY = e.touches[0].clientY - dragStartY;
-        applyTransform();
-      } else if (e.touches.length === 2 && initialPinchDistance) {
-        // Pinch zoom move
-        const currentDist = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
-        );
-        scale = Math.max(0.3, Math.min(initialScale * (currentDist / initialPinchDistance), 3));
-        applyTransform();
-      }
-    }, { passive: false });
-
-    workspace.addEventListener('touchend', () => {
-      isDragging = false;
-      initialPinchDistance = null;
-    });
-
-    // Mouse Wheel Zoom
-    workspace.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-      
-      // Zoom towards mouse pointer
-      const rect = workspace.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      const newScale = Math.max(0.3, Math.min(scale * zoomFactor, 3));
-      
-      // Adjust translation to zoom around cursor
-      translateX = mouseX - (mouseX - translateX) * (newScale / scale);
-      translateY = mouseY - (mouseY - translateY) * (newScale / scale);
-      scale = newScale;
-      
-      applyTransform();
-    }, { passive: false });
-
-    // --- Click Detection on Canvas ---
-    
-    // Click event for Canvas
-    // Using point distance to detect click vs drag
-    let mousedownPoint = {x: 0, y: 0};
-    
-    container.addEventListener('mousedown', (e) => {
-      mousedownPoint = { x: e.clientX, y: e.clientY };
-    });
-
-    container.addEventListener('mouseup', (e) => {
-      const dist = Math.hypot(e.clientX - mousedownPoint.x, e.clientY - mousedownPoint.y);
-      if (dist > 5) return; // It was a drag, not a click
-
-      const rect = container.getBoundingClientRect();
-      // Calculate coordinates inside the unscaled canvas
-      const x = (e.clientX - rect.left) / scale;
-      const y = (e.clientY - rect.top) / scale;
-
-      handleCanvasClick(x, y, e.clientX, e.clientY);
-    });
-
-    // Accessibility Hover Tooltip (Task T-33)
-    const tooltipEl = document.getElementById('seatTooltip');
-    container.addEventListener('mousemove', (e) => {
-      if (isDragging) {
-        if (tooltipEl) tooltipEl.classList.add('hidden');
-        return;
-      }
-
-      const rect = container.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / scale;
-      const y = (e.clientY - rect.top) / scale;
-
-      let hoveredSeat = null;
-      for (const seat of seats) {
-        const h = seat.hitArea;
-        if (h && x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) {
-          hoveredSeat = seat;
-          break;
-        }
-      }
-
-      if (hoveredSeat && tooltipEl) {
-        const seatLabel = `${hoveredSeat.row}${hoveredSeat.seatNumber}`;
-        const priceFmt = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(hoveredSeat.price);
-
-        let desc = '';
-        if (selectedSeatIds.has(hoveredSeat.id)) {
-          desc = `Ghế ${seatLabel} - Đang chọn (${priceFmt})`;
-        } else if (myHeldSeatIds.has(hoveredSeat.id)) {
-          desc = `Ghế ${seatLabel} - Đang được bạn giữ (Bấm để huỷ giữ)`;
-        } else if (hoveredSeat.status === 'AVAILABLE') {
-          desc = `Ghế ${seatLabel} - Còn trống (${priceFmt})`;
-        } else if (hoveredSeat.status === 'HELD') {
-          desc = `Ghế ${seatLabel} - Người khác đang giữ`;
-        } else {
-          desc = `Ghế ${seatLabel} - Đã bán`;
-        }
-
-        tooltipEl.textContent = desc;
-        tooltipEl.style.left = `${e.clientX + 14}px`;
-        tooltipEl.style.top = `${e.clientY + 14}px`;
-        tooltipEl.classList.remove('hidden');
-        container.style.cursor = (hoveredSeat.status === 'AVAILABLE' || myHeldSeatIds.has(hoveredSeat.id)) ? 'pointer' : 'not-allowed';
-      } else {
-        if (tooltipEl) tooltipEl.classList.add('hidden');
-        container.style.cursor = isDragging ? 'grabbing' : 'grab';
-      }
-    });
-
-    container.addEventListener('mouseleave', () => {
-      if (tooltipEl) tooltipEl.classList.add('hidden');
-    });
-
-    // Mobile click support
-    let touchStartPoint = {x: 0, y: 0};
-    container.addEventListener('touchstart', (e) => {
-      if(e.touches.length === 1) {
-        touchStartPoint = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      }
-    });
-
-    container.addEventListener('touchend', (e) => {
-      if(e.changedTouches.length === 1) {
-        const touch = e.changedTouches[0];
-        const dist = Math.hypot(touch.clientX - touchStartPoint.x, touch.clientY - touchStartPoint.y);
-        if (dist > 10) return; // Dragged
-
-        const rect = container.getBoundingClientRect();
-        const x = (touch.clientX - rect.left) / scale;
-        const y = (touch.clientY - rect.top) / scale;
-
-        handleCanvasClick(x, y, touch.clientX, touch.clientY);
-      }
-    });
-
-    function findSeatAt(x, y) {
-      return seats.find(seat => {
-        const h = seat.hitArea;
-        return h && x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h;
-      });
-    }
-
-    function updateSeatTooltipForPointer(clientX, clientY) {
-      const rect = container.getBoundingClientRect();
-      if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
-        hideSeatTooltip();
-        return;
-      }
-
-      const x = (clientX - rect.left) / scale;
-      const y = (clientY - rect.top) / scale;
-      const seat = findSeatAt(x, y);
-
-      if (seat) {
-        showSeatTooltip(seat, clientX, clientY);
-      } else {
-        hideSeatTooltip();
-      }
-    }
-
-    function showSeatTooltip(seat, clientX, clientY) {
-      const tooltip = document.getElementById('seatTooltip');
-      const workspaceRect = workspace.getBoundingClientRect();
-      const categoryColor = getCategoryColor(seat.categoryName);
-      tooltip.innerHTML = `
-        <strong>Ghế ${escapeHtml(seat.row)}${seat.seatNumber}</strong><br>
-        <span class="tooltip-category-row">
-          <span
-            class="tooltip-category-swatch"
-            style="background-color: ${categoryColor.background}; border-color: ${categoryColor.border};"
-            aria-hidden="true"></span>
-          Hạng: ${escapeHtml(seat.categoryName)}
-        </span><br>
-        Giá: ${formatPrice(seat.price)}`;
-      tooltip.style.display = 'block';
-
-      const maxLeft = Math.max(8, workspace.clientWidth - tooltip.offsetWidth - 8);
-      const maxTop = Math.max(8, workspace.clientHeight - tooltip.offsetHeight - 8);
-      tooltip.style.left = `${Math.min(clientX - workspaceRect.left + 14, maxLeft)}px`;
-      tooltip.style.top = `${Math.min(clientY - workspaceRect.top + 14, maxTop)}px`;
-    }
-
-    function hideSeatTooltip() {
-      document.getElementById('seatTooltip').style.display = 'none';
-    }
-
-    function handleCanvasClick(x, y, clientX, clientY) {
-      const seat = findSeatAt(x, y);
-      if (!seat) {
-        hideSeatTooltip();
-        return;
-      }
-
-      showSeatTooltip(seat, clientX, clientY);
-      toggleSeat(seat);
-    }
-
-    function toggleSeat(seat) {
-      if (seat.status === 'SOLD') return;
-
-      // NFR (T-26): Bấm lại ghế đang giữ thì gọi T-25 và đổi màu ghế ngay tại chỗ không tải lại trang
-      if (seat.status === 'HELD') {
-        if (myHeldSeatIds.has(seat.id)) {
-          releaseHeldSeat(seat.id);
-        } else {
-          alert("Ghế này đang được giữ chỗ bởi người dùng khác.");
-        }
-        return;
-      }
-
-      if (seat.status === 'AVAILABLE') {
-        if (selectedSeatIds.has(seat.id)) {
-          selectedSeatIds.delete(seat.id);
-        } else {
-          if (selectedSeatIds.size + myHeldSeatIds.size >= 10) {
-            alert("Bạn chỉ được chọn tối đa 10 ghế mỗi lần.");
-            return;
-          }
-          selectedSeatIds.add(seat.id);
-        }
-        
-        // Cập nhật Canvas và Cart ngay tại chỗ không tải lại trang
-        drawCanvas();
-        updateCart();
-      }
-    }
-
-    // Bỏ chọn ghế đang chọn nháp (Task T-26)
-    function deselectSeat(seatId) {
-      if (selectedSeatIds.has(seatId)) {
-        selectedSeatIds.delete(seatId);
-        drawCanvas();
-        updateCart();
-      }
-    }
-
-    // Huỷ giữ ghế đã giữ trên Server via T-25 API (Task T-26)
-    async function releaseHeldSeat(seatId) {
-      const seat = seatMap.get(seatId);
-      if (!seat) return;
-
-      try {
-        const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-        const headers = { 'Content-Type': 'application/json' };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const response = await fetch(`/api/showtimes/${showtimeId}/seats/${seatId}/hold`, {
-          method: 'DELETE',
-          headers: headers
-        });
-
-        const json = await response.json();
-
-        if (response.status === 200 && json.success) {
-          // 1. Cập nhật trạng thái ghế trong bộ nhớ tại chỗ (không tải lại trang)
-          seat.status = 'AVAILABLE';
-          myHeldSeatIds.delete(seatId);
-
-          // 2. Đổi màu ghế ngay tại chỗ trên Canvas
-          drawCanvas();
-
-          // 3. Cập nhật tổng tiền tạm tính và danh sách ghế
-          updateCart();
-
-          // 4. Ẩn đồng hồ khi hết ghế đang giữ
-          if (myHeldSeatIds.size === 0) {
-            stopHoldCountdown();
-          }
-        } else if (response.status === 401) {
-          alert("Vui lòng đăng nhập để huỷ giữ ghế.");
-          window.location.href = `./login.html?redirect=${encodeURIComponent(window.location.href)}`;
-        } else {
-          alert("Lỗi huỷ giữ ghế: " + (json.message || "Không thể huỷ giữ ghế"));
-        }
-      } catch (err) {
-        console.error("[T-25] Lỗi huỷ giữ ghế:", err);
-        alert("Không thể kết nối máy chủ để huỷ giữ ghế.");
-      }
-    }
-
-    function updateCart() {
-      const countEl = document.getElementById('selectedCount');
-      const priceEl = document.getElementById('totalPrice');
-      const btnEl = document.getElementById('btnBook');
-      const containerEl = document.getElementById('selectedSeatsContainer');
-      const listEl = document.getElementById('selectedSeatsList');
-
-      const totalCount = selectedSeatIds.size + myHeldSeatIds.size;
-      countEl.textContent = totalCount;
-      
-      let total = 0;
-      let hasMissingPrice = false;
-      let listHtml = '';
-
-      // Hiển thị các ghế đang chọn nháp (Màu xanh Emerald)
-      selectedSeatIds.forEach(id => {
-        const seat = seatMap.get(id);
-        if (seat) {
-          if (seat.price === null || seat.price === undefined) hasMissingPrice = true;
-          else total += seat.price;
-          const seatLabel = `${seat.row}${seat.seatNumber}`;
-          listHtml += `
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-full text-xs font-bold shadow-sm transition hover:bg-emerald-100">
-              <span>${seatLabel}</span>
-              <button onclick="deselectSeat('${id}')" class="w-4 h-4 rounded-full flex items-center justify-center hover:bg-emerald-200 text-emerald-800 transition" title="Bỏ chọn ghế ${seatLabel}">
-                <i class="fa-solid fa-xmark text-xs"></i>
-              </button>
-            </span>`;
-        }
-      });
-
-      // Hiển thị các ghế đang giữ trên Server (Màu vàng Amber)
-      myHeldSeatIds.forEach(id => {
-        const seat = seatMap.get(id);
-        if (seat) {
-          if (seat.price === null || seat.price === undefined) hasMissingPrice = true;
-          else total += seat.price;
-          const seatLabel = `${seat.row}${seat.seatNumber}`;
-          listHtml += `
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded-full text-xs font-bold shadow-sm transition hover:bg-amber-100">
-              <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-              <span>${seatLabel} (Đang giữ)</span>
-              <button onclick="releaseHeldSeat('${id}')" class="w-4 h-4 rounded-full flex items-center justify-center hover:bg-amber-200 text-amber-950 transition" title="Huỷ giữ ghế ${seatLabel}">
-                <i class="fa-solid fa-xmark text-xs"></i>
-              </button>
-            </span>`;
-        }
-      });
-
-      priceEl.textContent = hasMissingPrice ? 'Chưa đặt giá' : formatPrice(total);
-
-      if (listEl) listEl.innerHTML = listHtml;
-
-      if (containerEl) {
-        if (totalCount > 0) {
-          containerEl.classList.remove('hidden');
-        } else {
-          containerEl.classList.add('hidden');
-        }
-      }
-
-      if (selectedSeatIds.size > 0) {
-        btnEl.disabled = false;
-        btnEl.querySelector('span').textContent = 'Tiếp tục thanh toán';
-      } else if (myHeldSeatIds.size > 0) {
-        btnEl.disabled = false;
-        btnEl.querySelector('span').textContent = 'Xác nhận thanh toán';
-      } else {
-        btnEl.disabled = true;
-        btnEl.querySelector('span').textContent = 'Tiếp tục thanh toán';
-      }
-    }
-
-    // --- Task T-24 / T-33: Countdown Timer & Server Time Calibration ---
+    let selectedSeatIds = new Set();  // Ghế chọn nháp trên client
+    let myHeldSeatIds = new Set();    // Ghế đã giữ trên server bởi user này
+    let currentZoom = 1.0;
+
+    // Timer state
     let holdTimerInterval = null;
     let holdRefServerTimeMs = 0;
     let holdRefLocalPerfMs = 0;
     let holdExpiresAtMs = 0;
-    let isHoldExpiredRefreshed = false;
+    const DEFAULT_HOLD_DURATION_SECONDS = 10 * 60; // 10 minutes (600 seconds)
 
-    // --- Task T-33: Khôi phục ghế đang giữ và countdown từ T-32 API ---
-    async function restoreHeldSeats() {
-      const errBanner = document.getElementById('errorBanner');
-      if (errBanner) errBanner.classList.add('hidden');
+    // Format currency
+    function formatCurrency(amount) {
+      if (!amount) return '0 ₫';
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    }
 
-      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-      // Nếu user chưa đăng nhập thì không có giữ chỗ cá nhân nào
-      if (!token) {
-        myHeldSeatIds.clear();
-        stopHoldCountdown();
-        updateCart();
-        drawCanvas();
-        return;
+    // Format date string
+    function formatDateTimeFull(isoString) {
+      if (!isoString) return '';
+      const d = new Date(isoString);
+      const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+      const dayName = days[d.getDay()];
+      const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      const date = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+      return `${time}, ${dayName} ${date}`;
+    }
+
+    // Toast helpers
+    function showConflictToast(msg) {
+      const toastWrapper = document.getElementById('conflict-toast-wrapper');
+      const toastMsg = document.getElementById('conflict-toast-msg');
+      if (toastWrapper && toastMsg) {
+        toastMsg.textContent = msg;
+        toastWrapper.classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    function hideConflictToast() {
+      const toastWrapper = document.getElementById('conflict-toast-wrapper');
+      if (toastWrapper) toastWrapper.classList.add('hidden');
+    }
+
+    function showSuccessToast(msg) {
+      const toastWrapper = document.getElementById('success-toast-wrapper');
+      const toastMsg = document.getElementById('success-toast-msg');
+      if (toastWrapper && toastMsg) {
+        toastMsg.textContent = msg;
+        toastWrapper.classList.remove('hidden');
+        setTimeout(() => hideSuccessToast(), 6000);
+      }
+    }
+
+    function hideSuccessToast() {
+      const toastWrapper = document.getElementById('success-toast-wrapper');
+      if (toastWrapper) toastWrapper.classList.add('hidden');
+    }
+
+    // Auth Navigation state
+    function renderAuthNav() {
+      const container = document.getElementById('navAuthContainer');
+      const token = getValidToken();
+      const userStr = localStorage.getItem('user_info');
+
+      if (token && userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          const roles = (user.roles || []).map(r => (r || '').toLowerCase());
+          const isAdmin = roles.includes('admin');
+          const isOrganizer = roles.includes('organizer') || roles.includes('staff');
+
+          let portalLink = '';
+          if (isAdmin) {
+            portalLink = `
+              <a href="./admin-users.html" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold hover:bg-amber-200 transition">
+                <span class="material-symbols-outlined text-[16px]">manage_accounts</span>
+                <span>Quản trị</span>
+              </a>
+            `;
+          } else if (isOrganizer) {
+            portalLink = `
+              <a href="./events.html" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-xs font-bold hover:bg-secondary-fixed-dim transition">
+                <span class="material-symbols-outlined text-[16px]">domain</span>
+                <span>Quản trị sự kiện</span>
+              </a>
+            `;
+          }
+
+          container.innerHTML = `
+            ${portalLink}
+            <div class="flex items-center gap-2 pl-2 border-l border-surface-container-high">
+              <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm">
+                <span class="material-symbols-outlined text-[18px]">person</span>
+              </div>
+              <div class="text-left hidden sm:block">
+                <div class="text-xs font-bold text-on-surface leading-tight">${user.fullName || user.username}</div>
+                <div class="text-[11px] text-outline">${roles[0] || 'Khách hàng'}</div>
+              </div>
+              <button onclick="handleLogout()" title="Đăng xuất" class="p-1.5 text-on-surface-variant hover:text-error transition rounded-lg hover:bg-surface-container-high ml-1">
+                <span class="material-symbols-outlined text-[18px]">logout</span>
+              </button>
+            </div>
+          `;
+          return;
+        } catch {}
       }
 
+      const returnUrl = encodeURIComponent(window.location.href);
+      container.innerHTML = `
+        <a href="./login.html?returnUrl=${returnUrl}" class="px-4 py-2 rounded-lg text-sm font-semibold text-primary bg-primary-fixed/40 hover:bg-primary-fixed transition">
+          Đăng nhập
+        </a>
+        <a href="./register.html?returnUrl=${returnUrl}" class="px-4 py-2 rounded-lg text-sm font-bold text-white bg-primary hover:bg-on-primary-fixed-variant transition shadow-sm">
+          Đăng ký
+        </a>
+      `;
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user_info');
+      renderAuthNav();
+    }
+
+    // Modal Helpers
+    function openLoginModal(customMsg) {
+      if (customMsg) {
+        const msgEl = document.getElementById('loginModalMsg');
+        if (msgEl) msgEl.textContent = customMsg;
+      }
+      const modal = document.getElementById('loginRequiredModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    }
+
+    function closeLoginModal() {
+      const modal = document.getElementById('loginRequiredModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    function goToLoginWithPendingSeats() {
+      savePendingSeats();
+      window.location.href = `./login.html?returnUrl=${encodeURIComponent(window.location.href)}`;
+    }
+
+    function goToRegisterWithPendingSeats() {
+      savePendingSeats();
+      window.location.href = `./register.html?returnUrl=${encodeURIComponent(window.location.href)}`;
+    }
+
+    function openExpiredModal() {
+      const modal = document.getElementById('holdExpiredModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    }
+
+    function closeExpiredModal() {
+      const modal = document.getElementById('holdExpiredModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+      window.scrollTo({ top: 300, behavior: 'smooth' });
+    }
+
+    function savePendingSeats() {
+      if (selectedSeatIds.size > 0 && showtimeId) {
+        sessionStorage.setItem(`pending_seats_${showtimeId}`, JSON.stringify(Array.from(selectedSeatIds)));
+      }
+    }
+
+    function restorePendingSeats() {
       try {
-        const response = await fetch(`/api/showtimes/${showtimeId}/seats/my-holds`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+        if (!showtimeId) return;
+        const saved = sessionStorage.getItem(`pending_seats_${showtimeId}`);
+        if (!saved) return;
+        const ids = JSON.parse(saved);
+        if (Array.isArray(ids) && ids.length > 0) {
+          let count = 0;
+          ids.forEach(id => {
+            const s = seatMap.get(id);
+            if (s && s.status === 'AVAILABLE') {
+              selectedSeatIds.add(id);
+              updateSeatButtonState(id);
+              count++;
+            }
+          });
+          if (count > 0) {
+            updateCartPanel();
+            showSuccessToast(`Đã tự động khôi phục ${count} vị trí ghế bạn vừa chọn!`);
+          }
+        }
+        sessionStorage.removeItem(`pending_seats_${showtimeId}`);
+      } catch (e) {
+        console.warn("Không thể khôi phục ghế chọn nháp:", e);
+      }
+    }
+
+    // --- 2. Zoom Controls ---
+    function zoomIn() {
+      if (currentZoom < 1.4) {
+        currentZoom = +(currentZoom + 0.1).toFixed(2);
+        applyZoom();
+      }
+    }
+
+    function zoomOut() {
+      if (currentZoom > 0.7) {
+        currentZoom = +(currentZoom - 0.1).toFixed(2);
+        applyZoom();
+      }
+    }
+
+    function resetZoom() {
+      currentZoom = 1.0;
+      applyZoom();
+    }
+
+    function applyZoom() {
+      const wrapper = document.getElementById('seatMatrixWrapper');
+      if (wrapper) {
+        wrapper.style.transform = `scale(${currentZoom})`;
+      }
+    }
+
+    // --- 3. Fetch Data ---
+    async function loadEventInfo() {
+      try {
+        if (eventId && showtimeId) {
+          const res = await fetch(`${API_BASE}/api/public/events/${eventId}/showtimes/${showtimeId}`).catch(() => null);
+          if (res && res.ok) {
+            const json = await res.json();
+            if (json.success && json.data) {
+              applyEventDetails(json.data);
+              return;
+            }
+          }
+        }
+
+        if (eventId) {
+          const res = await fetch(`${API_BASE}/api/public/events/${eventId}`).catch(() => null);
+          if (res && res.ok) {
+            const json = await res.json();
+            if (json.success && json.data) {
+              applyEventDetails(json.data);
+              return;
+            }
+          }
+        }
+
+        // Fallback: Tìm từ public showtimes
+        const resList = await fetch(`${API_BASE}/api/public/showtimes?limit=50`).catch(() => null);
+        if (resList && resList.ok) {
+          const json = await resList.json();
+          const items = (json.data && json.data.items) ? json.data.items : [];
+          const found = items.find(s => s.id === showtimeId || s.eventId === eventId);
+          if (found) {
+            applyEventDetails(found);
+          }
+        }
+      } catch (err) {
+        console.warn("Lỗi tải thông tin sự kiện:", err);
+      }
+    }
+
+    function applyEventDetails(data) {
+      const title = data.eventTitle || data.title || 'Live Concert Series';
+      document.title = `${title} - Chọn Ghế | EventPulse`;
+      document.getElementById('pageTitle').textContent = `${title} - Chọn Ghế | EventPulse`;
+      document.getElementById('eventContextTitle').textContent = title;
+
+      if (data.startTime) {
+        document.getElementById('eventContextDate').textContent = formatDateTimeFull(data.startTime);
+      }
+
+      const loc = data.eventLocation || data.location || 'Hà Nội';
+      document.getElementById('eventContextLocation').textContent = loc;
+      document.getElementById('hallName').textContent = loc.split('-')[0].trim() || 'Khán phòng Tầng 1';
+
+      const organizer = data.organizerName || 'Live Nation VN & EventPulse';
+      document.getElementById('organizerNameMini').textContent = organizer;
+
+      // Update back button link
+      if (data.eventId || eventId) {
+        const evId = data.eventId || eventId;
+        document.getElementById('btnBackToEvent').href = `./event-info.html?id=${evId}&showtimeId=${showtimeId || ''}`;
+      }
+    }
+
+    async function loadSeats() {
+      const loading = document.getElementById('seatGridLoading');
+      const loadedArea = document.getElementById('seatGridLoadedArea');
+
+      loading.classList.remove('hidden');
+      loadedArea.classList.add('hidden');
+
+      try {
+        const res = await fetch(`${API_BASE}/api/public/showtimes/${showtimeId}/seats`);
+        const json = await res.json();
+
+        if (json.success && Array.isArray(json.data)) {
+          allSeats = json.data;
+          seatMap.clear();
+          allSeats.forEach(s => seatMap.set(s.id, s));
+
+          renderSeatMatrix();
+          renderTierPills();
+
+          loading.classList.add('hidden');
+          loadedArea.classList.remove('hidden');
+          loadedArea.classList.add('flex');
+        } else {
+          loading.innerHTML = `
+            <div class="text-error font-bold mb-2">Không thể tải sơ đồ ghế</div>
+            <p class="text-sm text-on-surface-variant">${json.message || 'Vui lòng kiểm tra lại liên kết hoặc thử lại sau.'}</p>
+          `;
+        }
+      } catch (err) {
+        console.error("Lỗi kết nối khi tải ghế:", err);
+        loading.innerHTML = `
+          <div class="text-error font-bold mb-2">Lỗi kết nối máy chủ</div>
+          <button onclick="loadSeats()" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold shadow-md hover:bg-primary-container transition mt-2">
+            Thử lại
+          </button>
+        `;
+      }
+    }
+
+    // --- 4. Render Seat Matrix (HTML / Tailwind Grid chuẩn đẹp) ---
+    function renderSeatMatrix() {
+      const rowsContainer = document.getElementById('seatMatrixRows');
+      const colHeader = document.getElementById('columnHeaderIndex');
+      rowsContainer.innerHTML = '';
+      colHeader.innerHTML = '';
+
+      // Group seats by Row (A, B, C...)
+      const rowGroups = {};
+      allSeats.forEach(s => {
+        if (!rowGroups[s.row]) rowGroups[s.row] = [];
+        rowGroups[s.row].push(s);
+      });
+
+      const sortedRowKeys = Object.keys(rowGroups).sort();
+
+      // Find max seat numbers for column header
+      let maxSeatNum = 0;
+      allSeats.forEach(s => {
+        if (s.seatNumber > maxSeatNum) maxSeatNum = s.seatNumber;
+      });
+
+      // Render Column Header Index (01, 02, 03... with Aisle)
+      const aisleIndex1 = Math.floor(maxSeatNum / 3);
+      const aisleIndex2 = Math.floor(maxSeatNum * 2 / 3);
+
+      for (let i = 1; i <= maxSeatNum; i++) {
+        const numStr = String(i).padStart(2, '0');
+        const colDiv = document.createElement('div');
+        colDiv.className = "w-7 text-center font-code-mono text-label-sm text-outline";
+        colDiv.textContent = numStr;
+        colHeader.appendChild(colDiv);
+
+        if (i === aisleIndex1 || i === aisleIndex2) {
+          const sep = document.createElement('div');
+          sep.className = "w-6 text-center text-outline/30 font-code-mono text-label-sm";
+          sep.textContent = "|";
+          colHeader.appendChild(sep);
+        }
+      }
+
+      // Identify categories per row to show Section Banners
+      let lastCategoryName = null;
+
+      sortedRowKeys.forEach((rowKey) => {
+        const rowSeats = rowGroups[rowKey].sort((a, b) => a.seatNumber - b.seatNumber);
+        const firstSeat = rowSeats[0];
+        const categoryName = firstSeat ? (firstSeat.categoryName || 'Tiêu chuẩn') : 'Tiêu chuẩn';
+        const price = firstSeat ? (firstSeat.price || 0) : 0;
+
+        // Nếu chuyển sang hạng ghế mới hoặc đầu danh sách: vẽ Section Banner
+        if (categoryName !== lastCategoryName) {
+          lastCategoryName = categoryName;
+          const banner = createSectionBanner(categoryName, price, rowKey);
+          rowsContainer.appendChild(banner);
+        }
+
+        // Vẽ Row
+        const rowDiv = document.createElement('div');
+        rowDiv.className = "flex items-center gap-1.5 group";
+
+        // Row label letter (A, B, C...)
+        const labelDiv = document.createElement('div');
+        labelDiv.className = "w-7 h-7 flex items-center justify-center font-bold text-on-surface font-code-mono text-body-sm";
+        labelDiv.textContent = rowKey;
+        rowDiv.appendChild(labelDiv);
+
+        // Render each seat in row
+        rowSeats.forEach((seat) => {
+          const seatBtn = createSeatButton(seat);
+          rowDiv.appendChild(seatBtn);
+
+          // Lối đi (Aisle)
+          if (seat.seatNumber === aisleIndex1 || seat.seatNumber === aisleIndex2) {
+            const aisleDiv = document.createElement('div');
+            aisleDiv.className = "w-6 text-center text-outline-variant text-[11px] font-code-mono";
+            rowDiv.appendChild(aisleDiv);
           }
         });
 
-        // 401: Token hết hạn hoặc chưa đăng nhập hợp lệ
-        if (response.status === 401) {
-          myHeldSeatIds.clear();
-          stopHoldCountdown();
-          updateCart();
-          drawCanvas();
+        rowsContainer.appendChild(rowDiv);
+      });
+    }
+
+    function createSectionBanner(categoryName, price, startRow) {
+      const banner = document.createElement('div');
+      
+      const isVip = categoryName.toLowerCase().includes('vip');
+      const isStandard = categoryName.toLowerCase().includes('standard') || categoryName.toLowerCase().includes('thường') || categoryName.toLowerCase().includes('b');
+
+      if (isVip) {
+        banner.className = "w-full flex items-center justify-between px-3 py-1 bg-amber-500/10 rounded-md mt-2 border border-amber-500/20";
+        banner.innerHTML = `
+          <span class="font-label-sm text-label-sm text-amber-700 font-bold tracking-wider flex items-center gap-1">
+            <span class="material-symbols-outlined text-[16px] text-amber-600">crown</span>
+            <span>KHU VỰC ${categoryName.toUpperCase()} (${formatCurrency(price)})</span>
+          </span>
+          <span class="font-code-mono text-label-sm text-amber-700 font-semibold">Khu vực ưu tiên</span>
+        `;
+      } else if (isStandard) {
+        banner.className = "w-full flex items-center justify-between px-3 py-1 bg-tertiary-fixed/30 rounded-md mt-2 border border-tertiary/20";
+        banner.innerHTML = `
+          <span class="font-label-sm text-label-sm text-tertiary font-bold tracking-wider flex items-center gap-1">
+            <span class="material-symbols-outlined text-[16px] text-tertiary">confirmation_number</span>
+            <span>KHU VỰC ${categoryName.toUpperCase()} (${formatCurrency(price)})</span>
+          </span>
+          <span class="font-code-mono text-label-sm text-tertiary font-semibold">Khán phòng trung tâm</span>
+        `;
+      } else {
+        banner.className = "w-full flex items-center justify-between px-3 py-1 bg-primary/10 rounded-md mt-2 border border-primary/20";
+        banner.innerHTML = `
+          <span class="font-label-sm text-label-sm text-primary font-bold tracking-wider flex items-center gap-1">
+            <span class="material-symbols-outlined text-[16px] text-primary">star</span>
+            <span>KHU VỰC ${categoryName.toUpperCase()} (${formatCurrency(price)})</span>
+          </span>
+          <span class="font-code-mono text-label-sm text-primary font-semibold">Tầm nhìn tiêu chuẩn</span>
+        `;
+      }
+
+      return banner;
+    }
+
+    function createSeatButton(seat) {
+      const btn = document.createElement('button');
+      const numStr = String(seat.seatNumber).padStart(2, '0');
+      const seatLabel = `${seat.row}${numStr}`;
+      const isSelected = selectedSeatIds.has(seat.id);
+      const isMyHeld = myHeldSeatIds.has(seat.id);
+
+      btn.id = `seat-btn-${seat.id}`;
+      btn.setAttribute('data-seat-id', seat.id);
+
+      const categoryName = seat.categoryName || 'Standard';
+      const isVip = categoryName.toLowerCase().includes('vip');
+      const isStandard = categoryName.toLowerCase().includes('standard') || categoryName.toLowerCase().includes('thường') || categoryName.toLowerCase().includes('b');
+
+      if (isSelected) {
+        // ĐANG CHỌN (SELECTED)
+        btn.className = "w-7 h-7 rounded bg-primary text-on-primary font-code-mono text-[11px] font-bold flex items-center justify-center shadow-[0_0_0_2px_#ffffff,0_0_0_4px_#4f46e5] relative transition-transform hover:scale-110 active:scale-95";
+        btn.title = `Ghế ${seatLabel} • ${categoryName} • ${formatCurrency(seat.price)} (Đã chọn)`;
+        btn.innerHTML = `<span class="material-symbols-outlined text-[16px]">check</span>`;
+        btn.onclick = () => toggleSeatClick(seat);
+      } else if (isMyHeld) {
+        // BẠN ĐANG GIỮ (MY HELD)
+        btn.className = "w-7 h-7 rounded bg-amber-100 text-amber-900 font-code-mono text-[11px] font-bold flex items-center justify-center shadow-[inset_0_0_0_1.5px_#f59e0b] relative transition-transform hover:scale-110 active:scale-95";
+        btn.title = `Ghế ${seatLabel} • ${categoryName} • ${formatCurrency(seat.price)} (Bạn đang giữ chỗ 10 phút)`;
+        btn.innerHTML = `<span class="material-symbols-outlined text-[14px] text-amber-700 animate-pulse">lock</span>`;
+        btn.onclick = () => toggleSeatClick(seat);
+      } else if (seat.status === 'HELD') {
+        // NGƯỜI KHÁC ĐANG GIỮ
+        btn.className = "w-7 h-7 rounded bg-amber-100 text-amber-800 font-code-mono text-[11px] flex items-center justify-center cursor-not-allowed opacity-80 bg-[repeating-linear-gradient(45deg,#fef3c7,#fef3c7_4px,#fde68a_4px,#fde68a_8px)]";
+        btn.title = `Ghế ${seatLabel} • Đang được giữ bởi khán giả khác`;
+        btn.disabled = true;
+        btn.innerHTML = `<span class="material-symbols-outlined text-[14px]">lock</span>`;
+      } else if (seat.status === 'SOLD') {
+        // ĐÃ BÁN (SOLD OUT)
+        btn.className = "w-7 h-7 rounded bg-surface-container-high text-outline font-code-mono text-[11px] flex items-center justify-center cursor-not-allowed opacity-50";
+        btn.title = `Ghế ${seatLabel} • Đã bán`;
+        btn.disabled = true;
+        btn.textContent = "✕";
+      } else {
+        // CÒN TRỐNG (AVAILABLE)
+        if (isVip) {
+          btn.className = "w-7 h-7 rounded bg-amber-50 text-amber-900 font-code-mono text-[11px] font-semibold flex items-center justify-center shadow-[inset_0_0_0_1.5px_#f59e0b] hover:bg-amber-400 hover:text-white transition-all transform hover:scale-110 active:scale-95";
+        } else if (isStandard) {
+          btn.className = "w-7 h-7 rounded bg-emerald-50 text-emerald-900 font-code-mono text-[11px] font-semibold flex items-center justify-center shadow-[inset_0_0_0_1.5px_#0d9488] hover:bg-emerald-600 hover:text-white transition-all transform hover:scale-110 active:scale-95";
+        } else {
+          btn.className = "w-7 h-7 rounded bg-surface-container-lowest text-primary font-code-mono text-[11px] font-semibold flex items-center justify-center shadow-[inset_0_0_0_1.5px_#4f46e5] hover:bg-primary hover:text-white transition-all transform hover:scale-110 active:scale-95";
+        }
+        btn.title = `Ghế ${seatLabel} • ${categoryName} • ${formatCurrency(seat.price)}`;
+        btn.textContent = numStr;
+        btn.onclick = () => toggleSeatClick(seat);
+      }
+
+      return btn;
+    }
+
+    function renderTierPills() {
+      const container = document.getElementById('ticketTiersSummaryPills');
+      if (!container) return;
+      container.innerHTML = '';
+
+      // Group categories
+      const catMap = new Map();
+      allSeats.forEach(s => {
+        const name = s.categoryName || 'Tiêu chuẩn';
+        if (!catMap.has(name) || (s.price && s.price > 0 && !catMap.get(name).price)) {
+          catMap.set(name, { name, price: s.price || 0 });
+        }
+      });
+
+      catMap.forEach(item => {
+        const pill = document.createElement('div');
+        const isVip = item.name.toLowerCase().includes('vip');
+        const isStandard = item.name.toLowerCase().includes('standard') || item.name.toLowerCase().includes('thường') || item.name.toLowerCase().includes('b');
+
+        if (isVip) {
+          pill.className = "flex items-center gap-1.5 px-3 py-1 rounded-lg text-amber-800 bg-amber-50 border border-amber-200";
+          pill.innerHTML = `
+            <span class="material-symbols-outlined text-[16px] text-amber-600">crown</span>
+            <span class="font-bold">${item.name}:</span>
+            <span>${formatCurrency(item.price)}</span>
+          `;
+        } else if (isStandard) {
+          pill.className = "flex items-center gap-1.5 px-3 py-1 rounded-lg text-tertiary bg-tertiary-fixed/40 border border-tertiary/20";
+          pill.innerHTML = `
+            <span class="material-symbols-outlined text-[16px]">confirmation_number</span>
+            <span class="font-bold">${item.name}:</span>
+            <span>${formatCurrency(item.price)}</span>
+          `;
+        } else {
+          pill.className = "flex items-center gap-1.5 px-3 py-1 rounded-lg text-primary bg-primary-fixed/50 border border-primary/20";
+          pill.innerHTML = `
+            <span class="material-symbols-outlined text-[16px]">stars</span>
+            <span class="font-bold">${item.name}:</span>
+            <span>${formatCurrency(item.price)}</span>
+          `;
+        }
+        container.appendChild(pill);
+      });
+    }
+
+    // --- 5. Seat Click & Cart Logic ---
+    function toggleSeatClick(seat) {
+      if (seat.status === 'SOLD') return;
+
+      // Nếu đang là ghế bạn đang giữ trên server: bấm lại để hủy giữ
+      if (myHeldSeatIds.has(seat.id)) {
+        releaseSingleHold(seat.id);
+        return;
+      }
+
+      // Nếu là ghế đang giữ bởi người khác
+      if (seat.status === 'HELD' && !myHeldSeatIds.has(seat.id)) {
+        showConflictToast(`Ghế ${seat.row}${seat.seatNumber} đang được giữ chỗ bởi khán giả khác.`);
+        return;
+      }
+
+      // Xử lý chọn nháp (AVAILABLE)
+      if (selectedSeatIds.has(seat.id)) {
+        selectedSeatIds.delete(seat.id);
+      } else {
+        if (selectedSeatIds.size + myHeldSeatIds.size >= 10) {
+          alert("Quý khách chỉ được chọn tối đa 10 ghế mỗi lượt đặt vé.");
           return;
         }
+        selectedSeatIds.add(seat.id);
+      }
 
-        if (response.status === 404) {
-          console.warn("[T-33] Suất chiếu không tồn tại.");
-          return;
-        }
+      // Cập nhật lại giao diện nút ghế
+      updateSeatButtonState(seat.id);
+      updateCartPanel();
+    }
 
-        const httpDateHeader = response.headers.get('Date');
-        const json = await response.json();
+    function updateSeatButtonState(seatId) {
+      const oldBtn = document.getElementById(`seat-btn-${seatId}`);
+      const seat = seatMap.get(seatId);
+      if (oldBtn && seat) {
+        const newBtn = createSeatButton(seat);
+        oldBtn.replaceWith(newBtn);
+      }
+    }
 
-        if (response.ok && json.success && json.data) {
+    function removeSingleSelection(seatId) {
+      if (selectedSeatIds.has(seatId)) {
+        selectedSeatIds.delete(seatId);
+        updateSeatButtonState(seatId);
+        updateCartPanel();
+      } else if (myHeldSeatIds.has(seatId)) {
+        releaseSingleHold(seatId);
+      }
+    }
+
+    async function clearAllSelections() {
+      if (selectedSeatIds.size === 0 && myHeldSeatIds.size === 0) return;
+
+      // Xóa tất cả ghế nháp
+      const draftIds = Array.from(selectedSeatIds);
+      selectedSeatIds.clear();
+      draftIds.forEach(id => updateSeatButtonState(id));
+
+      // Hủy tất cả ghế đang hold trên server nếu có
+      if (myHeldSeatIds.size > 0) {
+        const heldIds = Array.from(myHeldSeatIds);
+        const token = getValidToken();
+        heldIds.forEach(async (id) => {
+          const seat = seatMap.get(id);
+          if (seat) seat.status = 'AVAILABLE';
+          myHeldSeatIds.delete(id);
+          updateSeatButtonState(id);
+          if (token) {
+            fetch(`${API_BASE}/api/showtimes/${showtimeId}/seats/${id}/hold`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              }
+            }).catch(() => null);
+          }
+        });
+        stopHoldCountdown();
+        sessionStorage.removeItem(`eventpulse_held_${showtimeId}`);
+      }
+
+      updateCartPanel();
+    }
+
+    function updateCartPanel() {
+      const countEl = document.getElementById('selectedSeatsCountText');
+      const listContainer = document.getElementById('selectedSeatsListContainer');
+      const subtotalLabel = document.getElementById('subtotalLabel');
+      const subtotalPrice = document.getElementById('subtotalPrice');
+      const totalPaymentPrice = document.getElementById('totalPaymentPrice');
+      const btnAction = document.getElementById('btnPrimaryAction');
+      const btnActionText = document.getElementById('btnPrimaryActionText');
+      const btnClearAll = document.getElementById('btnClearAll');
+
+      const totalCount = selectedSeatIds.size + myHeldSeatIds.size;
+      countEl.textContent = totalCount;
+
+      if (totalCount > 0) {
+        btnClearAll.classList.remove('opacity-50', 'cursor-not-allowed');
+      } else {
+        btnClearAll.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+
+      if (totalCount === 0) {
+        listContainer.innerHTML = `
+          <div class="text-center py-8 text-on-surface-variant text-sm font-medium flex flex-col items-center justify-center">
+            <span class="material-symbols-outlined text-outline text-3xl mb-1">airline_seat_recline_extra</span>
+            <span>Vui lòng nhấp chọn ghế trên sơ đồ</span>
+          </div>
+        `;
+        subtotalLabel.textContent = `Tạm tính (0 vé):`;
+        subtotalPrice.textContent = `0 ₫`;
+        totalPaymentPrice.textContent = `0 ₫`;
+        btnAction.disabled = true;
+        btnActionText.textContent = "Tiến hành giữ vé & thanh toán";
+        return;
+      }
+
+      listContainer.innerHTML = '';
+      let sumPrice = 0;
+
+      // Render Selected Draft Seats
+      selectedSeatIds.forEach(id => {
+        const s = seatMap.get(id);
+        if (!s) return;
+        sumPrice += (s.price || 0);
+        const card = createCartItemCard(s, false);
+        listContainer.appendChild(card);
+      });
+
+      // Render Held Seats
+      myHeldSeatIds.forEach(id => {
+        const s = seatMap.get(id);
+        if (!s) return;
+        sumPrice += (s.price || 0);
+        const card = createCartItemCard(s, true);
+        listContainer.appendChild(card);
+      });
+
+      subtotalLabel.textContent = `Tạm tính (${totalCount} vé):`;
+      subtotalPrice.textContent = formatCurrency(sumPrice);
+      totalPaymentPrice.textContent = formatCurrency(sumPrice);
+
+      btnAction.disabled = false;
+      if (selectedSeatIds.size > 0) {
+        btnActionText.textContent = "Tiến hành giữ vé & thanh toán";
+      } else if (myHeldSeatIds.size > 0) {
+        btnActionText.textContent = "Xác nhận & Chuyển sang thanh toán";
+      }
+    }
+
+    function createCartItemCard(seat, isHeldOnServer) {
+      const item = document.createElement('div');
+      item.className = "p-space-sm rounded-lg bg-surface-container-low flex items-center justify-between group hover:bg-surface-container transition-colors border border-surface-container-high/40";
+      
+      const numStr = String(seat.seatNumber).padStart(2, '0');
+      const seatCode = `${seat.row}${numStr}`;
+      const catName = seat.categoryName || 'Standard';
+
+      item.innerHTML = `
+        <div class="flex items-center gap-space-sm">
+          <div class="w-10 h-10 rounded-lg ${isHeldOnServer ? 'bg-amber-600' : 'bg-primary'} text-white flex flex-col items-center justify-center font-code-mono font-bold leading-none shadow-sm">
+            <span class="text-[9px] text-white/70">ROW</span>
+            <span class="text-sm">${seatCode}</span>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="font-label-md text-label-md text-on-surface font-bold">${catName}</span>
+              ${isHeldOnServer 
+                ? `<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-label-sm text-[10px] font-bold flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>Đang giữ</span>` 
+                : `<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-label-sm text-[10px] font-bold">Đã chọn</span>`
+              }
+            </div>
+            <div class="font-code-mono text-label-sm text-primary font-bold">${formatCurrency(seat.price)}</div>
+          </div>
+        </div>
+        <button onclick="removeSingleSelection('${seat.id}')" class="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:text-error hover:bg-error-container/20 transition-colors" title="Hủy chọn ghế ${seatCode}">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+      `;
+
+      return item;
+    }
+
+    // --- 6. Hold & Release Server API Integration ---
+    async function handlePrimaryAction() {
+      // TH1: Đã giữ chỗ thành công trên server (myHeldSeatIds > 0) và không có ghế nháp mới
+      if (selectedSeatIds.size === 0 && myHeldSeatIds.size > 0) {
+        await createOrderAndProceed();
+        return;
+      }
+
+      // TH2: Có ghế đang chọn nháp -> Gọi API Giữ Chỗ (POST /api/showtimes/{id}/seats/hold)
+      if (selectedSeatIds.size === 0) return;
+
+      const token = getValidToken();
+      if (!token) {
+        savePendingSeats();
+        openLoginModal();
+        return;
+      }
+
+      const btn = document.getElementById('btnPrimaryAction');
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `
+        <div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+        <span>Đang khóa vị trí ghế...</span>
+      `;
+
+      try {
+        const seatIdsToHold = Array.from(selectedSeatIds);
+
+        const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/seats/hold`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ seatIds: seatIdsToHold })
+        });
+
+        const httpDateHeader = res.headers.get('Date');
+        let json = null;
+        try { json = await res.json(); } catch {}
+
+        if (res.ok && json && json.success) {
           const data = json.data;
-          const heldIds = data.seatIds || [];
-
-          // TEST 1 & CASE không có hold: Nếu danh sách rỗng
-          if (!heldIds || heldIds.length === 0) {
-            myHeldSeatIds.clear();
-            stopHoldCountdown();
-            updateCart();
-            drawCanvas();
-            return;
-          }
-
-          // Kiểm tra expiresAt hợp lệ (tránh 0001-01-01T00:00:00)
-          const expiresAt = data.expiresAt;
-          if (!expiresAt || expiresAt.startsWith('0001-01-01')) {
-            myHeldSeatIds.clear();
-            stopHoldCountdown();
-            updateCart();
-            drawCanvas();
-            return;
-          }
-
-          // Đối chiếu và khôi phục ghế vào myHeldSeatIds (HELD BY CURRENT USER)
-          myHeldSeatIds.clear();
-          heldIds.forEach(id => {
+          const newlyHeld = data.seatIds || [];
+          
+          newlyHeld.forEach(id => {
             myHeldSeatIds.add(id);
-            const seat = seatMap.get(id);
-            if (seat) {
-              seat.status = 'HELD';
-            }
+            selectedSeatIds.delete(id);
+            const s = seatMap.get(id);
+            if (s) s.status = 'HELD';
+            updateSeatButtonState(id);
           });
 
-          // Cập nhật giao diện ghế và giỏ tạm tính
-          drawCanvas();
-          updateCart();
+          updateCartPanel();
 
-          // Khởi động đồng hồ đếm ngược với thời gian thực còn lại
-          startHoldCountdown(expiresAt, data.serverTime, httpDateHeader);
+          // Kích hoạt Countdown Timer 10 phút
+          startHoldCountdown(data.expiresAt, data.serverTime, httpDateHeader);
+          showSuccessToast(`Đã giữ thành công ${newlyHeld.length} ghế! Quý khách có 10 phút để hoàn tất thanh toán.`);
+
+          // Cập nhật text nút để chuyển sang thanh toán
+          btn.innerHTML = `
+            <span>Xác nhận &amp; Chuyển sang thanh toán</span>
+            <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+          `;
+          btn.disabled = false;
+
+        } else if (res.status === 401) {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('user_info');
+          renderAuthNav();
+          savePendingSeats();
+          openLoginModal("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để giữ chỗ.");
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        } else if (res.status === 409) {
+          showConflictToast((json && json.message) || "Một hoặc nhiều ghế đã được khán giả khác nhanh tay chọn trước. Vui lòng chọn vị trí khác!");
+          selectedSeatIds.clear();
+          await loadSeats();
+          updateCartPanel();
+          btn.innerHTML = originalText;
+          btn.disabled = false;
         } else {
-          showHoldError(json.message || "Không thể tải trạng thái ghế đang giữ.");
+          showConflictToast((json && json.message) || "Không thể thực hiện giữ ghế. Vui lòng thử lại.");
+          await loadSeats();
+          updateCartPanel();
+          btn.innerHTML = originalText;
+          btn.disabled = false;
         }
       } catch (err) {
-        console.error("[T-33] Lỗi gọi API my-holds:", err);
-        showHoldError("Không thể kết nối máy chủ để kiểm tra ghế đang giữ.");
+        console.error("Lỗi khi giữ ghế:", err);
+        showConflictToast("Không thể kết nối máy chủ để giữ ghế. Vui lòng kiểm tra lại mạng hoặc thử lại!");
+        btn.innerHTML = originalText;
+        btn.disabled = false;
       }
     }
 
-    function showHoldError(msg) {
-      const errBanner = document.getElementById('errorBanner');
-      const errMsg = document.getElementById('errorMessage');
-      if (errBanner && errMsg) {
-        errMsg.textContent = msg;
-        errBanner.classList.remove('hidden');
+    async function createOrderAndProceed() {
+      const btn = document.getElementById('btnPrimaryAction');
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `
+        <div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+        <span>Đang khởi tạo đơn hàng...</span>
+      `;
+
+      try {
+        const token = getValidToken();
+        if (!token) {
+          savePendingSeats();
+          openLoginModal("Vui lòng đăng nhập để tiến hành thanh toán.");
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+          return;
+        }
+
+        const res = await fetch(`${API_BASE}/api/v1/orders/showtimes/${showtimeId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        let json = null;
+        try { json = await res.json(); } catch {}
+
+        if (res.ok && json && json.success && json.data) {
+          const order = json.data;
+          // Xóa lưu tạm giữ chỗ
+          sessionStorage.removeItem(`eventpulse_held_${showtimeId}`);
+          sessionStorage.removeItem(`pending_seats_${showtimeId}`);
+          // Điều hướng sang trang thanh toán giả lập
+          window.location.href = `./mock-payment.html?orderId=${order.id}&amount=${order.totalAmount}`;
+        } else {
+          alert((json && json.message) || "Không thể tạo đơn hàng. Vui lòng kiểm tra lại trạng thái ghế.");
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
+      } catch (err) {
+        console.error("Lỗi khi khởi tạo đơn hàng:", err);
+        alert("Lỗi kết nối khi khởi tạo đơn hàng.");
+        btn.innerHTML = originalText;
+        btn.disabled = false;
       }
     }
 
-    async function retryRestoreHolds() {
-      const errBanner = document.getElementById('errorBanner');
-      if (errBanner) errBanner.classList.add('hidden');
-      await restoreHeldSeats();
+    async function releaseSingleHold(seatId) {
+      const seat = seatMap.get(seatId);
+      if (!seat) return;
+
+      try {
+        const token = getValidToken();
+        if (!token) return;
+
+        const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/seats/${seatId}/hold`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        const json = await res.json().catch(() => null);
+        if (res.ok && json && json.success) {
+          seat.status = 'AVAILABLE';
+          myHeldSeatIds.delete(seatId);
+          updateSeatButtonState(seatId);
+          updateCartPanel();
+
+          if (myHeldSeatIds.size === 0) {
+            stopHoldCountdown();
+          }
+        }
+      } catch (err) {
+        console.warn("Lỗi khi hủy giữ ghế:", err);
+      }
     }
 
+    // --- 7. Countdown Timer Logic (10 phút đếm ngược & Tự động nhả ghế) ---
     function startHoldCountdown(expiresAtIso, serverTimeIso, httpDateHeader) {
-      stopHoldCountdown(); // Dọn dẹp timer cũ nếu có
+      stopHoldCountdown();
 
-      // 1. Xác định thời gian máy chủ tại thời điểm trả về response
       let serverTimeMs = 0;
       if (serverTimeIso) {
         serverTimeMs = new Date(serverTimeIso).getTime();
@@ -1190,30 +1479,22 @@
         serverTimeMs = Date.now();
       }
 
-      // 2. Parse mốc hết hạn target expiresAt
       const expiresAtMs = new Date(expiresAtIso).getTime();
-      if (isNaN(expiresAtMs) || isNaN(serverTimeMs)) {
-        console.error("[T-24 / T-33] Mốc thời gian không hợp lệ:", { expiresAtIso, serverTimeIso });
-        return;
-      }
-
-      // Nếu đã hết hạn trước khi bắt đầu
-      if (expiresAtMs <= serverTimeMs) {
+      if (isNaN(expiresAtMs) || isNaN(serverTimeMs) || expiresAtMs <= serverTimeMs) {
         handleHoldExpired();
         return;
       }
 
-      // 3. Ghi nhận mốc đo thời gian monotonic (performance.now chống chỉnh đồng hồ OS client)
       holdRefServerTimeMs = serverTimeMs;
       holdRefLocalPerfMs = performance.now();
       holdExpiresAtMs = expiresAtMs;
-      isHoldExpiredRefreshed = false;
 
-      // 4. Hiển thị Banner đồng hồ
-      const banner = document.getElementById('hold-timer-banner');
-      if (banner) banner.classList.remove('hidden');
+      // Lưu state vào sessionStorage
+      sessionStorage.setItem(`eventpulse_held_${showtimeId}`, JSON.stringify({
+        expiresAt: expiresAtIso,
+        serverTime: serverTimeIso || new Date(serverTimeMs).toISOString()
+      }));
 
-      // 5. Chạy tick đầu tiên ngay lập tức và khởi tạo lặp lại mỗi 1 giây
       updateCountdownTick();
       holdTimerInterval = setInterval(updateCountdownTick, 1000);
     }
@@ -1221,77 +1502,61 @@
     function updateCountdownTick() {
       if (!holdExpiresAtMs) return;
 
-      // Tính thời gian đã trôi qua dạng monotonic tính từ mốc tham chiếu
-      const elapsedPerfMs = performance.now() - holdRefLocalPerfMs;
-      const currentServerTimeMs = holdRefServerTimeMs + elapsedPerfMs;
-      const remainingMs = holdExpiresAtMs - currentServerTimeMs;
-      const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+      const elapsed = performance.now() - holdRefLocalPerfMs;
+      const currentServerMs = holdRefServerTimeMs + elapsed;
+      const remainMs = holdExpiresAtMs - currentServerMs;
+      const remainSec = Math.max(0, Math.floor(remainMs / 1000));
 
-      // Định dạng MM:SS
-      const minutes = Math.floor(remainingSeconds / 60);
-      const seconds = remainingSeconds % 60;
-      const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      const mins = Math.floor(remainSec / 60);
+      const secs = remainSec % 60;
+      const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 
-      const displayEl = document.getElementById('countdownDisplay');
-      if (displayEl) {
-        displayEl.textContent = formattedTime;
+      const clockEl = document.getElementById('countdown-clock');
+      const progressEl = document.getElementById('timer-progress');
+      const warnText = document.getElementById('timerWarningText');
+      const timerCard = document.getElementById('holdTimerCard');
+
+      if (clockEl) clockEl.textContent = timeStr;
+
+      if (progressEl) {
+        const pct = Math.min(100, Math.max(0, (remainSec / DEFAULT_HOLD_DURATION_SECONDS) * 100));
+        progressEl.style.width = `${pct}%`;
       }
 
-      // Cập nhật số lượng và danh sách ghế đang giữ trên banner
-      const countBadge = document.getElementById('heldCountBadge');
-      if (countBadge) {
-        countBadge.textContent = `${myHeldSeatIds.size} ghế`;
-      }
-
-      const quickList = document.getElementById('heldSeatsQuickList');
-      if (quickList) {
-        const labels = Array.from(myHeldSeatIds)
-          .map(id => seatMap.get(id))
-          .filter(Boolean)
-          .map(s => `<span class="px-2 py-0.5 bg-white/20 rounded text-xs font-bold">${s.row}${s.seatNumber}</span>`)
-          .join('');
-        quickList.innerHTML = labels;
-      }
-
-      // Trạng thái cảnh báo nhẹ khi gần hết hạn (< 90 giây) (Task T-33)
-      const banner = document.getElementById('hold-timer-banner');
-      const subtextEl = document.getElementById('timerSubtext');
-      const statusBadge = document.getElementById('timerStatusBadge');
-      
-      if (remainingSeconds <= 90 && remainingSeconds > 0) {
-        if (banner) {
-          banner.classList.remove('from-amber-500', 'via-amber-600', 'to-orange-600');
-          banner.classList.add('from-rose-600', 'via-rose-600', 'to-red-700');
+      // Cảnh báo gấp khi < 90 giây
+      if (remainSec <= 90 && remainSec > 0) {
+        if (timerCard) {
+          timerCard.classList.remove('bg-amber-50', 'border-amber-200/80');
+          timerCard.classList.add('bg-rose-50', 'border-rose-300');
         }
-        if (subtextEl) {
-          subtextEl.textContent = '⚠️ Sắp hết hạn giữ chỗ!';
-          subtextEl.classList.add('text-rose-200');
+        if (clockEl) {
+          clockEl.classList.remove('text-amber-900');
+          clockEl.classList.add('text-error', 'animate-pulse');
         }
-        if (statusBadge) {
-          statusBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-xs text-rose-200"></i><span class="text-xs font-semibold">Vui lòng hoàn tất thanh toán</span>`;
+        if (warnText) {
+          warnText.textContent = "🚨 Sắp hết thời gian giữ chỗ! Vui lòng bấm xác nhận thanh toán ngay.";
+          warnText.classList.remove('text-amber-800/80');
+          warnText.classList.add('text-error', 'font-bold');
         }
       } else {
-        if (banner) {
-          banner.classList.remove('from-rose-600', 'via-rose-600', 'to-red-700');
-          banner.classList.add('from-amber-500', 'via-amber-600', 'to-orange-600');
+        if (timerCard) {
+          timerCard.classList.remove('bg-rose-50', 'border-rose-300');
+          timerCard.classList.add('bg-amber-50', 'border-amber-200/80');
         }
-        if (subtextEl) {
-          subtextEl.textContent = '(Đồng bộ máy chủ)';
-          subtextEl.classList.remove('text-rose-200');
+        if (clockEl) {
+          clockEl.classList.remove('text-error', 'animate-pulse');
+          clockEl.classList.add('text-amber-900');
         }
-        if (statusBadge) {
-          statusBadge.innerHTML = `<i class="fa-solid fa-shield-halved text-xs text-amber-200"></i><span class="text-xs font-semibold">Ghế của bạn đã được khóa an toàn</span>`;
+        if (warnText) {
+          warnText.textContent = "⚠️ Chỗ ngồi sẽ tự động trả về hệ thống nếu không hoàn tất thanh toán trước khi đồng hồ kết thúc.";
+          warnText.classList.remove('text-error', 'font-bold');
+          warnText.classList.add('text-amber-800/80');
         }
       }
 
-      // Khi đếm ngược về 0
-      if (remainingSeconds <= 0) {
+      if (remainSec <= 0) {
         stopHoldCountdown();
-
-        if (!isHoldExpiredRefreshed) {
-          isHoldExpiredRefreshed = true;
-          handleHoldExpired();
-        }
+        handleHoldExpired();
       }
     }
 
@@ -1300,151 +1565,133 @@
         clearInterval(holdTimerInterval);
         holdTimerInterval = null;
       }
-
-      const banner = document.getElementById('hold-timer-banner');
-      if (banner) banner.classList.add('hidden');
+      holdExpiresAtMs = 0;
+      sessionStorage.removeItem(`eventpulse_held_${showtimeId}`);
+      const clockEl = document.getElementById('countdown-clock');
+      const progressEl = document.getElementById('timer-progress');
+      if (clockEl) clockEl.textContent = "10:00";
+      if (progressEl) progressEl.style.width = "100%";
     }
 
     async function handleHoldExpired() {
-      // Dừng timer ngay
-      stopHoldCountdown();
-
-      // Bỏ trạng thái giữ ghế của current user
+      // 1. Dọn dẹp state trên client
+      const heldToRelease = Array.from(myHeldSeatIds);
       myHeldSeatIds.clear();
       selectedSeatIds.clear();
-      updateCart();
-      drawCanvas();
+      sessionStorage.removeItem(`eventpulse_held_${showtimeId}`);
+      updateCartPanel();
 
-      alert("Thời gian giữ ghế của bạn đã hết hạn.");
+      // 2. Gửi request huỷ giữ chỗ lên server (giải phóng ngay lập tức)
+      const token = getValidToken();
+      if (token && heldToRelease.length > 0) {
+        heldToRelease.forEach(seatId => {
+          fetch(`${API_BASE}/api/showtimes/${showtimeId}/seats/${seatId}/hold`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          }).catch(() => null);
+        });
+      }
 
-      // Làm mới sơ đồ ghế từ API
+      // 3. Tải lại sơ đồ ghế để các ghế chuyển về AVAILABLE (màu xanh)
+      await loadSeats();
+
+      // 4. Hiển thị thông báo hết 10 phút trực quan, trang trọng
+      openExpiredModal();
+    }
+
+    async function restoreMyHoldsOnLoad() {
+      const token = getValidToken();
+      if (!token) return;
+
       try {
-        await fetchSeats();
+        const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/seats/my-holds`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            const heldIds = json.data.seatIds || [];
+            const expiresAt = json.data.expiresAt;
+            const serverTime = json.data.serverTime;
+            const httpDate = res.headers.get('Date');
+
+            if (heldIds.length > 0 && expiresAt) {
+              myHeldSeatIds.clear();
+              heldIds.forEach(id => {
+                myHeldSeatIds.add(id);
+                selectedSeatIds.delete(id);
+                const s = seatMap.get(id);
+                if (s) s.status = 'HELD';
+                updateSeatButtonState(id);
+              });
+
+              updateCartPanel();
+              startHoldCountdown(expiresAt, serverTime, httpDate);
+            }
+          }
+        }
       } catch (err) {
-        console.error("[T-33] Lỗi làm mới sơ đồ ghế sau khi hết hạn:", err);
+        console.warn("Không thể khôi phục ghế giữ:", err);
       }
     }
 
-    // Cập nhật đếm ngược ngay lập tức khi người dùng quay lại tab
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && holdTimerInterval) {
-        updateCountdownTick();
-      }
-    });
-
-    // Dọn dẹp timer khi người dùng rời trang để tránh memory leak
-    window.addEventListener('beforeunload', () => {
-      stopHoldCountdown();
-    });
-
-    // --- Tiến hành Giữ Ghế (Tích hợp API T-23 & T-24) ---
-    async function proceedToBooking() {
-      if (selectedSeatIds.size === 0 && myHeldSeatIds.size > 0) {
-        const btnEl = document.getElementById('btnBook');
-        const originalText = btnEl.innerHTML;
-        btnEl.disabled = true;
-        btnEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Đang khởi tạo đơn hàng...</span>`;
-
+    // --- 8. Initialize on Page Load ---
+    async function initPage() {
+      if (!showtimeId) {
+        // Query first available showtime from API
         try {
-          const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-          const headers = { 'Content-Type': 'application/json' };
-          if (token) headers['Authorization'] = `Bearer ${token}`;
-
-          const response = await fetch(`/api/v1/orders/showtimes/${showtimeId}`, {
-            method: 'POST',
-            headers: headers
-          });
-          const json = await response.json();
-          if (response.ok && json.success) {
-            window.location.href = `./mock-payment.html?orderId=${json.data.id}&amount=${json.data.totalAmount}`;
-          } else {
-            alert(json.message || "Không thể tạo đơn hàng. Vui lòng thử lại.");
-            btnEl.disabled = false;
-            btnEl.innerHTML = originalText;
+          const res = await fetch(`${API_BASE}/api/public/showtimes?limit=10`);
+          if (res.ok) {
+            const json = await res.json();
+            const items = (json.data && json.data.items) ? json.data.items : [];
+            let found = null;
+            if (eventId) {
+              found = items.find(s => s.eventId === eventId);
+            }
+            if (!found && items.length > 0) {
+              found = items[0];
+            }
+            if (found) {
+              showtimeId = found.id;
+              if (!eventId) eventId = found.eventId;
+              const newUrl = new URL(window.location.href);
+              newUrl.searchParams.set('showtimeId', showtimeId);
+              if (eventId) newUrl.searchParams.set('eventId', eventId);
+              window.history.replaceState({}, '', newUrl.toString());
+            }
           }
         } catch (e) {
-          console.error(e);
-          alert("Lỗi kết nối khi tạo đơn hàng.");
-          btnEl.disabled = false;
-          btnEl.innerHTML = originalText;
+          console.warn("Could not find default showtime", e);
         }
+      }
+
+      if (!showtimeId) {
+        alert("Thiếu thông tin suất diễn. Hệ thống sẽ chuyển quý khách về danh sách sự kiện.");
+        window.location.href = './public-events.html';
         return;
       }
 
-      if (selectedSeatIds.size === 0) return;
-
-      const btnEl = document.getElementById('btnBook');
-      const originalText = btnEl.innerHTML;
-
-      btnEl.disabled = true;
-      btnEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Đang giữ ghế...</span>`;
-
-      try {
-        const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-        const headers = { 'Content-Type': 'application/json' };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const response = await fetch(`/api/showtimes/${showtimeId}/seats/hold`, {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify({ seatIds: Array.from(selectedSeatIds) })
-        });
-
-        const httpDateHeader = response.headers.get('Date');
-        const json = await response.json();
-
-        if (response.status === 200 && json.success) {
-          const data = json.data;
-          const newlyHeldIds = data.seatIds || [];
-          const expiresAt = data.expiresAt;
-          const serverTime = data.serverTime;
-
-          // Cập nhật trạng thái ghế trong bộ nhớ tại chỗ và lưu vào myHeldSeatIds
-          newlyHeldIds.forEach(id => {
-            myHeldSeatIds.add(id);
-            const seat = seatMap.get(id);
-            if (seat) seat.status = 'HELD';
-          });
-
-          // Xóa chọn nháp & cập nhật UI
-          selectedSeatIds.clear();
-
-          // Đổi màu ghế ngay tại chỗ không cần reload trang
-          drawCanvas();
-          updateCart();
-
-          // Kích hoạt đồng hồ đếm ngược T-24
-          startHoldCountdown(expiresAt, serverTime, httpDateHeader);
-
-          alert(`Giữ chỗ thành công ${newlyHeldIds.length} ghế! Thời gian giữ chỗ: 10 phút.`);
-        } else if (response.status === 409) {
-          alert("Không thể giữ ghế: " + (json.message || "Một hoặc nhiều ghế đã được giữ chỗ bởi người dùng khác."));
-          selectedSeatIds.clear();
-          updateCart();
-          await fetchSeats();
-        } else if (response.status === 401) {
-          alert("Vui lòng đăng nhập để thực hiện giữ chỗ.");
-          window.location.href = `./login.html?redirect=${encodeURIComponent(window.location.href)}`;
-        } else {
-          alert("Lỗi giữ ghế: " + (json.message || "Không thể thực hiện giữ ghế."));
-          await fetchSeats();
-        }
-      } catch (err) {
-        console.error("[T-23/T-24] Lỗi kết nối API giữ ghế:", err);
-        alert("Không thể kết nối máy chủ để giữ ghế.");
-      } finally {
-        btnEl.disabled = false;
-        btnEl.innerHTML = originalText;
-        updateCart();
-      }
+      renderAuthNav();
+      await loadEventInfo();
+      await loadSeats();
+      restorePendingSeats();
+      await restoreMyHoldsOnLoad();
     }
 
-    // Start
-    init();
+    document.addEventListener('DOMContentLoaded', initPage);
 
+    // Dọn dẹp timer khi thoát trang
+    window.addEventListener('beforeunload', () => {
+      stopHoldCountdown();
+    });
   </script>
 </body>
 </html>
-

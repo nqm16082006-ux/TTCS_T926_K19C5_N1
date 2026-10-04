@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace EventTicketBooking.Api.DTOs
 {
@@ -12,7 +13,11 @@ namespace EventTicketBooking.Api.DTOs
 
         public string? EventDescription { get; set; }
 
+        public string? ImageUrl { get; set; }
+
         public string EventLocation { get; set; } = string.Empty;
+
+        public string OrganizerName { get; set; } = string.Empty;
 
         public DateTime StartTime { get; set; }
 
@@ -20,10 +25,42 @@ namespace EventTicketBooking.Api.DTOs
 
         public int AvailableSeats { get; set; }
 
+        public int TotalSeats { get; set; }
+
         public string Status { get; set; } = string.Empty;
 
         public decimal MinPrice { get; set; }
 
         public decimal MaxPrice { get; set; }
     }
+
+    public class PublicEventDetailDto
+    {
+        public Guid Id { get; set; }
+
+        public string Title { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public string? ImageUrl { get; set; }
+
+        public string Location { get; set; } = string.Empty;
+
+        public string OrganizerName { get; set; } = string.Empty;
+
+        public DateTime StartTime { get; set; }
+
+        public DateTime EndTime { get; set; }
+
+        public int TotalSeats { get; set; }
+
+        public int AvailableSeats { get; set; }
+
+        public decimal MinPrice { get; set; }
+
+        public decimal MaxPrice { get; set; }
+
+        public List<PublicShowtimeDto> Showtimes { get; set; } = new List<PublicShowtimeDto>();
+    }
 }
+

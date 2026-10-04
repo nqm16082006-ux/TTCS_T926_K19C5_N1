@@ -83,6 +83,7 @@ namespace EventTicketBooking.Api.Controllers
             var query = _context.Showtimes
                 .AsNoTracking()
                 .Include(s => s.Event)
+                    .ThenInclude(e => e.Owner)
                 .Include(s => s.SeatCategories)
                 .Where(s => s.Status == ShowtimeStatus.OnSale);
 
@@ -108,13 +109,16 @@ namespace EventTicketBooking.Api.Controllers
                 EventId = s.EventId,
                 EventTitle = s.Event?.Title ?? string.Empty,
                 EventDescription = s.Event?.Description,
+                ImageUrl = s.Event?.ImageUrl,
                 EventLocation = s.Event?.Location ?? string.Empty,
+                OrganizerName = s.Event?.Owner?.FullName ?? s.Event?.Owner?.Username ?? "Ban Tổ Chức",
                 StartTime = s.StartTime,
                 EndTime = s.EndTime,
                 AvailableSeats = s.AvailableSeats,
+                TotalSeats = s.Event?.TotalSeats ?? 0,
                 Status = s.Status.ToString(),
-                MinPrice = s.SeatCategories != null && s.SeatCategories.Any() ? s.SeatCategories.Min(sc => sc.Price) ?? 0 : 0m,
-                MaxPrice = s.SeatCategories != null && s.SeatCategories.Any() ? s.SeatCategories.Max(sc => sc.Price) ?? 0 : 0m
+                MinPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Min(sc => sc.Price) ?? 0) : 0m,
+                MaxPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Max(sc => sc.Price) ?? 0) : 0m
             }).ToList();
 
             string? nextCursor = null;
@@ -154,6 +158,76 @@ namespace EventTicketBooking.Api.Controllers
         }
 
         /// <summary>
+        /// Lấy thông tin chi tiết Sự kiện công khai kèm danh sách Suất chiếu.
+        /// GET /api/public/events/{id}
+        /// </summary>
+        [HttpGet("events/{id:guid}")]
+        [ProducesResponseType(typeof(ApiResponse<PublicEventDetailDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetPublicEventDetail(Guid id)
+        {
+            var ev = await _context.Events
+                .AsNoTracking()
+                .Include(e => e.Owner)
+                .Include(e => e.Showtimes)
+                    .ThenInclude(s => s.SeatCategories)
+                .FirstOrDefaultAsync(e => e.Id == id);
+
+            if (ev == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy sự kiện."));
+            }
+
+            var showtimesList = ev.Showtimes
+                .OrderBy(s => s.StartTime)
+                .Select(s => new PublicShowtimeDto
+                {
+                    Id = s.Id,
+                    EventId = s.EventId,
+                    EventTitle = ev.Title,
+                    EventDescription = ev.Description,
+                    ImageUrl = ev.ImageUrl,
+                    EventLocation = ev.Location,
+                    OrganizerName = ev.Owner?.FullName ?? ev.Owner?.Username ?? "Ban Tổ Chức",
+                    StartTime = s.StartTime,
+                    EndTime = s.EndTime,
+                    AvailableSeats = s.AvailableSeats,
+                    TotalSeats = ev.TotalSeats,
+                    Status = s.Status.ToString(),
+                    MinPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Min(sc => sc.Price) ?? 0) : 0m,
+                    MaxPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Max(sc => sc.Price) ?? 0) : 0m
+                }).ToList();
+
+            decimal overallMinPrice = showtimesList.Any(s => s.MinPrice > 0)
+                ? showtimesList.Where(s => s.MinPrice > 0).Min(s => s.MinPrice)
+                : 0m;
+            decimal overallMaxPrice = showtimesList.Any(s => s.MaxPrice > 0)
+                ? showtimesList.Max(s => s.MaxPrice)
+                : 0m;
+
+            int availableSeats = showtimesList.Sum(s => s.AvailableSeats);
+
+            var eventDetail = new PublicEventDetailDto
+            {
+                Id = ev.Id,
+                Title = ev.Title,
+                Description = ev.Description,
+                ImageUrl = ev.ImageUrl,
+                Location = ev.Location,
+                OrganizerName = ev.Owner?.FullName ?? ev.Owner?.Username ?? "Ban Tổ Chức",
+                StartTime = ev.StartTime,
+                EndTime = ev.EndTime,
+                TotalSeats = ev.TotalSeats,
+                AvailableSeats = availableSeats,
+                MinPrice = overallMinPrice,
+                MaxPrice = overallMaxPrice,
+                Showtimes = showtimesList
+            };
+
+            return Ok(ApiResponse<PublicEventDetailDto>.SuccessResult(eventDetail, "Lấy thông tin chi tiết sự kiện thành công."));
+        }
+
+        /// <summary>
         /// Lấy thông tin chi tiết Suất chiếu công khai theo Event ID và Showtime ID (Dùng cho T-18).
         /// GET /api/public/events/{eventId}/showtimes/{showtimeId}
         /// </summary>
@@ -165,6 +239,7 @@ namespace EventTicketBooking.Api.Controllers
             var showtime = await _context.Showtimes
                 .AsNoTracking()
                 .Include(s => s.Event)
+                    .ThenInclude(e => e.Owner)
                 .Include(s => s.SeatCategories)
                 .FirstOrDefaultAsync(s => s.EventId == eventId && s.Id == showtimeId);
 
@@ -179,13 +254,16 @@ namespace EventTicketBooking.Api.Controllers
                 EventId = showtime.EventId,
                 EventTitle = showtime.Event?.Title ?? string.Empty,
                 EventDescription = showtime.Event?.Description,
+                ImageUrl = showtime.Event?.ImageUrl,
                 EventLocation = showtime.Event?.Location ?? string.Empty,
+                OrganizerName = showtime.Event?.Owner?.FullName ?? showtime.Event?.Owner?.Username ?? "Ban Tổ Chức",
                 StartTime = showtime.StartTime,
                 EndTime = showtime.EndTime,
                 AvailableSeats = showtime.AvailableSeats,
+                TotalSeats = showtime.Event?.TotalSeats ?? 0,
                 Status = showtime.Status.ToString(),
-                MinPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? showtime.SeatCategories.Min(sc => sc.Price) ?? 0 : 0m,
-                MaxPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? showtime.SeatCategories.Max(sc => sc.Price) ?? 0 : 0m
+                MinPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? (showtime.SeatCategories.Min(sc => sc.Price) ?? 0) : 0m,
+                MaxPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? (showtime.SeatCategories.Max(sc => sc.Price) ?? 0) : 0m
             };
 
             return Ok(ApiResponse<PublicShowtimeDto>.SuccessResult(dto, "Lấy thông tin chi tiết suất chiếu thành công."));

@@ -157,7 +157,7 @@ TTCS_T926_K19C5_N1/
 Để đảm bảo trải nghiệm đặt vé mượt mà cho các sự kiện quy mô lớn (lên tới 2000+ ghế), hệ thống sơ đồ ghế trên trình duyệt được xây dựng tối ưu với **HTML5 Canvas** và **Hardware-Accelerated CSS**.
 
 ### Thông Số Kỹ Thuật
-- **Dữ liệu mẫu**: Hỗ trợ tải file JSON hàng ngàn ghế (sẵn sàng nạp qua API). Tệp mẫu 2000 ghế đã được cung cấp sẵn tại \data/sample_seats_2000.json\.
+- **Dữ liệu mẫu**: Hỗ trợ tải file JSON hàng ngàn ghế (sẵn sàng nạp qua API). Tệp mẫu 2000 ghế đã được cung cấp sẵn tại `data/sample_seats_2000.json`.
 - **Render**: Render toàn bộ sơ đồ ghế thông qua 1 thẻ \<canvas>\ duy nhất thay vì tạo hàng ngàn DOM Nodes.
 - **Tốc độ thực thi**:
   - Thời gian xử lý dữ liệu và vẽ Canvas: ~2-5 ms.

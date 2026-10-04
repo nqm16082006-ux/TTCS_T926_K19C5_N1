@@ -13,6 +13,9 @@ else if (File.Exists("../../.env"))
     Env.Load("../../.env");
 }
 
+// Cho phép Npgsql xử lý DateTime linh hoạt (cả Local và UTC)
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Đảm bảo Configuration đọc các biến môi trường
@@ -130,6 +133,7 @@ if (builder.Environment.IsProduction() && paymentProvider.Equals("Mock", StringC
 builder.Services.Configure<EventTicketBooking.Api.Options.PayOSOptions>(builder.Configuration.GetSection(EventTicketBooking.Api.Options.PayOSOptions.SectionName));
 builder.Services.AddHttpClient<EventTicketBooking.Api.Services.Interfaces.IPaymentGateway, EventTicketBooking.Api.Services.Implementations.Payment.PayOSPaymentGateway>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IPaymentService, EventTicketBooking.Api.Services.Implementations.PaymentService>();
+builder.Services.AddHttpClient();
 
 
 // Add Controllers, CORS & Swagger

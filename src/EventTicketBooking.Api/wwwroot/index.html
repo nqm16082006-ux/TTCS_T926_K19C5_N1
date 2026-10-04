@@ -312,7 +312,6 @@
   </footer>
 
   <script>
-    const API_BASE = (window.location.protocol === 'file:' || (window.location.port && window.location.port !== '5012')) ? 'http://localhost:5012' : '';
     let allShowtimes = [];
 
     // Kiểm tra trạng thái đăng nhập
@@ -324,29 +323,19 @@
       if (token && userStr) {
         try {
           const user = JSON.parse(userStr);
-          const roles = (user.roles || []).map(r => (r || '').toLowerCase());
-          const isAdmin = roles.includes('admin');
-          const isOrganizer = roles.includes('organizer') || roles.includes('staff');
+          const roles = user.roles || [];
+          const isAdminOrOrg = roles.some(r => {
+            const low = (r || '').toLowerCase();
+            return low === 'admin' || low === 'organizer' || low === 'staff';
+          });
 
-          let portalLinkHtml = '';
-          if (isAdmin) {
-            portalLinkHtml = `
-              <a href="./admin-users.html" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold hover:bg-amber-200 transition">
-                <span class="material-symbols-outlined text-[16px]">manage_accounts</span>
-                <span>Quản trị người dùng</span>
-              </a>
-            `;
-          } else if (isOrganizer) {
-            portalLinkHtml = `
+          container.innerHTML = `
+            ${isAdminOrOrg ? `
               <a href="./events.html" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-xs font-bold hover:bg-secondary-fixed-dim transition">
                 <span class="material-symbols-outlined text-[16px]">domain</span>
                 <span>Quản trị sự kiện</span>
               </a>
-            `;
-          }
-
-          container.innerHTML = `
-            ${portalLinkHtml}
+            ` : ''}
             <div class="flex items-center gap-2 pl-2 border-l border-surface-container-high">
               <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white">
                 <span class="material-symbols-outlined text-[18px]">person</span>
@@ -415,14 +404,14 @@
       emptyState.classList.add('hidden');
 
       try {
-        const res = await fetch(`${API_BASE}/api/public/showtimes?limit=50`);
+        const res = await fetch('/api/public/showtimes?limit=50');
         const json = await res.json().catch(() => ({}));
 
         let items = (json.success && json.data && json.data.items) ? json.data.items : [];
 
         // Nếu database chưa có showtime OnSale, thử gọi API /api/events để xem có event nào không
         if (items.length === 0) {
-          const resEvents = await fetch(`${API_BASE}/api/events`).catch(() => null);
+          const resEvents = await fetch('/api/events').catch(() => null);
           if (resEvents && resEvents.ok) {
             const eventsData = await resEvents.json().catch(() => []);
             if (Array.isArray(eventsData) && eventsData.length > 0) {

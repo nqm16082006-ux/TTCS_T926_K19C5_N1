@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace EventTicketBooking.Api.DTOs
 {
@@ -16,4 +17,49 @@ namespace EventTicketBooking.Api.DTOs
         public bool CanCloseSale => Status == EventTicketBooking.Api.Models.ShowtimeStatus.OnSale;
         public string? StatusActionMessage { get; set; }
     }
+
+    public class CreateShowtimeDto : IValidatableObject
+    {
+        [Required(ErrorMessage = "Thời gian bắt đầu là bắt buộc.")]
+        public DateTime StartTime { get; set; }
+
+        [Required(ErrorMessage = "Thời gian kết thúc là bắt buộc.")]
+        public DateTime EndTime { get; set; }
+
+        public int AvailableSeats { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (EndTime <= StartTime)
+            {
+                yield return new ValidationResult(
+                    "Thời gian kết thúc phải lớn hơn thời gian bắt đầu.",
+                    new[] { nameof(EndTime) }
+                );
+            }
+        }
+    }
+
+    public class UpdateShowtimeDto : IValidatableObject
+    {
+        [Required(ErrorMessage = "Thời gian bắt đầu là bắt buộc.")]
+        public DateTime StartTime { get; set; }
+
+        [Required(ErrorMessage = "Thời gian kết thúc là bắt buộc.")]
+        public DateTime EndTime { get; set; }
+
+        public int? AvailableSeats { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (EndTime <= StartTime)
+            {
+                yield return new ValidationResult(
+                    "Thời gian kết thúc phải lớn hơn thời gian bắt đầu.",
+                    new[] { nameof(EndTime) }
+                );
+            }
+        }
+    }
 }
+

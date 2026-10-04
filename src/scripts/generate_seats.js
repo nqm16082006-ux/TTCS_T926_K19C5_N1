@@ -1,13 +1,17 @@
 const fs = require('fs');
+const path = require('path');
 
 /**
  * T-21: Script sinh dữ liệu 2000 ghế mẫu cho Event Ticket Booking
- * Chạy bằng: node scripts/generate_seats.js
+ * Chạy bằng: node scripts/generate_seats.js hoặc node src/scripts/generate_seats.js
  */
 
 const SEATS_COUNT = 2000;
 const SEATS_PER_ROW = 50;
-const OUTPUT_FILE = './data/sample_seats_2000.json';
+
+// Đường dẫn chuẩn tới thư mục data ở thư mục gốc của project
+const ROOT_DATA_DIR = path.resolve(__dirname, '../../data');
+const OUTPUT_FILE = path.join(ROOT_DATA_DIR, 'sample_seats_2000.json');
 
 // Cấu hình các loại ghế
 const CATEGORIES = [
@@ -39,10 +43,12 @@ function generateSeats() {
                 categoryIndex = 1;
             }
 
+            const catName = CATEGORIES[categoryIndex].name;
             seats.push({
                 row: rowName,
                 seatNumber: s,
-                category: CATEGORIES[categoryIndex].name
+                category: catName,
+                categoryName: catName
             });
 
             currentIndex++;
@@ -66,10 +72,11 @@ function getRowName(index) {
 const data = generateSeats();
 console.log(`Đã sinh thành công ${data.length} ghế.`);
 
-// Đảm bảo thư mục data tồn tại
-if (!fs.existsSync('./data')){
-    fs.mkdirSync('./data');
+// Đảm bảo thư mục data ở thư mục gốc tồn tại
+if (!fs.existsSync(ROOT_DATA_DIR)){
+    fs.mkdirSync(ROOT_DATA_DIR, { recursive: true });
 }
 
 fs.writeFileSync(OUTPUT_FILE, JSON.stringify(data, null, 2));
 console.log(`Đã lưu file tại: ${OUTPUT_FILE}`);
+

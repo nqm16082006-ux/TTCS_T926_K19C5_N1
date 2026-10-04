@@ -1,4 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
@@ -7,11 +13,14 @@ using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace EventTicketBooking.Api.Controllers
 {
     /// <summary>
     /// Controller phụ trách xác thực người dùng (Task TTKN-25 - Story S-02).
+    /// Hỗ trợ Đăng nhập/Đăng ký chuẩn bằng Email & Mật khẩu + OTP 6 số và Tiếp tục bằng Google.
     /// </summary>
     [ApiController]
     [Route("api/auth")]
@@ -21,17 +30,29 @@ namespace EventTicketBooking.Api.Controllers
         private readonly AppDbContext _context;
         private readonly IPasswordHasher _passwordHasher;
         private readonly IEmailService _emailService;
+        private readonly ITokenService _tokenService;
+        private readonly IConfiguration _configuration;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ILogger<AuthController> _logger;
 
         public AuthController(
             IAuthService authService,
             AppDbContext context,
             IPasswordHasher passwordHasher,
-            IEmailService emailService)
+            IEmailService emailService,
+            ITokenService tokenService,
+            IConfiguration configuration,
+            IHttpClientFactory httpClientFactory,
+            ILogger<AuthController> logger)
         {
             _authService = authService;
             _context = context;
             _passwordHasher = passwordHasher;
             _emailService = emailService;
+            _tokenService = tokenService;
+            _configuration = configuration;
+            _httpClientFactory = httpClientFactory;
+            _logger = logger;
         }
 
         /// <summary>
@@ -73,38 +94,10 @@ namespace EventTicketBooking.Api.Controllers
             });
         }
 
-        /// <summary>
-        /// API Xác thực Email thông qua Link (Task T-08).
-        /// </summary>
-        [HttpGet("verify-email")]
-        public async Task<IActionResult> VerifyEmail([FromQuery] string email, [FromQuery] string token)
-        {
-            if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(token))
-            {
-                return BadRequest("Thiếu thông tin xác thực.");
-            }
 
-            var success = await _authService.VerifyEmailCodeAsync(email, token);
-
-            if (!success)
-            {
-                return BadRequest("Liên kết xác nhận không hợp lệ, đã hết hạn hoặc tài khoản đã được xác nhận.");
-            }
-
-            // Trả về HTML thân thiện cho người dùng click từ Email
-            var html = @"
-                <html>
-                <body style='font-family: sans-serif; text-align: center; padding: 50px;'>
-                    <h2 style='color: green;'>✅ Xác thực Email thành công!</h2>
-                    <p>Tài khoản của bạn đã được kích hoạt. Bạn có thể đăng nhập ngay bây giờ.</p>
-                </body>
-                </html>
-            ";
-            return Content(html, "text/html");
-        }
 
         /// <summary>
-        /// API Đăng ký tài khoản mới (Task T-07).
+        /// Bước 1: API Đăng ký tài khoản mới qua Email & Mật khẩu -> Gửi mã xác nhận OTP 6 số về email.
         /// </summary>
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
@@ -114,15 +107,19 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(ModelState);
             }
 
-            // Kiểm tra email trùng lặp
-            bool emailExists = await _context.Users.AnyAsync(u => u.Email == request.Email);
-            if (emailExists)
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+
+            // Kiểm tra user đã tồn tại
+            var existingUser = await _context.Users
+                .Include(u => u.UserRoles)
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
+
+            if (existingUser != null && existingUser.IsActive)
             {
-                // Yêu cầu: "thông báo lỗi không phân biệt email đã tồn tại hay chưa"
-                return BadRequest(new { message = "Đăng ký không thành công. Thông tin không hợp lệ hoặc email đã tồn tại." });
+                return BadRequest(new { message = "Email này đã được đăng ký và kích hoạt trong hệ thống. Vui lòng đăng nhập." });
             }
 
-            // Lấy Role ""Customer"" từ Database (Tạo nếu chưa có để tránh lỗi khi không seed Data)
+            // Lấy Role "Customer" từ Database
             var customerRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Customer");
             if (customerRole == null)
             {
@@ -137,60 +134,603 @@ namespace EventTicketBooking.Api.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            // Hash mật khẩu với Argon2id
+            // Sinh mã OTP 6 chữ số an toàn
+            string otpCode = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+            DateTime expiresAt = DateTime.UtcNow.AddMinutes(15);
             string hashedPassword = _passwordHasher.Hash(request.Password);
 
-            // Dùng phần trước @ của Email để làm Username
-            string baseUsername = request.Email.Split('@')[0];
-            string username = baseUsername;
+            User targetUser;
 
-            // Xử lý trùng lặp Username
-            int counter = 1;
-            while (await _context.Users.AnyAsync(u => u.Username == username))
+            if (existingUser != null)
             {
-                username = $"{baseUsername}{counter}";
-                counter++;
+                // Người dùng đã đăng ký trước đó nhưng chưa xác thực OTP -> cập nhật lại thông tin & mã mới
+                existingUser.FullName = request.FullName.Trim();
+                existingUser.PasswordHash = hashedPassword;
+                existingUser.VerificationCode = otpCode;
+                existingUser.VerificationCodeExpiresAt = expiresAt;
+                existingUser.UpdatedAt = DateTime.UtcNow;
+                targetUser = existingUser;
+            }
+            else
+            {
+                // Dùng phần trước @ của Email để làm Username
+                string baseUsername = normalizedEmail.Split('@')[0];
+                string username = baseUsername;
+                int counter = 1;
+                while (await _context.Users.AnyAsync(u => u.Username == username))
+                {
+                    username = $"{baseUsername}{counter}";
+                    counter++;
+                }
+
+                targetUser = new User
+                {
+                    Id = Guid.NewGuid(),
+                    FullName = request.FullName.Trim(),
+                    Email = normalizedEmail,
+                    Username = username,
+                    PasswordHash = hashedPassword,
+                    IsActive = false,
+                    VerificationCode = otpCode,
+                    VerificationCodeExpiresAt = expiresAt,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                targetUser.UserRoles.Add(new UserRole
+                {
+                    UserId = targetUser.Id,
+                    RoleId = customerRole.Id
+                });
+
+                _context.Users.Add(targetUser);
             }
 
-            // Tạo User mới (Cờ chưa kích hoạt IsActive = false)
-            var newUser = new User
-            {
-                Id = Guid.NewGuid(),
-                FullName = request.FullName,
-                Email = request.Email,
-                Username = username,
-                PasswordHash = hashedPassword,
-                IsActive = false
-            };
-
-            // Tạo quan hệ N-N trong UserRoles
-            var userRole = new UserRole
-            {
-                UserId = newUser.Id,
-                RoleId = customerRole.Id
-            };
-            newUser.UserRoles.Add(userRole);
-
-            _context.Users.Add(newUser);
             await _context.SaveChangesAsync();
 
-            // T-08: Sinh mã xác thực và lưu vào DB (Hạn 24 giờ)
-            var token = await _authService.GenerateAndSaveVerificationCodeAsync(newUser);
-
-            // T-08: Tạo link xác thực chứa token và gửi qua Email Service
-            var scheme = Request.Scheme ?? "https";
-            var host = Request.Host.Value ?? "localhost";
-            var verificationLink = $"{scheme}://{host}/api/auth/verify-email?email={newUser.Email}&token={token}";
-
-            await _emailService.SendConfirmationEmailAsync(newUser.Email, newUser.FullName ?? newUser.Username, verificationLink);
-
-            // Trả về kết quả thành công
-            return Created("", new
+            // Gửi email chứa mã OTP 6 số qua EmailService
+            _ = Task.Run(async () =>
             {
-                message = "Đăng ký thành công. Vui lòng kiểm tra email để kích hoạt tài khoản.",
-                userId = newUser.Id,
-                email = newUser.Email
+                try
+                {
+                    await _emailService.SendOtpEmailAsync(targetUser.Email, targetUser.FullName ?? targetUser.Username, otpCode);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi nền khi gửi OTP cho {Email}", targetUser.Email);
+                }
             });
+
+            return Ok(new
+            {
+                success = true,
+                requiresOtp = true,
+                email = targetUser.Email,
+                message = "Mã xác thực gồm 6 chữ số đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư."
+            });
+        }
+
+        /// <summary>
+        /// Bước 2: API Xác thực mã OTP 6 số để hoàn tất đăng ký tài khoản.
+        /// </summary>
+        [HttpPost("verify-otp")]
+        public async Task<IActionResult> VerifyOtp([FromBody] VerifyEmailDto request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            var code = request.Code.Trim();
+
+            var user = await _context.Users
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
+
+            if (user == null)
+            {
+                return BadRequest(new { message = "Không tìm thấy thông tin tài khoản đăng ký với email này." });
+            }
+
+            if (user.IsActive)
+            {
+                return BadRequest(new { message = "Tài khoản này đã được kích hoạt trước đó. Vui lòng đăng nhập." });
+            }
+
+            if (string.IsNullOrEmpty(user.VerificationCode) ||
+                user.VerificationCode != code ||
+                !user.VerificationCodeExpiresAt.HasValue ||
+                user.VerificationCodeExpiresAt.Value < DateTime.UtcNow)
+            {
+                return BadRequest(new { message = "Mã xác thực không chính xác hoặc đã hết hạn (15 phút). Vui lòng thử lại hoặc bấm Gửi lại mã." });
+            }
+
+            // Kích hoạt tài khoản
+            user.IsActive = true;
+            user.VerificationCode = null;
+            user.VerificationCodeExpiresAt = null;
+            user.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            // Gửi email xác nhận đăng ký thành công cho người dùng qua Email & Mật khẩu
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _emailService.SendWelcomeEmailAsync(user.Email, user.FullName ?? user.Username, "Email & Mật khẩu");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi gửi email xác nhận đăng ký thành công cho {Email}", user.Email);
+                }
+            });
+
+            // Lấy danh sách Roles
+            var roles = user.UserRoles
+                .Where(ur => ur.Role != null)
+                .Select(ur => ur.Role!.Name)
+                .ToList();
+
+            if (roles.Count == 0)
+            {
+                roles.Add("Customer");
+            }
+
+            // Tự động tạo Access Token và đăng nhập ngay
+            var accessToken = _tokenService.GenerateAccessToken(user, roles);
+
+            _logger.LogInformation("Người dùng {Email} đã kích hoạt tài khoản thành công qua OTP 6 số!", user.Email);
+
+            return Ok(new LoginResponseDto
+            {
+                AccessToken = accessToken,
+                TokenType = "Bearer",
+                ExpiresIn = 86400,
+                User = new UserDto
+                {
+                    Id = user.Id,
+                    Username = user.Username,
+                    Email = user.Email,
+                    FullName = user.FullName,
+                    Roles = roles
+                }
+            });
+        }
+
+        /// <summary>
+        /// API Gửi lại mã xác nhận OTP (Resend OTP).
+        /// </summary>
+        [HttpPost("resend-otp")]
+        public async Task<IActionResult> ResendOtp([FromBody] ResendOtpDto request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
+
+            if (user == null)
+            {
+                return BadRequest(new { message = "Email chưa được đăng ký trong hệ thống." });
+            }
+
+            if (user.IsActive)
+            {
+                return BadRequest(new { message = "Tài khoản này đã được kích hoạt, bạn có thể đăng nhập ngay." });
+            }
+
+            // Sinh mã OTP 6 số mới
+            string newOtp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+            user.VerificationCode = newOtp;
+            user.VerificationCodeExpiresAt = DateTime.UtcNow.AddMinutes(15);
+            user.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            // Gửi email mới
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _emailService.SendOtpEmailAsync(user.Email, user.FullName ?? user.Username, newOtp);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi gửi lại OTP cho {Email}", user.Email);
+                }
+            });
+
+            return Ok(new { success = true, message = "Đã gửi lại mã xác thực mới vào email của bạn. Vui lòng kiểm tra hộp thư." });
+        }
+
+        /// <summary>
+        /// API Tiếp tục bằng Google (Google Sign-In / OAuth).
+        /// Xác thực ID Token từ Google Identity Services và đăng nhập / đăng ký tự động.
+        /// </summary>
+        [HttpPost("google")]
+        public async Task<IActionResult> GoogleAuth([FromBody] GoogleAuthRequestDto request)
+        {
+            if (string.IsNullOrWhiteSpace(request?.Credential))
+            {
+                return BadRequest(new { message = "Mã xác thực Google không hợp lệ hoặc bị thiếu." });
+            }
+
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                // Gọi API xác thực Google tokeninfo chuẩn
+                var response = await client.GetAsync($"https://oauth2.googleapis.com/tokeninfo?id_token={request.Credential}");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return BadRequest(new { message = "Mã xác thực Google không hợp lệ hoặc đã hết hạn." });
+                }
+
+                var payload = await response.Content.ReadFromJsonAsync<GoogleTokenPayload>();
+                if (payload == null || string.IsNullOrWhiteSpace(payload.Email))
+                {
+                    return BadRequest(new { message = "Không thể đọc thông tin người dùng từ Google." });
+                }
+
+                // Kiểm tra Audience (Client ID)
+                var expectedClientId = _configuration["GoogleAuth:ClientId"];
+                if (!string.IsNullOrEmpty(expectedClientId) && !string.Equals(payload.Aud, expectedClientId, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogWarning("Google Token Aud '{Aud}' không khớp cấu hình '{Expected}'", payload.Aud, expectedClientId);
+                    return BadRequest(new { message = "Google Client ID không khớp với hệ thống." });
+                }
+
+                var normalizedEmail = payload.Email.Trim().ToLowerInvariant();
+
+                // Tìm hoặc tạo User
+                var user = await _context.Users
+                    .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                    .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
+
+                if (user == null)
+                {
+                    var customerRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Customer");
+                    if (customerRole == null)
+                    {
+                        customerRole = new Role
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Customer",
+                            Description = "Khách hàng và người tham dự",
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        _context.Roles.Add(customerRole);
+                        await _context.SaveChangesAsync();
+                    }
+
+                    string baseUsername = normalizedEmail.Split('@')[0];
+                    string username = baseUsername;
+                    int counter = 1;
+                    while (await _context.Users.AnyAsync(u => u.Username == username))
+                    {
+                        username = $"{baseUsername}{counter}";
+                        counter++;
+                    }
+
+                    string verificationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+
+                    user = new User
+                    {
+                        Id = Guid.NewGuid(),
+                        FullName = payload.Name ?? baseUsername,
+                        Email = normalizedEmail,
+                        Username = username,
+                        PasswordHash = _passwordHasher.Hash(Guid.NewGuid().ToString("N")),
+                        IsActive = false, // Bắt buộc phải bấm nút xác nhận trong email gửi về
+                        VerificationCode = verificationToken,
+                        VerificationCodeExpiresAt = DateTime.UtcNow.AddHours(24),
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    user.UserRoles.Add(new UserRole
+                    {
+                        UserId = user.Id,
+                        RoleId = customerRole.Id,
+                        Role = customerRole
+                    });
+
+                    _context.Users.Add(user);
+                    await _context.SaveChangesAsync();
+
+                    // Gửi email chứa nút bấm xác nhận kích hoạt tài khoản
+                    string scheme = Request.Scheme;
+                    string host = Request.Host.Value;
+                    string confirmationLink = $"{scheme}://{host}/activate.html?email={Uri.EscapeDataString(user.Email)}&token={verificationToken}";
+
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _emailService.SendConfirmationEmailAsync(user.Email, user.FullName ?? user.Username, confirmationLink);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Lỗi gửi email xác nhận tài khoản Google cho {Email}", user.Email);
+                        }
+                    });
+
+                    return Ok(new
+                    {
+                        success = true,
+                        requiresEmailConfirmation = true,
+                        email = user.Email,
+                        message = "Chúng tôi đã gửi email xác nhận đến hòm thư của bạn. Vui lòng mở email và bấm nút 'Xác nhận Đăng ký Tài khoản' để hoàn tất kích hoạt."
+                    });
+                }
+                else
+                {
+                    // Nếu tài khoản đã bị khóa bởi Quản trị viên (VerificationCode bị xóa khi khóa)
+                    if (!user.IsActive && string.IsNullOrEmpty(user.VerificationCode))
+                    {
+                        return StatusCode(StatusCodes.Status423Locked, new
+                        {
+                            statusCode = StatusCodes.Status423Locked,
+                            message = "Tài khoản của bạn đã bị khóa bởi Quản trị viên. Vui lòng liên hệ Admin để được hỗ trợ.",
+                            isLocked = true
+                        });
+                    }
+
+                    // Nếu là Đăng ký (Mode == "register") HOẶC tài khoản chưa được kích hoạt:
+                    // Bắt buộc gửi email chứa nút bấm xác nhận và yêu cầu người dùng bấm nút
+                    if (string.Equals(request.Mode, "register", StringComparison.OrdinalIgnoreCase) || !user.IsActive)
+                    {
+                        user.IsActive = false;
+                        string verificationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+                        user.VerificationCode = verificationToken;
+                        user.VerificationCodeExpiresAt = DateTime.UtcNow.AddHours(24);
+                        user.UpdatedAt = DateTime.UtcNow;
+
+                        if (string.IsNullOrWhiteSpace(user.FullName) && !string.IsNullOrWhiteSpace(payload.Name))
+                        {
+                            user.FullName = payload.Name;
+                        }
+
+                        await _context.SaveChangesAsync();
+
+                        string scheme = Request.Scheme;
+                        string host = Request.Host.Value;
+                        string confirmationLink = $"{scheme}://{host}/activate.html?email={Uri.EscapeDataString(user.Email)}&token={verificationToken}";
+
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await _emailService.SendConfirmationEmailAsync(user.Email, user.FullName ?? user.Username, confirmationLink);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Lỗi gửi email xác nhận cho {Email}", user.Email);
+                            }
+                        });
+
+                        return Ok(new
+                        {
+                            success = true,
+                            requiresEmailConfirmation = true,
+                            email = user.Email,
+                            message = "Chúng tôi đã gửi email xác nhận đến hòm thư của bạn. Vui lòng mở email và nhấn nút 'Xác nhận Đăng ký Tài khoản' để hoàn tất kích hoạt."
+                        });
+                    }
+
+                    if (string.IsNullOrWhiteSpace(user.FullName) && !string.IsNullOrWhiteSpace(payload.Name))
+                    {
+                        user.FullName = payload.Name;
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
+                // Nếu tài khoản ĐÃ được kích hoạt thành công trước đó (đã bấm nút xác nhận trong mail)
+                var roles = user.UserRoles
+                    .Where(ur => ur.Role != null)
+                    .Select(ur => ur.Role!.Name)
+                    .ToList();
+
+                if (roles.Count == 0)
+                {
+                    roles.Add("Customer");
+                }
+
+                var accessToken = _tokenService.GenerateAccessToken(user, roles);
+
+                _logger.LogInformation("Người dùng {Email} đăng nhập Google thành công (tài khoản đã kích hoạt)!", user.Email);
+
+                return Ok(new LoginResponseDto
+                {
+                    AccessToken = accessToken,
+                    TokenType = "Bearer",
+                    ExpiresIn = 86400,
+                    User = new UserDto
+                    {
+                        Id = user.Id,
+                        Username = user.Username,
+                        Email = user.Email,
+                        FullName = user.FullName,
+                        Roles = roles
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi xử lý đăng nhập Google.");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Lỗi xác thực Google từ máy chủ." });
+            }
+        }
+
+        /// <summary>
+        /// API Xác nhận email khi người dùng bấm vào nút trong email gửi về.
+        /// Kích hoạt tài khoản, gửi email chào mừng thành công và tự động đăng nhập.
+        /// </summary>
+        [HttpGet("verify-email")]
+        public async Task<IActionResult> VerifyEmail([FromQuery] string email, [FromQuery] string token)
+        {
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
+            {
+                return BadRequest(new { message = "Thông tin xác nhận email không đầy đủ hoặc bị thiếu." });
+            }
+
+            var normalizedEmail = email.Trim().ToLowerInvariant();
+            var user = await _context.Users
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
+
+            if (user == null)
+            {
+                return NotFound(new { message = "Không tìm thấy thông tin tài khoản ứng với email này." });
+            }
+
+            var roles = user.UserRoles
+                .Where(ur => ur.Role != null)
+                .Select(ur => ur.Role!.Name)
+                .ToList();
+            if (roles.Count == 0) roles.Add("Customer");
+
+            if (user.IsActive)
+            {
+                var existingToken = _tokenService.GenerateAccessToken(user, roles);
+                return Ok(new
+                {
+                    success = true,
+                    isAlreadyActive = true,
+                    message = "Tài khoản của bạn đã được xác nhận và kích hoạt từ trước.",
+                    accessToken = existingToken,
+                    user = new UserDto
+                    {
+                        Id = user.Id,
+                        Username = user.Username,
+                        Email = user.Email,
+                        FullName = user.FullName,
+                        Roles = roles
+                    }
+                });
+            }
+
+            // Kiểm tra token và thời hạn
+            if (string.IsNullOrEmpty(user.VerificationCode) ||
+                !string.Equals(user.VerificationCode.Trim(), token.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                !user.VerificationCodeExpiresAt.HasValue ||
+                user.VerificationCodeExpiresAt.Value < DateTime.UtcNow)
+            {
+                return BadRequest(new { message = "Liên kết xác nhận không hợp lệ hoặc đã hết hạn (24 giờ). Vui lòng yêu cầu gửi lại email mới." });
+            }
+
+            // Kích hoạt tài khoản thành công
+            user.IsActive = true;
+            user.VerificationCode = null;
+            user.VerificationCodeExpiresAt = null;
+            user.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            var newAccessToken = _tokenService.GenerateAccessToken(user, roles);
+
+            _logger.LogInformation("Người dùng {Email} đã bấm nút xác nhận trong email kích hoạt thành công!", user.Email);
+
+            // Gửi email chúc mừng đăng ký thành công
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _emailService.SendWelcomeEmailAsync(user.Email, user.FullName ?? user.Username, "Tài khoản Google");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi gửi email chào mừng cho {Email}", user.Email);
+                }
+            });
+
+            return Ok(new
+            {
+                success = true,
+                message = "Kích hoạt tài khoản thành công!",
+                accessToken = newAccessToken,
+                user = new UserDto
+                {
+                    Id = user.Id,
+                    Username = user.Username,
+                    Email = user.Email,
+                    FullName = user.FullName,
+                    Roles = roles
+                }
+            });
+        }
+
+        /// <summary>
+        /// API Gửi lại email chứa nút xác nhận kích hoạt tài khoản.
+        /// </summary>
+        [HttpPost("resend-confirmation-link")]
+        public async Task<IActionResult> ResendConfirmationLink([FromBody] ResendOtpDto request)
+        {
+            if (string.IsNullOrWhiteSpace(request?.Email))
+            {
+                return BadRequest(new { message = "Email không được để trống." });
+            }
+
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
+
+            if (user == null)
+            {
+                return BadRequest(new { message = "Không tìm thấy tài khoản với email này." });
+            }
+
+            if (user.IsActive)
+            {
+                return Ok(new { success = true, isAlreadyActive = true, message = "Tài khoản này đã được kích hoạt trước đó. Bạn có thể đăng nhập ngay." });
+            }
+
+            string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            user.VerificationCode = token;
+            user.VerificationCodeExpiresAt = DateTime.UtcNow.AddHours(24);
+            user.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            string scheme = Request.Scheme;
+            string host = Request.Host.Value;
+            string confirmationLink = $"{scheme}://{host}/activate.html?email={Uri.EscapeDataString(user.Email)}&token={token}";
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _emailService.SendConfirmationEmailAsync(user.Email, user.FullName ?? user.Username, confirmationLink);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi gửi lại liên kết xác nhận cho {Email}", user.Email);
+                }
+            });
+
+            return Ok(new { success = true, message = "Đã gửi lại email xác nhận mới. Vui lòng kiểm tra hộp thư của bạn." });
+        }
+
+        private class GoogleTokenPayload
+        {
+            [JsonPropertyName("email")]
+            public string? Email { get; set; }
+
+            [JsonPropertyName("name")]
+            public string? Name { get; set; }
+
+            [JsonPropertyName("sub")]
+            public string? Sub { get; set; }
+
+            [JsonPropertyName("aud")]
+            public string? Aud { get; set; }
+
+            [JsonPropertyName("email_verified")]
+            public string? EmailVerified { get; set; }
         }
     }
 }

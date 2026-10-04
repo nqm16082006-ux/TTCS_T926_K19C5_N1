@@ -1,275 +1,241 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cổng Thanh Toán Giả Lập - Mock Payment Gateway</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Cổng Thanh Toán Giả Lập Sandbox - EventPulse</title>
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
   <style>
-    :root {
-      --bg-app: #f1f5f9;
-      --bg-surface: #ffffff;
-      --border-color: #e2e8f0;
-      --primary: #4f46e5;
-      --text-heading: #0f172a;
-      --text-body: #334155;
-      --text-muted: #64748b;
-      --success: #16a34a;
-      --danger: #dc2626;
-      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+    @layer base {
+      html, body { margin: 0; padding: 0; }
+      body { overscroll-behavior: none; }
+      main > :first-child { margin-top: 0 !important; }
+      main > :last-child { margin-bottom: 0 !important; }
     }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: var(--bg-app);
-      color: var(--text-body);
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 24px;
-    }
-
-    .card {
-      background: var(--bg-surface);
-      border-radius: 20px;
-      box-shadow: var(--shadow);
-      width: 100%;
-      max-width: 500px;
-      padding: 32px;
-      border: 1px solid var(--border-color);
-    }
-
-    .header {
-      text-align: center;
-      margin-bottom: 24px;
-    }
-
-    .badge-test {
-      display: inline-block;
-      background: #e0f2fe;
-      color: #0284c7;
-      font-size: 11px;
-      font-weight: 800;
-      padding: 4px 12px;
-      border-radius: 999px;
-      letter-spacing: 0.5px;
-      margin-bottom: 10px;
-      border: 1px solid #bae6fd;
-    }
-
-    .header h2 {
-      color: var(--text-heading);
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: -0.3px;
-    }
-
-    .header p {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-
-    .order-box {
-      background: #f8fafc;
-      border: 1px solid var(--border-color);
-      border-radius: 14px;
-      padding: 18px 20px;
-      margin-bottom: 24px;
-    }
-
-    .event-title-banner {
-      font-size: 16px;
-      font-weight: 800;
-      color: var(--primary);
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-      font-size: 13px;
-    }
-
-    .row:last-child {
-      margin-bottom: 0;
-      padding-top: 10px;
-      border-top: 1px dashed var(--border-color);
-    }
-
-    .label {
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-
-    .value {
-      font-weight: 700;
-      color: var(--text-heading);
-      text-align: right;
-    }
-
-    .seats-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      justify-content: flex-end;
-    }
-
-    .seat-tag {
-      background: #eef2ff;
-      color: #4338ca;
-      border: 1px solid #c7d2fe;
-      padding: 2px 8px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .price-total {
-      color: #2563eb;
-      font-size: 20px;
-      font-weight: 800;
-    }
-
-    .actions {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .btn {
-      width: 100%;
-      padding: 14px;
-      border: none;
-      border-radius: 12px;
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-
-    .btn-success {
-      background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-      color: #ffffff;
-      box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
-    }
-
-    .btn-success:hover {
-      background: #15803d;
-      transform: translateY(-1px);
-    }
-
-    .btn-danger {
-      background: #ffffff;
-      color: #dc2626;
-      border: 1px solid #fecaca;
-    }
-
-    .btn-danger:hover {
-      background: #fef2f2;
-    }
-
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .note {
-      text-align: center;
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 18px;
-      line-height: 1.5;
-    }
+    ::-webkit-scrollbar { display: none; }
   </style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "inverse-primary": "#c3c0ff", "surface-container-high": "#e2e7ff", "surface-container-low": "#f2f3ff",
+            "tertiary-fixed-dim": "#6bd8cb", "tertiary-fixed": "#89f5e7", "primary": "#3525cd",
+            "outline-variant": "#c7c4d8", "on-primary": "#ffffff", "on-tertiary-fixed": "#00201d",
+            "primary-container": "#4f46e5", "on-secondary-fixed": "#25005a", "tertiary": "#00524b",
+            "secondary-container": "#8a4cfc", "on-tertiary": "#ffffff", "on-primary-container": "#dad7ff",
+            "on-secondary-container": "#fffbff", "primary-fixed-dim": "#c3c0ff", "on-surface": "#131b2e",
+            "surface-bright": "#faf8ff", "inverse-on-surface": "#eef0ff", "secondary": "#712ae2",
+            "tertiary-container": "#006c63", "surface-container-highest": "#dae2fd", "surface-container-lowest": "#ffffff",
+            "outline": "#777587", "on-tertiary-container": "#81eddf", "on-surface-variant": "#464555",
+            "error-container": "#ffdad6", "on-primary-fixed-variant": "#3323cc", "on-secondary": "#ffffff",
+            "on-error": "#ffffff", "surface": "#faf8ff", "on-tertiary-fixed-variant": "#005049",
+            "background": "#faf8ff", "on-background": "#131b2e", "secondary-fixed-dim": "#d2bbff",
+            "surface-dim": "#d2d9f4", "on-secondary-fixed-variant": "#5a00c6", "on-primary-fixed": "#0f0069",
+            "secondary-fixed": "#eaddff", "on-error-container": "#93000a", "surface-tint": "#4d44e3",
+            "primary-fixed": "#e2dfff", "error": "#ba1a1a", "inverse-surface": "#283044",
+            "surface-container": "#eaedff", "surface-variant": "#dae2fd"
+          },
+          borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+          spacing: {
+            "space-xl": "2rem", "gutter-lg": "2rem", "margin": "1.5rem", "margin-lg": "2.5rem",
+            "margin-sm": "1rem", "space-xs": "0.25rem", "gutter": "1.5rem", "space-2xl": "3rem",
+            "space-md": "1rem", "space-lg": "1.5rem", "gutter-sm": "0.75rem", "space-sm": "0.5rem"
+          },
+          fontFamily: {
+            "body-md": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"], "label-md": ["Plus Jakarta Sans"],
+            "label-lg": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"], "display-lg-mobile": ["Plus Jakarta Sans"],
+            "display-lg": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"], "headline-xl": ["Plus Jakarta Sans"],
+            "headline-xl-mobile": ["Plus Jakarta Sans"], "body-sm": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"],
+            "code-mono": ["JetBrains Mono"], "headline-lg": ["Plus Jakarta Sans"]
+          }
+        }
+      }
+    };
+  </script>
 </head>
-<body>
-
-  <div class="card">
-    <div class="header">
-      <span class="badge-test">MOCK ENVIRONMENT</span>
-      <h2>Cổng Thanh Toán Giả Lập</h2>
-      <p>Mô phỏng quy trình xử lý giao dịch thanh toán vé trực tuyến</p>
+<body class="bg-surface font-body-md text-body-md text-on-surface min-h-screen flex flex-col justify-between">
+  <!-- Header -->
+  <header class="fixed top-0 left-0 w-full z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+    <div class="h-16 max-w-7xl mx-auto px-margin flex items-center justify-between">
+      <div class="flex items-center gap-space-lg">
+        <a class="flex items-center gap-space-sm" href="./public-events.html">
+          <div class="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center shadow-sm">
+            <span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+          </div>
+          <span class="font-headline-md text-headline-md tracking-tight text-primary font-bold">EventPulse</span>
+        </a>
+        <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold font-code-mono">
+          SANDBOX SIMULATOR
+        </span>
+      </div>
+      <div>
+        <a href="./public-events.html" class="flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary transition">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+          <span>Hủy &amp; Quay lại</span>
+        </a>
+      </div>
     </div>
+  </header>
 
-    <div class="order-box">
-      <div class="event-title-banner" id="eventTitleBanner">
-        <span>🎸</span> <span id="eventTitle">Đại Nhạc Hội 2026</span>
-      </div>
-
-      <div class="row" id="rowLocation">
-        <span class="label">Địa điểm:</span>
-        <span class="value" id="eventLocation">Hà Nội</span>
-      </div>
-
-      <div class="row" id="rowCustomer">
-        <span class="label">Người đặt vé:</span>
-        <span class="value" id="customerInfo">Khách hàng</span>
-      </div>
-
-      <div class="row">
-        <span class="label">Mã đơn hàng:</span>
-        <span class="value" id="orderIdText" style="font-family: monospace; font-size: 12px;">--</span>
-      </div>
-
-      <div class="row">
-        <span class="label">Ghế đã chọn:</span>
-        <div class="seats-tags" id="seatsList">
-          <span class="seat-tag">Đang tải...</span>
+  <!-- Main Content -->
+  <main class="w-full pt-20 pb-12 bg-surface flex-1 flex items-center justify-center">
+    <div class="w-full max-w-6xl mx-auto px-margin">
+      <!-- Top Order Brief -->
+      <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-space-md mb-space-lg bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-surface-container-high">
+        <div class="flex items-center gap-space-md">
+          <div class="w-12 h-12 rounded-xl bg-primary-container/10 flex items-center justify-center text-primary flex-shrink-0">
+            <span class="material-symbols-outlined text-[28px]">lock</span>
+          </div>
+          <div>
+            <div class="flex items-center gap-space-xs">
+              <span class="font-label-sm text-label-sm text-primary uppercase font-bold tracking-wider">Cổng thanh toán giả lập</span>
+              <span class="text-outline-variant">•</span>
+              <span class="font-code-mono text-code-mono text-on-surface-variant font-medium" id="orderCodeLabel">MÃ ĐƠN: ...</span>
+            </div>
+            <h1 class="font-headline-lg text-headline-lg text-on-surface font-bold tracking-tight" id="eventTitle">
+              Đang tải thông tin đơn hàng...
+            </h1>
+          </div>
+        </div>
+        <div class="flex items-center gap-space-md self-stretch lg:self-auto justify-between lg:justify-end bg-surface-container-low px-space-lg py-space-sm rounded-lg border border-surface-container-high">
+          <div class="text-right">
+            <span class="text-xs text-on-surface-variant block font-medium">Tổng tiền thanh toán</span>
+            <span class="font-code-mono text-headline-md text-primary font-bold" id="totalAmountText">0 ₫</span>
+          </div>
         </div>
       </div>
 
-      <div class="row">
-        <span class="label">Tổng tiền thanh toán:</span>
-        <span class="value price-total" id="amountDisplay">0 VNĐ</span>
+      <!-- Dual Column Layout -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter-lg items-start">
+        <!-- LEFT: Payment Details & QR (7 cols) -->
+        <div class="lg:col-span-7 flex flex-col gap-space-lg">
+          <div class="bg-surface-container-lowest p-space-xl rounded-2xl shadow-sm border border-surface-container-high">
+            <h2 class="font-headline-md text-headline-md text-on-surface font-bold mb-1">Quét mã VietQR chuyển khoản</h2>
+            <p class="font-body-sm text-body-sm text-on-surface-variant mb-space-md">
+              Hệ thống tự động kích hoạt vé ngay khi phát hiện giao dịch thành công.
+            </p>
+
+            <!-- Bank Info Box -->
+            <div class="w-full bg-surface-container-low p-space-md rounded-xl mb-space-md text-left border border-surface-container-high">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-label-sm text-label-sm text-on-surface-variant font-bold uppercase">Ngân hàng nhận</span>
+                <span class="font-code-mono text-label-sm font-bold text-primary">BIDV / VIETQR</span>
+              </div>
+              <p class="font-headline-sm text-headline-sm text-on-surface font-bold">CÔNG TY CỔ PHẦN EVENTPULSE</p>
+              <div class="flex items-center justify-between mt-2 pt-2 bg-surface-container-high/40 px-space-sm py-1 rounded">
+                <span class="font-body-sm text-body-sm text-on-surface-variant">Số tài khoản: <strong class="font-code-mono text-on-surface font-bold">1903.8821.9999</strong></span>
+                <span class="text-xs text-primary font-semibold">Tự động đối soát</span>
+              </div>
+            </div>
+
+            <!-- Visual QR Representation -->
+            <div class="flex flex-col items-center justify-center p-4 bg-surface-container-low rounded-xl mb-space-md">
+              <div class="w-48 h-48 bg-white rounded-lg p-2 flex items-center justify-center shadow-md relative">
+                <!-- Stylized QR SVG -->
+                <svg class="w-full h-full text-on-surface" fill="currentColor" viewBox="0 0 200 200">
+                  <rect fill="#131b2e" height="50" rx="6" width="50" x="10" y="10"></rect>
+                  <rect fill="#ffffff" height="34" rx="2" width="34" x="18" y="18"></rect>
+                  <rect fill="#3525cd" height="20" rx="3" width="20" x="25" y="25"></rect>
+                  <rect fill="#131b2e" height="50" rx="6" width="50" x="140" y="10"></rect>
+                  <rect fill="#ffffff" height="34" rx="2" width="34" x="148" y="18"></rect>
+                  <rect fill="#3525cd" height="20" rx="3" width="20" x="155" y="25"></rect>
+                  <rect fill="#131b2e" height="50" rx="6" width="50" x="10" y="140"></rect>
+                  <rect fill="#ffffff" height="34" rx="2" width="34" x="18" y="148"></rect>
+                  <rect fill="#3525cd" height="20" rx="3" width="20" x="25" y="155"></rect>
+                  <rect height="10" rx="1" width="10" x="70" y="15"></rect>
+                  <rect height="10" rx="1" width="15" x="90" y="15"></rect>
+                  <rect height="15" rx="1" width="10" x="115" y="15"></rect>
+                  <rect fill="#3525cd" height="30" rx="4" width="70" x="65" y="85"></rect>
+                  <text fill="#ffffff" font-family="Plus Jakarta Sans" font-size="11" font-weight="bold" text-anchor="middle" x="100" y="104">EventPulse</text>
+                  <rect height="10" rx="1" width="20" x="70" y="125"></rect>
+                  <rect height="15" rx="1" width="15" x="100" y="125"></rect>
+                  <rect height="20" rx="1" width="10" x="125" y="125"></rect>
+                  <rect height="10" rx="1" width="30" x="70" y="180"></rect>
+                  <rect height="15" rx="1" width="20" x="110" y="175"></rect>
+                </svg>
+              </div>
+              <p class="text-xs text-on-surface-variant font-medium mt-3">
+                Quét mã bằng app ngân hàng bất kỳ để hoàn tất
+              </p>
+            </div>
+
+            <!-- Order Details Breakdown -->
+            <div class="space-y-2 bg-surface-container-high/30 p-space-md rounded-lg text-sm text-left">
+              <div class="flex justify-between items-center">
+                <span class="text-on-surface-variant">Nội dung chuyển khoản:</span>
+                <span class="font-code-mono font-bold text-primary bg-white px-2 py-0.5 rounded shadow-sm" id="orderTransferContent">--</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-on-surface-variant">Danh sách ghế:</span>
+                <div class="flex flex-wrap gap-1 justify-end" id="seatsListContainer">
+                  <span class="px-2 py-0.5 bg-primary-fixed text-primary text-xs rounded font-bold font-code-mono">Đang tải...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Sandbox Testing Actions (5 cols) -->
+        <div class="lg:col-span-5 flex flex-col gap-space-lg">
+          <div class="bg-surface-container-lowest p-space-xl rounded-2xl shadow-sm border border-surface-container-high">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="material-symbols-outlined text-secondary text-[24px]">terminal</span>
+              <h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Bảng Kiểm Thử Sandbox QA</h3>
+            </div>
+            <p class="text-sm text-on-surface-variant mb-6 leading-relaxed">
+              Môi trường giả lập phục vụ quá trình chấm điểm và kiểm thử logic webhook / xử lý thanh toán tự động:
+            </p>
+
+            <div class="flex flex-col gap-3">
+              <!-- Simulate Success -->
+              <button onclick="submitPayment(true)" id="btnSuccess" class="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-label-lg text-label-lg font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99]">
+                <span class="material-symbols-outlined text-[20px]">check_circle</span>
+                <span>Thanh toán Thành công (200 OK)</span>
+              </button>
+
+              <!-- Simulate Fail -->
+              <button onclick="submitPayment(false)" id="btnFail" class="w-full h-12 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-label-lg text-label-lg font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99]">
+                <span class="material-symbols-outlined text-[20px]">cancel</span>
+                <span>Báo lỗi Thanh toán Thất bại</span>
+              </button>
+            </div>
+
+            <div class="mt-6 p-4 rounded-xl bg-surface-container-low border border-surface-container-high text-xs text-on-surface-variant space-y-1">
+              <div class="font-bold text-on-surface flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm text-primary">info</span>
+                Quy trình xử lý tự động:
+              </div>
+              <p>• Khi bấm <strong>Thành công</strong>: Backend chuyển đơn hàng sang trạng thái <code>PAID</code>, ghế chuyển sang <code>SOLD</code>.</p>
+              <p>• Khi bấm <strong>Thất bại</strong>: Backend giữ nguyên trạng thái đơn hàng để thử lại hoặc kích hoạt job nền huỷ quá hạn.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+  </main>
 
-    <div class="actions">
-      <button class="btn btn-success" id="btnPaySuccess" onclick="processPayment(true)">
-        <span>💳</span> Xác nhận Thanh toán Thành Công
-      </button>
-      <button class="btn btn-danger" id="btnPayFail" onclick="processPayment(false)">
-        <span>✕</span> Báo lỗi Thanh toán Thất Bại
-      </button>
-    </div>
-
-    <p class="note">
-      Môi trường Sandbox / Mock dùng để kiểm thử luồng đặt vé và đối soát giao dịch tự động.
-    </p>
-  </div>
+  <footer class="w-full py-4 text-center text-xs text-on-surface-variant bg-surface-container-low border-t border-surface-container-high">
+    <p>© 2026 EventPulse System. Mock Payment Sandbox Environment.</p>
+  </footer>
 
   <script>
-    const API_BASE = window.location.origin;
+    const API_BASE = (window.location.protocol === 'file:' || (window.location.port && window.location.port !== '5012')) ? 'http://localhost:5012' : '';
     const params = new URLSearchParams(window.location.search);
     const orderId = params.get('orderId') || '';
     const initialAmount = params.get('amount') || '0';
     const token = localStorage.getItem('access_token');
 
-    document.getElementById('orderIdText').textContent = orderId || 'Chưa có mã đơn';
-    document.getElementById('amountDisplay').textContent = parseInt(initialAmount).toLocaleString('vi-VN') + ' VNĐ';
+    document.getElementById('orderCodeLabel').textContent = `MÃ ĐƠN: ${orderId.substring(0, 8).toUpperCase()}`;
+    document.getElementById('orderTransferContent').textContent = `PAY ${orderId.substring(0, 8).toUpperCase()}`;
+    document.getElementById('totalAmountText').textContent = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(parseInt(initialAmount) || 0);
 
-    // Nạp chi tiết đơn hàng
-    async function loadOrderDetails() {
+    async function loadOrder() {
       if (!orderId) return;
 
       try {
@@ -282,40 +248,29 @@
           if (json.data) {
             const o = json.data;
             if (o.eventTitle) document.getElementById('eventTitle').textContent = o.eventTitle;
-            if (o.eventLocation) document.getElementById('eventLocation').textContent = o.eventLocation;
-            if (o.customerName || o.customerEmail) {
-              document.getElementById('customerInfo').textContent = `${o.customerName || ''} (${o.customerEmail || ''})`.trim();
-            }
             if (o.totalAmount) {
-              document.getElementById('amountDisplay').textContent = o.totalAmount.toLocaleString('vi-VN') + ' VNĐ';
+              document.getElementById('totalAmountText').textContent = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(o.totalAmount);
             }
-
             if (o.items && o.items.length > 0) {
-              document.getElementById('seatsList').innerHTML = o.items.map(item => 
-                `<span class="seat-tag">Ghế ${escapeHtml(item.seatName || 'N/A')}${item.categoryName ? ' - ' + escapeHtml(item.categoryName) : ''}</span>`
+              document.getElementById('seatsListContainer').innerHTML = o.items.map(it => 
+                `<span class="px-2 py-0.5 bg-primary-fixed text-primary text-xs rounded font-bold font-code-mono">Ghế ${it.seatName || 'N/A'}</span>`
               ).join('');
             }
           }
         }
       } catch (err) {
-        console.warn('Could not load rich order summary, falling back to URL params', err);
+        console.warn('Could not load rich order details:', err);
       }
     }
 
-    async function processPayment(isSuccess) {
-      const btnSuccess = document.getElementById('btnPaySuccess');
-      const btnFail = document.getElementById('btnPayFail');
+    async function submitPayment(isSuccess) {
+      const btnSuccess = document.getElementById('btnSuccess');
+      const btnFail = document.getElementById('btnFail');
       btnSuccess.disabled = true;
       btnFail.disabled = true;
 
-      if (isSuccess) {
-        btnSuccess.innerHTML = '⌛ Đang xử lý giao dịch...';
-      } else {
-        btnFail.innerHTML = '⌛ Đang ghi nhận...';
-      }
-
       try {
-        const response = await fetch(`${API_BASE}/api/mock-payment/callback`, {
+        const res = await fetch(`${API_BASE}/api/mock-payment/callback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -324,32 +279,22 @@
           })
         });
 
-        const result = await response.json().catch(() => ({}));
-        if (response.ok) {
-          const redirectUrl = (result.data && result.data.redirectUrl) || `/order-success.html?orderId=${encodeURIComponent(orderId)}`;
-          window.location.href = redirectUrl;
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          window.location.href = `./payment-result.html?orderId=${encodeURIComponent(orderId)}&status=${isSuccess ? 'PAID' : 'FAILED'}`;
         } else {
-          alert(result.message || 'Xử lý thanh toán thất bại.');
+          alert(data.message || 'Lỗi khi gửi kết quả thanh toán.');
           btnSuccess.disabled = false;
           btnFail.disabled = false;
-          btnSuccess.innerHTML = '<span>💳</span> Xác nhận Thanh toán Thành Công';
-          btnFail.innerHTML = '<span>✕</span> Báo lỗi Thanh toán Thất Bại';
         }
       } catch (e) {
-        alert('Không thể kết nối đến máy chủ.');
+        alert('Không thể kết nối máy chủ Web API.');
         btnSuccess.disabled = false;
         btnFail.disabled = false;
-        btnSuccess.innerHTML = '<span>💳</span> Xác nhận Thanh toán Thành Công';
-        btnFail.innerHTML = '<span>✕</span> Báo lỗi Thanh toán Thất Bại';
       }
     }
 
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    loadOrderDetails();
+    loadOrder();
   </script>
 </body>
 </html>

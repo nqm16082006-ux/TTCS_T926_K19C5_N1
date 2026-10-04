@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html class="h-full" lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <meta content="web_dashboard" name="shell-type">
+  <title>Tổng quan Ban Tổ Chức - EventPulse</title>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+
+  <style>
+    @layer base {
+      html, body { margin: 0; padding: 0; }
+      body { overscroll-behavior: none; }
+      main > :first-child { margin-top: 0 !important; }
+      main > :last-child { margin-bottom: 0 !important; }
+    }
+    ::-webkit-scrollbar { display: none; }
+  </style>
+
+  <!-- Tailwind CSS Configuration matching design system -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-container-highest": "#dae2fd",
+            "on-tertiary": "#ffffff",
+            "on-primary-container": "#dad7ff",
+            "tertiary-fixed": "#89f5e7",
+            "on-primary": "#ffffff",
+            "on-secondary": "#ffffff",
+            "secondary-fixed": "#eaddff",
+            "tertiary-container": "#006c63",
+            "surface-container": "#eaedff",
+            "outline": "#777587",
+            "inverse-surface": "#283044",
+            "on-tertiary-fixed-variant": "#005049",
+            "secondary-container": "#8a4cfc",
+            "on-error-container": "#93000a",
+            "primary-fixed": "#e2dfff",
+            "primary": "#3525cd",
+            "on-primary-fixed-variant": "#3323cc",
+            "on-tertiary-fixed": "#00201d",
+            "surface-container-high": "#e2e7ff",
+            "outline-variant": "#c7c4d8",
+            "inverse-primary": "#c3c0ff",
+            "surface-dim": "#d2d9f4",
+            "secondary-fixed-dim": "#d2bbff",
+            "on-secondary-container": "#fffbff",
+            "surface-bright": "#faf8ff",
+            "tertiary": "#00524b",
+            "surface-variant": "#dae2fd",
+            "primary-fixed-dim": "#c3c0ff",
+            "secondary": "#712ae2",
+            "surface-container-lowest": "#ffffff",
+            "on-tertiary-container": "#81eddf",
+            "error-container": "#ffdad6",
+            "on-surface": "#131b2e",
+            "on-primary-fixed": "#0f0069",
+            "surface-container-low": "#f2f3ff",
+            "on-error": "#ffffff",
+            "background": "#faf8ff",
+            "surface": "#faf8ff",
+            "surface-tint": "#4d44e3",
+            "tertiary-fixed-dim": "#6bd8cb",
+            "on-surface-variant": "#464555",
+            "on-secondary-fixed": "#25005a",
+            "on-background": "#131b2e",
+            "error": "#ba1a1a",
+            "on-secondary-fixed-variant": "#5a00c6",
+            "primary-container": "#4f46e5",
+            "inverse-on-surface": "#eef0ff"
+          },
+          borderRadius: {
+            DEFAULT: "0.25rem",
+            lg: "0.5rem",
+            xl: "0.75rem",
+            full: "9999px"
+          },
+          spacing: {
+            "margin-lg": "2.5rem",
+            gutter: "1.5rem",
+            "space-xl": "2rem",
+            margin: "1.5rem",
+            "space-xs": "0.25rem",
+            "space-sm": "0.5rem",
+            "space-2xl": "3rem",
+            "gutter-sm": "0.75rem",
+            "space-lg": "1.5rem",
+            "margin-sm": "1rem",
+            "gutter-lg": "2rem",
+            "space-md": "1rem"
+          },
+          fontFamily: {
+            "display-lg-mobile": ["Plus Jakarta Sans"],
+            "label-lg": ["Plus Jakarta Sans"],
+            "headline-lg": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"],
+            "label-md": ["Plus Jakarta Sans"],
+            "headline-xl-mobile": ["Plus Jakarta Sans"],
+            "display-lg": ["Plus Jakarta Sans"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "headline-md": ["Plus Jakarta Sans"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "headline-sm": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "headline-xl": ["Plus Jakarta Sans"],
+            "code-mono": ["JetBrains Mono"]
+          },
+          fontSize: {
+            "display-lg-mobile": ["30px", { lineHeight: "38px", letterSpacing: "-0.02em", fontWeight: "800" }],
+            "label-lg": ["14px", { lineHeight: "20px", fontWeight: "600" }],
+            "headline-lg": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "700" }],
+            "body-md": ["14px", { lineHeight: "22px", fontWeight: "400" }],
+            "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.01em", fontWeight: "600" }],
+            "headline-xl-mobile": ["24px", { lineHeight: "32px", letterSpacing: "-0.015em", fontWeight: "700" }],
+            "display-lg": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "800" }],
+            "body-sm": ["12px", { lineHeight: "18px", fontWeight: "400" }],
+            "headline-md": ["20px", { lineHeight: "28px", letterSpacing: "-0.005em", fontWeight: "600" }],
+            "label-sm": ["11px", { lineHeight: "14px", letterSpacing: "0.02em", fontWeight: "600" }],
+            "headline-sm": ["16px", { lineHeight: "24px", fontWeight: "600" }],
+            "body-lg": ["16px", { lineHeight: "26px", fontWeight: "400" }],
+            "headline-xl": ["32px", { lineHeight: "40px", letterSpacing: "-0.015em", fontWeight: "700" }],
+            "code-mono": ["13px", { lineHeight: "18px", fontWeight: "500" }]
+          }
+        }
+      }
+    };
+  </script>
+</head>
+
+<body class="bg-background font-body-md text-on-surface antialiased">
+
+  <!-- Sidebar Navigation matching template -->
+  <aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-low shadow-[1px_0_8px_rgba(0,0,0,0.03)] z-50 flex flex-col justify-between overflow-y-auto">
+    <div class="flex flex-col">
+      <!-- Logo Header -->
+      <div class="h-16 px-space-md flex items-center justify-between bg-surface-container-low">
+        <a href="./public-events.html" class="flex items-center gap-space-sm">
+          <img alt="EventPulse Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WTV6ECUtEUhk0z2OhrYrHSztCKcv9GeCNfmcT273KDmrGfvnfNjO-uFn7ATWOsV48K8VSD8RgaP6nA7UlHLZRqTI0Wp1hsKNBB2hCGvimywycHDhMKaCFgxRaIhinj6vXjrz4KX-RWUcFVmjpPY8KdEXLAiptD9n7k51M75Sc6w1aBY7AIYj55cuIhMogpGjtAb-tv4r8Mg5sBZlRk4SsC6WzXyCEM8aHQAZ3bI3WnX8ogB38-mTpVIKT9">
+          <div class="flex flex-col">
+            <span class="font-headline-sm text-headline-sm text-primary leading-tight">EventPulse</span>
+            <span class="font-label-sm text-label-sm text-secondary tracking-wider uppercase">Ban Tổ Chức</span>
+          </div>
+        </a>
+      </div>
+
+      <!-- Unit Information Card -->
+      <div class="px-space-md py-space-sm">
+        <div class="p-2.5 rounded-lg bg-surface-container flex items-center justify-between">
+          <div class="flex items-center gap-space-xs">
+            <span class="material-symbols-outlined text-[18px] text-primary">domain</span>
+            <div class="flex flex-col">
+              <span class="font-label-sm text-label-sm text-outline">Đơn vị quản trị</span>
+              <span class="font-label-md text-label-md text-on-surface truncate max-w-[130px]" id="sidebarOrgName">Event Organizer</span>
+            </div>
+          </div>
+          <span class="material-symbols-outlined text-[18px] text-outline">unfold_more</span>
+        </div>
+      </div>
+
+      <!-- Management Navigation Items -->
+      <div class="px-space-md py-space-xs">
+        <span class="font-label-sm text-label-sm uppercase tracking-wider text-outline px-2">Menu Quản trị</span>
+      </div>
+      <nav class="px-space-sm space-y-1" id="sidebar-nav">
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg shadow-sm" href="./overview.html" id="nav-tong-quan">
+          <span class="material-symbols-outlined text-[20px]">dashboard</span>Tổng quan
+        </a>
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./events.html" id="nav-quan-ly-su-kien">
+          <span class="material-symbols-outlined text-[20px]">event</span>Quản lý sự kiện
+        </a>
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./create-event.html" id="nav-tao-su-kien">
+          <span class="material-symbols-outlined text-[20px]">add_circle</span>Tạo sự kiện mới
+        </a>
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./events.html?action=showtimes" id="nav-danh-sach-suat-dien">
+          <span class="material-symbols-outlined text-[20px]">confirmation_number</span>Danh sách suất diễn
+        </a>
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./events.html?action=seats" id="nav-cau-hinh-ghe">
+          <span class="material-symbols-outlined text-[20px]">chair</span>Cấu hình ghế &amp; bảng giá
+        </a>
+      </nav>
+    </div>
+
+    <!-- Sidebar Bottom / Account Status & Logout -->
+    <div class="p-space-sm bg-surface-container-low">
+      <div class="px-space-xs py-space-xs">
+        <span class="font-label-sm text-label-sm uppercase tracking-wider text-outline px-2">Hệ thống</span>
+      </div>
+      <nav class="space-y-1">
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="javascript:void(0)" onclick="alert('Phiên bản hệ thống: EventPulse Organizer v2.5.0')">
+          <span class="material-symbols-outlined text-[20px]">settings</span>Cài đặt tổ chức
+        </a>
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-error hover:bg-error-container hover:text-on-error-container transition-all font-label-lg text-label-lg" href="javascript:void(0)" onclick="logout()">
+          <span class="material-symbols-outlined text-[20px]">logout</span>Đăng xuất
+        </a>
+      </nav>
+      <div class="mt-space-sm p-3 rounded-lg bg-surface-container flex items-center justify-between">
+        <a class="flex items-center gap-space-xs font-label-sm text-label-sm text-primary hover:text-on-primary-fixed transition-colors" href="./public-events.html">
+          <span class="material-symbols-outlined text-[16px]">arrow_back</span>Giao diện người mua
+        </a>
+        <span class="w-2 h-2 rounded-full bg-tertiary-fixed-dim animate-pulse" title="Hệ thống trực tuyến"></span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content Wrap -->
+  <div class="pl-64">
+    <!-- Top Header -->
+    <header class="fixed top-0 left-64 right-0 h-16 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 px-space-lg flex items-center justify-between">
+      <div class="flex items-center gap-space-sm text-body-sm font-body-sm text-on-surface-variant">
+        <span class="material-symbols-outlined text-[18px] text-outline">corporate_fare</span>
+        <span>Ban Tổ Chức</span>
+        <span class="text-outline-variant">/</span>
+        <span class="font-label-md text-label-md text-on-surface" id="topHeaderOrg">Event Organizer</span>
+        <div class="ml-space-md hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-label-sm text-label-sm">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Hệ thống online
+        </div>
+      </div>
+      <div class="flex items-center gap-space-md">
+        <a class="hidden sm:flex items-center gap-space-xs px-3.5 py-2 rounded-lg bg-primary text-on-primary font-label-lg text-label-lg shadow-sm hover:bg-on-primary-fixed-variant transition-all active:scale-95" href="./create-event.html">
+          <span class="material-symbols-outlined text-[18px]">add</span>Tạo sự kiện mới
+        </a>
+        <button aria-label="Thông báo quản trị" class="relative p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" type="button" onclick="alert('Bạn chưa có thông báo mới.')">
+          <span class="material-symbols-outlined text-[20px]">notifications</span>
+          <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-secondary-container"></span>
+        </button>
+        <div class="flex items-center gap-space-sm pl-space-xs">
+          <div class="text-right hidden md:block">
+            <div class="font-label-md text-label-md text-on-surface leading-tight" id="topUserName">Event Organizer</div>
+            <div class="font-label-sm text-label-sm text-outline" id="topUserRole">Lead Organizer</div>
+          </div>
+          <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-bold text-sm shadow-sm" id="topUserAvatar">
+            E
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="relative pt-16 bg-surface w-full px-space-lg min-h-screen">
+      <div class="flex flex-col w-full pb-space-2xl">
+        
+        <!-- Top Bar / Page Header -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md py-space-lg">
+          <div class="flex flex-col gap-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full bg-surface-container-high text-primary font-label-sm text-label-sm">
+                Workspace EventPulse
+              </span>
+              <span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+              <span class="font-code-mono text-code-mono text-outline">Q4 / 2026</span>
+            </div>
+            <h1 class="font-headline-xl text-headline-xl text-on-surface tracking-tight">
+              Bảng điều khiển tổ chức sự kiện
+            </h1>
+            <p class="font-body-md text-body-md text-on-surface-variant">
+              Theo dõi trạng thái phát hành vé, tiến độ cấu hình sơ đồ ghế và hiệu suất suất diễn theo thời gian thực.
+            </p>
+          </div>
+          <div class="flex items-center gap-space-sm shrink-0">
+            <button onclick="loadOverviewData()" class="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container font-label-lg text-label-lg shadow-sm transition-all border border-outline-variant/30" type="button">
+              <span class="material-symbols-outlined text-[18px]">sync</span>
+              <span>Đồng bộ dữ liệu</span>
+            </button>
+            <a class="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-on-primary hover:bg-on-primary-fixed-variant font-label-lg text-label-lg shadow-md hover:shadow-lg transition-all" href="./create-event.html">
+              <span class="material-symbols-outlined text-[20px]">add_circle</span>
+              <span>+ Tạo sự kiện mới</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Metric Cards Bento Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md mt-space-sm">
+          <!-- Card 1: Tổng số sự kiện -->
+          <div class="relative overflow-hidden rounded-xl bg-surface-container-lowest p-space-lg shadow-sm hover:shadow-md transition-shadow">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-primary/5 pointer-events-none"></div>
+            <div class="flex items-start justify-between">
+              <div class="flex flex-col">
+                <span class="font-label-md text-label-md text-on-surface-variant">Tổng số sự kiện</span>
+                <div class="flex items-baseline gap-2 mt-2">
+                  <span class="font-display-lg text-display-lg text-on-surface leading-none" id="ovTotalEvents">0</span>
+                  <span class="font-label-sm text-label-sm text-outline">sự kiện</span>
+                </div>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center text-primary shadow-sm">
+                <span class="material-symbols-outlined text-[24px]">calendar_month</span>
+              </div>
+            </div>
+            <div class="mt-space-md pt-space-sm flex items-center justify-between bg-surface-container-low/60 -mx-space-lg -mb-space-lg px-space-lg py-2.5">
+              <div class="flex items-center gap-1.5 text-primary font-label-sm text-label-sm">
+                <span class="material-symbols-outlined text-[16px]">trending_up</span>
+                <span id="ovTotalEventsMonth">Sẵn sàng mở bán</span>
+              </div>
+              <span class="font-code-mono text-body-sm text-outline">Hệ thống</span>
+            </div>
+          </div>
+
+          <!-- Card 2: Đang mở bán -->
+          <div class="relative overflow-hidden rounded-xl bg-surface-container-lowest p-space-lg shadow-sm hover:shadow-md transition-shadow">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-tertiary-fixed-dim/20 pointer-events-none"></div>
+            <div class="flex items-start justify-between">
+              <div class="flex flex-col">
+                <span class="font-label-md text-label-md text-on-surface-variant">Sự kiện đang mở bán</span>
+                <div class="flex items-baseline gap-2 mt-2">
+                  <span class="font-display-lg text-display-lg text-tertiary leading-none" id="ovActiveEvents">0</span>
+                  <span class="font-label-sm text-label-sm text-outline">hoạt động</span>
+                </div>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shadow-sm">
+                <span class="material-symbols-outlined text-[24px]">confirmation_number</span>
+              </div>
+            </div>
+            <div class="mt-space-md pt-space-sm flex items-center justify-between bg-surface-container-low/60 -mx-space-lg -mb-space-lg px-space-lg py-2.5">
+              <div class="flex items-center gap-1.5 text-emerald-700 font-label-sm text-label-sm">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Tỉ lệ lấp đầy cao</span>
+              </div>
+              <span class="font-code-mono text-body-sm text-outline">Real-time</span>
+            </div>
+          </div>
+
+          <!-- Card 3: Sự kiện nháp -->
+          <div class="relative overflow-hidden rounded-xl bg-surface-container-lowest p-space-lg shadow-sm hover:shadow-md transition-shadow">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-amber-500/10 pointer-events-none"></div>
+            <div class="flex items-start justify-between">
+              <div class="flex flex-col">
+                <span class="font-label-md text-label-md text-on-surface-variant">Sự kiện nháp</span>
+                <div class="flex items-baseline gap-2 mt-2">
+                  <span class="font-display-lg text-display-lg text-amber-700 leading-none" id="ovDraftEvents">0</span>
+                  <span class="font-label-sm text-label-sm text-outline">chưa xuất bản</span>
+                </div>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shadow-sm">
+                <span class="material-symbols-outlined text-[24px]">edit_note</span>
+              </div>
+            </div>
+            <div class="mt-space-md pt-space-sm flex items-center justify-between bg-surface-container-low/60 -mx-space-lg -mb-space-lg px-space-lg py-2.5">
+              <div class="flex items-center gap-1.5 text-amber-700 font-label-sm text-label-sm">
+                <span class="material-symbols-outlined text-[16px]">pending_actions</span>
+                <span>Cần cấu hình suất diễn</span>
+              </div>
+              <span class="font-code-mono text-body-sm text-amber-700 font-bold">Ưu tiên</span>
+            </div>
+          </div>
+
+          <!-- Card 4: Tổng số suất diễn -->
+          <div class="relative overflow-hidden rounded-xl bg-surface-container-lowest p-space-lg shadow-sm hover:shadow-md transition-shadow">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-secondary/10 pointer-events-none"></div>
+            <div class="flex items-start justify-between">
+              <div class="flex flex-col">
+                <span class="font-label-md text-label-md text-on-surface-variant">Tổng số suất diễn</span>
+                <div class="flex items-baseline gap-2 mt-2">
+                  <span class="font-display-lg text-display-lg text-secondary leading-none" id="ovTotalShowtimes">0</span>
+                  <span class="font-label-sm text-label-sm text-outline">timeline</span>
+                </div>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-secondary-fixed/50 text-secondary flex items-center justify-center shadow-sm">
+                <span class="material-symbols-outlined text-[24px]">schedule</span>
+              </div>
+            </div>
+            <div class="mt-space-md pt-space-sm flex items-center justify-between bg-surface-container-low/60 -mx-space-lg -mb-space-lg px-space-lg py-2.5">
+              <div class="flex items-center gap-1.5 text-secondary font-label-sm text-label-sm">
+                <span class="material-symbols-outlined text-[16px]">event_repeat</span>
+                <span id="ovTotalSeats">Tổng ghế phát hành</span>
+              </div>
+              <span class="font-code-mono text-body-sm text-outline">Sơ đồ ghế</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Action Required Banner -->
+        <div class="mt-space-xl rounded-xl bg-gradient-to-r from-amber-50 via-amber-100/50 to-surface-container-low p-space-lg shadow-sm relative overflow-hidden">
+          <div class="absolute -right-10 -top-10 w-44 h-44 rounded-full bg-amber-300/20 blur-2xl pointer-events-none"></div>
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md relative z-10">
+            <div class="flex items-start gap-space-md">
+              <div class="w-11 h-11 rounded-lg bg-amber-500 text-on-primary flex items-center justify-center shrink-0 shadow-md">
+                <span class="material-symbols-outlined text-[24px]">notification_important</span>
+              </div>
+              <div class="flex flex-col gap-0.5">
+                <div class="flex items-center gap-2">
+                  <span class="font-headline-sm text-headline-sm text-amber-950 font-bold">
+                    Tiến độ cấu hình suất diễn &amp; Sơ đồ ghế
+                  </span>
+                  <span class="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-label-sm text-label-sm uppercase font-bold">
+                    Cảnh báo xuất bản
+                  </span>
+                </div>
+                <p class="font-body-md text-body-md text-amber-900 max-w-3xl leading-relaxed">
+                  Đảm bảo các sự kiện đã được nạp ma trận sơ đồ ghế (JSON) và áp giá từng hạng ghế trước khi mở bán vé công khai cho khán giả.
+                </p>
+                <div class="flex items-center gap-4 mt-2">
+                  <div class="flex items-center gap-1.5 text-amber-900 font-label-sm text-label-sm">
+                    <span class="material-symbols-outlined text-[16px] text-amber-700">timer</span>
+                    <span>Tích hợp nạp ghế nhanh 50 ghế (VIP &amp; Standard)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-space-sm shrink-0 self-end lg:self-center">
+              <a class="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-on-primary font-label-lg text-label-lg shadow-sm transition-all" href="./events.html?action=seats">
+                <span class="material-symbols-outlined text-[18px]">grid_view</span>
+                <span>Upload sơ đồ ghế ngay</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Recent Events Table -->
+        <div class="mt-space-xl flex flex-col gap-space-md">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+            <div class="flex items-center gap-space-sm">
+              <div class="w-2.5 h-6 rounded-full bg-primary"></div>
+              <h2 class="font-headline-lg text-headline-lg text-on-surface">Sự kiện gần đây</h2>
+              <span class="px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-code-mono" id="ovEventsCountBadge">0 sự kiện</span>
+            </div>
+            <div class="flex items-center gap-space-sm">
+              <a href="./events.html" class="h-10 px-4 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-primary flex items-center gap-1.5 font-label-md text-label-md shadow-sm transition-colors border border-outline-variant/30">
+                <span>Xem tất cả sự kiện</span>
+                <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Main Table Container -->
+          <div class="overflow-x-auto rounded-xl bg-surface-container-lowest shadow-sm">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider h-12">
+                  <th class="px-space-lg py-3 font-semibold">Tên sự kiện &amp; Thông tin</th>
+                  <th class="px-space-md py-3 font-semibold">Thời gian</th>
+                  <th class="px-space-md py-3 font-semibold text-center">Suất diễn</th>
+                  <th class="px-space-md py-3 font-semibold">Trạng thái phát hành</th>
+                  <th class="px-space-md py-3 font-semibold">Tổng số ghế</th>
+                  <th class="px-space-lg py-3 font-semibold text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y-0 text-on-surface" id="ovRecentEventsBody">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section 4: Supporting Visual Insights Bento -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-space-md mt-space-xl">
+          <!-- Mini Widget 1: Sơ đồ phân bổ trạng thái vé -->
+          <div class="lg:col-span-2 rounded-xl bg-surface-container-lowest p-space-lg shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-space-md">
+              <div class="flex flex-col">
+                <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Phân tích khoang vé thời gian thực</span>
+                <h3 class="font-headline-sm text-headline-sm text-on-surface">Tình trạng phân bổ chỗ ngồi toàn bộ hệ thống</h3>
+              </div>
+              <span class="font-code-mono text-code-mono text-primary font-bold" id="ovSeatAllocationHeader">Đang cập nhật...</span>
+            </div>
+            <!-- Segmented Metric Bar -->
+            <div class="w-full flex flex-col gap-2">
+              <div class="w-full h-4 rounded-full bg-surface-container overflow-hidden flex shadow-inner">
+                <div class="h-full bg-emerald-500 hover:opacity-90 transition-opacity" style="width: 65%" title="Đã bán: 65%"></div>
+                <div class="h-full bg-amber-400 hover:opacity-90 transition-opacity" style="width: 15%" title="Đang giữ chỗ: 15%"></div>
+                <div class="h-full bg-surface-container-high hover:opacity-90 transition-opacity" style="width: 20%" title="Còn trống: 20%"></div>
+              </div>
+              <div class="grid grid-cols-3 gap-2 mt-3 pt-3">
+                <div class="flex items-center gap-2">
+                  <span class="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span>
+                  <div class="flex flex-col">
+                    <span class="font-label-sm text-label-sm text-on-surface-variant">Đã thanh toán</span>
+                    <span class="font-label-md text-label-md text-on-surface font-bold">65% tỷ lệ</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="w-3 h-3 rounded-full bg-amber-400 shrink-0"></span>
+                  <div class="flex flex-col">
+                    <span class="font-label-sm text-label-sm text-on-surface-variant">Đang giữ vé (Hold)</span>
+                    <span class="font-label-md text-label-md text-on-surface font-bold">15% tạm giữ</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="w-3 h-3 rounded-full bg-surface-container-highest shrink-0"></span>
+                  <div class="flex flex-col">
+                    <span class="font-label-sm text-label-sm text-on-surface-variant">Còn khả dụng</span>
+                    <span class="font-label-md text-label-md text-on-surface font-bold">20% ghế trống</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mini Widget 2: Quick Launch / Hướng dẫn cấu hình -->
+          <div class="rounded-xl bg-surface-container-low p-space-lg shadow-sm flex flex-col justify-between">
+            <div class="flex flex-col gap-2">
+              <div class="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <span class="material-symbols-outlined text-[22px]">rocket_launch</span>
+              </div>
+              <h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Quy trình mở bán vé</h3>
+              <p class="font-body-sm text-body-sm text-on-surface-variant">
+                Đảm bảo hoàn thành 3 bước kiểm duyệt kỹ thuật trước khi thông báo cổng mua vé công khai cho khán giả.
+              </p>
+            </div>
+            <div class="space-y-2 mt-4">
+              <div class="flex items-center gap-2 text-label-sm text-emerald-700">
+                <span class="material-symbols-outlined text-[18px]">check_circle</span>
+                <span>1. Nhập thông tin sự kiện &amp; nghệ sĩ</span>
+              </div>
+              <div class="flex items-center gap-2 text-label-sm text-emerald-700">
+                <span class="material-symbols-outlined text-[18px]">check_circle</span>
+                <span>2. Tạo lịch suất diễn &amp; địa điểm</span>
+              </div>
+              <div class="flex items-center gap-2 text-label-sm text-amber-700 font-bold">
+                <span class="material-symbols-outlined text-[18px]">pending</span>
+                <span>3. Dựng sơ đồ ghế &amp; áp bảng giá</span>
+              </div>
+            </div>
+            <a class="mt-4 flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-primary hover:bg-on-primary-fixed-variant text-on-primary font-label-md text-label-md shadow-sm transition-all" href="./create-event.html">
+              <span>Bắt đầu tạo sự kiện mới</span>
+              <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:5012' : '';
+    const token = localStorage.getItem('access_token');
+
+    // Curated high quality posters
+    const POSTERS = [
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuCwgfSQKNAE5_AwoH7VdGLGQyDLytRQ1WgIpeNwcfEJrpZNNWrU_ZqE8nnwRTIKIpSGWMu2D6TjqsLZwtWEGFq9z55HU37WXIzEOOUWmyGAHLNQjGf2O0PBdCZNYDpoiYyTKXB__S5RBsA80ZvxGhkkeJXZRUyBCtuisrXe03l0g6o77NacpQ7Oa77kM5dxW1RwU-psLPACrDSo-YUByJwkNz5-lzuisC1gcoOm7eWHr8Di3eJLmd7HOw',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuAZ7__2YI8x3FM5Dvf7jpAW66PsIHCc_tHdSNnMgxXw1vihOd__UyD1m1Tp9v1RiBXt3cw-kipHzj0MtBrLukCh4hh8D3H8Gs_2MYpjUpTeEG5_pq2cU8laWIiYOOhKFQgaqzK0w7oQvD3rC6FscijtE7nLPUtyiIzB_QgsewqN6qS9XzZXbwBC6I3riGJkL1iXXHagO--jglP9sAKyLkKt1m5EoIylVnNTEVLR4F7FMNoVK_pASHpbtQ',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuB-m9mA07LTMJEHflwQxPY_isfKMParlI_Y3g02JpQbezNHE4dcKwPE_Gz7huey4MHkZSSYs1l1nnc4E7LJ2lzdEqVviycJqz2tuwgH13n81Yjcs0KEQIaVC5ceKmnNOH4v_8EKNC6SDJNSi1yTUG5dwnf1_sawQ67tcMdgXRQmJcD4hkFC0o-Ut3jdAvD7g5Uhp1U7zKiCU8CyeHwB8Kq5jTkJHLBlv5iQkEduk3TplW2E1gENBUUBTQ',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuClJ-h-GCO1jM12PfT6Kv744le1l0tHcVvqeJs2gZIwWUC_o1nDHhMpfZ9KGldXiLxzcQ4S-eufMNQFT5UwNQrcaOttMPmPS9r3xFe1pqsucjZr0eknF4V3hZYGgU7Z2AQQmuSgPRC598XUzjZfxpyEJSpgGLjYXFblOi6o_7j-0vJjf5KWuSBtmM-jIXsx7iS85_GRsa_TXamHPNZR3_wqEvNW_VH6LAV_fDoQUhv8HDcnne4KvdcIUg'
+    ];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadOverviewData();
+    });
+
+    async function loadOverviewData() {
+      try {
+        const res = await fetch(`${API_BASE}/api/events`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        if (res.status === 401) {
+          window.location.href = './login.html';
+          return;
+        }
+
+        const result = await res.json().catch(() => ({}));
+        if (res.ok && result.data) {
+          renderOverview(result.data);
+        }
+      } catch (err) {
+        console.error('Failed to load overview data', err);
+      }
+    }
+
+    function renderOverview(events) {
+      const total = events.length;
+      let activeCount = 0;
+      let draftCount = 0;
+      let totalShowtimes = 0;
+      let totalSeats = 0;
+
+      events.forEach(e => {
+        const showtimes = e.showtimes || [];
+        totalShowtimes += showtimes.length;
+        totalSeats += (e.totalSeats || 0);
+
+        const hasOnSale = showtimes.some(s => s.status === 2 || s.status === 'OnSale');
+        if (hasOnSale) activeCount++;
+        else draftCount++;
+      });
+
+      document.getElementById('ovTotalEvents').textContent = String(total).padStart(2, '0');
+      document.getElementById('ovActiveEvents').textContent = String(activeCount).padStart(2, '0');
+      document.getElementById('ovDraftEvents').textContent = String(draftCount).padStart(2, '0');
+      document.getElementById('ovTotalShowtimes').textContent = String(totalShowtimes).padStart(2, '0');
+      document.getElementById('ovTotalSeats').textContent = `${totalSeats.toLocaleString('vi-VN')} ghế phát hành`;
+      document.getElementById('ovEventsCountBadge').textContent = `${total} sự kiện`;
+      document.getElementById('ovSeatAllocationHeader').textContent = `${totalSeats.toLocaleString('vi-VN')} ghế toàn hệ thống`;
+
+      const tbody = document.getElementById('ovRecentEventsBody');
+      if (events.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-outline">Chưa có sự kiện nào.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = events.slice(0, 5).map((e, idx) => {
+        const poster = POSTERS[idx % POSTERS.length];
+        const showtimes = e.showtimes || [];
+        const hasOnSale = showtimes.some(s => s.status === 2 || s.status === 'OnSale');
+        const d = new Date(e.startTime);
+        const dateStr = !isNaN(d.getTime()) ? `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${d.getFullYear()}` : '';
+
+        return `
+          <tr class="hover:bg-surface-container-low/70 transition-colors group">
+            <td class="px-space-lg py-4">
+              <div class="flex items-center gap-space-md">
+                <div class="w-14 h-14 rounded-lg overflow-hidden shrink-0 shadow-sm relative">
+                  <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" src="${poster}" alt="${escapeHtml(e.title)}">
+                  <span class="absolute bottom-1 right-1 px-1 rounded bg-black/70 text-white font-code-mono text-[9px]">${hasOnSale ? 'LIVE' : 'DRAFT'}</span>
+                </div>
+                <div class="flex flex-col min-w-0">
+                  <a class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors font-bold truncate max-w-sm" href="./event-detail.html?id=${e.id}">
+                    ${escapeHtml(e.title)}
+                  </a>
+                  <div class="flex items-center gap-2 mt-1 text-on-surface-variant font-body-sm text-body-sm">
+                    <span class="material-symbols-outlined text-[15px] text-outline">location_on</span>
+                    <span class="truncate max-w-xs">${escapeHtml(e.location)}</span>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td class="px-space-md py-4 font-code-mono text-body-sm text-on-surface-variant whitespace-nowrap">
+              ${dateStr}
+            </td>
+            <td class="px-space-md py-4 text-center whitespace-nowrap">
+              <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-full bg-surface-container font-label-md text-label-md text-primary font-bold">
+                ${showtimes.length} suất
+              </span>
+            </td>
+            <td class="px-space-md py-4 whitespace-nowrap">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full ${hasOnSale ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-100 text-amber-900'} font-label-sm text-label-sm font-semibold">
+                <span class="w-2 h-2 rounded-full ${hasOnSale ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}"></span>
+                ${hasOnSale ? 'Đang mở bán' : 'Bản nháp'}
+              </span>
+            </td>
+            <td class="px-space-md py-4 whitespace-nowrap font-code-mono text-body-md text-on-surface font-semibold">
+              ${(e.totalSeats || 0).toLocaleString('vi-VN')} ghế
+            </td>
+            <td class="px-space-lg py-4 text-right whitespace-nowrap">
+              <a class="px-3.5 py-1.5 rounded-lg bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface font-label-sm text-label-sm transition-all shadow-sm font-semibold" href="./event-detail.html?id=${e.id}">
+                Xem chi tiết
+              </a>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+  </script>
+
+  <!-- Shared Organizer Navigation & Session Script -->
+  <script src="./organizer-nav.js"></script>
+</body>
+</html>

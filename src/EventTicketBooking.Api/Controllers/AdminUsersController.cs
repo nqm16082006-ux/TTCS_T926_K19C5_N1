@@ -214,6 +214,11 @@ namespace EventTicketBooking.Api.Controllers
 
             user.IsActive = dto.IsActive;
             user.UpdatedAt = DateTime.UtcNow;
+            if (!dto.IsActive)
+            {
+                user.VerificationCode = null;
+                user.VerificationCodeExpiresAt = null;
+            }
 
             await _context.SaveChangesAsync();
 
