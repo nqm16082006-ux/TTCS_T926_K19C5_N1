@@ -26,7 +26,10 @@ public static class DatabaseInitializer
         var adminRole = await db.Roles.SingleAsync(r => r.Name == "Admin");
         var user = new User
         {
-            Email = email, Username = email, FullName = "Administrator", IsActive = true,
+            Email = email,
+            Username = email,
+            FullName = "Administrator",
+            IsActive = true,
             PasswordHash = scope.ServiceProvider.GetRequiredService<IPasswordHasher>().Hash(password)
         };
         user.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = adminRole.Id });

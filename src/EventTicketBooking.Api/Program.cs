@@ -44,7 +44,11 @@ if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("POSTGRES_HOST
 
     pgConnection = new Npgsql.NpgsqlConnectionStringBuilder
     {
-        Host = host, Port = int.Parse(port), Database = db, Username = user, Password = pass
+        Host = host,
+        Port = int.Parse(port),
+        Database = db,
+        Username = user,
+        Password = pass
     }.ConnectionString;
 }
 

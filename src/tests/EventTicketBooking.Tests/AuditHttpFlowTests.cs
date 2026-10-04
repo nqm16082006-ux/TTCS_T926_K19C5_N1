@@ -32,8 +32,11 @@ public class AuditHttpFlowTests
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Logging.ClearProviders();
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> {
-            ["Jwt:Key"] = "Audit_Http_Test_Secret_With_At_Least_32_Bytes_12345", ["PaymentSettings:Provider"] = "Mock" });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Jwt:Key"] = "Audit_Http_Test_Secret_With_At_Least_32_Bytes_12345",
+            ["PaymentSettings:Provider"] = "Mock"
+        });
         builder.Services.AddControllers().AddApplicationPart(typeof(EventController).Assembly);
         builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connection));
         builder.Services.AddDistributedMemoryCache();
@@ -53,7 +56,8 @@ public class AuditHttpFlowTests
         stranger.UserRoles.Add(new UserRole { UserId = stranger.Id, RoleId = organizerRole.Id, Role = organizerRole });
         var ev = new Event { OwnerId = owner.Id, Title = "Audit concert", Location = "Venue", TotalSeats = 1 };
         var show = new Showtime { EventId = ev.Id, StartTime = DateTime.UtcNow.AddDays(1), EndTime = DateTime.UtcNow.AddDays(1).AddHours(1), AvailableSeats = 1 };
-        using (var scope = app.Services.CreateScope()) {
+        using (var scope = app.Services.CreateScope())
+        {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await db.Database.EnsureCreatedAsync();
             db.AddRange(owner, customer, stranger, ev, show);
@@ -63,7 +67,8 @@ public class AuditHttpFlowTests
         using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
         var tokenService = new TokenService(builder.Configuration);
         void Authenticate(User user) => client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenService.GenerateAccessToken(user, Array.Empty<string>()));
-        async Task<HttpResponseMessage> Import(string content, string action = "import") {
+        async Task<HttpResponseMessage> Import(string content, string action = "import")
+        {
             using var form = new MultipartFormDataContent();
             form.Add(new ByteArrayContent(Encoding.UTF8.GetBytes(content)), "file", "seats.json");
             return await client.PostAsync($"/api/showtimes/{show.Id}/seats/{action}", form);
@@ -76,11 +81,12 @@ public class AuditHttpFlowTests
         Assert.Equal(HttpStatusCode.Forbidden, (await Import(json)).StatusCode);
         Authenticate(owner);
         Assert.Equal(HttpStatusCode.BadRequest, (await Import("[null]", "preview")).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await Import("{" )).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Import("{")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await Import(json)).StatusCode);
         Guid categoryId;
         Guid seatId;
-        using (var scope = app.Services.CreateScope()) {
+        using (var scope = app.Services.CreateScope())
+        {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var category = await db.SeatCategories.SingleAsync();
             Assert.Null(category.Price);
@@ -119,7 +125,8 @@ public class AuditHttpFlowTests
         Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(holdUrl, new { seatIds = new[] { seatId } })).StatusCode);
         Authenticate(owner);
         Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync($"/api/events/{ev.Id}")).StatusCode);
-        using (var scope = app.Services.CreateScope()) {
+        using (var scope = app.Services.CreateScope())
+        {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             Assert.Equal(OrderStatus.Paid, (await db.Orders.SingleAsync()).Status);
             Assert.Equal("SOLD", (await db.Seats.SingleAsync()).Status);
@@ -133,7 +140,8 @@ public class AuditHttpFlowTests
         Assert.Equal(HttpStatusCode.Created, duplicated.StatusCode);
         var copyId = (await duplicated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data").GetProperty("id").GetGuid();
         Assert.NotEqual(ev.Id, copyId);
-        using (var scope = app.Services.CreateScope()) {
+        using (var scope = app.Services.CreateScope())
+        {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var copy = await db.Events.Include(e => e.Showtimes).ThenInclude(s => s.SeatCategories).SingleAsync(e => e.Id == copyId);
             Assert.EndsWith(" (Bản sao)", copy.Title);

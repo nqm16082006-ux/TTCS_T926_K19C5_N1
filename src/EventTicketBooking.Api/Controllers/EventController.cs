@@ -162,28 +162,39 @@ namespace EventTicketBooking.Api.Controllers
             {
                 OwnerId = userId.Value,
                 Title = source.Title[..Math.Min(source.Title.Length, 250 - suffix.Length)] + suffix,
-                Description = source.Description, ImageUrl = source.ImageUrl, Location = source.Location,
-                StartTime = source.StartTime, EndTime = source.EndTime, TotalSeats = source.TotalSeats
+                Description = source.Description,
+                ImageUrl = source.ImageUrl,
+                Location = source.Location,
+                StartTime = source.StartTime,
+                EndTime = source.EndTime,
+                TotalSeats = source.TotalSeats
             };
             foreach (var original in source.Showtimes)
             {
                 var originalSeats = seats.Where(s => s.ShowtimeId == original.Id).ToList();
                 var show = new Showtime
                 {
-                    EventId = copy.Id, StartTime = original.StartTime, EndTime = original.EndTime,
+                    EventId = copy.Id,
+                    StartTime = original.StartTime,
+                    EndTime = original.EndTime,
                     AvailableSeats = originalSeats.Count > 0 ? originalSeats.Count : original.AvailableSeats
                 };
                 var categories = original.SeatCategories.ToDictionary(c => c.Id, c => new SeatCategory
                 {
-                    ShowtimeId = show.Id, Name = c.Name, Price = c.Price
+                    ShowtimeId = show.Id,
+                    Name = c.Name,
+                    Price = c.Price
                 });
                 show.SeatCategories = categories.Values.ToList();
                 copy.Showtimes.Add(show);
                 foreach (var seat in originalSeats)
                     _context.Seats.Add(new Seat
                     {
-                        ShowtimeId = show.Id, SeatCategoryId = categories[seat.SeatCategoryId].Id,
-                        Row = seat.Row, SeatNumber = seat.SeatNumber, Status = "AVAILABLE"
+                        ShowtimeId = show.Id,
+                        SeatCategoryId = categories[seat.SeatCategoryId].Id,
+                        Row = seat.Row,
+                        SeatNumber = seat.SeatNumber,
+                        Status = "AVAILABLE"
                     });
             }
             _context.Events.Add(copy);

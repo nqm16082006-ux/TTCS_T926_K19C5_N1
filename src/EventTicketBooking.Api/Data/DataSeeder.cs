@@ -34,7 +34,8 @@ namespace EventTicketBooking.Api.Data
                         await conn.OpenAsync();
                     await conn.ReloadTypesAsync();
 
-                    try {
+                    try
+                    {
                         using var cmd = conn.CreateCommand();
                         cmd.CommandText = @"
                             CREATE OR REPLACE FUNCTION text_to_showtime_status(text) RETURNS showtime_status AS $$
@@ -68,7 +69,9 @@ namespace EventTicketBooking.Api.Data
                                 END IF;
                             END $$;";
                         await cmd.ExecuteNonQueryAsync();
-                    } catch (Exception ex) {
+                    }
+                    catch (Exception ex)
+                    {
                         logger?.LogError(ex, "Error creating implicit cast!");
                     }
 
