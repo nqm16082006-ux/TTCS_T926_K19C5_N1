@@ -66,3 +66,4 @@ audit-initial.patch
 audit-fix-frontend.cjs
 demo-*.jpg
 artifacts/
+.tmp/

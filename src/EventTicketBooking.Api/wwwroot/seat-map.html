@@ -554,6 +554,7 @@
 
     // Timer state
     let holdTimerInterval = null;
+    let holdExpirationInProgress = false;
     let holdRefServerTimeMs = 0;
     let holdRefLocalPerfMs = 0;
     let holdExpiresAtMs = 0;
@@ -1424,9 +1425,15 @@
     }
 
     // --- 7. Countdown Timer Logic (10 phút đếm ngược & Tự động nhả ghế) ---
-    function startHoldCountdown(expiresAtIso, serverTimeIso, httpDateHeader) {
+    function startHoldCountdown(expiresAtIso, serverTimeIso, httpDateHeader, expireIfElapsed = true) {
       stopHoldCountdown();
 
+      // A hold deadline must identify an absolute instant; never guess its timezone.
+      if (!/(Z|[+-]\d{2}:\d{2})$/i.test(expiresAtIso || "") ||
+          (serverTimeIso && !/(Z|[+-]\d{2}:\d{2})$/i.test(serverTimeIso))) {
+        console.warn("Thời gian giữ ghế thiếu múi giờ; không tạo bộ đếm.");
+        return;
+      }
       let serverTimeMs = 0;
       if (serverTimeIso) {
         serverTimeMs = new Date(serverTimeIso).getTime();
@@ -1437,8 +1444,12 @@
       }
 
       const expiresAtMs = new Date(expiresAtIso).getTime();
-      if (isNaN(expiresAtMs) || isNaN(serverTimeMs) || expiresAtMs <= serverTimeMs) {
-        handleHoldExpired();
+      if (isNaN(expiresAtMs) || isNaN(serverTimeMs)) {
+        console.warn("Thời gian giữ ghế không hợp lệ; không tạo bộ đếm.");
+        return;
+      }
+      if (expiresAtMs <= serverTimeMs) {
+        if (expireIfElapsed) handleHoldExpired();
         return;
       }
 
@@ -1554,19 +1565,25 @@
     }
 
     async function handleHoldExpired() {
-      // 1. Dọn dẹp state trên client
-      stopHoldCountdown();
-      myHeldSeatIds.clear();
-      selectedSeatIds.clear();
-      sessionStorage.removeItem(`eventpulse_held_${showtimeId}`);
-      updateCartPanel();
+      if (holdExpirationInProgress) return;
+      holdExpirationInProgress = true;
+      try {
+        // 1. Dọn dẹp state trên client
+        stopHoldCountdown();
+        myHeldSeatIds.clear();
+        selectedSeatIds.clear();
+        sessionStorage.removeItem(`eventpulse_held_${showtimeId}`);
+        updateCartPanel();
 
-      // 3. Tải lại sơ đồ ghế để các ghế chuyển về AVAILABLE (màu xanh)
-      await loadSeats();
-      await restoreMyHoldsOnLoad();
+        // 3. Tải lại sơ đồ ghế để các ghế chuyển về AVAILABLE (màu xanh)
+        await loadSeats();
+        await restoreMyHoldsOnLoad();
 
-      // 4. Hiển thị thông báo hết 10 phút trực quan, trang trọng
-      openExpiredModal();
+        // 4. Hiển thị thông báo hết 10 phút trực quan, trang trọng
+        openExpiredModal();
+      } finally {
+        holdExpirationInProgress = false;
+      }
     }
 
     async function restoreMyHoldsOnLoad() {
@@ -1591,7 +1608,10 @@
             const httpDate = res.headers.get('Date');
 
             myHeldSeatIds.clear();
-            if (heldIds.length > 0 && expiresAt) {
+            const absoluteDeadline = /(Z|[+-]\d{2}:\d{2})$/i.test(expiresAt || "");
+            const referenceTime = new Date(serverTime || httpDate || Date.now()).getTime();
+            const deadline = new Date(expiresAt).getTime();
+            if (heldIds.length > 0 && absoluteDeadline && Number.isFinite(deadline) && deadline > referenceTime) {
               heldIds.forEach(id => {
                 myHeldSeatIds.add(id);
                 selectedSeatIds.delete(id);
@@ -1601,7 +1621,7 @@
               });
 
               updateCartPanel();
-              startHoldCountdown(expiresAt, serverTime, httpDate);
+              startHoldCountdown(expiresAt, serverTime, httpDate, false);
             } else {
               stopHoldCountdown();
               updateCartPanel();
