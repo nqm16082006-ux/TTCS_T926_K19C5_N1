@@ -25,16 +25,42 @@ namespace EventTicketBooking.Api.Controllers
         private readonly ILogger<PaymentsController> _logger;
         private readonly EventTicketBooking.Api.Data.AppDbContext _context;
 
+        [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
+        public PaymentsController(
+            IPaymentService paymentService,
+            IPaymentGateway paymentGateway,
+            ILogger<PaymentsController> logger,
+            EventTicketBooking.Api.Data.AppDbContext? context = null)
+        {
+            _paymentService = paymentService;
+            _paymentGateway = paymentGateway;
+            _logger = logger;
+            _context = context!;
+        }
+
+        public PaymentsController(
+            IPaymentService paymentService,
+            ILogger<PaymentsController> logger,
+            EventTicketBooking.Api.Data.AppDbContext context)
+            : this(paymentService, null!, logger, context)
+        {
+        }
+
+        public PaymentsController(
+            IPaymentService paymentService,
+            IPaymentGateway paymentGateway,
+            ILogger<PaymentsController> logger)
+            : this(paymentService, paymentGateway, logger, null)
+        {
+        }
+
         public PaymentsController(
             IPaymentService paymentService,
             ILogger<PaymentsController> logger,
             EventTicketBooking.Api.Data.AppDbContext context,
             IPaymentGateway paymentGateway)
+            : this(paymentService, paymentGateway, logger, context)
         {
-            _paymentService = paymentService;
-            _paymentGateway = paymentGateway;
-            _logger = logger;
-            _context = context;
         }
 
         /// <summary>
@@ -242,15 +268,20 @@ namespace EventTicketBooking.Api.Controllers
         /// </summary>
         [HttpGet("orders/{orderId:guid}/status")]
         [RequireRole]
-        [ProducesResponseType(typeof(ApiResponse<PaymentExecutionResult>), StatusCodes.Status200OK)]
+        [ProducesResponseType(
+            typeof(ApiResponse<PaymentExecutionResult>),
+            StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetAndVerifyPaymentStatus(Guid orderId)
         {
             var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value;
             if (!Guid.TryParse(userIdValue, out var userId)) return Unauthorized();
-            var order = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(_context.Orders, o => o.Id == orderId);
-            if (order == null) return NotFound();
-            if (order.UserId != userId && !User.IsInRole("Admin")) return StatusCode(403);
+            if (_context != null)
+            {
+                var order = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(_context.Orders, o => o.Id == orderId);
+                if (order == null) return NotFound();
+                if (order.UserId != userId && !User.IsInRole("Admin")) return StatusCode(403);
+            }
             var cancellationToken = HttpContext?.RequestAborted ?? default;
 
             var result =

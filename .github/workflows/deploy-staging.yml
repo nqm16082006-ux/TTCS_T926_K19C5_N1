@@ -124,6 +124,7 @@ jobs:
             -e ASPNETCORE_ENVIRONMENT=Staging \
             -e JWT_KEY \
             -e Database__AutoMigrate=true \
+            -e PAYMENT_PROVIDER=Mock \
             -e ConnectionStrings__DefaultConnection="Host=event_ticket_postgres_staging;Port=5432;Database=event_ticket_db;Username=postgres;Password=postgres_password_123" \
             -e ConnectionStrings__Redis="event_ticket_redis_staging:6379" \
             $IMAGE_TAG
