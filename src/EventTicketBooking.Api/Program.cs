@@ -121,7 +121,7 @@ var paymentProvider = builder.Configuration["PaymentSettings:Provider"]
                      ?? "Mock";
 
 // Nếu môi trường là Production mà cấu hình dùng cổng giả lập (Mock) -> Từ chối khởi động
-if (!builder.Environment.IsDevelopment() && paymentProvider.Equals("Mock", StringComparison.OrdinalIgnoreCase))
+if (builder.Environment.IsProduction() && paymentProvider.Equals("Mock", StringComparison.OrdinalIgnoreCase))
 {
     throw new InvalidOperationException("CRITICAL CONFIGURATION ERROR: Mock Payment Gateway ('Mock') is strictly prohibited in Production environment!");
 }
