@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using EventTicketBooking.Api.DTOs.Common;
 using EventTicketBooking.Api.DTOs.Payment;
 using EventTicketBooking.Api.Services.Interfaces;
+using EventTicketBooking.Api.Middlewares;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -22,22 +23,25 @@ namespace EventTicketBooking.Api.Controllers
         private readonly IPaymentService _paymentService;
         private readonly IPaymentGateway _paymentGateway;
         private readonly ILogger<PaymentsController> _logger;
+        private readonly EventTicketBooking.Api.Data.AppDbContext _context;
 
         public PaymentsController(
             IPaymentService paymentService,
-            IPaymentGateway paymentGateway,
-            ILogger<PaymentsController> logger)
+            ILogger<PaymentsController> logger,
+            EventTicketBooking.Api.Data.AppDbContext context,
+            IPaymentGateway paymentGateway)
         {
             _paymentService = paymentService;
             _paymentGateway = paymentGateway;
             _logger = logger;
+            _context = context;
         }
 
         /// <summary>
         /// Tạo link thanh toán cho đơn hàng (Task T-40 & T-41).
         /// </summary>
         [HttpPost("orders/{orderId:guid}")]
-        [Authorize]
+        [RequireRole]
         [ProducesResponseType(typeof(ApiResponse<PaymentCreationResult>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -45,7 +49,7 @@ namespace EventTicketBooking.Api.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> CreatePayment(Guid orderId)
         {
-            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
             if (!Guid.TryParse(userIdStr, out var userId))
             {
                 return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
@@ -237,13 +241,16 @@ namespace EventTicketBooking.Api.Controllers
         /// Dành cho trang thanh toán frontend kiểm tra trạng thái thực tế từ máy chủ.
         /// </summary>
         [HttpGet("orders/{orderId:guid}/status")]
-        [Authorize]
-        [ProducesResponseType(
-            typeof(ApiResponse<PaymentExecutionResult>),
-            StatusCodes.Status200OK)]
+        [RequireRole]
+        [ProducesResponseType(typeof(ApiResponse<PaymentExecutionResult>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetAndVerifyPaymentStatus(Guid orderId)
         {
+            var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value;
+            if (!Guid.TryParse(userIdValue, out var userId)) return Unauthorized();
+            var order = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(_context.Orders, o => o.Id == orderId);
+            if (order == null) return NotFound();
+            if (order.UserId != userId && !User.IsInRole("Admin")) return StatusCode(403);
             var cancellationToken = HttpContext?.RequestAborted ?? default;
 
             var result =
@@ -268,3 +275,6 @@ namespace EventTicketBooking.Api.Controllers
         }
     }
 }
+
+
+

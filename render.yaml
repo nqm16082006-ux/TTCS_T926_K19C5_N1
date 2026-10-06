@@ -1,0 +1,66 @@
+# Persistent production deployment. These resources are paid; review Render's estimate before creating.
+services:
+  - type: web
+    name: eventpulse
+    runtime: docker
+    region: singapore
+    plan: 0.5c-512mb
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeployTrigger: "off"
+    disk:
+      name: eventpulse-uploads
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: Database__AutoMigrate
+        value: "true"
+      - key: Uploads__Path
+        value: /var/data/uploads
+      - key: JWT_KEY
+        generateValue: true
+      - key: POSTGRES_HOST
+        fromDatabase: {name: eventpulse-db, property: host}
+      - key: POSTGRES_PORT
+        fromDatabase: {name: eventpulse-db, property: port}
+      - key: POSTGRES_DB
+        fromDatabase: {name: eventpulse-db, property: database}
+      - key: POSTGRES_USER
+        fromDatabase: {name: eventpulse-db, property: user}
+      - key: POSTGRES_PASSWORD
+        fromDatabase: {name: eventpulse-db, property: password}
+      - key: ConnectionStrings__Redis
+        value: ""
+      - key: Bootstrap__AdminEmail
+        sync: false
+      - key: Bootstrap__AdminPassword
+        sync: false
+      - key: PaymentSettings__Provider
+        value: PayOS
+      - key: Payment__PayOS__ClientId
+        sync: false
+      - key: Payment__PayOS__ApiKey
+        sync: false
+      - key: Payment__PayOS__ChecksumKey
+        sync: false
+      - key: EmailSettings__SmtpHost
+        value: smtp.gmail.com
+      - key: EmailSettings__SmtpPort
+        value: "587"
+      - key: EmailSettings__SmtpUser
+        sync: false
+      - key: EmailSettings__SmtpPass
+        sync: false
+      - key: EmailSettings__SenderEmail
+        sync: false
+databases:
+  - name: eventpulse-db
+    region: singapore
+    plan: 0.1c-256mb
+    diskSizeGB: 1
+    postgresMajorVersion: "16"
+    databaseName: event_ticket_db
+    user: eventpulse
+    ipAllowList: []

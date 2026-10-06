@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 font-sans">
-  
+
   <header class="bg-white border-b border-slate-200 shadow-sm">
     <div class="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
       <h1 class="text-xl font-bold text-slate-800">Chi tiết đơn hàng</h1>
@@ -143,7 +143,7 @@
       document.getElementById('orderContent').classList.remove('hidden');
 
       document.getElementById('orderIdDisplay').textContent = order.id;
-      
+
       const statusConfig = getStatusConfig(order.status);
       const badge = document.getElementById('orderStatusBadge');
       badge.textContent = statusConfig.text;
@@ -170,7 +170,7 @@
       const btnRepay = document.getElementById('btnRepay');
       const timerWarning = document.getElementById('timerWarning');
       const processingWarning = document.getElementById('processingWarning');
-      
+
       const expiresAt = new Date(order.expiresAt).getTime();
       const now = new Date().getTime();
       const isExpired = expiresAt <= now;
@@ -201,7 +201,7 @@
 
     function startTimer(expiresAt, timerWarning) {
       if (countdownInterval) clearInterval(countdownInterval);
-      
+
       const update = () => {
         const now = new Date().getTime();
         const distance = expiresAt - now;
@@ -219,7 +219,7 @@
 
         const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
         const s = Math.floor((distance % (1000 * 60)) / 1000);
-        document.getElementById('timeRemaining').textContent = 
+        document.getElementById('timeRemaining').textContent =
           `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
       };
 
@@ -262,7 +262,7 @@
       } catch (err) {
         console.error(err);
         alert(err.message);
-        
+
         // Restore button state
         btnElement.disabled = false;
         btnElement.innerHTML = `<span>Thanh toán lại</span><i class="fa-solid fa-arrow-right"></i>`;

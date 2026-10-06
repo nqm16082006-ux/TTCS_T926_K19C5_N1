@@ -26,7 +26,7 @@ namespace EventTicketBooking.Api.Middlewares
         {
             _next = next;
         }
-        public async Task InvokeAsync(HttpContext context, AppDbContext dbContext)
+        public async Task InvokeAsync(HttpContext context, AppDbContext dbContext, IConfiguration configuration)
         {
             var endpoint = context.GetEndpoint();
             if (endpoint == null)
@@ -58,9 +58,8 @@ namespace EventTicketBooking.Api.Middlewares
                         var handler = new JwtSecurityTokenHandler();
                         if (handler.CanReadToken(token))
                         {
-                            var jwt = handler.ReadJwtToken(token);
-                            var identity = new ClaimsIdentity(jwt.Claims, "Bearer");
-                            context.User = new ClaimsPrincipal(identity);
+                            context.User = handler.ValidateToken(token,
+                                EventTicketBooking.Api.Services.JwtValidation.Parameters(configuration), out _);
                         }
                     }
                     catch
@@ -82,12 +81,29 @@ namespace EventTicketBooking.Api.Middlewares
                 return;
             }
 
+            var userIdValue = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                              ?? context.User.FindFirst("id")?.Value ?? context.User.FindFirst("sub")?.Value;
+            var user = Guid.TryParse(userIdValue, out var authenticatedUserId)
+                ? await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == authenticatedUserId)
+                : null;
+            if (user == null || !user.IsActive)
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await context.Response.WriteAsJsonAsync(new { message = "Tài khoản không tồn tại hoặc đã bị khóa." });
+                return;
+            }
+
+            // Roles in the database are authoritative, including revocations after token issuance.
+            var currentRoles = await dbContext.UserRoles.AsNoTracking()
+                .Where(ur => ur.UserId == authenticatedUserId).Select(ur => ur.Role.Name).ToListAsync();
+            var currentIdentity = new ClaimsIdentity(context.User.Claims.Where(c => c.Type != ClaimTypes.Role && c.Type != "role"), "Bearer");
+            currentIdentity.AddClaims(currentRoles.Select(role => new Claim(ClaimTypes.Role, role)));
+            context.User = new ClaimsPrincipal(currentIdentity);
+
             // 2. Kiểm tra RequireEmailConfirmed
             if (requiresEmailConfirmed != null)
             {
-                var isActiveClaim = context.User.FindFirst("IsActive")?.Value;
-
-                if (isActiveClaim == null || !bool.TryParse(isActiveClaim, out bool isActive) || !isActive)
+                if (!user.IsActive)
                 {
                     context.Response.StatusCode = StatusCodes.Status403Forbidden;
                     context.Response.ContentType = "application/json";

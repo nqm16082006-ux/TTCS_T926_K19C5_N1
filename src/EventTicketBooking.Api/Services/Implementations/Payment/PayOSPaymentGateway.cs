@@ -83,9 +83,7 @@ namespace EventTicketBooking.Api.Services.Implementations.Payment
                 if (string.IsNullOrWhiteSpace(_options.ApiKey) || string.IsNullOrWhiteSpace(_options.ClientId))
                 {
                     // Chế độ mô phỏng khi chưa điền thông tin cổng thật trong môi trường dev/local
-                    _logger.LogInformation("PayOS options chưa được cấu hình ClientId/ApiKey. Tự động trả về link thanh toán mô phỏng.");
-                    string simulatedUrl = $"{_options.BaseUrl}/payment-link/{orderCode}?signature={signature}";
-                    return PaymentCreationResult.CreateSuccess(simulatedUrl, $"TXN_{orderCode}", null, orderCode);
+                    return PaymentCreationResult.CreateFailure("Cổng thanh toán chưa được cấu hình.");
                 }
 
                 // Gửi request thực tế sang PayOS
@@ -122,7 +120,7 @@ namespace EventTicketBooking.Api.Services.Implementations.Payment
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Ngoại lệ khi tạo thanh toán với PayOS");
-                return PaymentCreationResult.CreateFailure($"Lỗi hệ thống khi kết nối cổng thanh toán: {ex.Message}");
+                return PaymentCreationResult.CreateFailure("Lỗi hệ thống khi kết nối cổng thanh toán.");
             }
         }
 

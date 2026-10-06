@@ -23,7 +23,7 @@ namespace EventTicketBooking.Api.Controllers
     /// </summary>
     [ApiController]
     [Route("api/events")]
-    [RequireRole]
+    [RequireRole("Organizer", "Admin")]
     public class EventController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -48,10 +48,20 @@ namespace EventTicketBooking.Api.Controllers
                 return StatusCode(StatusCodes.Status401Unauthorized, ApiResponse<object>.FailureResult("Vui lòng đăng nhập để thực hiện thao tác này."));
             }
 
-            var events = await _context.Events
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+
+            var query = _context.Events
                 .AsNoTracking()
+                .Include(e => e.Owner)
                 .Include(e => e.Showtimes)
-                .Where(e => e.OwnerId == currentUserId.Value)
+                .AsQueryable();
+
+            if (!isAdmin)
+            {
+                query = query.Where(e => e.OwnerId == currentUserId.Value);
+            }
+
+            var events = await query
                 .OrderByDescending(e => e.CreatedAt)
                 .ToListAsync();
 
@@ -91,15 +101,19 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(ApiResponse<object>.FailureResult("Tổng số ghế phải lớn hơn 0."));
             }
 
+            var startTimeUtc = dto.StartTime.Kind == DateTimeKind.Utc ? dto.StartTime : dto.StartTime.ToUniversalTime();
+            var endTimeUtc = dto.EndTime.Kind == DateTimeKind.Utc ? dto.EndTime : dto.EndTime.ToUniversalTime();
+
             var newEvent = new Event
             {
                 Id = Guid.NewGuid(),
                 OwnerId = currentUserId.Value,
                 Title = dto.Title.Trim(),
                 Description = dto.Description?.Trim(),
+                ImageUrl = dto.ImageUrl?.Trim(),
                 Location = dto.Location.Trim(),
-                StartTime = dto.StartTime,
-                EndTime = dto.EndTime,
+                StartTime = startTimeUtc,
+                EndTime = endTimeUtc,
                 TotalSeats = dto.TotalSeats,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -129,6 +143,66 @@ namespace EventTicketBooking.Api.Controllers
         /// GET /api/events/{id}
         /// Kiểm tra phân quyền sở hữu: trả 404 nếu không tồn tại, trả 403 nếu thuộc về user khác.
         /// </summary>
+        [HttpPost("{id:guid}/duplicate")]
+        public async Task<IActionResult> DuplicateEvent(Guid id)
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue) return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+            var source = await _context.Events.AsNoTracking()
+                .Include(e => e.Showtimes).ThenInclude(s => s.SeatCategories)
+                .FirstOrDefaultAsync(e => e.Id == id);
+            if (source == null) return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
+            if (source.OwnerId != userId && !await IsCurrentUserAdminAsync(userId.Value))
+                return StatusCode(403, ApiResponse<object>.FailureResult("Bạn không có quyền nhân bản sự kiện này."));
+
+            var showtimeIds = source.Showtimes.Select(s => s.Id).ToList();
+            var seats = await _context.Seats.AsNoTracking().Where(s => showtimeIds.Contains(s.ShowtimeId)).ToListAsync();
+            const string suffix = " (Bản sao)";
+            var copy = new Event
+            {
+                OwnerId = userId.Value,
+                Title = source.Title[..Math.Min(source.Title.Length, 250 - suffix.Length)] + suffix,
+                Description = source.Description,
+                ImageUrl = source.ImageUrl,
+                Location = source.Location,
+                StartTime = source.StartTime,
+                EndTime = source.EndTime,
+                TotalSeats = source.TotalSeats
+            };
+            foreach (var original in source.Showtimes)
+            {
+                var originalSeats = seats.Where(s => s.ShowtimeId == original.Id).ToList();
+                var show = new Showtime
+                {
+                    EventId = copy.Id,
+                    StartTime = original.StartTime,
+                    EndTime = original.EndTime,
+                    AvailableSeats = originalSeats.Count > 0 ? originalSeats.Count : original.AvailableSeats
+                };
+                var categories = original.SeatCategories.ToDictionary(c => c.Id, c => new SeatCategory
+                {
+                    ShowtimeId = show.Id,
+                    Name = c.Name,
+                    Price = c.Price
+                });
+                show.SeatCategories = categories.Values.ToList();
+                copy.Showtimes.Add(show);
+                foreach (var seat in originalSeats)
+                    _context.Seats.Add(new Seat
+                    {
+                        ShowtimeId = show.Id,
+                        SeatCategoryId = categories[seat.SeatCategoryId].Id,
+                        Row = seat.Row,
+                        SeatNumber = seat.SeatNumber,
+                        Status = "AVAILABLE"
+                    });
+            }
+            _context.Events.Add(copy);
+            await _context.SaveChangesAsync();
+            return StatusCode(201, ApiResponse<EventResponseDto>.SuccessResult(MapToEventResponseDto(copy),
+                "Đã nhân bản sự kiện thành bản nháp. Hãy kiểm tra lịch diễn trước khi mở bán."));
+        }
+
         [HttpGet("{id:guid}")]
         [ProducesResponseType(typeof(ApiResponse<EventResponseDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -144,6 +218,7 @@ namespace EventTicketBooking.Api.Controllers
 
             var ev = await _context.Events
                 .AsNoTracking()
+                .Include(e => e.Owner)
                 .Include(e => e.Showtimes)
                 .FirstOrDefaultAsync(e => e.Id == id);
 
@@ -152,7 +227,8 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
             }
 
-            if (ev.OwnerId != currentUserId.Value)
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền truy cập sự kiện này."));
             }
@@ -189,7 +265,8 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
             }
 
-            if (ev.OwnerId != currentUserId.Value)
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền chỉnh sửa sự kiện này."));
             }
@@ -210,11 +287,15 @@ namespace EventTicketBooking.Api.Controllers
             }
 
             // Cập nhật các trường thông tin (OwnerId không thay đổi)
+            var startTimeUtc = dto.StartTime.Kind == DateTimeKind.Utc ? dto.StartTime : dto.StartTime.ToUniversalTime();
+            var endTimeUtc = dto.EndTime.Kind == DateTimeKind.Utc ? dto.EndTime : dto.EndTime.ToUniversalTime();
+
             ev.Title = dto.Title.Trim();
             ev.Description = dto.Description?.Trim();
+            ev.ImageUrl = dto.ImageUrl?.Trim();
             ev.Location = dto.Location.Trim();
-            ev.StartTime = dto.StartTime;
-            ev.EndTime = dto.EndTime;
+            ev.StartTime = startTimeUtc;
+            ev.EndTime = endTimeUtc;
             ev.TotalSeats = dto.TotalSeats;
             ev.UpdatedAt = DateTime.UtcNow;
 
@@ -222,6 +303,47 @@ namespace EventTicketBooking.Api.Controllers
 
             var responseDto = MapToEventResponseDto(ev);
             return Ok(ApiResponse<EventResponseDto>.SuccessResult(responseDto, "Cập nhật sự kiện thành công."));
+        }
+
+        /// <summary>
+        /// Xóa sự kiện.
+        /// DELETE /api/events/{id}
+        /// </summary>
+        [HttpDelete("{id:guid}")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DeleteEvent(Guid id)
+        {
+            var currentUserId = GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return StatusCode(StatusCodes.Status401Unauthorized, ApiResponse<object>.FailureResult("Vui lòng đăng nhập để thực hiện thao tác này."));
+            }
+
+            var ev = await _context.Events
+                .Include(e => e.Showtimes)
+                .FirstOrDefaultAsync(e => e.Id == id);
+
+            if (ev == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
+            }
+
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền xóa sự kiện này."));
+            }
+
+            var showtimeIds = ev.Showtimes.Select(s => s.Id).ToList();
+            if (await _context.Orders.AnyAsync(o => showtimeIds.Contains(o.ShowtimeId)))
+                return Conflict(ApiResponse<object>.FailureResult("Không thể xóa sự kiện đã có đơn hàng."));
+            _context.Events.Remove(ev);
+            await _context.SaveChangesAsync();
+
+            return Ok(ApiResponse<object>.SuccessResult(null, "Xóa sự kiện thành công."));
         }
 
         /// <summary>
@@ -252,11 +374,16 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
             }
 
-            if (ev.OwnerId != currentUserId.Value)
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền truy cập suất diễn của sự kiện này."));
             }
 
+            var ids = ev.Showtimes.Select(s => s.Id).ToList();
+            var seatCounts = await _context.Seats.AsNoTracking().Where(s => ids.Contains(s.ShowtimeId))
+                .GroupBy(s => s.ShowtimeId).Select(g => new { Id = g.Key, Total = g.Count(), Sold = g.Count(s => s.Status == "SOLD") })
+                .ToDictionaryAsync(g => g.Id);
             var showtimesDto = ev.Showtimes.Select(s => new ShowtimeResponseDto
             {
                 Id = s.Id,
@@ -264,6 +391,8 @@ namespace EventTicketBooking.Api.Controllers
                 StartTime = s.StartTime,
                 EndTime = s.EndTime,
                 AvailableSeats = s.AvailableSeats,
+                ActualSeatCount = seatCounts.TryGetValue(s.Id, out var counts) ? counts.Total : 0,
+                SoldSeatCount = seatCounts.TryGetValue(s.Id, out var soldCounts) ? soldCounts.Sold : 0,
                 Status = s.Status,
                 SeatCategories = s.SeatCategories
                     .OrderBy(category => category.Name)
@@ -274,11 +403,217 @@ namespace EventTicketBooking.Api.Controllers
                         Price = category.Price
                     })
                     .ToList(),
-                StatusActionMessage = GetShowtimeStatusActionMessage(s)
+                StatusActionMessage = s.Status != ShowtimeStatus.Draft ? GetShowtimeStatusActionMessage(s) :
+                    !seatCounts.ContainsKey(s.Id) ? "Tải sơ đồ ghế trước khi mở bán." :
+                    s.SeatCategories.Count == 0 || s.SeatCategories.Any(c => c.Price is null or < 0) ? "Thiết lập giá cho tất cả hạng ghế trước khi mở bán." :
+                    GetShowtimeStatusActionMessage(s)
             }).ToList();
 
             return Ok(ApiResponse<List<ShowtimeResponseDto>>.SuccessResult(showtimesDto, "Lấy danh sách suất diễn thành công."));
         }
+
+        /// <summary>
+        /// Tạo suất diễn mới cho Sự kiện.
+        /// POST /api/events/{id}/showtimes
+        /// </summary>
+        [HttpPost("{id:guid}/showtimes")]
+        [RequireRole("Organizer", "Admin")]
+        [ProducesResponseType(typeof(ApiResponse<ShowtimeResponseDto>), StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> CreateShowtime(Guid id, [FromBody] CreateShowtimeDto dto)
+        {
+            var currentUserId = GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return StatusCode(StatusCodes.Status401Unauthorized, ApiResponse<object>.FailureResult("Vui lòng đăng nhập để thực hiện thao tác này."));
+            }
+
+            var ev = await _context.Events
+                .Include(e => e.Showtimes)
+                .FirstOrDefaultAsync(e => e.Id == id);
+
+            if (ev == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
+            }
+
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền thao tác trên sự kiện này."));
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Dữ liệu không hợp lệ.", GetModelStateErrors()));
+            }
+
+            if (dto.EndTime <= dto.StartTime)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Thời gian kết thúc phải lớn hơn thời gian bắt đầu."));
+            }
+
+            var startTimeUtc = dto.StartTime.Kind == DateTimeKind.Utc ? dto.StartTime : dto.StartTime.ToUniversalTime();
+            var endTimeUtc = dto.EndTime.Kind == DateTimeKind.Utc ? dto.EndTime : dto.EndTime.ToUniversalTime();
+
+            var showtime = new Showtime
+            {
+                Id = Guid.NewGuid(),
+                EventId = ev.Id,
+                StartTime = startTimeUtc,
+                EndTime = endTimeUtc,
+                AvailableSeats = dto.AvailableSeats > 0 ? dto.AvailableSeats : ev.TotalSeats
+            };
+
+            _context.Showtimes.Add(showtime);
+            await _context.SaveChangesAsync();
+
+            var responseDto = new ShowtimeResponseDto
+            {
+                Id = showtime.Id,
+                EventId = showtime.EventId,
+                StartTime = showtime.StartTime,
+                EndTime = showtime.EndTime,
+                AvailableSeats = showtime.AvailableSeats,
+                Status = showtime.Status,
+                SeatCategories = new List<SeatCategoryPriceDto>(),
+                StatusActionMessage = GetShowtimeStatusActionMessage(showtime)
+            };
+
+            return StatusCode(StatusCodes.Status201Created, ApiResponse<ShowtimeResponseDto>.SuccessResult(responseDto, "Tạo suất diễn thành công."));
+        }
+
+        /// <summary>
+        /// Cập nhật thời gian hoặc số ghế của suất diễn.
+        /// PUT /api/events/{eventId}/showtimes/{showtimeId}
+        /// </summary>
+        [HttpPut("{eventId:guid}/showtimes/{showtimeId:guid}")]
+        [RequireRole("Organizer", "Admin")]
+        [ProducesResponseType(typeof(ApiResponse<ShowtimeResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UpdateShowtime(Guid eventId, Guid showtimeId, [FromBody] UpdateShowtimeDto dto)
+        {
+            var currentUserId = GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return StatusCode(StatusCodes.Status401Unauthorized, ApiResponse<object>.FailureResult("Vui lòng đăng nhập để thực hiện thao tác này."));
+            }
+
+            var ev = await _context.Events
+                .Include(e => e.Showtimes)
+                .FirstOrDefaultAsync(e => e.Id == eventId);
+
+            if (ev == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
+            }
+
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền thao tác trên sự kiện này."));
+            }
+
+            var showtime = ev.Showtimes.FirstOrDefault(s => s.Id == showtimeId);
+            if (showtime == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Suất diễn không tồn tại."));
+            }
+
+            if (dto.EndTime <= dto.StartTime)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Thời gian kết thúc phải lớn hơn thời gian bắt đầu."));
+            }
+
+            var startTimeUtc = dto.StartTime.Kind == DateTimeKind.Utc ? dto.StartTime : dto.StartTime.ToUniversalTime();
+            var endTimeUtc = dto.EndTime.Kind == DateTimeKind.Utc ? dto.EndTime : dto.EndTime.ToUniversalTime();
+
+            showtime.StartTime = startTimeUtc;
+            showtime.EndTime = endTimeUtc;
+            if (dto.AvailableSeats.HasValue && dto.AvailableSeats.Value > 0)
+            {
+                showtime.AvailableSeats = dto.AvailableSeats.Value;
+            }
+
+            await _context.SaveChangesAsync();
+
+            var responseDto = new ShowtimeResponseDto
+            {
+                Id = showtime.Id,
+                EventId = showtime.EventId,
+                StartTime = showtime.StartTime,
+                EndTime = showtime.EndTime,
+                AvailableSeats = showtime.AvailableSeats,
+                Status = showtime.Status,
+                StatusActionMessage = GetShowtimeStatusActionMessage(showtime)
+            };
+
+            return Ok(ApiResponse<ShowtimeResponseDto>.SuccessResult(responseDto, "Cập nhật suất diễn thành công."));
+        }
+
+        /// <summary>
+        /// Xóa suất diễn.
+        /// DELETE /api/events/{eventId}/showtimes/{showtimeId}
+        /// </summary>
+        [HttpDelete("{eventId:guid}/showtimes/{showtimeId:guid}")]
+        [RequireRole("Organizer", "Admin")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DeleteShowtime(Guid eventId, Guid showtimeId)
+        {
+            var currentUserId = GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return StatusCode(StatusCodes.Status401Unauthorized, ApiResponse<object>.FailureResult("Vui lòng đăng nhập để thực hiện thao tác này."));
+            }
+
+            var ev = await _context.Events
+                .Include(e => e.Showtimes)
+                .FirstOrDefaultAsync(e => e.Id == eventId);
+
+            if (ev == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
+            }
+
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền thao tác trên sự kiện này."));
+            }
+
+            var showtime = ev.Showtimes.FirstOrDefault(s => s.Id == showtimeId);
+            if (showtime == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Suất diễn không tồn tại."));
+            }
+
+            if (showtime.Status == ShowtimeStatus.OnSale)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Không thể xóa suất diễn đang trong trạng thái mở bán. Vui lòng đóng bán trước khi xóa."));
+            }
+
+            var hasOrders = await _context.Orders.AnyAsync(o => o.ShowtimeId == showtimeId);
+            if (hasOrders)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Không thể xóa suất diễn đã có đơn đặt vé."));
+            }
+
+            _context.Showtimes.Remove(showtime);
+            await _context.SaveChangesAsync();
+
+            return Ok(ApiResponse<object>.SuccessResult(null, "Xóa suất diễn thành công."));
+        }
+
 
         /// <summary>
         /// Cập nhật giá các hạng ghế của một suất diễn (Task T-35).
@@ -311,16 +646,17 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
             }
 
-            if (ev.OwnerId != currentUserId.Value)
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền cập nhật giá cho sự kiện này."));
             }
 
-            var showtimeExists = await _context.Showtimes
+            var pricingShowtime = await _context.Showtimes
                 .AsNoTracking()
-                .AnyAsync(s => s.Id == showtimeId && s.EventId == eventId);
+                .FirstOrDefaultAsync(s => s.Id == showtimeId && s.EventId == eventId);
 
-            if (!showtimeExists)
+            if (pricingShowtime == null)
             {
                 return NotFound(ApiResponse<object>.FailureResult("Suất diễn không tồn tại trong sự kiện này."));
             }
@@ -330,10 +666,13 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(ApiResponse<object>.FailureResult("Danh sách hạng ghế cần cập nhật không được để trống."));
             }
 
-            if (dto.Categories.Any(item => item.Price < 0))
+            if (dto.Categories.Any(item => item == null || item.Price < 0))
             {
                 return BadRequest(ApiResponse<object>.FailureResult("Giá hạng ghế không được là số âm."));
             }
+
+            if (pricingShowtime.Status == ShowtimeStatus.OnSale && dto.Categories.Any(item => item.Price == null))
+                return BadRequest(ApiResponse<object>.FailureResult("Không thể xóa giá ghế của suất diễn đang mở bán."));
 
             var requestedCategoryIds = dto.Categories
                 .Select(item => item.SeatCategoryId)
@@ -406,7 +745,8 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
             }
 
-            if (ev.OwnerId != currentUserId.Value)
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền thao tác trên sự kiện này."));
             }
@@ -423,6 +763,13 @@ namespace EventTicketBooking.Api.Controllers
 
             try
             {
+                if (showtime.AvailableSeats <= 0)
+                    return BadRequest(ApiResponse<object>.FailureResult("Không thể chuyển sang trạng thái Đang bán vì suất diễn chưa có ghế."));
+                if (showtime.SeatCategories.Count == 0)
+                    return BadRequest(ApiResponse<object>.FailureResult("Suất diễn chưa có hạng ghế để mở bán."));
+                if (showtime.SeatCategories.All(c => c.Price.HasValue && c.Price.Value >= 0) &&
+                    !await _context.Seats.AnyAsync(s => s.ShowtimeId == showtimeId))
+                    return BadRequest(ApiResponse<object>.FailureResult("Suất diễn chưa có sơ đồ ghế để mở bán."));
                 showtime.ChangeStatus(ShowtimeStatus.OnSale);
                 await _context.SaveChangesAsync();
 
@@ -472,7 +819,8 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
             }
 
-            if (ev.OwnerId != currentUserId.Value)
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền thao tác trên sự kiện này."));
             }
@@ -545,14 +893,31 @@ namespace EventTicketBooking.Api.Controllers
             return null;
         }
 
+        private async Task<bool> IsCurrentUserAdminAsync(Guid userId)
+        {
+            if (User.IsInRole("Admin") ||
+                User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") &&
+                                   string.Equals(c.Value, "Admin", StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+
+            return await _context.UserRoles
+                .AsNoTracking()
+                .AnyAsync(ur => ur.UserId == userId && ur.Role.Name == "Admin");
+        }
+
         private static EventResponseDto MapToEventResponseDto(Event ev)
         {
             return new EventResponseDto
             {
                 Id = ev.Id,
                 OwnerId = ev.OwnerId,
+                OwnerName = ev.Owner != null ? (!string.IsNullOrWhiteSpace(ev.Owner.FullName) ? ev.Owner.FullName : ev.Owner.Username) : null,
+                OwnerEmail = ev.Owner?.Email,
                 Title = ev.Title,
                 Description = ev.Description,
+                ImageUrl = ev.ImageUrl,
                 Location = ev.Location,
                 StartTime = ev.StartTime,
                 EndTime = ev.EndTime,

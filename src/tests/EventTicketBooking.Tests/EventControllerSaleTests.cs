@@ -77,6 +77,9 @@ namespace EventTicketBooking.Tests
                 EndTime = ev.EndTime
             };
             ev.Showtimes.Add(showtime);
+            var category = new SeatCategory { ShowtimeId = showtime.Id, Name = "Standard", Price = 100000 };
+            showtime.SeatCategories.Add(category);
+            _context.Seats.Add(new Seat { ShowtimeId = showtime.Id, SeatCategoryId = category.Id, Row = "A", SeatNumber = 1 });
             _context.Events.Add(ev);
             await _context.SaveChangesAsync();
 
@@ -268,7 +271,7 @@ namespace EventTicketBooking.Tests
             {
                 Id = Guid.NewGuid(),
                 EventId = ev.Id,
-                AvailableSeats = 100, // Has seats -> Draft status, valid to open
+                AvailableSeats = 100, // Planned capacity without an imported map
                 StartTime = ev.StartTime,
                 EndTime = ev.EndTime
             };
@@ -286,9 +289,9 @@ namespace EventTicketBooking.Tests
 
             var dto = Assert.Single(apiResponse.Data);
             Assert.Equal(ShowtimeStatus.Draft, dto.Status);
-            Assert.True(dto.CanOpenSale);
+            Assert.False(dto.CanOpenSale);
             Assert.False(dto.CanCloseSale);
-            Assert.Equal("Suất diễn đủ điều kiện để mở bán.", dto.StatusActionMessage);
+            Assert.Equal("Tải sơ đồ ghế trước khi mở bán.", dto.StatusActionMessage);
         }
     }
 }

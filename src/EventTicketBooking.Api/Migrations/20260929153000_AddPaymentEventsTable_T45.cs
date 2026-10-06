@@ -15,10 +15,10 @@ namespace EventTicketBooking.Api.Migrations
                 name: "payment_events",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    TransactionId = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    RawPayload = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    TransactionId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    RawPayload = table.Column<string>(type: "text", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
                 },
                 constraints: table =>
                 {

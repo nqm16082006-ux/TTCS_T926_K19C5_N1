@@ -129,8 +129,9 @@ namespace EventTicketBooking.Tests
 
             var controller = new PaymentsController(
                 paymentService,
-                paymentGateway,
-                logger)
+                logger,
+                _context,
+                paymentGateway)
             {
                 ControllerContext = new ControllerContext
                 {

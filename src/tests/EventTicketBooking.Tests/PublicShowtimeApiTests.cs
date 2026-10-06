@@ -90,6 +90,24 @@ namespace EventTicketBooking.Tests
         }
 
         [Fact]
+        public async Task DetailEndpoints_ShouldReturnSameRemainingSeatsAsListing()
+        {
+            var ev = new Event { Id = Guid.NewGuid(), OwnerId = Guid.NewGuid(), Title = "Available event", Location = "HCM", TotalSeats = 300 };
+            _context.Users.Add(new User { Id = ev.OwnerId, Username = "owner", Email = "owner@example.com", PasswordHash = "test" });
+            var showtime = new Showtime { Id = Guid.NewGuid(), EventId = ev.Id, AvailableSeats = 300, StartTime = DateTime.UtcNow.AddDays(1), EndTime = DateTime.UtcNow.AddDays(1).AddHours(2) };
+            showtime.ChangeStatus(ShowtimeStatus.OnSale);
+            _context.Events.Add(ev);
+            _context.Showtimes.Add(showtime);
+            await _context.SaveChangesAsync();
+            var controller = CreateController();
+            var listing = Assert.IsType<ApiResponse<CursorPagedResultDto<PublicShowtimeDto>>>(Assert.IsType<OkObjectResult>(await controller.GetOnSaleShowtimes()).Value);
+            var eventDetail = Assert.IsType<ApiResponse<PublicEventDetailDto>>(Assert.IsType<OkObjectResult>(await controller.GetPublicEventDetail(ev.Id)).Value);
+            var showtimeDetail = Assert.IsType<ApiResponse<PublicShowtimeDto>>(Assert.IsType<OkObjectResult>(await controller.GetPublicShowtimeDetail(ev.Id, showtime.Id)).Value);
+            Assert.Equal(300, Assert.Single(listing.Data!.Items).RemainingSeats);
+            Assert.Equal(300, Assert.Single(eventDetail.Data!.Showtimes).RemainingSeats);
+            Assert.Equal(300, showtimeDetail.Data!.RemainingSeats);
+        }
+        [Fact]
         public async Task Test1_PublicApi_ShouldSucceed_WithoutAuthentication()
         {
             var controller = CreateController();

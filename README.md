@@ -2,6 +2,8 @@
 
 Hệ thống Backend cho ứng dụng **Bán vé sự kiện có sơ đồ ghế** được dựng trên nền tảng **C# .NET 9 Web API**, sử dụng **Entity Framework Core**, **PostgreSQL** làm cơ sở dữ liệu chính, và **Redis** làm bộ nhớ đệm (Cache).
 
+Hướng dẫn clone/chạy trên máy mới và triển khai Render: [DEPLOY_RENDER.md](DEPLOY_RENDER.md). Cấu hình Render hiện tại dùng tài nguyên có phí; xem chi phí trước khi tạo dịch vụ.
+
 ---
 
 ## 📋 Yêu Cầu Tiền Đề (Prerequisites)
@@ -10,7 +12,7 @@ Hệ thống Backend cho ứng dụng **Bán vé sự kiện có sơ đồ ghế
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (cho PostgreSQL & Redis container)
 - Công cụ CLI Entity Framework Core (`dotnet-ef`):
   ```powershell
-  dotnet tool install --global dotnet-ef
+  dotnet tool install --global dotnet-ef --version 9.0.2
   ```
 
 ---
@@ -25,7 +27,7 @@ Hệ thống đọc các chuỗi kết nối và thông số cấu hình từ **
 ```env
 # App settings
 ASPNETCORE_ENVIRONMENT=Development
-PORT=5000
+PORT=5012
 
 # PostgreSQL Configuration
 POSTGRES_HOST=localhost
@@ -99,7 +101,7 @@ dotnet run --project src/EventTicketBooking.Api
 ```
 
 Sau khi ứng dụng khởi động:
-- **Swagger UI**: Access tại [http://localhost:5000/swagger](http://localhost:5000/swagger) (hoặc URL hiển thị trên terminal).
+- **Swagger UI**: Access tại [http://localhost:5012/swagger](http://localhost:5012/swagger) (hoặc URL hiển thị trên terminal).
 - **Health Check API**: Access tại `GET /api/health` để kiểm tra kết nối realtime tới PostgreSQL và Redis.
 
 ---
@@ -152,15 +154,6 @@ TTCS_T926_K19C5_N1/
 
 ---
 
-## 📊 Báo Cáo Hiệu Năng Sơ Đồ Ghế
+## Sơ đồ ghế hiện tại
 
-Để đảm bảo trải nghiệm đặt vé mượt mà cho các sự kiện quy mô lớn (lên tới 2000+ ghế), hệ thống sơ đồ ghế trên trình duyệt được xây dựng tối ưu với **HTML5 Canvas** và **Hardware-Accelerated CSS**.
-
-### Thông Số Kỹ Thuật
-- **Dữ liệu mẫu**: Hỗ trợ tải file JSON hàng ngàn ghế (sẵn sàng nạp qua API). Tệp mẫu 2000 ghế đã được cung cấp sẵn tại \data/sample_seats_2000.json\.
-- **Render**: Render toàn bộ sơ đồ ghế thông qua 1 thẻ \<canvas>\ duy nhất thay vì tạo hàng ngàn DOM Nodes.
-- **Tốc độ thực thi**:
-  - Thời gian xử lý dữ liệu và vẽ Canvas: ~2-5 ms.
-  - Tổng thời gian tải từ lúc gọi API tới lúc sơ đồ hiện xong: **< 50 ms** (đáp ứng xuất sắc yêu cầu dưới 2 giây).
-- **Thao tác**: Các thao tác phóng to/thu nhỏ (Zoom) và di chuyển (Pan) đạt chuẩn 60 FPS mượt mà trên cả điện thoại và máy tính.
-
+Giao diện sử dụng DOM/CSS, có lọc khu vực, màu theo hạng vé và phóng to/thu nhỏ. File mẫu 3.000 ghế: data/seat-map-3000.json. Các số đo hiệu năng cần kiểm tra trên môi trường triển khai thực tế.

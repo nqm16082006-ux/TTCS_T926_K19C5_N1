@@ -17,7 +17,7 @@ WORKDIR /app
 EXPOSE 5000
 
 ENV ASPNETCORE_URLS=http://+:5000
-ENV ASPNETCORE_ENVIRONMENT=Staging
+ENV ASPNETCORE_ENVIRONMENT=Production
 
 # Install curl for healthcheck in container
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
@@ -25,6 +25,6 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/publish .
 
 HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
-  CMD curl -f http://localhost:5000/api/health || exit 1
+  CMD curl -f http://localhost:${PORT:-5000}/api/health || exit 1
 
 ENTRYPOINT ["dotnet", "EventTicketBooking.Api.dll"]

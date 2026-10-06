@@ -23,9 +23,87 @@ namespace EventTicketBooking.Api.Data
             var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
             var logger = scope.ServiceProvider.GetService<ILogger<AppDbContext>>();
 
+            // Migration failures must stop startup rather than be swallowed as seed warnings.
+            await context.Database.MigrateAsync();
+
             try
             {
-                await context.Database.EnsureCreatedAsync();
+
+                if (context.Database.IsNpgsql())
+                {
+                    var conn = (Npgsql.NpgsqlConnection)context.Database.GetDbConnection();
+                    if (conn.State != System.Data.ConnectionState.Open)
+                        await conn.OpenAsync();
+                    await conn.ReloadTypesAsync();
+
+                    try
+                    {
+                        using var cmd = conn.CreateCommand();
+                        cmd.CommandText = @"
+                            CREATE OR REPLACE FUNCTION text_to_showtime_status(text) RETURNS showtime_status AS $$
+                            SELECT CASE LOWER(REPLACE($1, ' ', ''))
+                                WHEN 'draft' THEN 'draft'::showtime_status
+                                WHEN 'onsale' THEN 'on_sale'::showtime_status
+                                WHEN 'closed' THEN 'closed'::showtime_status
+                                ELSE LOWER($1)::showtime_status
+                            END;
+                            $$ LANGUAGE SQL IMMUTABLE;
+
+                            CREATE OR REPLACE FUNCTION text_to_order_status(text) RETURNS order_status AS $$
+                            SELECT CASE LOWER(REPLACE($1, ' ', ''))
+                                WHEN 'pending' THEN 'pending'::order_status
+                                WHEN 'paid' THEN 'paid'::order_status
+                                WHEN 'cancelled' THEN 'cancelled'::order_status
+                                WHEN 'expired' THEN 'expired'::order_status
+                                WHEN 'needsattention' THEN 'needs_attention'::order_status
+                                ELSE LOWER($1)::order_status
+                            END;
+                            $$ LANGUAGE SQL IMMUTABLE;
+
+                            DO $$ BEGIN
+                                IF NOT EXISTS (SELECT 1 FROM pg_cast WHERE castsource = 'text'::regtype AND casttarget = 'showtime_status'::regtype) THEN
+                                    CREATE CAST (text AS showtime_status) WITH FUNCTION text_to_showtime_status(text) AS IMPLICIT;
+                                    CREATE CAST (character varying AS showtime_status) WITH FUNCTION text_to_showtime_status(text) AS IMPLICIT;
+                                END IF;
+                                IF NOT EXISTS (SELECT 1 FROM pg_cast WHERE castsource = 'text'::regtype AND casttarget = 'order_status'::regtype) THEN
+                                    CREATE CAST (text AS order_status) WITH FUNCTION text_to_order_status(text) AS IMPLICIT;
+                                    CREATE CAST (character varying AS order_status) WITH FUNCTION text_to_order_status(text) AS IMPLICIT;
+                                END IF;
+                            END $$;";
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger?.LogError(ex, "Error creating implicit cast!");
+                    }
+
+                    var enumAlterStatements = new[]
+                    {
+                        "ALTER TYPE showtime_status ADD VALUE IF NOT EXISTS 'Draft';",
+                        "ALTER TYPE showtime_status ADD VALUE IF NOT EXISTS 'OnSale';",
+                        "ALTER TYPE showtime_status ADD VALUE IF NOT EXISTS 'Closed';",
+                        "ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'Pending';",
+                        "ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'Paid';",
+                        "ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'Cancelled';",
+                        "ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'Expired';",
+                        "ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'NeedsAttention';"
+                    };
+
+                    foreach (var stmt in enumAlterStatements)
+                    {
+                        try
+                        {
+                            using var alterCmd = conn.CreateCommand();
+                            alterCmd.CommandText = stmt;
+                            await alterCmd.ExecuteNonQueryAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            logger?.LogWarning(ex, "Could not alter enum value: {Stmt}", stmt);
+                        }
+                    }
+                    await conn.ReloadTypesAsync();
+                }
 
                 // 1. Kiểm tra nếu bảng Roles chưa có dữ liệu thì seed 5 roles
                 if (!await context.Roles.AnyAsync())
@@ -56,6 +134,7 @@ namespace EventTicketBooking.Api.Data
                         Email = "admin@eventticket.com",
                         PasswordHash = passwordHasher.Hash("Admin@123456"),
                         FullName = "System Administrator",
+                        IsActive = true,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
                     };
@@ -67,6 +146,7 @@ namespace EventTicketBooking.Api.Data
                         Email = "organizer@eventticket.com",
                         PasswordHash = passwordHasher.Hash("Organizer@123456"),
                         FullName = "Event Organizer",
+                        IsActive = true,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
                     };
@@ -107,6 +187,7 @@ namespace EventTicketBooking.Api.Data
                         Title = "Live Concert Anh Trai Say Hi 2026",
                         Description = "Đêm nhạc quy tụ dàn ca sĩ hàng đầu với hệ thống âm thanh, ánh sáng chuẩn quốc tế.",
                         Location = "Sân vận động Quốc gia Mỹ Đình, Hà Nội",
+                        ImageUrl = "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80",
                         StartTime = DateTime.UtcNow.AddDays(7),
                         EndTime = DateTime.UtcNow.AddDays(7).AddHours(4),
                         TotalSeats = 50,
@@ -141,6 +222,7 @@ namespace EventTicketBooking.Api.Data
                         Title = "Festival Âm Nhạc Mùa Hè 2026",
                         Description = "Lễ hội âm nhạc mùa hè cuồng nhiệt với nhiều nghệ sĩ Indie và Rock bùng nổ.",
                         Location = "Phố đi bộ Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh",
+                        ImageUrl = "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&q=80",
                         StartTime = DateTime.UtcNow.AddDays(14),
                         EndTime = DateTime.UtcNow.AddDays(14).AddHours(5),
                         TotalSeats = 50,

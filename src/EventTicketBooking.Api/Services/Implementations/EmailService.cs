@@ -1,7 +1,12 @@
+using System;
+using System.Threading.Tasks;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
 using EventTicketBooking.Api.Services.Interfaces;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace EventTicketBooking.Api.Services.Implementations;
 
@@ -23,58 +28,176 @@ public class EmailService : IEmailService
     }
 
     /// <inheritdoc/>
-    /// <remarks>
-    /// AC1: Gửi email ngay sau khi đăng ký thành công.
-    /// AC2: Email chứa liên kết xác nhận hợp lệ được tạo từ Identity token.
-    /// </remarks>
     public async Task SendConfirmationEmailAsync(string toEmail, string toName, string confirmationLink)
     {
         var settings = _configuration.GetSection("EmailSettings");
 
         var message = new MimeMessage();
         message.From.Add(new MailboxAddress(
-            settings["SenderName"] ?? "Hệ thống",
-            settings["SenderEmail"] ?? "noreply@example.com"
+            settings["SenderName"] ?? "EventPulse Ticketing",
+            settings["SenderEmail"] ?? "noreply@eventticket.com"
         ));
         message.To.Add(new MailboxAddress(toName, toEmail));
-        message.Subject = "✅ Xác nhận địa chỉ email của bạn";
+        message.Subject = "✅ Xác nhận địa chỉ email của bạn - EventPulse";
 
-        // Nội dung email HTML đẹp, rõ ràng
         message.Body = new TextPart("html")
         {
-            Text = BuildEmailBody(toName, confirmationLink)
+            Text = BuildEmailBody(System.Net.WebUtility.HtmlEncode(toName), System.Net.WebUtility.HtmlEncode(confirmationLink))
         };
 
-        // Yêu cầu: môi trường dev in ra log thay vì gửi thật, không log mã kích hoạt ở môi trường staging trở lên
-        if (_env.IsDevelopment())
+        await SendEmailInternalAsync(message, toEmail, $"Link: {confirmationLink}");
+    }
+
+    /// <inheritdoc/>
+    public async Task SendOtpEmailAsync(string toEmail, string toName, string otpCode)
+    {
+        var settings = _configuration.GetSection("EmailSettings");
+
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(
+            settings["SenderName"] ?? "EventPulse Ticketing",
+            settings["SenderEmail"] ?? "noreply@eventticket.com"
+        ));
+        message.To.Add(new MailboxAddress(toName, toEmail));
+        message.Subject = $"Mã xác nhận EventPulse của bạn: {otpCode}";
+
+        message.Body = new TextPart("html")
         {
-            _logger.LogInformation("🛠️ [DEV MODE] Đã giả lập gửi email xác nhận đến {Email}. Link kích hoạt: {Link}", toEmail, confirmationLink);
-            return;
+            Text = BuildOtpEmailBody(System.Net.WebUtility.HtmlEncode(toName), otpCode)
+        };
+
+        await SendEmailInternalAsync(message, toEmail, $"Mã OTP: {otpCode}");
+    }
+
+    /// <inheritdoc/>
+    public async Task SendWelcomeEmailAsync(string toEmail, string toName, string registrationMethod)
+    {
+        var settings = _configuration.GetSection("EmailSettings");
+
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(
+            settings["SenderName"] ?? "EventPulse Ticketing",
+            settings["SenderEmail"] ?? "noreply@eventticket.com"
+        ));
+        message.To.Add(new MailboxAddress(toName, toEmail));
+        message.Subject = "🎉 Đăng ký thành công - Chào mừng bạn đến với EventPulse!";
+
+        message.Body = new TextPart("html")
+        {
+            Text = BuildWelcomeEmailBody(System.Net.WebUtility.HtmlEncode(toName), System.Net.WebUtility.HtmlEncode(toEmail), System.Net.WebUtility.HtmlEncode(registrationMethod))
+        };
+
+        await SendEmailInternalAsync(message, toEmail, $"Chào mừng thành viên mới ({registrationMethod})");
+    }
+
+    private async Task SendEmailInternalAsync(MimeMessage message, string toEmail, string logDetail)
+    {
+        var settings = _configuration.GetSection("EmailSettings");
+        var user = settings["SmtpUser"] ?? "";
+        var pass = settings["SmtpPass"] ?? "";
+
+        // Nếu chưa cấu hình mật khẩu SMTP thì ghi log mô phỏng (cho môi trường test)
+        if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(pass))
+        {
+            if (_env.IsDevelopment())
+            {
+                _logger.LogInformation("[SIMULATED] Email tới {Email}", toEmail);
+                return;
+            }
+            throw new InvalidOperationException("SMTP credentials must be configured.");
         }
 
-        using var client = new SmtpClient();
         try
         {
-            var host = settings["SmtpHost"] ?? "smtp.ethereal.email";
+            var host = settings["SmtpHost"] ?? "smtp.gmail.com";
             var port = int.Parse(settings["SmtpPort"] ?? "587");
-            var user = settings["SmtpUser"] ?? "";
-            var pass = settings["SmtpPass"] ?? "";
+
+            using var client = new SmtpClient();
+            // Bỏ qua chứng chỉ SSL nếu chạy localhost debug
 
             await client.ConnectAsync(host, port, SecureSocketOptions.StartTls);
             await client.AuthenticateAsync(user, pass);
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
 
-            _logger.LogInformation("📧 Đã gửi email xác nhận đến {Email}", toEmail);
+            _logger.LogInformation("📧 Đã gửi email thành công đến {Email}", toEmail);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ Lỗi khi gửi email đến {Email}", toEmail);
-            throw new InvalidOperationException($"Không thể gửi email xác nhận: {ex.Message}", ex);
+            _logger.LogError(ex, "❌ Lỗi khi gửi email qua SMTP đến {Email}: {Message}", toEmail, ex.Message);
+            // Vẫn log chi tiết để nhà phát triển có thể kiểm tra nếu SMTP gặp sự cố mạng
+            throw;
         }
     }
 
-    // ─── Template email HTML ────────────────────────────────────────────────
+    // ─── Template email OTP ──────────────────────────────────────────────────
+    private static string BuildOtpEmailBody(string name, string otpCode) => $"""
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="UTF-8"/>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center">
+                <table width="100%" style="max-width: 540px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+                  <!-- Header -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #3525cd 0%, #712ae2 100%); padding: 32px 24px; text-align: center;">
+                      <div style="font-size: 32px; line-height: 1;">🎫</div>
+                      <h1 style="color: #ffffff; margin: 8px 0 0 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
+                        EventPulse Ticketing
+                      </h1>
+                      <p style="color: #e0e7ff; margin: 4px 0 0 0; font-size: 13px;">Hệ thống phân phối & đặt vé sự kiện trực tuyến</p>
+                    </td>
+                  </tr>
+
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding: 32px 28px;">
+                      <p style="font-size: 16px; color: #1e293b; margin: 0 0 12px 0;">Xin chào <strong>{name}</strong>,</p>
+                      <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 24px 0;">
+                        Bạn vừa đăng ký tài khoản tại <strong>EventPulse</strong>. Dưới đây là mã xác thực OTP 6 số để hoàn tất kích hoạt tài khoản của bạn:
+                      </p>
+
+                      <!-- OTP Box -->
+                      <div style="background-color: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 20px; text-align: center; margin: 0 0 24px 0;">
+                        <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 8px;">Mã xác thực của bạn</span>
+                        <div style="font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace; font-size: 36px; font-weight: 900; letter-spacing: 8px; color: #3525cd;">
+                          {otpCode}
+                        </div>
+                        <span style="font-size: 12px; color: #94a3b8; display: block; margin-top: 8px;">Hiệu lực trong vòng <strong>15 phút</strong></span>
+                      </div>
+
+                      <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin: 0 0 16px 0;">
+                        🔒 <strong>Lưu ý bảo mật:</strong> Không chia sẻ mã xác thực này cho bất kỳ ai. Nhân viên EventPulse sẽ không bao giờ hỏi mã OTP của bạn.
+                      </p>
+
+                      <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin: 0;">
+                        Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email hoặc thông báo cho chúng tôi để bảo vệ tài khoản.
+                      </p>
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f8fafc; padding: 20px 24px; text-align: center; border-top: 1px solid #f1f5f9;">
+                      <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+                        © 2026 EventPulse System. Email tự động từ hệ thống, vui lòng không phản hồi.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        """;
+
+    // ─── Template email Link Nút bấm xác nhận ──────────────────────────────
     private static string BuildEmailBody(string name, string link) => $"""
         <!DOCTYPE html>
         <html lang="vi">
@@ -82,53 +205,144 @@ public class EmailService : IEmailService
           <meta charset="UTF-8"/>
           <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
         </head>
-        <body style="font-family: Arial, sans-serif; background:#f4f4f4; margin:0; padding:20px;">
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px;">
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0"
-                       style="background:#ffffff; border-radius:8px; overflow:hidden;
-                              box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                <table width="100%" style="max-width: 560px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
                   <!-- Header -->
                   <tr>
-                    <td style="background:#4F46E5; padding:32px; text-align:center;">
-                      <h1 style="color:#ffffff; margin:0; font-size:24px;">
-                        🔐 Xác nhận Email
+                    <td style="background: linear-gradient(135deg, #3525cd 0%, #712ae2 100%); padding: 32px 24px; text-align: center;">
+                      <div style="font-size: 36px; line-height: 1;">🔐</div>
+                      <h1 style="color: #ffffff; margin: 8px 0 0 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
+                        Xác Nhận Kích Hoạt Tài Khoản
                       </h1>
+                      <p style="color: #e0e7ff; margin: 4px 0 0 0; font-size: 13px;">Hệ thống bán vé sự kiện EventPulse</p>
                     </td>
                   </tr>
+
                   <!-- Body -->
                   <tr>
-                    <td style="padding:32px;">
-                      <p style="font-size:16px; color:#333;">Xin chào <strong>{name}</strong>,</p>
-                      <p style="font-size:15px; color:#555; line-height:1.6;">
-                        Cảm ơn bạn đã đăng ký tài khoản. Vui lòng nhấn vào nút bên dưới
-                        để xác nhận địa chỉ email và kích hoạt tài khoản của bạn.
+                    <td style="padding: 32px 28px;">
+                      <p style="font-size: 16px; color: #1e293b; margin: 0 0 12px 0;">Xin chào <strong>{name}</strong>,</p>
+                      <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 20px 0;">
+                        Bạn vừa thực hiện đăng ký hoặc đăng nhập bằng tài khoản <strong>Google</strong> tại EventPulse. Để đảm bảo an toàn và hoàn tất quá trình này, bạn vui lòng nhấn vào nút xác nhận bên dưới:
                       </p>
-                      <div style="text-align:center; margin:32px 0;">
+
+                      <!-- Action Button -->
+                      <div style="text-align: center; margin: 30px 0;">
                         <a href="{link}"
-                           style="background:#4F46E5; color:#ffffff; padding:14px 32px;
-                                  text-decoration:none; border-radius:6px; font-size:16px;
-                                  font-weight:bold; display:inline-block;">
-                          ✅ Xác nhận Email
+                           style="background: linear-gradient(135deg, #3525cd 0%, #4f46e5 100%); color: #ffffff; padding: 16px 36px; text-decoration: none; border-radius: 12px; font-size: 15px; font-weight: 800; display: inline-block; box-shadow: 0 4px 14px rgba(53,37,205,0.35); letter-spacing: 0.3px;">
+                          👉 XÁC NHẬN ĐĂNG KÝ TÀI KHOẢN
                         </a>
                       </div>
-                      <p style="font-size:13px; color:#888;">
-                        Liên kết này có hiệu lực trong <strong>24 giờ</strong>.
-                        Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email này.
-                      </p>
-                      <hr style="border:none; border-top:1px solid #eee; margin:24px 0;"/>
-                      <p style="font-size:12px; color:#aaa; word-break:break-all;">
-                        Hoặc sao chép liên kết này vào trình duyệt:<br/>
-                        <span style="color:#4F46E5;">{link}</span>
+
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; margin: 0 0 20px 0; font-size: 12px; color: #64748b; line-height: 1.5;">
+                        ⏱️ Liên kết xác nhận này có hiệu lực trong vòng <strong>24 giờ</strong>. Nếu bạn không bấm nút xác nhận, tài khoản sẽ chưa thể kích hoạt vào hệ thống.
+                      </div>
+
+                      <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; margin: 0;">
+                        Nếu nút bấm bên trên không hoạt động, bạn có thể sao chép và dán liên kết sau vào trình duyệt:<br/>
+                        <a href="{link}" style="color: #3525cd; word-break: break-all;">{link}</a>
                       </p>
                     </td>
                   </tr>
+
                   <!-- Footer -->
                   <tr>
-                    <td style="background:#f9f9f9; padding:16px; text-align:center;">
-                      <p style="font-size:12px; color:#bbb; margin:0;">
-                        © 2026 Hệ thống. Email này được gửi tự động, vui lòng không trả lời.
+                    <td style="background-color: #f8fafc; padding: 20px 24px; text-align: center; border-top: 1px solid #f1f5f9;">
+                      <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+                        © 2026 EventPulse System. Email tự động từ hệ thống bảo mật EventPulse.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        """;
+
+    // ─── Template email Chào mừng đăng ký thành công ─────────────────────────
+    private string BuildWelcomeEmailBody(string name, string email, string method) => $"""
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="UTF-8"/>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center">
+                <table width="100%" style="max-width: 560px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+                  <!-- Header -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 32px 24px; text-align: center;">
+                      <div style="font-size: 36px; line-height: 1;">🎉</div>
+                      <h1 style="color: #ffffff; margin: 8px 0 0 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">
+                        Đăng Ký Thành Công!
+                      </h1>
+                      <p style="color: #d1fae5; margin: 4px 0 0 0; font-size: 14px;">Chào mừng bạn đến với cộng đồng người mua vé EventPulse</p>
+                    </td>
+                  </tr>
+
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding: 32px 28px;">
+                      <p style="font-size: 16px; color: #1e293b; margin: 0 0 12px 0;">Xin chào <strong>{name}</strong>,</p>
+                      <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 20px 0;">
+                        Tài khoản EventPulse của bạn đã được khởi tạo và <strong>kích hoạt thành công</strong>. Từ bây giờ bạn có thể trải nghiệm toàn bộ tiện ích đặt vé, giữ chỗ sự kiện trực tuyến.
+                      </p>
+
+                      <!-- Summary Card -->
+                      <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 18px 20px; margin: 0 0 24px 0;">
+                        <table width="100%" cellpadding="4" cellspacing="0" style="font-size: 13px; color: #166534;">
+                          <tr>
+                            <td width="35%" style="font-weight: 700;">Họ và tên:</td>
+                            <td>{name}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700;">Email đăng ký:</td>
+                            <td>{email}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700;">Phương thức:</td>
+                            <td>{method}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700;">Trạng thái:</td>
+                            <td><span style="display:inline-block; padding:2px 8px; background:#dcfce7; color:#15803d; border-radius:6px; font-weight:bold; font-size:11px;">Hoạt động (Active)</span></td>
+                          </tr>
+                        </table>
+                      </div>
+
+                      <!-- Feature highlights -->
+                      <div style="margin: 0 0 28px 0; border-top: 1px solid #f1f5f9; padding-top: 20px;">
+                        <h3 style="font-size: 14px; font-weight: 800; color: #0f172a; margin: 0 0 12px 0;">Quyền lợi thành viên của bạn:</h3>
+                        <div style="font-size: 13px; color: #475569; line-height: 1.8;">
+                          <div>🎫 <strong>Đặt vé tức thì:</strong> Nhận vé điện tử mã QR check-in qua email.</div>
+                          <div>⏱️ <strong>Giữ chỗ 10 phút:</strong> Không lo bị giành ghế trong lúc thanh toán.</div>
+                          <div>🔔 <strong>Lịch diễn âm nhạc:</strong> Cập nhật sớm các đại nhạc hội và liveshow đỉnh cao.</div>
+                        </div>
+                      </div>
+
+                      <!-- Action Button -->
+                      <div style="text-align: center; margin: 0 0 16px 0;">
+                        <a href="{System.Net.WebUtility.HtmlEncode((_configuration["App:PublicBaseUrl"] ?? "http://localhost:5012").TrimEnd('/') + "/public-events.html")}"
+                           style="background: #3525cd; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 800; display: inline-block; box-shadow: 0 4px 12px rgba(53,37,205,0.25);">
+                          Khám Phá Sự Kiện Ngay →
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f8fafc; padding: 20px 24px; text-align: center; border-top: 1px solid #f1f5f9;">
+                      <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+                        © 2026 EventPulse System. Hỗ trợ khách hàng: 1900 8899 | support@eventticket.com
                       </p>
                     </td>
                   </tr>
@@ -140,4 +354,3 @@ public class EmailService : IEmailService
         </html>
         """;
 }
-

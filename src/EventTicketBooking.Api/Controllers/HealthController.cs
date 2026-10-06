@@ -32,9 +32,9 @@ namespace EventTicketBooking.Api.Controllers
             {
                 isDbConnected = await _dbContext.Database.CanConnectAsync();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                dbError = ex.Message;
+                dbError = "Database connection failed.";
             }
 
             bool isRedisConnected = false;
@@ -50,9 +50,9 @@ namespace EventTicketBooking.Api.Controllers
                 var value = await _cache.GetStringAsync(pingKey);
                 isRedisConnected = value == "ok";
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                redisError = ex.Message;
+                redisError = "Cache connection failed.";
             }
 
             var response = new

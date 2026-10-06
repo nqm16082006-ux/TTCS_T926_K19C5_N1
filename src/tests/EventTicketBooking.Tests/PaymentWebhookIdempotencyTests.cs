@@ -366,9 +366,9 @@ namespace EventTicketBooking.Tests
 
                 Assert.NotNull(order);
                 Assert.NotEqual(OrderStatus.Paid, order.Status); // KHÔNG đổi đơn thành đã trả
-                Assert.Equal(OrderStatus.Expired, order.Status); // Vẫn giữ nguyên Expired
+                Assert.Equal(OrderStatus.NeedsAttention, order.Status); // Tiền về sau hạn: cần đối soát, không bán lại ghế
                 Assert.NotNull(paymentTx);
-                Assert.Equal("REFUND_REQUIRED", paymentTx.Status);
+                Assert.Equal("NEEDS_ATTENTION", paymentTx.Status);
                 Assert.Equal(0, soldSeatsCount); // Không xuất/sinh vé mới
             }
             finally

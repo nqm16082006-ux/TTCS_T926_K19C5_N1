@@ -177,6 +177,16 @@ namespace EventTicketBooking.Api.Services.Implementations
                 }
             }
 
+            // Kiểm tra trạng thái hoạt động (kích hoạt / đóng tài khoản)
+            if (!user.IsActive)
+            {
+                if (string.IsNullOrEmpty(user.VerificationCode))
+                {
+                    return AuthResult.Locked("Tài khoản của bạn đã bị khóa bởi Quản trị viên. Vui lòng liên hệ Admin để được hỗ trợ.");
+                }
+                return AuthResult.Locked("Tài khoản của bạn chưa được kích hoạt. Vui lòng hoàn tất xác thực email để đăng nhập.");
+            }
+
             // Lấy Role
             var roles = user.UserRoles
                 .Where(ur => ur.Role != null)

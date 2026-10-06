@@ -19,7 +19,7 @@ namespace EventTicketBooking.Api.Migrations
                 table: "Showtimes",
                 type: "showtime_status",
                 nullable: false,
-                defaultValue: 1);
+                defaultValueSql: "'draft'::showtime_status");
         }
 
         /// <inheritdoc />
