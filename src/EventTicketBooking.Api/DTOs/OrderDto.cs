@@ -17,6 +17,8 @@ namespace EventTicketBooking.Api.DTOs
         public int TotalAmount { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset ExpiresAt { get; set; }
+        public bool HasFailedPayment { get; set; }
+        public bool IsPaymentProcessing { get; set; }
         public List<OrderItemDto> Items { get; set; } = new();
     }
 

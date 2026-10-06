@@ -184,6 +184,7 @@ namespace EventTicketBooking.Api.Controllers
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Seat)
                         .ThenInclude(s => s.SeatCategory)
+                .Include(o => o.PaymentTransaction)
                 .FirstOrDefaultAsync(o => o.Id == orderId);
 
             if (order == null)
@@ -245,6 +246,9 @@ namespace EventTicketBooking.Api.Controllers
                 TotalAmount = order.TotalAmount,
                 CreatedAt = order.CreatedAt,
                 ExpiresAt = order.ExpiresAt,
+                HasFailedPayment = order.PaymentTransaction != null &&
+                    (order.PaymentTransaction.Status == "FAILED" || order.PaymentTransaction.Status == "CANCELLED"),
+                IsPaymentProcessing = order.PaymentTransaction != null && order.PaymentTransaction.Status == "PENDING",
                 Items = order.OrderItems.Select(oi => new OrderItemDto
                 {
                     Id = oi.Id,
