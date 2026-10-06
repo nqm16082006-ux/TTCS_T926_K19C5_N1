@@ -332,6 +332,45 @@ namespace EventTicketBooking.Tests
             Assert.All(updatedSeats, s => Assert.Equal("AVAILABLE", s.Status));
         }
 
+        [Fact]
+        public async Task HandlePaymentResult_FailedResult_KeepsOrderPendingAndDoesNotChangeSeats()
+        {
+            // Arrange
+            var (_, _, seats, order, paymentTx, holds) = await SeedFullOrderGraphAsync(500000);
+            var fakeGateway = new FakePaymentGateway();
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance);
+
+            var failedResult = new PaymentResultDto
+            {
+                Success = false,
+                OrderId = order.Id.ToString(),
+                OrderCode = paymentTx.OrderCode,
+                Amount = 500000,
+                Status = PaymentStatus.Failed,
+                ErrorMessage = "Thanh toán thất bại từ cổng."
+            };
+
+            // Act
+            var executionResult = await paymentService.HandlePaymentResultAsync(failedResult);
+
+            // Assert
+            Assert.False(executionResult.Success);
+
+            var updatedOrder = await _context.Orders.FindAsync(order.Id);
+            Assert.NotNull(updatedOrder);
+            Assert.Equal(OrderStatus.Pending, updatedOrder.Status);
+
+            var updatedTx = await _context.PaymentTransactions.FirstOrDefaultAsync(pt => pt.OrderId == order.Id);
+            Assert.NotNull(updatedTx);
+            Assert.Equal("PENDING", updatedTx.Status);
+
+            var updatedSeats = await _context.Seats.Where(s => seats.Select(x => x.Id).Contains(s.Id)).ToListAsync();
+            Assert.All(updatedSeats, s => Assert.Equal("AVAILABLE", s.Status));
+
+            var updatedHolds = await _context.SeatHold.Where(h => holds.Select(x => x.Id).Contains(h.Id)).ToListAsync();
+            Assert.All(updatedHolds, h => Assert.Equal("ACTIVE", h.Status));
+        }
+
         #endregion
 
         #region 5. Webhook Flow Integration with Handler
@@ -564,7 +603,7 @@ namespace EventTicketBooking.Tests
             };
 
             var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance);
-            var controller = new PaymentsController(paymentService, NullLogger<PaymentsController>.Instance, _context);
+            var controller = new PaymentsController(paymentService, fakeGateway, NullLogger<PaymentsController>.Instance, _context);
 
             var query = new PaymentReturnQueryDto
             {
@@ -594,7 +633,7 @@ namespace EventTicketBooking.Tests
             };
 
             var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance);
-            var controller = new PaymentsController(paymentService, NullLogger<PaymentsController>.Instance, _context);
+            var controller = new PaymentsController(paymentService, fakeGateway, NullLogger<PaymentsController>.Instance, _context);
 
             var query = new PaymentReturnQueryDto
             {
@@ -627,7 +666,7 @@ namespace EventTicketBooking.Tests
             };
 
             var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance);
-            var controller = new PaymentsController(paymentService, NullLogger<PaymentsController>.Instance, _context);
+            var controller = new PaymentsController(paymentService, fakeGateway, NullLogger<PaymentsController>.Instance, _context);
 
             var userPrincipal = new ClaimsPrincipal(new ClaimsIdentity(new[]
             {

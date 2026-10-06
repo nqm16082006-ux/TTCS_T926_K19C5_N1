@@ -161,13 +161,13 @@ namespace EventTicketBooking.Api.Services.Implementations.Payment
                     string dataSignString = string.Join("&", parts);
 
                     string expectedSignature = ComputeHmacSha256(dataSignString, secret);
-                    return string.Equals(expectedSignature, signature, StringComparison.OrdinalIgnoreCase);
+                    return FixedTimeEquals(expectedSignature, signature);
                 }
                 else
                 {
                     // Trường hợp payload là chuỗi data trực tiếp
                     string expectedSignature = ComputeHmacSha256(webhookPayload, secret);
-                    return string.Equals(expectedSignature, signature, StringComparison.OrdinalIgnoreCase);
+                    return FixedTimeEquals(expectedSignature, signature);
                 }
             }
             catch (Exception ex)
@@ -175,6 +175,21 @@ namespace EventTicketBooking.Api.Services.Implementations.Payment
                 _logger.LogError(ex, "Lỗi kiểm tra chữ ký webhook");
                 return false;
             }
+        }
+
+        private static bool FixedTimeEquals(string expectedSignature, string signature)
+        {
+            if (string.IsNullOrEmpty(expectedSignature) || string.IsNullOrEmpty(signature))
+            {
+                return false;
+            }
+
+            byte[] expectedBytes = Encoding.UTF8.GetBytes(expectedSignature.ToLowerInvariant());
+            byte[] actualBytes = Encoding.UTF8.GetBytes(signature.ToLowerInvariant());
+
+            return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                expectedBytes,
+                actualBytes);
         }
 
         public WebhookParseResult ParseWebhookData(string webhookPayload)
