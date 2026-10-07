@@ -135,6 +135,7 @@ else if (paymentProvider.Equals("PayOS", StringComparison.OrdinalIgnoreCase))
 else
     throw new InvalidOperationException("Unsupported payment provider.");
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IPaymentService, EventTicketBooking.Api.Services.Implementations.PaymentService>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITicketService, EventTicketBooking.Api.Services.Implementations.TicketService>();
 builder.Services.AddHttpClient();
 
 

@@ -21,15 +21,18 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly AppDbContext _context;
         private readonly IPaymentGateway _paymentGateway;
         private readonly ILogger<PaymentService> _logger;
+        private readonly ITicketService _ticketService;
 
         public PaymentService(
             AppDbContext context,
             IPaymentGateway paymentGateway,
-            ILogger<PaymentService> logger)
+            ILogger<PaymentService> logger,
+            ITicketService? ticketService = null)
         {
             _context = context;
             _paymentGateway = paymentGateway;
             _logger = logger;
+            _ticketService = ticketService ?? new TicketService();
         }
 
         public async Task<PaymentCreationResult> CreatePaymentForOrderAsync(Guid orderId, Guid userId, CancellationToken cancellationToken = default)
@@ -494,6 +497,29 @@ namespace EventTicketBooking.Api.Services.Implementations
                 foreach (var hold in holds)
                 {
                     hold.Status = "CONVERTED";
+                }
+
+                // E. Sinh vé điện tử cho từng ghế trong đơn hàng (Story S-25)
+                var existingTicketItemIds = await _context.Tickets
+                    .Where(t => order.OrderItems.Select(oi => oi.Id).Contains(t.OrderItemId))
+                    .Select(t => t.OrderItemId)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var item in order.OrderItems)
+                {
+                    if (!existingTicketItemIds.Contains(item.Id) && item.Ticket == null)
+                    {
+                        var ticket = new Ticket
+                        {
+                            Id = Guid.NewGuid(),
+                            OrderItemId = item.Id,
+                            TicketCode = _ticketService.GenerateTicketCode(),
+                            CreatedAt = DateTimeOffset.UtcNow,
+                            OrderItem = item
+                        };
+                        _context.Tickets.Add(ticket);
+                        item.Ticket = ticket;
+                    }
                 }
 
                 await _context.SaveChangesAsync(cancellationToken);
