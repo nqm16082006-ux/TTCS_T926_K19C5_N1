@@ -28,7 +28,7 @@ Write-Host "`n--- 2. Testing AC1: Authentic Ticket Verification ---" -Foreground
 
 # Tạo một vé mẫu và xác thực qua verify-qr API
 # Đăng nhập lấy vé đã thanh toán từ đơn hàng gần nhất (hoặc gọi API /tickets của đơn hàng Paid)
-$loginBody = @{ email = "customer1@eventticket.com"; password = "Admin@123456" } | ConvertTo-Json
+$loginBody = @{ email = "admin@eventticket.com"; password = "Admin@123456" } | ConvertTo-Json
 $loginRes = Invoke-RestMethod -Uri "$baseUrl/api/auth/login" -Method Post -Body $loginBody -ContentType "application/json"
 $token = $loginRes.accessToken
 $headers = @{ Authorization = "Bearer $token"; "Content-Type" = "application/json" }
