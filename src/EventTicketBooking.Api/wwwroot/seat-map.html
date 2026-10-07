@@ -193,10 +193,15 @@
 
           <!-- Quick Session Status Badges -->
           <div class="flex items-center gap-space-sm flex-shrink-0">
-            <div class="flex items-center gap-2 px-space-md py-space-xs rounded-full bg-surface-container-high text-on-surface font-label-md text-label-md font-medium shadow-sm">
-              <span class="material-symbols-outlined text-[18px] text-secondary">group</span>
-              <span id="onlineViewersCount">1.482 người đang xem sơ đồ</span>
-            </div>
+              <div class="flex items-center gap-2 px-space-md py-space-xs rounded-full bg-surface-container-high text-on-surface font-label-md text-label-md font-medium shadow-sm">
+                  <span class="material-symbols-outlined text-[18px] text-secondary">group</span>
+                  <span id="onlineViewersCount">1.482 người đang xem sơ đồ</span>
+              </div>
+              <!-- Badge giới hạn số vé mua -->
+              <div class="flex items-center gap-2 px-space-md py-space-xs rounded-full bg-primary-container text-on-primary-container font-label-md font-bold">
+                  <span class="material-symbols-outlined text-[18px]">confirmation_number</span>
+                  <span>Tối đa 4 vé/tài khoản</span>
+              </div>
           </div>
         </div>
       </div>
@@ -548,6 +553,7 @@
     let seatMap = new Map();
     let selectedSeatIds = new Set();  // Ghế chọn nháp trên client
     let myHeldSeatIds = new Set();    // Ghế đã giữ trên server bởi user này
+    const MAX_SEATS_PER_ACCOUNT = 4;
     let currentZoom = 1.0;
     let activeCategoryFilter = '';
     let bookingActionInFlight = false;
@@ -1071,8 +1077,8 @@
       if (selectedSeatIds.has(seat.id)) {
         selectedSeatIds.delete(seat.id);
       } else {
-        if (selectedSeatIds.size + myHeldSeatIds.size >= 10) {
-          alert("Quý khách chỉ được chọn tối đa 10 ghế mỗi lượt đặt vé.");
+          if (selectedSeatIds.size + myHeldSeatIds.size >= MAX_SEATS_PER_ACCOUNT) {
+          showConflictToast(`Mỗi tài khoản chỉ được phép giữ/mua tối đa ${MAX_SEATS_PER_ACCOUNT} vé cho suất diễn này.`);
           return;
         }
         selectedSeatIds.add(seat.id);
@@ -1305,7 +1311,7 @@
           openLoginModal("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để giữ chỗ.");
           btn.innerHTML = originalText;
           btn.disabled = false;
-        } else if (res.status === 409) {
+        } else if (res.status === 400 || res.status === 409) {
           showConflictToast((json && json.message) || "Một hoặc nhiều ghế đã được khán giả khác nhanh tay chọn trước. Vui lòng chọn vị trí khác!");
           selectedSeatIds.clear();
           await loadSeats();
