@@ -75,7 +75,7 @@ namespace EventTicketBooking.Tests
                 StartTime = DateTime.UtcNow.AddHours(-1), // Đang diễn ra
                 EndTime = DateTime.UtcNow.AddHours(1)
             };
-            
+
             _context.Events.Add(ev);
             _context.Showtimes.Add(showtime);
             await _context.SaveChangesAsync();
@@ -103,7 +103,7 @@ namespace EventTicketBooking.Tests
                 StartTime = DateTime.UtcNow.AddDays(2), // Ngày kia
                 EndTime = DateTime.UtcNow.AddDays(2).AddHours(2)
             };
-            
+
             _context.Events.Add(ev);
             _context.Showtimes.Add(showtime);
             await _context.SaveChangesAsync();
@@ -159,7 +159,7 @@ namespace EventTicketBooking.Tests
             var order = new Order { Id = orderId, ShowtimeId = showtimeId, Status = OrderStatus.Pending }; // CHƯA THANH TOÁN
             var seat = new Seat { Id = seatId, ShowtimeId = showtimeId, Row = "A", SeatNumber = 1, SeatCategoryId = Guid.NewGuid() };
             var ticket = new OrderItem { Id = Guid.NewGuid(), OrderId = orderId, Order = order, SeatId = seatId, Seat = seat, Price = 100 };
-            
+
             _context.Orders.Add(order);
             _context.Seats.Add(seat);
             _context.OrderItems.Add(ticket);
@@ -184,11 +184,11 @@ namespace EventTicketBooking.Tests
             var actualShowtimeId = Guid.NewGuid();
             var wrongShowtimeId = Guid.NewGuid(); // Quét sai suất
             var seatId = Guid.NewGuid();
-            
+
             var order = new Order { Id = orderId, ShowtimeId = actualShowtimeId, Status = OrderStatus.Paid };
             var seat = new Seat { Id = seatId, ShowtimeId = actualShowtimeId, Row = "A", SeatNumber = 1, SeatCategoryId = Guid.NewGuid() };
             var ticket = new OrderItem { Id = Guid.NewGuid(), OrderId = orderId, Order = order, SeatId = seatId, Seat = seat, Price = 100 };
-            
+
             _context.Orders.Add(order);
             _context.Seats.Add(seat);
             _context.OrderItems.Add(ticket);
@@ -212,17 +212,22 @@ namespace EventTicketBooking.Tests
             var orderId = Guid.NewGuid();
             var showtimeId = Guid.NewGuid();
             var seatId = Guid.NewGuid();
-            
+
             var order = new Order { Id = orderId, ShowtimeId = showtimeId, Status = OrderStatus.Paid };
             var seat = new Seat { Id = seatId, ShowtimeId = showtimeId, Row = "A", SeatNumber = 1, SeatCategoryId = Guid.NewGuid() };
-            var ticket = new OrderItem 
-            { 
-                Id = Guid.NewGuid(), OrderId = orderId, Order = order, SeatId = seatId, Seat = seat, Price = 100,
+            var ticket = new OrderItem
+            {
+                Id = Guid.NewGuid(),
+                OrderId = orderId,
+                Order = order,
+                SeatId = seatId,
+                Seat = seat,
+                Price = 100,
                 IsCheckedIn = true, // ĐÃ QUÉT TRƯỚC ĐÓ
                 CheckInGate = "Gate B",
                 CheckInTime = DateTimeOffset.UtcNow.AddMinutes(-5)
             };
-            
+
             _context.Orders.Add(order);
             _context.Seats.Add(seat);
             _context.OrderItems.Add(ticket);
@@ -246,15 +251,20 @@ namespace EventTicketBooking.Tests
             var orderId = Guid.NewGuid();
             var showtimeId = Guid.NewGuid();
             var seatId = Guid.NewGuid();
-            
+
             var order = new Order { Id = orderId, ShowtimeId = showtimeId, Status = OrderStatus.Paid };
             var seat = new Seat { Id = seatId, ShowtimeId = showtimeId, Row = "A", SeatNumber = 1, SeatCategoryId = Guid.NewGuid() };
-            var ticket = new OrderItem 
-            { 
-                Id = Guid.NewGuid(), OrderId = orderId, Order = order, SeatId = seatId, Seat = seat, Price = 100,
+            var ticket = new OrderItem
+            {
+                Id = Guid.NewGuid(),
+                OrderId = orderId,
+                Order = order,
+                SeatId = seatId,
+                Seat = seat,
+                Price = 100,
                 IsCheckedIn = false
             };
-            
+
             _context.Orders.Add(order);
             _context.Seats.Add(seat);
             _context.OrderItems.Add(ticket);
@@ -267,7 +277,7 @@ namespace EventTicketBooking.Tests
             // In .NET 8/9 InMemory provider DOES NOT support ExecuteUpdateAsync, it throws InvalidOperationException.
             // Để test phương thức này, ta phải bọc logic check hoặc dùng Sqlite in-memory, 
             // Tạm thời nếu test này lỗi (do InMemoryDatabase) thì chúng ta cần biết giới hạn đó.
-            
+
             try
             {
                 // Act
@@ -275,7 +285,7 @@ namespace EventTicketBooking.Tests
 
                 // Assert
                 var okResult = Assert.IsType<OkObjectResult>(result);
-                
+
                 // Refresh ticket from DB (Nếu dùng provider thật)
                 // var updatedTicket = await _context.OrderItems.FindAsync(ticket.Id);
                 // Assert.True(updatedTicket.IsCheckedIn);
@@ -283,7 +293,7 @@ namespace EventTicketBooking.Tests
             catch (InvalidOperationException ex) when (ex.Message.Contains("ExecuteUpdate"))
             {
                 // Bỏ qua lỗi do hạn chế của EF Core InMemory Database không hỗ trợ ExecuteUpdateAsync
-                Assert.True(true); 
+                Assert.True(true);
             }
         }
     }

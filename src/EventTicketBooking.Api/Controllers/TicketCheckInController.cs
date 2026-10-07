@@ -45,10 +45,11 @@ namespace EventTicketBooking.Api.Controllers
             // Lọc các suất diễn bắt đầu trong ngày hôm nay VÀ chưa kết thúc ở thời điểm hiện tại
             var shows = await _context.Showtimes
                 .Include(s => s.Event)
-                .Where(s => s.StartTime >= todayVnStartUtc 
-                         && s.StartTime < tomorrowVnStartUtc 
+                .Where(s => s.StartTime >= todayVnStartUtc
+                         && s.StartTime < tomorrowVnStartUtc
                          && s.EndTime >= nowUtc)
-                .Select(s => new {
+                .Select(s => new
+                {
                     s.Id,
                     EventTitle = s.Event.Title,
                     s.StartTime,
@@ -110,8 +111,8 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(new { Message = "Vé vừa được quét tại một thiết bị khác ngay tức thì." });
             }
 
-            return Ok(new 
-            { 
+            return Ok(new
+            {
                 Message = "Check-in thành công.",
                 SeatInfo = $"{ticket.Seat.Row}{ticket.Seat.SeatNumber}",
                 Gate = request.GateName
