@@ -62,11 +62,11 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(s => s.EndTime).IsRequired();
                 entity.Property(s => s.AvailableSeats).IsRequired();
 
-				entity.Property(s => s.MaxTicketsPerUser)
-		  .IsRequired()
-		  .HasDefaultValue(4);
+                entity.Property(s => s.MaxTicketsPerUser)
+          .IsRequired()
+          .HasDefaultValue(4);
 
-				entity.Property(s => s.Status)
+                entity.Property(s => s.Status)
                       .HasConversion<string>();
 
                 entity.HasOne(s => s.Event)
