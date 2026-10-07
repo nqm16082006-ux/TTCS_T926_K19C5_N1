@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chi tiết đơn hàng - Event Ticket Booking</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 font-sans">
+
+  <header class="bg-white border-b border-slate-200 shadow-sm">
+    <div class="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+      <h1 class="text-xl font-bold text-slate-800">Chi tiết đơn hàng</h1>
+      <a href="public-events.html" class="text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition">Về trang chủ</a>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 py-8">
+    <div id="loadingState" class="flex flex-col items-center justify-center py-12">
+      <div class="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-3"></div>
+      <p class="text-sm font-semibold text-slate-500">Đang tải thông tin đơn hàng...</p>
+    </div>
+
+    <div id="errorState" class="hidden text-center py-12">
+      <i class="fa-solid fa-circle-exclamation text-rose-500 text-5xl mb-4"></i>
+      <h2 class="text-xl font-bold text-slate-800 mb-2">Lỗi tải dữ liệu</h2>
+      <p id="errorMessage" class="text-slate-500"></p>
+    </div>
+
+    <div id="orderContent" class="hidden bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <!-- Header / Status Info -->
+      <div class="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <p class="text-xs text-slate-500 font-semibold mb-1 uppercase tracking-wider">Mã đơn hàng</p>
+          <p id="orderIdDisplay" class="font-mono text-sm font-bold text-slate-700"></p>
+        </div>
+        <div class="flex items-center gap-3">
+          <span id="orderStatusBadge" class="px-3 py-1 text-xs font-bold rounded-full"></span>
+        </div>
+      </div>
+
+      <!-- Expiration Timer Warning -->
+      <div id="timerWarning" class="hidden bg-amber-50 border-b border-amber-100 p-4 flex items-center gap-3">
+        <i class="fa-regular fa-clock text-amber-500 text-lg"></i>
+        <div class="text-sm font-medium text-amber-800">
+          Đơn hàng sẽ hết hạn trong: <span id="timeRemaining" class="font-bold font-mono">--:--</span>
+        </div>
+      </div>
+
+      <!-- Processing Warning -->
+      <div id="processingWarning" class="hidden bg-blue-50 border-b border-blue-100 p-4 flex items-center gap-3">
+        <i class="fa-solid fa-circle-notch fa-spin text-blue-500 text-lg"></i>
+        <div class="text-sm font-medium text-blue-800">
+          Giao dịch thanh toán đang được xử lý. Vui lòng chờ...
+        </div>
+      </div>
+
+      <!-- Items List -->
+      <div class="p-6">
+        <h3 class="text-base font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">Danh sách vé</h3>
+        <ul id="orderItemsList" class="space-y-3">
+          <!-- Items injected here -->
+        </ul>
+      </div>
+
+      <!-- Total & Action -->
+      <div class="p-6 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div>
+          <p class="text-sm text-slate-500 font-medium mb-1">Tổng tiền thanh toán:</p>
+          <p id="totalAmountDisplay" class="text-2xl font-black text-indigo-700"></p>
+        </div>
+
+        <button id="btnRepay" class="hidden w-full md:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-sm shadow-indigo-200 transition-all flex items-center justify-center gap-2">
+          <span>Thanh toán lại</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderId = urlParams.get('orderId') || urlParams.get('orderCode');
+    let countdownInterval = null;
+
+    if (!orderId) {
+      showError("Không tìm thấy mã đơn hàng trong URL.");
+    } else {
+      loadOrderDetails();
+    }
+
+    function formatCurrency(amount) {
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    }
+
+    function showError(message) {
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('orderContent').classList.add('hidden');
+      const errorState = document.getElementById('errorState');
+      errorState.classList.remove('hidden');
+      document.getElementById('errorMessage').textContent = message;
+    }
+
+    function getStatusConfig(status) {
+      switch (status) {
+        case 'Pending': return { text: 'Chờ thanh toán', css: 'bg-amber-100 text-amber-800 border-amber-200' };
+        case 'Paid': return { text: 'Đã thanh toán', css: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+        case 'Completed': return { text: 'Hoàn tất', css: 'bg-blue-100 text-blue-800 border-blue-200' };
+        case 'Expired': return { text: 'Đã hết hạn', css: 'bg-slate-100 text-slate-600 border-slate-200' };
+        case 'Cancelled': return { text: 'Đã huỷ', css: 'bg-rose-100 text-rose-800 border-rose-200' };
+        default: return { text: status, css: 'bg-slate-100 text-slate-800' };
+      }
+    }
+
+    async function loadOrderDetails() {
+      try {
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+          window.location.href = `login.html?returnUrl=${encodeURIComponent(window.location.href)}`;
+          return;
+        }
+
+        const response = await fetch(`/api/v1/orders/${orderId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || 'Không thể tải chi tiết đơn hàng.');
+        }
+
+        renderOrder(result.data);
+
+      } catch (err) {
+        console.error(err);
+        showError(err.message);
+      }
+    }
+
+    function renderOrder(order) {
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('orderContent').classList.remove('hidden');
+
+      document.getElementById('orderIdDisplay').textContent = order.id;
+
+      const statusConfig = getStatusConfig(order.status);
+      const badge = document.getElementById('orderStatusBadge');
+      badge.textContent = statusConfig.text;
+      badge.className = `px-3 py-1 text-xs font-bold rounded-full border ${statusConfig.css}`;
+
+      document.getElementById('totalAmountDisplay').textContent = formatCurrency(order.totalAmount);
+
+      const itemsList = document.getElementById('orderItemsList');
+      itemsList.innerHTML = '';
+      order.items.forEach(item => {
+        const li = document.createElement('li');
+        li.className = 'flex items-center justify-between p-3 bg-slate-50/50 border border-slate-100 rounded-lg';
+        li.innerHTML = `
+          <div class="flex flex-col">
+            <span class="font-bold text-slate-700">Vé: ${item.seatName || 'Vé chung'}</span>
+            <span class="text-xs text-slate-500">${item.categoryName || 'Không phân hạng'}</span>
+          </div>
+          <div class="font-semibold text-slate-700">${formatCurrency(item.price)}</div>
+        `;
+        itemsList.appendChild(li);
+      });
+
+      // T-55: Xử lý hiển thị nút Thanh toán lại & Timer
+      const btnRepay = document.getElementById('btnRepay');
+      const timerWarning = document.getElementById('timerWarning');
+      const processingWarning = document.getElementById('processingWarning');
+
+      const expiresAt = new Date(order.expiresAt).getTime();
+      const now = new Date().getTime();
+      const isExpired = expiresAt <= now;
+      const isPending = order.status === 'Pending';
+
+      // Ẩn/Hiện nút Thanh toán lại
+      // Điều kiện T-55: Pending AND chưa hết hạn AND có giao dịch Failed/Cancelled AND ko có giao dịch Pending
+      if (isPending && !isExpired && order.hasFailedPayment && !order.isPaymentProcessing) {
+        btnRepay.classList.remove('hidden');
+        btnRepay.onclick = () => handleRepayment(order.id, btnRepay);
+      } else {
+        btnRepay.classList.add('hidden');
+      }
+
+      if (isPending && order.isPaymentProcessing) {
+        processingWarning.classList.remove('hidden');
+      }
+
+      // Timer countdown
+      if (isPending && !isExpired) {
+        timerWarning.classList.remove('hidden');
+        startTimer(expiresAt, timerWarning);
+      } else {
+        timerWarning.classList.add('hidden');
+        if (countdownInterval) clearInterval(countdownInterval);
+      }
+    }
+
+    function startTimer(expiresAt, timerWarning) {
+      if (countdownInterval) clearInterval(countdownInterval);
+
+      const update = () => {
+        const now = new Date().getTime();
+        const distance = expiresAt - now;
+
+        if (distance <= 0) {
+          clearInterval(countdownInterval);
+          document.getElementById('timeRemaining').textContent = '00:00';
+          timerWarning.classList.remove('bg-amber-50', 'border-amber-100');
+          timerWarning.classList.add('bg-rose-50', 'border-rose-100');
+          document.querySelector('#timerWarning .text-amber-800').classList.replace('text-amber-800', 'text-rose-800');
+          document.querySelector('#timerWarning i').classList.replace('text-amber-500', 'text-rose-500');
+          document.getElementById('btnRepay').classList.add('hidden'); // Ẩn khi hết hạn
+          return;
+        }
+
+        const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const s = Math.floor((distance % (1000 * 60)) / 1000);
+        document.getElementById('timeRemaining').textContent =
+          `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      };
+
+      update();
+      countdownInterval = setInterval(update, 1000);
+    }
+
+    async function handleRepayment(id, btnElement) {
+      try {
+        // UI Feedback
+        const originalContent = btnElement.innerHTML;
+        btnElement.disabled = true;
+        btnElement.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Đang xử lý...`;
+        btnElement.classList.replace('bg-indigo-600', 'bg-indigo-400');
+        btnElement.classList.replace('hover:bg-indigo-700', 'hover:bg-indigo-400');
+        btnElement.classList.add('cursor-not-allowed');
+
+        const token = localStorage.getItem('accessToken');
+        const response = await fetch(`/api/v1/payments/orders/${id}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Không thể tạo yêu cầu thanh toán.');
+        }
+
+        // T-41: Redirect to payment gateway
+        if (result.data && result.data.paymentUrl) {
+          window.location.href = result.data.paymentUrl;
+        } else {
+          throw new Error('Cổng thanh toán không trả về đường dẫn.');
+        }
+
+      } catch (err) {
+        console.error(err);
+        alert(err.message);
+
+        // Restore button state
+        btnElement.disabled = false;
+        btnElement.innerHTML = `<span>Thanh toán lại</span><i class="fa-solid fa-arrow-right"></i>`;
+        btnElement.classList.replace('bg-indigo-400', 'bg-indigo-600');
+        btnElement.classList.replace('hover:bg-indigo-400', 'hover:bg-indigo-700');
+        btnElement.classList.remove('cursor-not-allowed');
+      }
+    }
+  </script>
+</body>
+</html>

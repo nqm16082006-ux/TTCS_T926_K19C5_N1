@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html class="h-full" lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title id="pageTitle">Chi tiết Sự kiện - EventPulse</title>
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <style>
+    @layer base {
+      html, body { margin: 0; padding: 0; }
+      body { overscroll-behavior: none; }
+      main > :first-child { margin-top: 0 !important; }
+      main > :last-child { margin-bottom: 0 !important; }
+    }
+    ::-webkit-scrollbar { display: none; }
+  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-container-highest": "#dae2fd", "on-tertiary": "#ffffff", "on-primary-container": "#dad7ff",
+            "tertiary-fixed": "#89f5e7", "on-primary": "#ffffff", "on-secondary": "#ffffff",
+            "secondary-fixed": "#eaddff", "tertiary-container": "#006c63", "surface-container": "#eaedff",
+            "outline": "#777587", "inverse-surface": "#283044", "on-tertiary-fixed-variant": "#005049",
+            "secondary-container": "#8a4cfc", "on-error-container": "#93000a", "primary-fixed": "#e2dfff",
+            "primary": "#3525cd", "on-primary-fixed-variant": "#3323cc", "on-tertiary-fixed": "#00201d",
+            "surface-container-high": "#e2e7ff", "outline-variant": "#c7c4d8", "inverse-primary": "#c3c0ff",
+            "surface-dim": "#d2d9f4", "secondary-fixed-dim": "#d2bbff", "on-secondary-container": "#fffbff",
+            "surface-bright": "#faf8ff", "tertiary": "#00524b", "surface-variant": "#dae2fd",
+            "primary-fixed-dim": "#c3c0ff", "secondary": "#712ae2", "surface-container-lowest": "#ffffff",
+            "on-tertiary-container": "#81eddf", "error-container": "#ffdad6", "on-surface": "#131b2e",
+            "on-primary-fixed": "#0f0069", "surface-container-low": "#f2f3ff", "on-error": "#ffffff",
+            "background": "#faf8ff", "surface": "#faf8ff", "surface-tint": "#4d44e3",
+            "tertiary-fixed-dim": "#6bd8cb", "on-surface-variant": "#464555", "on-secondary-fixed": "#25005a",
+            "on-background": "#131b2e", "error": "#ba1a1a", "on-secondary-fixed-variant": "#5a00c6",
+            "primary-container": "#4f46e5", "inverse-on-surface": "#eef0ff"
+          },
+          borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+          spacing: {
+            "margin-lg": "2.5rem", "gutter": "1.5rem", "space-xl": "2rem", "margin": "1.5rem",
+            "space-xs": "0.25rem", "space-sm": "0.5rem", "space-2xl": "3rem", "gutter-sm": "0.75rem",
+            "space-lg": "1.5rem", "margin-sm": "1rem", "gutter-lg": "2rem", "space-md": "1rem"
+          },
+          fontFamily: {
+            "display-lg-mobile": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"], "label-md": ["Plus Jakarta Sans"], "headline-xl-mobile": ["Plus Jakarta Sans"],
+            "display-lg": ["Plus Jakarta Sans"], "body-sm": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"],
+            "label-sm": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"],
+            "headline-xl": ["Plus Jakarta Sans"], "code-mono": ["JetBrains Mono"]
+          },
+          fontSize: {
+            "display-lg-mobile": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+            "label-lg": ["14px", {"lineHeight": "20px", "fontWeight": "600"}],
+            "headline-lg": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+            "body-md": ["14px", {"lineHeight": "22px", "fontWeight": "400"}],
+            "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+            "headline-xl-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.015em", "fontWeight": "700"}],
+            "display-lg": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+            "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+            "headline-md": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.005em", "fontWeight": "600"}],
+            "label-sm": ["11px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+            "headline-sm": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+            "body-lg": ["16px", {"lineHeight": "26px", "fontWeight": "400"}],
+            "headline-xl": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.015em", "fontWeight": "700"}],
+            "code-mono": ["13px", {"lineHeight": "18px", "fontWeight": "500"}]
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<script src="./security.js"></script>
+<body class="bg-background font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between">
+
+  <!-- Top Navigation Header -->
+  <header class="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+    <div class="h-16 max-w-7xl mx-auto px-margin flex items-center justify-between gap-space-md">
+      <div class="flex items-center gap-space-lg">
+        <a class="flex items-center gap-space-sm" href="./public-events.html">
+          <div class="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center shadow-sm">
+            <span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+          </div>
+          <span class="font-headline-sm text-headline-sm text-primary tracking-tight font-extrabold">EventPulse</span>
+        </a>
+        <nav class="hidden md:flex items-center gap-space-lg">
+          <a class="font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface transition-colors py-space-sm" href="./public-events.html">Trang chủ</a>
+          <a class="font-label-lg text-label-lg text-primary font-bold border-b-2 border-primary py-space-sm" href="./public-events.html#events-section">Sự kiện</a>
+        </nav>
+      </div>
+
+      <div class="flex items-center gap-space-md" id="navAuthContainer">
+        <!-- Rendered dynamically -->
+        <a href="./login.html" class="px-4 py-2 rounded-lg text-sm font-semibold text-primary bg-primary-fixed/40 hover:bg-primary-fixed transition">
+          Đăng nhập
+        </a>
+        <a href="./register.html" class="px-4 py-2 rounded-lg text-sm font-bold text-white bg-primary hover:bg-on-primary-fixed-variant transition shadow-sm">
+          Đăng ký
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="w-full pt-16 bg-surface min-h-[calc(100vh-16rem)] flex-1">
+    
+    <!-- Loading State -->
+    <div id="loadingOverlay" class="max-w-7xl mx-auto px-margin py-16 flex flex-col items-center justify-center text-center">
+      <div class="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4"></div>
+      <p class="font-headline-sm text-on-surface-variant">Đang tải thông tin chi tiết sự kiện...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="hidden max-w-xl mx-auto px-margin py-20 text-center">
+      <div class="w-16 h-16 rounded-full bg-error-container text-error flex items-center justify-center mx-auto mb-4">
+        <span class="material-symbols-outlined text-3xl">error</span>
+      </div>
+      <h2 class="font-headline-lg text-on-surface font-bold mb-2">Không tìm thấy sự kiện</h2>
+      <p class="text-on-surface-variant mb-6 text-sm">Sự kiện có thể đã kết thúc hoặc liên kết không còn chính xác.</p>
+      <a href="./public-events.html" class="px-6 py-2.5 rounded-lg bg-primary text-white font-bold shadow-md hover:bg-primary-container transition">
+        Quay lại danh sách sự kiện
+      </a>
+    </div>
+
+    <!-- Event Detail Content -->
+    <div id="eventDetailContent" class="hidden flex flex-col w-full">
+      
+      <!-- HERO BANNER SECTION (Dark Premium Luxury) -->
+      <div class="relative w-full overflow-hidden bg-inverse-surface text-inverse-on-surface">
+        <div id="heroBgImage" class="absolute inset-0 bg-cover bg-center opacity-30 mix-blend-luminosity scale-105 transform hover:scale-100 transition-transform duration-1000"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-inverse-surface via-inverse-surface/80 to-transparent"></div>
+        <div class="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-secondary-container/20 blur-3xl pointer-events-none"></div>
+
+        <div class="relative max-w-7xl mx-auto px-margin py-space-2xl flex flex-col gap-space-lg">
+          
+          <!-- Badges Bar -->
+          <div class="flex flex-wrap items-center gap-space-sm font-label-md text-label-md">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-lowest/15 backdrop-blur-md text-surface-bright">
+              <span class="w-2 h-2 rounded-full bg-tertiary-fixed animate-pulse"></span>
+              Live Concert Series
+            </span>
+            <span class="text-outline-variant font-code-mono text-code-mono" id="eventCodeBadge">EVT-2026-LIVE</span>
+          </div>
+
+          <!-- Title & Price Standard -->
+          <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-space-xl">
+            <div class="max-w-3xl space-y-space-md">
+              <h1 class="font-display-lg text-display-lg text-surface-bright tracking-tight leading-tight font-extrabold" id="eventTitle">
+                Tên Sự Kiện
+              </h1>
+              <div class="flex flex-wrap items-center gap-space-md">
+                <div class="flex items-center gap-2 bg-surface-container-lowest/10 backdrop-blur-md px-3.5 py-1.5 rounded-lg">
+                  <span class="font-label-md text-label-md text-surface-bright" id="organizerName">Ban Tổ Chức</span>
+                  <span class="material-symbols-outlined text-[18px] text-tertiary-fixed" style="font-variation-settings: 'FILL' 1;">verified</span>
+                </div>
+                <span class="text-outline-variant hidden sm:inline">•</span>
+                <span class="font-body-md text-body-md text-surface-container-highest" id="eventCategoryBadge">Âm nhạc &amp; Biểu diễn Trực tiếp</span>
+              </div>
+            </div>
+
+            <!-- Standard Ticket Range -->
+            <div class="flex flex-col items-start lg:items-end bg-surface-container-lowest/10 backdrop-blur-md p-space-md rounded-xl shrink-0">
+              <span class="font-label-sm text-label-sm text-outline-variant uppercase tracking-wider">Mức vé tiêu chuẩn</span>
+              <div class="font-headline-xl text-headline-xl text-surface-bright font-bold font-code-mono" id="eventPriceRange">
+                600.000₫ - 1.500.000₫
+              </div>
+            </div>
+          </div>
+
+          <!-- 3 Quick Bento Boxes -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-space-md pt-space-md">
+            <div class="flex items-center gap-3 p-3.5 rounded-lg bg-surface-container-lowest/5 backdrop-blur-sm">
+              <div class="w-10 h-10 rounded-lg bg-primary-container/40 flex items-center justify-center text-primary-fixed shrink-0">
+                <span class="material-symbols-outlined text-[22px]">calendar_month</span>
+              </div>
+              <div class="min-w-0">
+                <div class="font-label-sm text-label-sm text-outline-variant">Thời gian diễn ra</div>
+                <div class="font-label-lg text-label-lg text-surface-bright truncate" id="eventDateStr">Đang cập nhật</div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3 p-3.5 rounded-lg bg-surface-container-lowest/5 backdrop-blur-sm">
+              <div class="w-10 h-10 rounded-lg bg-primary-container/40 flex items-center justify-center text-primary-fixed shrink-0">
+                <span class="material-symbols-outlined text-[22px]">location_on</span>
+              </div>
+              <div class="min-w-0">
+                <div class="font-label-sm text-label-sm text-outline-variant">Địa điểm biểu diễn</div>
+                <div class="font-label-lg text-label-lg text-surface-bright truncate" id="eventLocationBento" title="">Đang cập nhật</div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3 p-3.5 rounded-lg bg-surface-container-lowest/5 backdrop-blur-sm">
+              <div class="w-10 h-10 rounded-lg bg-primary-container/40 flex items-center justify-center text-primary-fixed shrink-0">
+                <span class="material-symbols-outlined text-[22px]">confirmation_number</span>
+              </div>
+              <div class="min-w-0">
+                <div class="font-label-sm text-label-sm text-outline-variant">Hình thức nhận vé</div>
+                <div class="font-label-lg text-label-lg text-surface-bright">Vé điện tử QR Check-in</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- MAIN 2-COLUMN LAYOUT (7 cols left + 5 cols sticky right) -->
+      <div class="max-w-7xl mx-auto w-full px-margin py-space-xl">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
+          
+          <!-- LEFT COLUMN (7 COLS) -->
+          <div class="lg:col-span-7 flex flex-col gap-space-xl">
+            
+            <!-- SECTION 1: Giới thiệu đêm nhạc -->
+            <section class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm space-y-space-md border border-surface-container-high/60">
+              <div class="flex items-center justify-between">
+                <h2 class="font-headline-lg text-headline-lg text-on-surface flex items-center gap-2 font-bold">
+                  <span class="w-1.5 h-6 rounded-full bg-primary inline-block"></span>
+                  Giới thiệu đêm nhạc
+                </h2>
+                <span class="px-2.5 py-1 rounded bg-surface-container-high font-label-sm text-label-sm text-primary font-semibold" id="durationBadge">
+                  Thời lượng: 150 phút
+                </span>
+              </div>
+
+              <div class="font-body-md text-body-md text-on-surface-variant leading-relaxed space-y-3" id="eventDescription">
+                <!-- Injected Description -->
+              </div>
+
+              <!-- 2 Artist/Gallery Images -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md pt-space-xs">
+                <div class="relative overflow-hidden rounded-lg group h-44 bg-surface-container">
+                  <img id="galleryImg1" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=80" alt="Nghệ sĩ biểu diễn">
+                  <div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/90 via-transparent to-transparent flex items-end p-3">
+                    <span class="font-label-md text-label-md text-surface-bright">Dàn Nghệ Sĩ Khách Mời Đỉnh Cao</span>
+                  </div>
+                </div>
+                <div class="relative overflow-hidden rounded-lg group h-44 bg-surface-container">
+                  <img id="galleryImg2" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" src="https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=800&q=80" alt="Không gian sân khấu">
+                  <div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/90 via-transparent to-transparent flex items-end p-3">
+                    <span class="font-label-md text-label-md text-surface-bright">Không Gian Sân Khấu Hiện Đại</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Acoustic / Sound system note -->
+              <div class="p-space-md rounded-lg bg-surface-container-low flex items-start gap-space-sm border border-surface-container-high/40">
+                <span class="material-symbols-outlined text-primary text-[20px] mt-0.5">graphic_eq</span>
+                <p class="font-body-sm text-body-sm text-on-surface-variant">
+                  Hệ thống xử lý âm thanh L-Acoustics K2 đạt tiêu chuẩn quốc tế đỉnh cao, mang lại trải nghiệm âm hưởng chân thực và sống động cho mọi vị trí ghế ngồi.
+                </p>
+              </div>
+            </section>
+
+            <!-- SECTION 2: Sơ đồ tổng quan khán phòng -->
+            <section class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm space-y-space-md border border-surface-container-high/60">
+              <div class="flex items-center justify-between">
+                <h2 class="font-headline-lg text-headline-lg text-on-surface flex items-center gap-2 font-bold">
+                  <span class="w-1.5 h-6 rounded-full bg-secondary inline-block"></span>
+                  Sơ đồ tổng quan khán phòng
+                </h2>
+                <span class="font-label-sm text-label-sm text-outline font-code-mono" id="totalSeatsBadge">Quy mô: 3.500 ghế</span>
+              </div>
+
+              <div class="relative bg-surface-container-low rounded-lg p-space-md overflow-hidden flex flex-col items-center">
+                <div class="w-full max-w-md h-7 rounded-t-full bg-primary/20 flex items-center justify-center font-label-sm text-label-sm text-primary mb-space-md tracking-widest uppercase font-bold">
+                  SÂN KHẤU CHÍNH (MAIN STAGE)
+                </div>
+
+                <svg class="w-full max-w-lg h-auto text-on-surface select-none" fill="none" viewBox="0 0 460 220" xmlns="http://www.w3.org/2000/svg">
+                  <!-- VIP Area -->
+                  <path d="M 60 40 Q 230 10 400 40 L 420 80 Q 230 50 40 80 Z" fill="#8a4cfc" fill-opacity="0.85"></path>
+                  <text fill="#ffffff" font-size="11" font-weight="700" letter-spacing="1" text-anchor="middle" x="230" y="65">KHU VỰC V.I.P</text>
+                  
+                  <!-- Platinum Area -->
+                  <path d="M 40 90 Q 230 60 420 90 L 440 140 Q 230 110 20 140 Z" fill="#3525cd" fill-opacity="0.85"></path>
+                  <text fill="#ffffff" font-size="11" font-weight="700" letter-spacing="1" text-anchor="middle" x="230" y="118">KHU PLATINUM</text>
+                  
+                  <!-- Standard Area -->
+                  <path d="M 20 150 Q 230 120 440 150 L 455 200 Q 230 170 5 200 Z" fill="#777587" fill-opacity="0.35"></path>
+                  <text fill="#131b2e" font-size="11" font-weight="700" letter-spacing="1" text-anchor="middle" x="230" y="178">KHU STANDARD</text>
+                </svg>
+
+                <div class="flex flex-wrap items-center justify-center gap-space-md mt-space-md pt-space-sm" id="categoriesLegend">
+                  <div class="flex items-center gap-1.5 font-label-sm text-label-sm text-on-surface">
+                    <span class="w-3.5 h-3.5 rounded bg-secondary-container"></span>
+                    <span id="legendVip">VIP: Cao cấp</span>
+                  </div>
+                  <div class="flex items-center gap-1.5 font-label-sm text-label-sm text-on-surface">
+                    <span class="w-3.5 h-3.5 rounded bg-primary"></span>
+                    <span id="legendPlatinum">Platinum: Tiêu chuẩn</span>
+                  </div>
+                  <div class="flex items-center gap-1.5 font-label-sm text-label-sm text-on-surface">
+                    <span class="w-3.5 h-3.5 rounded bg-outline-variant"></span>
+                    <span id="legendStandard">Standard: Phổ thông</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- SECTION 3: Địa điểm & Bản đồ hướng dẫn -->
+            <section class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm space-y-space-md border border-surface-container-high/60">
+              <div class="flex flex-wrap items-center justify-between gap-space-sm">
+                <h2 class="font-headline-lg text-headline-lg text-on-surface flex items-center gap-2 font-bold">
+                  <span class="w-1.5 h-6 rounded-full bg-tertiary-container inline-block"></span>
+                  Địa điểm &amp; Bản đồ hướng dẫn
+                </h2>
+                <span class="px-2.5 py-1 rounded bg-surface-container-high font-label-sm text-label-sm text-tertiary font-semibold flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[16px]">near_me</span>
+                  Cổng đón khách chính
+                </span>
+              </div>
+
+              <!-- Location Details Card -->
+              <div class="p-space-md rounded-lg bg-surface-container-low flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-md border border-surface-container-high/40">
+                <div class="space-y-1">
+                  <div class="font-headline-sm text-headline-sm text-on-surface flex items-center gap-1.5 font-bold" id="locationTitle">
+                    <span class="material-symbols-outlined text-primary text-[20px]">apartment</span>
+                    <span>Trung tâm Biểu diễn</span>
+                  </div>
+                  <p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1.5" id="locationFullAddress">
+                    <span class="material-symbols-outlined text-outline text-[16px]">place</span>
+                    <span>Đang cập nhật địa chỉ...</span>
+                  </p>
+                  <p class="font-body-sm text-body-sm text-outline flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[16px]">door_front</span>
+                    <span>Cửa soát vé chính &amp; Làn check-in QR Code</span>
+                  </p>
+                </div>
+                <div class="flex items-center gap-space-xs shrink-0">
+                  <a id="btnGoogleMaps" href="https://maps.google.com" target="_blank" class="h-10 px-3.5 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md flex items-center gap-1.5 shadow-sm transition-all font-semibold">
+                    <span class="material-symbols-outlined text-[18px]">map</span>
+                    <span>Mở Google Maps</span>
+                  </a>
+                  <button id="btnCopyAddress" onclick="copyAddressToClipboard()" type="button" class="h-10 px-3 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-label-md flex items-center gap-1.5 transition-all" title="Sao chép địa chỉ">
+                    <span class="material-symbols-outlined text-[18px]" id="copyIcon">content_copy</span>
+                    <span id="copyText">Chép địa chỉ</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Vector Map View -->
+              <div class="relative rounded-xl overflow-hidden bg-surface-container h-72 border border-outline-variant/30 select-none">
+                <svg class="w-full h-full object-cover" viewBox="0 0 700 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="700" height="320" fill="#eaedff"></rect>
+                  <path d="M-20 80 Q 250 90 720 70" stroke="#d2d9f4" stroke-width="28"></path>
+                  <path d="M-20 80 Q 250 90 720 70" stroke="#ffffff" stroke-width="20"></path>
+                  <path d="M220 -20 L 250 340" stroke="#d2d9f4" stroke-width="32"></path>
+                  <path d="M220 -20 L 250 340" stroke="#ffffff" stroke-width="24"></path>
+                  <path d="M-20 220 L 720 210" stroke="#d2d9f4" stroke-width="40"></path>
+                  <path d="M-20 220 L 720 210" stroke="#ffffff" stroke-width="32"></path>
+                  <path d="M500 -20 L 480 340" stroke="#d2d9f4" stroke-width="22"></path>
+                  <path d="M500 -20 L 480 340" stroke="#ffffff" stroke-width="16"></path>
+                  
+                  <!-- Surrounding Landmarks -->
+                  <rect x="40" y="110" width="140" height="80" rx="8" fill="#dae2fd" fill-opacity="0.7" stroke="#c7c4d8" stroke-width="1"></rect>
+                  <text x="110" y="145" font-size="11" font-weight="600" fill="#464555" text-anchor="middle" font-family="Plus Jakarta Sans">Khu Đỗ Xe Khách</text>
+                  <text x="110" y="162" font-size="9" fill="#777587" text-anchor="middle" font-family="Plus Jakarta Sans">Lối vào số 1</text>
+                  
+                  <rect x="280" y="110" width="180" height="85" rx="10" fill="#dad7ff" fill-opacity="0.6" stroke="#8a4cfc" stroke-dasharray="3 3" stroke-width="1.5"></rect>
+                  <text x="370" y="145" font-size="12" font-weight="700" fill="#3525cd" text-anchor="middle" font-family="Plus Jakarta Sans">Khu Vực Biểu Diễn</text>
+                  <text x="370" y="163" font-size="10" fill="#712ae2" text-anchor="middle" font-family="Plus Jakarta Sans">Sảnh Đón VIP &amp; Check-in</text>
+                  
+                  <rect x="520" y="110" width="140" height="75" rx="8" fill="#dae2fd" fill-opacity="0.7" stroke="#c7c4d8" stroke-width="1"></rect>
+                  <text x="590" y="145" font-size="11" font-weight="600" fill="#464555" text-anchor="middle" font-family="Plus Jakarta Sans">Quầy Thông Tin</text>
+                  <text x="590" y="162" font-size="9" fill="#777587" text-anchor="middle" font-family="Plus Jakarta Sans">Hỗ trợ khách hàng</text>
+
+                  <text x="360" y="226" font-size="11" font-weight="700" fill="#777587" letter-spacing="2" text-anchor="middle" font-family="Plus Jakarta Sans">ĐẠI LỘ TIẾP CẬN CHÍNH</text>
+                  
+                  <!-- Pulsing Marker Pin -->
+                  <g transform="translate(355, 120)">
+                    <circle cx="15" cy="15" r="20" fill="#4f46e5" fill-opacity="0.2" class="animate-pulse"></circle>
+                    <circle cx="15" cy="15" r="12" fill="#3525cd"></circle>
+                    <path d="M15 8 A 6 6 0 0 0 9 14 C 9 18 15 24 15 24 C 15 24 21 18 21 14 A 6 6 0 0 0 15 8 Z" fill="#ffffff"></path>
+                    <circle cx="15" cy="13" r="2.5" fill="#3525cd"></circle>
+                  </g>
+                </svg>
+
+                <div class="absolute top-3 left-3 bg-surface-container-lowest/95 backdrop-blur-md px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-2 border border-outline-variant/40">
+                  <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                  <span class="font-label-sm text-label-sm text-on-surface font-semibold" id="mapBadgeLocation">Điểm Biểu Diễn Trực Tiếp</span>
+                </div>
+              </div>
+
+              <!-- Transit options -->
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-space-sm pt-space-xs">
+                <div class="p-space-sm rounded-lg bg-surface-container-low flex items-start gap-2.5">
+                  <div class="w-8 h-8 rounded-full bg-primary-container/20 text-primary flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined text-[18px]">directions_bus</span>
+                  </div>
+                  <div class="space-y-0.5">
+                    <div class="font-label-md text-label-md text-on-surface font-semibold">Tuyến xe buýt</div>
+                    <div class="font-body-sm text-body-sm text-on-surface-variant">Tuyến công cộng thuận tiện ngay trước cổng</div>
+                  </div>
+                </div>
+                <div class="p-space-sm rounded-lg bg-surface-container-low flex items-start gap-2.5">
+                  <div class="w-8 h-8 rounded-full bg-secondary-container/20 text-secondary flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined text-[18px]">local_parking</span>
+                  </div>
+                  <div class="space-y-0.5">
+                    <div class="font-label-md text-label-md text-on-surface font-semibold">Bãi đỗ xe rộng</div>
+                    <div class="font-body-sm text-body-sm text-on-surface-variant">Bãi xe ô tô &amp; hầm giữ xe máy an toàn</div>
+                  </div>
+                </div>
+                <div class="p-space-sm rounded-lg bg-surface-container-low flex items-start gap-2.5">
+                  <div class="w-8 h-8 rounded-full bg-tertiary-container/20 text-tertiary flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined text-[18px]">local_taxi</span>
+                  </div>
+                  <div class="space-y-0.5">
+                    <div class="font-label-md text-label-md text-on-surface font-semibold">Xe công nghệ / Taxi</div>
+                    <div class="font-body-sm text-body-sm text-on-surface-variant">Có làn trả khách riêng biệt trước sảnh</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- SECTION 4: Điều khoản & Quy định tham dự -->
+            <section class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm space-y-space-md border border-surface-container-high/60">
+              <h2 class="font-headline-lg text-headline-lg text-on-surface flex items-center gap-2 font-bold">
+                <span class="w-1.5 h-6 rounded-full bg-outline inline-block"></span>
+                Điều khoản &amp; Quy định tham dự
+              </h2>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+                <div class="p-space-md rounded-lg bg-surface-container-low space-y-1.5 border border-surface-container-high/40">
+                  <div class="flex items-center gap-2 font-headline-sm text-headline-sm text-on-surface font-semibold">
+                    <span class="material-symbols-outlined text-primary text-[20px]">person_alert</span>
+                    Quy định độ tuổi
+                  </div>
+                  <p class="font-body-sm text-body-sm text-on-surface-variant">
+                    Chương trình dành cho khán giả từ đủ 12 tuổi trở lên để bảo đảm trật tự và trải nghiệm không gian nghệ thuật chung.
+                  </p>
+                </div>
+                <div class="p-space-md rounded-lg bg-surface-container-low space-y-1.5 border border-surface-container-high/40">
+                  <div class="flex items-center gap-2 font-headline-sm text-headline-sm text-on-surface font-semibold">
+                    <span class="material-symbols-outlined text-primary text-[20px]">published_with_changes</span>
+                    Chính sách hoàn / đổi vé
+                  </div>
+                  <p class="font-body-sm text-body-sm text-on-surface-variant">
+                    Vé đã thanh toán không hỗ trợ hoàn hủy, trừ trường hợp sự kiện bị hoãn hoặc hủy theo thông báo chính thức của BTC.
+                  </p>
+                </div>
+                <div class="p-space-md rounded-lg bg-surface-container-low space-y-1.5 border border-surface-container-high/40">
+                  <div class="flex items-center gap-2 font-headline-sm text-headline-sm text-on-surface font-semibold">
+                    <span class="material-symbols-outlined text-primary text-[20px]">qr_code_scanner</span>
+                    Soát vé &amp; Check-in
+                  </div>
+                  <p class="font-body-sm text-body-sm text-on-surface-variant">
+                    Cửa soát vé mở trước giờ diễn 60 - 90 phút. Quý khách vui lòng xuất trình vé điện tử QR Code trên điện thoại khi vào cửa.
+                  </p>
+                </div>
+                <div class="p-space-md rounded-lg bg-surface-container-low space-y-1.5 border border-surface-container-high/40">
+                  <div class="flex items-center gap-2 font-headline-sm text-headline-sm text-on-surface font-semibold">
+                    <span class="material-symbols-outlined text-primary text-[20px]">videocam_off</span>
+                    Bản quyền ghi hình
+                  </div>
+                  <p class="font-body-sm text-body-sm text-on-surface-variant">
+                    Khán giả không mang máy ảnh chuyên nghiệp có ống kính tháo rời hoặc thiết bị livestream phát sóng trực tiếp vào khán phòng.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+          </div>
+
+          <!-- RIGHT COLUMN (5 COLS STICKY) - Chọn Suất Diễn -->
+          <div class="lg:col-span-5 flex flex-col gap-space-lg lg:sticky lg:top-20">
+            
+            <div class="bg-surface-container-lowest p-space-lg rounded-xl shadow-md space-y-space-md border border-surface-container-high/80">
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Lịch biểu diễn</span>
+                  <h2 class="font-headline-lg text-headline-lg text-on-surface font-bold">Chọn Suất Diễn</h2>
+                </div>
+                <span class="font-code-mono text-label-sm px-2.5 py-1 rounded bg-secondary-fixed text-on-secondary-fixed font-bold" id="totalShowtimesCount">
+                  ... Suất
+                </span>
+              </div>
+
+              <!-- Realtime lock banner -->
+              <div class="p-space-sm rounded-lg bg-surface-container flex items-center justify-between text-on-surface border border-surface-container-high/50">
+                <span class="flex items-center gap-2 font-label-md text-label-md">
+                  <span class="material-symbols-outlined text-[18px] text-primary">bolt</span>
+                  Giữ chỗ trực tiếp theo thời gian thực
+                </span>
+                <span class="font-code-mono text-label-sm text-primary font-bold">Live Matrix</span>
+              </div>
+
+              <!-- Showtimes List Container -->
+              <div class="space-y-space-md" id="showtimesContainer">
+                <!-- Dynamically Rendered Showtimes -->
+              </div>
+
+              <div class="p-space-sm rounded-lg bg-surface-container-high/40 text-on-surface-variant font-body-sm text-body-sm flex items-center gap-2 border border-surface-container-high/30">
+                <span class="material-symbols-outlined text-[18px] text-tertiary">verified_user</span>
+                <span>Vé chính hãng cam kết cấp bởi EventPulse Platform.</span>
+              </div>
+            </div>
+
+            <!-- VIP Support Card -->
+            <div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm space-y-space-sm border border-surface-container-high/60">
+              <div class="flex items-center gap-space-sm">
+                <div class="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed shrink-0">
+                  <span class="material-symbols-outlined text-[20px]">headset_mic</span>
+                </div>
+                <div>
+                  <div class="font-label-lg text-label-lg text-on-surface font-bold">Cần trợ giúp chọn vị trí?</div>
+                  <div class="font-body-sm text-body-sm text-on-surface-variant">Hotline ưu tiên khán giả VIP: <strong class="text-on-surface">1900 8899</strong></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="w-full bg-surface-container-low shadow-[0_-1px_6px_rgba(0,0,0,0.02)] mt-auto">
+    <div class="max-w-7xl mx-auto px-margin py-space-2xl">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-space-xl mb-space-2xl">
+        <div class="space-y-space-sm">
+          <div class="flex items-center gap-space-sm">
+            <div class="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center">
+              <span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+            </div>
+            <span class="font-headline-sm text-headline-sm text-primary font-bold">EventPulse</span>
+          </div>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">
+            Nền tảng đặt vé trực tuyến &amp; quản trị suất diễn hàng đầu. Hệ thống giữ chỗ tức thì không độ trễ cho mọi quy mô sự kiện.
+          </p>
+        </div>
+        <div class="space-y-space-sm">
+          <div class="font-headline-sm text-headline-sm text-on-surface font-bold">Chính sách &amp; Hỗ trợ</div>
+          <ul class="space-y-space-xs font-body-sm text-body-sm text-on-surface-variant">
+            <li><a class="hover:text-primary transition-colors" href="#">Quy chế hoạt động sàn</a></li>
+            <li><a class="hover:text-primary transition-colors" href="#">Chính sách bảo mật thanh toán</a></li>
+            <li><a class="hover:text-primary transition-colors" href="#">Quy trình đổi / hoàn vé</a></li>
+            <li><a class="hover:text-primary transition-colors" href="#">Điều khoản cho ban tổ chức</a></li>
+          </ul>
+        </div>
+        <div class="space-y-space-sm">
+          <div class="font-headline-sm text-headline-sm text-on-surface font-bold">Tổng đài trợ giúp</div>
+          <div class="space-y-space-xs font-body-sm text-body-sm text-on-surface-variant">
+            <p class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[16px] text-primary">support_agent</span>Hotline: <strong class="text-on-surface">1900 8899</strong></p>
+            <p class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[16px] text-primary">mail</span>support@eventpulse.vn</p>
+            <p class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[16px] text-primary">schedule</span>08:00 - 22:00 hàng ngày</p>
+          </div>
+        </div>
+        <div class="space-y-space-sm">
+          <div class="font-headline-sm text-headline-sm text-on-surface font-bold">Bảo mật &amp; Chứng nhận</div>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">Tuân thủ tiêu chuẩn PCI DSS Quốc tế &amp; Mã hoá đường truyền SSL 256-bit.</p>
+          <div class="flex items-center gap-space-sm">
+            <span class="px-2.5 py-1 rounded bg-surface-container-high font-code-mono text-label-sm text-primary font-bold">PCI-DSS</span>
+            <span class="px-2.5 py-1 rounded bg-surface-container-high font-code-mono text-label-sm text-tertiary-container text-on-tertiary-container font-bold">SSL 256-BIT</span>
+          </div>
+        </div>
+      </div>
+      <div class="pt-space-lg flex flex-col sm:flex-row items-center justify-between gap-space-md text-on-surface-variant font-body-sm text-body-sm border-t border-surface-container-high">
+        <p>© 2026 EventPulse Platform JSC. Bảo lưu mọi quyền.</p>
+        <div class="flex gap-space-md font-label-sm text-label-sm">
+          <a class="hover:text-on-surface transition-colors" href="./public-events.html">Trang chủ</a>
+          <a class="hover:text-on-surface transition-colors" href="./login.html">Quản trị</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-2 px-4 py-3 rounded-xl bg-inverse-surface text-inverse-on-surface shadow-2xl font-label-md text-sm">
+    <span class="material-symbols-outlined text-tertiary-fixed text-[20px]" id="toastIcon">check_circle</span>
+    <span id="toastMsg">Thao tác thành công</span>
+  </div>
+
+  <script>
+    const API_BASE = (window.location.protocol === 'file:' || (['localhost', '127.0.0.1'].includes(window.location.hostname) && ['5500', '5501'].includes(window.location.port))) ? 'http://localhost:5012' : '';
+    let currentEvent = null;
+
+    // Toast helper
+    function showToast(msg, icon = 'check_circle') {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+      toastMsg.innerText = msg;
+      toastIcon.innerText = icon;
+      toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+      }, 3000);
+    }
+
+    // Format tiền tệ
+    function formatCurrency(amount) {
+      if (!amount) return '0 ₫';
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    }
+
+    // Format Ngày giờ
+    function formatDateTime(isoString) {
+      if (!isoString) return '';
+      const d = new Date(isoString);
+      const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+      const dayName = days[d.getDay()];
+      const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      const date = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+      return { time, date, dayName, full: `${time} • ${dayName}, ${date}` };
+    }
+
+    // Format Date Range
+    function formatDateRange(startIso, endIso) {
+      if (!startIso) return '';
+      const d1 = new Date(startIso);
+      const str1 = `${String(d1.getDate()).padStart(2, '0')}/${String(d1.getMonth() + 1).padStart(2, '0')}/${d1.getFullYear()}`;
+      if (!endIso) return str1;
+      const d2 = new Date(endIso);
+      const str2 = `${String(d2.getDate()).padStart(2, '0')}/${String(d2.getMonth() + 1).padStart(2, '0')}/${d2.getFullYear()}`;
+      return str1 === str2 ? str1 : `${str1} - ${str2}`;
+    }
+
+    // Auth Navigation state
+    function renderAuthNav() {
+      const container = document.getElementById('navAuthContainer');
+      const token = localStorage.getItem('access_token');
+      const userStr = localStorage.getItem('user_info');
+
+      if (token && userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          const roles = (user.roles || []).map(r => (r || '').toLowerCase());
+          const isAdmin = roles.includes('admin');
+          const isOrganizer = roles.includes('organizer') || roles.includes('staff');
+
+          let portalLinkHtml = '';
+          if (isAdmin) {
+            portalLinkHtml = `
+              <a href="./admin-users.html" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold hover:bg-amber-200 transition">
+                <span class="material-symbols-outlined text-[16px]">manage_accounts</span>
+                <span>Quản trị</span>
+              </a>
+            `;
+          } else if (isOrganizer) {
+            portalLinkHtml = `
+              <a href="./events.html" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-xs font-bold hover:bg-secondary-fixed-dim transition">
+                <span class="material-symbols-outlined text-[16px]">domain</span>
+                <span>Quản trị sự kiện</span>
+              </a>
+            `;
+          }
+
+          container.innerHTML = `
+            ${portalLinkHtml}
+            <div class="flex items-center gap-2 pl-2 border-l border-surface-container-high">
+              <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white">
+                <span class="material-symbols-outlined text-[18px]">person</span>
+              </div>
+              <div class="text-left hidden sm:block">
+                <div class="text-xs font-bold text-on-surface leading-tight">${escapeHtml(user.fullName || user.username)}</div>
+                <div class="text-[11px] text-outline">${escapeHtml(roles[0] || 'Khách hàng')}</div>
+              </div>
+              <button onclick="handleLogout()" title="Đăng xuất" class="p-1.5 text-on-surface-variant hover:text-error transition rounded-lg hover:bg-surface-container-high ml-1">
+                <span class="material-symbols-outlined text-[18px]">logout</span>
+              </button>
+            </div>
+          `;
+          return;
+        } catch {}
+      }
+
+      container.innerHTML = `
+        <a href="./login.html" class="px-4 py-2 rounded-lg text-sm font-semibold text-primary bg-primary-fixed/40 hover:bg-primary-fixed transition">
+          Đăng nhập
+        </a>
+        <a href="./register.html" class="px-4 py-2 rounded-lg text-sm font-bold text-white bg-primary hover:bg-on-primary-fixed-variant transition shadow-sm">
+          Đăng ký
+        </a>
+      `;
+    }
+
+    function handleLogout() {
+      localStorage.clear();
+      renderAuthNav();
+    }
+
+    // Sao chép địa chỉ
+    function copyAddressToClipboard() {
+      if (!currentEvent || !currentEvent.location) return;
+      navigator.clipboard.writeText(currentEvent.location).then(() => {
+        const copyText = document.getElementById('copyText');
+        const copyIcon = document.getElementById('copyIcon');
+        copyText.innerText = 'Đã chép!';
+        copyIcon.innerText = 'done';
+        showToast('Đã sao chép địa chỉ sự kiện vào bộ nhớ tạm!');
+        setTimeout(() => {
+          copyText.innerText = 'Chép địa chỉ';
+          copyIcon.innerText = 'content_copy';
+        }, 2500);
+      }).catch(() => {
+        showToast('Không thể sao chép tự động', 'error');
+      });
+    }
+
+    // Tải thông tin sự kiện
+    async function initPage() {
+      renderAuthNav();
+
+      const urlParams = new URLSearchParams(window.location.search);
+      let eventId = urlParams.get('id') || urlParams.get('eventId');
+      const showtimeId = urlParams.get('showtimeId');
+
+      const loadingOverlay = document.getElementById('loadingOverlay');
+      const errorState = document.getElementById('errorState');
+      const content = document.getElementById('eventDetailContent');
+
+      try {
+        let eventData = null;
+
+        // 1. Thử gọi API lấy chi tiết sự kiện
+        if (eventId) {
+          const res = await fetch(`${API_BASE}/api/public/events/${eventId}`);
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success && json.data) {
+              eventData = json.data;
+            }
+          }
+        }
+
+        // 2. Nếu chưa có eventData nhưng có showtimeId, thử tìm từ danh sách public showtimes
+        if (!eventData && showtimeId) {
+          const resList = await fetch(`${API_BASE}/api/public/showtimes?limit=50`);
+          if (resList.ok) {
+            const jsonList = await resList.json();
+            const items = (jsonList.data && jsonList.data.items) ? jsonList.data.items : [];
+            const foundShowtime = items.find(s => s.id === showtimeId || (eventId && s.eventId === eventId));
+            if (foundShowtime) {
+              eventId = foundShowtime.eventId;
+              // Gọi lại API sự kiện
+              const res2 = await fetch(`${API_BASE}/api/public/events/${eventId}`);
+              if (res2.ok) {
+                const json2 = await res2.json();
+                if (json2.success && json2.data) {
+                  eventData = json2.data;
+                }
+              }
+
+              if (!eventData) {
+                // Tự cấu hình từ foundShowtime
+                eventData = {
+                  id: foundShowtime.eventId,
+                  title: foundShowtime.eventTitle,
+                  description: foundShowtime.eventDescription,
+                  imageUrl: foundShowtime.imageUrl,
+                  location: foundShowtime.eventLocation,
+                  organizerName: foundShowtime.organizerName || 'Ban Tổ Chức',
+                  startTime: foundShowtime.startTime,
+                  endTime: foundShowtime.endTime,
+                  minPrice: foundShowtime.minPrice,
+                  maxPrice: foundShowtime.maxPrice,
+                  totalSeats: foundShowtime.totalSeats || 3500,
+                  availableSeats: foundShowtime.availableSeats,
+                  showtimes: [foundShowtime]
+                };
+              }
+            }
+          }
+        }
+
+        // 3. Nếu vẫn chưa có eventData, fallback lấy sự kiện đầu tiên đang mở bán
+        if (!eventData) {
+          const resList = await fetch(`${API_BASE}/api/public/showtimes?limit=1`);
+          if (resList.ok) {
+            const jsonList = await resList.json();
+            const items = (jsonList.data && jsonList.data.items) ? jsonList.data.items : [];
+            if (items.length > 0) {
+              const firstShowtime = items[0];
+              const resFirst = await fetch(`/api/public/events/${firstShowtime.eventId}`);
+              if (resFirst.ok) {
+                const jf = await resFirst.json();
+                if (jf.success && jf.data) eventData = jf.data;
+              }
+            }
+          }
+        }
+
+        if (!eventData) {
+          loadingOverlay.classList.add('hidden');
+          errorState.classList.remove('hidden');
+          return;
+        }
+
+        currentEvent = eventData;
+        renderEventDetails(eventData, showtimeId);
+
+        loadingOverlay.classList.add('hidden');
+        content.classList.remove('hidden');
+
+      } catch (err) {
+        console.error("Lỗi khi tải chi tiết sự kiện:", err);
+        loadingOverlay.classList.add('hidden');
+        errorState.classList.remove('hidden');
+      }
+    }
+
+    function renderEventDetails(ev, activeShowtimeId) {
+      // 1. Title & Meta
+      document.title = `${ev.title} - Chi tiết Sự kiện | EventPulse`;
+      document.getElementById('pageTitle').innerText = `${ev.title} - EventPulse`;
+      document.getElementById('eventTitle').innerText = ev.title;
+      document.getElementById('organizerName').innerText = ev.organizerName || 'Ban Tổ Chức EventPulse';
+
+      // 2. Image & Cover
+      const defaultImg = "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80";
+      const bgUrl = ev.imageUrl || defaultImg;
+      document.getElementById('heroBgImage').style.backgroundImage = `url('${bgUrl}')`;
+      document.getElementById('galleryImg1').src = bgUrl;
+      document.getElementById('galleryImg2').src = "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=80";
+
+      // 3. Event Code & Category
+      const eventCode = 'EVT-' + (ev.id ? ev.id.substring(0, 8).toUpperCase() : '2026-LIVE');
+      document.getElementById('eventCodeBadge').innerText = eventCode;
+
+      // Phân tích thể loại từ description nếu có
+      if (ev.description && ev.description.includes('concert')) {
+        document.getElementById('eventCategoryBadge').innerText = 'Live Concert & Giao hưởng';
+      } else {
+        document.getElementById('eventCategoryBadge').innerText = 'Âm nhạc & Lễ hội Nghệ thuật';
+      }
+
+      // 4. Giá vé tiêu chuẩn
+      const minP = ev.minPrice ?? 0;
+      const maxP = ev.maxPrice ?? 0;
+      document.getElementById('eventPriceRange').innerText = `${formatCurrency(minP)} - ${formatCurrency(maxP)}`;
+
+      // 5. Bento Info
+      const dateRangeStr = formatDateRange(ev.startTime, ev.endTime);
+      document.getElementById('eventDateStr').innerText = dateRangeStr || 'Tháng 10/2026';
+      
+      const locText = ev.location || 'Trung tâm Hội nghị Quốc gia, Hà Nội';
+      document.getElementById('eventLocationBento').innerText = locText;
+      document.getElementById('eventLocationBento').title = locText;
+
+      // 6. Section Giới thiệu
+      const descEl = document.getElementById('eventDescription');
+      if (ev.description && ev.description.trim()) {
+        // Nếu có thẻ HTML hoặc text thuần
+        descEl.innerHTML = `<p class="leading-relaxed">${escapeHtml(ev.description).replace(/\n\n/g, '</p><p class="leading-relaxed">').replace(/\n/g, '<br>')}</p>`;
+      } else {
+        descEl.innerHTML = `
+          <p>Chưa có thông tin giới thiệu sự kiện.</p>
+        `;
+      }
+
+      // 7. Quy mô & Sơ đồ ghế
+      const totalSeats = ev.totalSeats ?? 0;
+      document.getElementById('totalSeatsBadge').innerText = `Quy mô: ${totalSeats.toLocaleString('vi-VN')} ghế`;
+      document.getElementById('legendVip').innerText = `VIP: ${formatCurrency(maxP)}`;
+      document.getElementById('legendStandard').innerText = `Standard: ${formatCurrency(minP)}`;
+      document.getElementById('legendPlatinum').innerText = 'Giá từng hạng ghế được hiển thị tại sơ đồ ghế';
+
+      // 8. Địa điểm & Bản đồ
+      document.getElementById('locationTitle').innerHTML = `
+        <span class="material-symbols-outlined text-primary text-[20px]">apartment</span>
+        <span>${escapeHtml(locText.split('-')[0].trim())}</span>
+      `;
+      document.getElementById('locationFullAddress').innerHTML = `
+        <span class="material-symbols-outlined text-outline text-[16px]">place</span>
+        <span>${escapeHtml(locText)}</span>
+      `;
+      document.getElementById('mapBadgeLocation').innerText = locText.split('-')[0].trim();
+
+      // Nút mở Google Maps thật
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locText)}`;
+      document.getElementById('btnGoogleMaps').href = mapsUrl;
+
+      // 9. Render Suất diễn ở cột phải
+      renderShowtimes(ev.showtimes || [], ev.id, activeShowtimeId, minP, maxP);
+    }
+
+    function renderShowtimes(showtimes, eventId, activeShowtimeId, defaultMin, defaultMax) {
+      const container = document.getElementById('showtimesContainer');
+      const countBadge = document.getElementById('totalShowtimesCount');
+      container.innerHTML = '';
+
+      if (!showtimes || showtimes.length === 0) {
+        countBadge.innerText = '0 Suất';
+        container.innerHTML = `
+          <div class="p-6 text-center bg-surface-container-low rounded-xl">
+            <span class="material-symbols-outlined text-3xl text-outline mb-2">schedule</span>
+            <p class="text-sm text-on-surface-variant">Chưa có lịch diễn nào được mở bán.</p>
+          </div>
+        `;
+        return;
+      }
+
+      countBadge.innerText = `${showtimes.length} Suất`;
+
+      showtimes.forEach((st, idx) => {
+        const dt = formatDateTime(st.startTime);
+        const isOnSale = st.status === 'OnSale';
+        const available = st.remainingSeats ?? st.availableSeats ?? 0;
+        const isSoldOut = available <= 0;
+
+        const minP = st.minPrice ?? defaultMin;
+        const maxP = st.maxPrice ?? defaultMax;
+        const priceText = `${formatCurrency(minP)} - ${formatCurrency(maxP)}`;
+
+        const seatMapUrl = `./seat-map.html?showtimeId=${st.id}&eventId=${eventId}`;
+        const isHighlighted = (activeShowtimeId && st.id === activeShowtimeId);
+
+        const card = document.createElement('div');
+
+        if (isOnSale && !isSoldOut) {
+          card.className = `group relative rounded-xl p-space-md transition-all shadow-sm hover:shadow-md bg-gradient-to-r from-surface-container-lowest to-surface-container-low/40 border ${
+            isHighlighted ? 'border-primary ring-2 ring-primary/20 bg-primary-fixed/10' : 'border-surface-container-high/60 hover:border-primary/40'
+          }`;
+
+          card.innerHTML = `
+            <div class="flex items-start justify-between gap-space-sm">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-headline-md text-headline-md text-on-surface font-extrabold">${dt.time}</span>
+                  <span class="text-outline-variant font-code-mono">•</span>
+                  <span class="font-headline-sm text-headline-sm text-on-surface font-semibold">${dt.dayName}, ${dt.date}</span>
+                </div>
+                <p class="font-body-sm text-body-sm text-on-surface-variant font-medium">
+                  ${idx === 0 ? 'Suất diễn chính • Khán phòng trung tâm' : 'Suất diễn bổ sung • Giữ chỗ trực tiếp'}
+                </p>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm flex items-center gap-1 font-bold shrink-0">
+                <span class="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse"></span>
+                Đang mở bán
+              </span>
+            </div>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pt-space-md mt-space-sm gap-space-sm border-t border-surface-container-high/40">
+              <div class="space-y-0.5">
+                <div class="font-label-sm text-label-sm text-outline">Tình trạng vé</div>
+                <div class="font-label-md text-label-md text-primary font-bold flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[16px]">airline_seat_recline_extra</span>
+                  Còn ${available.toLocaleString('vi-VN')} ghế trống
+                </div>
+                <div class="font-label-md text-label-md text-on-surface font-code-mono font-semibold">${priceText}</div>
+              </div>
+              <a href="${seatMapUrl}" class="h-11 px-5 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-1.5 shadow-sm hover:shadow active:scale-95 transition-all font-bold shrink-0">
+                <span>Chọn ghế ngay</span>
+                <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+              </a>
+            </div>
+          `;
+        } else {
+          // Closed / Sold Out state
+          card.className = "relative rounded-xl bg-surface-container-low/60 p-space-md opacity-85 border border-surface-container-high/40";
+          card.innerHTML = `
+            <div class="flex items-start justify-between gap-space-sm">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-headline-md text-headline-md text-outline font-bold">${dt.time}</span>
+                  <span class="text-outline-variant font-code-mono">•</span>
+                  <span class="font-headline-sm text-headline-sm text-outline font-semibold">${dt.dayName}, ${dt.date}</span>
+                </div>
+                <p class="font-body-sm text-body-sm text-outline">${isOnSale ? 'Hiện không còn ghế trống để chọn' : 'Suất diễn hiện không mở bán'}</p>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-semibold shrink-0">
+                ${isOnSale ? 'Hết ghế trống' : 'Đã đóng bán'}
+              </span>
+            </div>
+            <div class="flex items-center justify-between pt-space-md mt-space-sm border-t border-surface-container-high/40">
+              <div class="space-y-0.5">
+                <div class="font-label-sm text-label-sm text-outline">Tình trạng vé</div>
+                <div class="font-label-md text-label-md text-outline font-semibold"> ${available.toLocaleString('vi-VN')} chỗ trống</div>
+              </div>
+              <button disabled type="button" class="h-11 px-5 rounded-lg bg-surface-container-high text-outline cursor-not-allowed font-label-lg text-label-lg font-bold">
+                ${isOnSale ? 'Hết vé' : 'Không mở bán'}
+              </button>
+            </div>
+          `;
+        }
+
+        container.appendChild(card);
+      });
+    }
+
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', initPage);
+  </script>
+</body>
+</html>
