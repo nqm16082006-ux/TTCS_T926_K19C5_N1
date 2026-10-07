@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soát vé - Nhân viên soát vé | Event Ticket Booking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <style>
+    :root {
+      --bg-app: #f8fafc;
+      --bg-surface: #ffffff;
+      --border-color: #e2e8f0;
+      --border-focus: #4f46e5;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-light: #eef2ff;
+      --text-heading: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      --shadow-lg: 0 12px 28px -4px rgba(0, 0, 0, 0.08), 0 6px 12px -4px rgba(0, 0, 0, 0.03);
+      --danger-bg: #fef2f2;
+      --danger-border: #fecaca;
+      --danger-text: #dc2626;
+      --success-bg: #ecfdf5;
+      --success-border: #a7f3d0;
+      --success-text: #059669;
+      --info-bg: #eff6ff;
+      --info-border: #bfdbfe;
+      --info-text: #1d4ed8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-app);
+      color: var(--text-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .navbar {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 14px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 24px;
+      box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3);
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--text-heading);
+      letter-spacing: -0.02em;
+    }
+
+    .brand-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: var(--primary-light);
+      color: var(--primary);
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .user-nav {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .user-profile-info {
+      text-align: right;
+    }
+
+    .user-name {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--text-heading);
+    }
+
+    .user-role-badge {
+      font-size: 0.725rem;
+      font-weight: 600;
+      color: var(--primary);
+      background: var(--primary-light);
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-top: 2px;
+    }
+
+    .avatar-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: white;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+    }
+
+    .btn-logout {
+      padding: 8px 14px;
+      font-size: 0.825rem;
+      font-weight: 600;
+      color: var(--danger-text);
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-logout:hover {
+      background: #fee2e2;
+    }
+
+    .main-container {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 20px;
+      flex: 1;
+      width: 100%;
+    }
+
+    .page-header {
+      margin-bottom: 28px;
+      text-align: center;
+    }
+
+    .page-title {
+      font-size: 1.85rem;
+      font-weight: 800;
+      color: var(--text-heading);
+      letter-spacing: -0.025em;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .page-subtitle {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 36px 28px;
+      box-shadow: var(--shadow-md);
+      text-align: center;
+    }
+
+    .scanner-box {
+      border: 2px dashed #cbd5e1;
+      border-radius: 16px;
+      padding: 50px 24px;
+      background: #f8fafc;
+      margin: 20px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.2s;
+    }
+
+    .scanner-icon-wrap {
+      width: 80px;
+      height: 80px;
+      border-radius: 20px;
+      background: var(--primary-light);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .scanner-icon-wrap .material-symbols-outlined {
+      font-size: 44px;
+    }
+
+    .scanner-box-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-heading);
+      margin-bottom: 8px;
+    }
+
+    .scanner-box-desc {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      max-width: 440px;
+      line-height: 1.5;
+    }
+
+    .badge-s29 {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 18px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: #e0e7ff;
+      color: #3730a3;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .info-alert {
+      background: var(--info-bg);
+      border: 1px solid var(--info-border);
+      color: var(--info-text);
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 0.875rem;
+      line-height: 1.5;
+      text-align: left;
+      margin-top: 24px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .info-alert .material-symbols-outlined {
+      font-size: 20px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 24px;
+      color: var(--text-muted);
+      font-size: 0.825rem;
+      border-top: 1px solid var(--border-color);
+      background: var(--bg-surface);
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header / Navbar -->
+  <header class="navbar" id="staffNavbar">
+    <div class="brand">
+      <div class="brand-icon">
+        <span class="material-symbols-outlined">qr_code_scanner</span>
+      </div>
+      <div>
+        <span class="brand-title">EventTicket</span>
+        <span class="brand-badge">Soát vé</span>
+      </div>
+    </div>
+
+    <div class="user-nav" id="staffUserNav">
+      <div class="user-profile-info">
+        <div class="user-name" id="staffUserName">Nhân viên soát vé</div>
+        <div class="user-role-badge" id="staffUserRoleBadge">Staff (Soát vé)</div>
+      </div>
+      <div class="avatar-btn" id="staffAvatar">S</div>
+      <button class="btn-logout" id="logoutBtn" onclick="handleLogout()" title="Đăng xuất khỏi hệ thống">
+        <span class="material-symbols-outlined" style="font-size: 18px;">logout</span>
+        <span>Đăng xuất</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main-container">
+    <div class="page-header">
+      <h1 class="page-title" id="pageTitle">
+        <span class="material-symbols-outlined" style="font-size: 32px; color: var(--primary);">confirmation_number</span>
+        Soát vé
+      </h1>
+      <p class="page-subtitle" id="pageSubtitle">Màn hình vận hành soát vé dành cho nhân viên sự kiện</p>
+    </div>
+
+    <div class="card" id="scannerEntryCard" style="text-align: left;">
+      <div style="margin-bottom: 20px;">
+        <label for="showtimeSelect" style="display: block; font-weight: 600; margin-bottom: 8px;">1. Chọn suất diễn hiện tại:</label>
+        <select id="showtimeSelect" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); font-family: inherit;">
+          <option value="">Đang tải danh sách suất diễn...</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <label for="gateInput" style="display: block; font-weight: 600; margin-bottom: 8px;">2. Cửa kiểm soát (Gate):</label>
+        <input type="text" id="gateInput" value="Gate 1" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); font-family: inherit;">
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <label for="ticketInput" style="display: block; font-weight: 600; margin-bottom: 8px;">3. Nhập/Quét mã vé (Ticket ID):</label>
+        <div style="display: flex; gap: 10px;">
+          <input type="text" id="ticketInput" placeholder="Ví dụ: 123e4567-e89b-12d3-a456-426614174000" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); font-family: inherit;">
+          <button id="scanBtn" style="padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Kiểm tra vé</button>
+        </div>
+      </div>
+
+      <div id="scanResult" style="display: none; padding: 16px; border-radius: 8px; margin-bottom: 20px;"></div>
+
+      <!-- Thông tin quyền hạn nhân viên -->
+      <div class="info-alert" id="staffRoleNotice">
+        <span class="material-symbols-outlined">verified_user</span>
+        <div>
+          <strong>Xác thực thành công vai trò Soát vé (Staff):</strong>
+          <div style="margin-top: 4px;">
+            Tài khoản nhân viên của bạn đã được cấp quyền truy cập cổng soát vé. Các chức năng Quản trị hệ thống, Quản lý người dùng và Tạo sự kiện không hiển thị trên giao diện này.
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    Event Ticket Booking System &copy; 2026 - Cổng Soát Vé Dành Cho Nhân Viên
+  </footer>
+
+  <script>
+    (function () {
+      const token = localStorage.getItem('access_token');
+      const userInfoRaw = localStorage.getItem('user_info');
+
+      // 1. Kiểm tra đăng nhập
+      if (!token || !userInfoRaw) {
+        window.location.href = './login.html?returnUrl=' + encodeURIComponent(window.location.pathname);
+        return;
+      }
+
+      let user = null;
+      try {
+        user = JSON.parse(userInfoRaw);
+      } catch (e) {
+        console.error('Invalid user_info in localStorage', e);
+        window.location.href = './login.html';
+        return;
+      }
+
+      // 2. Kiểm tra phân quyền role: Phải có role Staff hoặc Admin
+      const roles = (user.roles || []).map(r => (r || '').toLowerCase());
+      const isStaff = roles.includes('staff');
+      const isAdmin = roles.includes('admin');
+
+      if (!isStaff && !isAdmin) {
+        // Nếu không có quyền soát vé: Chuyển hướng về trang phù hợp
+        if (roles.includes('organizer')) {
+          window.location.href = './events.html';
+        } else {
+          window.location.href = './public-events.html';
+        }
+        return;
+      }
+
+      // 3. Hiển thị thông tin người dùng Staff
+      const displayName = user.fullName || user.username || user.email || 'Nhân viên soát vé';
+      document.getElementById('staffUserName').textContent = displayName;
+      document.getElementById('staffAvatar').textContent = displayName.trim().charAt(0).toUpperCase() || 'S';
+
+      const roleBadge = document.getElementById('staffUserRoleBadge');
+      if (isAdmin && !isStaff) {
+        roleBadge.textContent = 'Admin (Xem trước)';
+      } else {
+        roleBadge.textContent = 'Nhân viên Soát vé (Staff)';
+      }
+
+      // 4. Khởi tạo tính năng soát vé
+      loadTodayShows();
+
+      document.getElementById('scanBtn').addEventListener('click', handleScan);
+      document.getElementById('ticketInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') handleScan();
+      });
+
+      async function loadTodayShows() {
+        const select = document.getElementById('showtimeSelect');
+        try {
+          const res = await fetch('/api/v1/checkin/today-shows', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          if (!res.ok) throw new Error('Không thể tải danh sách suất diễn');
+          const data = await res.json();
+          
+          select.innerHTML = '';
+          if (data.length === 0) {
+            select.innerHTML = '<option value="">Không có suất diễn nào đang diễn ra hôm nay</option>';
+            return;
+          }
+          
+          data.forEach(show => {
+            const startTime = new Date(show.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            const endTime = new Date(show.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            const option = document.createElement('option');
+            option.value = show.id;
+            option.textContent = `${show.eventTitle} (${startTime} - ${endTime})`;
+            select.appendChild(option);
+          });
+        } catch (error) {
+          console.error(error);
+          select.innerHTML = '<option value="">Lỗi tải danh sách suất diễn</option>';
+        }
+      }
+
+      async function handleScan() {
+        const ticketId = document.getElementById('ticketInput').value.trim();
+        const showtimeId = document.getElementById('showtimeSelect').value;
+        const gateName = document.getElementById('gateInput').value.trim();
+        const resultDiv = document.getElementById('scanResult');
+
+        resultDiv.style.display = 'block';
+        
+        if (!ticketId) {
+          showResult('error', 'Vui lòng nhập mã vé (Ticket ID).');
+          return;
+        }
+        if (!showtimeId) {
+          showResult('error', 'Vui lòng chọn suất diễn.');
+          return;
+        }
+
+        resultDiv.className = 'info-alert';
+        resultDiv.innerHTML = '<span class="material-symbols-outlined">sync</span> Đang kiểm tra...';
+
+        try {
+          const res = await fetch('/api/v1/checkin/scan', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              ticketId,
+              selectedShowtimeId: showtimeId,
+              gateName
+            })
+          });
+
+          const data = await res.json();
+
+          if (res.ok) {
+            showResult('success', `
+              <strong>✅ ${data.message}</strong><br>
+              Ghế: ${data.seatInfo} | Cửa: ${data.gate}
+            `);
+            document.getElementById('ticketInput').value = ''; // clear for next scan
+            document.getElementById('ticketInput').focus();
+          } else {
+            showResult('error', `<strong>❌ Lỗi:</strong> ${data.message}`);
+          }
+        } catch (error) {
+          console.error(error);
+          showResult('error', 'Lỗi kết nối đến máy chủ.');
+        }
+      }
+
+      function showResult(type, html) {
+        const resultDiv = document.getElementById('scanResult');
+        resultDiv.style.display = 'block';
+        if (type === 'success') {
+          resultDiv.style.background = 'var(--success-bg)';
+          resultDiv.style.border = '1px solid var(--success-border)';
+          resultDiv.style.color = 'var(--success-text)';
+        } else {
+          resultDiv.style.background = 'var(--danger-bg)';
+          resultDiv.style.border = '1px solid var(--danger-border)';
+          resultDiv.style.color = 'var(--danger-text)';
+        }
+        resultDiv.innerHTML = html;
+      }
+
+    })();
+
+    function handleLogout() {
+      if (confirm('Bạn có chắc chắn muốn đăng xuất khỏi cổng Soát vé không?')) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user_info');
+        window.location.href = './login.html';
+      }
+    }
+  </script>
+</body>
+</html>
