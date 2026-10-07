@@ -903,8 +903,10 @@
 
       showtimes.forEach((st, idx) => {
         const dt = formatDateTime(st.startTime);
-        const isOnSale = st.status === 'OnSale';
-        const available = st.remainingSeats ?? st.availableSeats ?? 0;
+        const isOnSale = !st.status || st.status.toLowerCase() === 'onsale';
+        const available = (typeof st.remainingSeats === 'number' && st.remainingSeats >= 0)
+          ? st.remainingSeats
+          : (st.availableSeats ?? 0);
         const isSoldOut = available <= 0;
 
         const minP = st.minPrice ?? defaultMin;
