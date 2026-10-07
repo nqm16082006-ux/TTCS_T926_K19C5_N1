@@ -150,6 +150,23 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers();
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddOptions<EventTicketBooking.Api.Options.TicketRateLimitOptions>()
+    .Bind(builder.Configuration.GetSection(EventTicketBooking.Api.Options.TicketRateLimitOptions.SectionName))
+    .Validate(o => o.Policies.ContainsKey("seat-hold") && o.Policies.ContainsKey("order-create")
+        && o.Policies.Values.All(r => r.AccountLimit > 0 && r.IpLimit > 0 && r.WindowSeconds > 0),
+        "Rate-limit policies must have positive limits and window durations.")
+    .Validate(o => !o.AllowInMemoryFallback || builder.Environment.IsDevelopment(),
+        "In-memory rate limiting is only supported in Development.")
+    .ValidateOnStart();
+builder.Services.AddSingleton<ITicketRateLimiter, TicketRateLimiter>();
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor;
+    foreach (var proxy in builder.Configuration.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? [])
+        options.KnownProxies.Add(System.Net.IPAddress.Parse(proxy));
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -161,6 +178,7 @@ builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.Expi
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.SeatHoldCleanupWorker>();
 
 var app = builder.Build();
+app.UseForwardedHeaders();
 
 if (builder.Configuration.GetValue<bool>("Database:AutoMigrate"))
     await DatabaseInitializer.InitializeAsync(app.Services, builder.Configuration);
@@ -208,8 +226,10 @@ if (!string.IsNullOrWhiteSpace(uploadsPath))
     });
 }
 
+app.UseRouting();
 app.UseAuthorization();
 app.UseMiddleware<EventTicketBooking.Api.Middlewares.RoleAuthorizationMiddleware>();
+app.UseMiddleware<EventTicketBooking.Api.Middlewares.TicketRateLimitMiddleware>();
 app.MapControllers();
 
 app.Run();

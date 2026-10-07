@@ -40,6 +40,9 @@ namespace EventTicketBooking.Api.Controllers
         /// POST /api/showtimes/{showtimeId}/seats/hold
         /// </summary>
         [HttpPost("hold")]
+        [TicketRateLimit("seat-hold")]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+        [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         [RequireRole]
         [ProducesResponseType(typeof(ApiResponse<HoldSeatsResponseDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]

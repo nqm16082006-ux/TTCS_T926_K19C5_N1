@@ -32,6 +32,9 @@ namespace EventTicketBooking.Api.Controllers
         /// T-37: Tạo đơn hàng từ giữ chỗ và gia hạn giữ chỗ
         /// </summary>
         [HttpPost("showtimes/{showtimeId:guid}")]
+        [TicketRateLimit("order-create")]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+        [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         [RequireRole]
         [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
