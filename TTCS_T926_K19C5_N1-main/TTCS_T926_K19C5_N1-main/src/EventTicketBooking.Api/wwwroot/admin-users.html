@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quản trị người dùng & Phân quyền - Event Ticket Booking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-app: #f8fafc;
+      --bg-surface: #ffffff;
+      --border-color: #e2e8f0;
+      --border-focus: #6366f1;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-light: #eef2ff;
+      --text-heading: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      --shadow-lg: 0 12px 28px -4px rgba(0, 0, 0, 0.08), 0 6px 12px -4px rgba(0, 0, 0, 0.03);
+      --danger-bg: #fef2f2;
+      --danger-border: #fecaca;
+      --danger-text: #dc2626;
+      --success-bg: #ecfdf5;
+      --success-border: #a7f3d0;
+      --success-text: #059669;
+      --warning-bg: #fffbeb;
+      --warning-border: #fde68a;
+      --warning-text: #d97706;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-app);
+      color: var(--text-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Navbar */
+    .navbar {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 14px 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 19px;
+      font-weight: 800;
+      color: var(--text-heading);
+      text-decoration: none;
+      letter-spacing: -0.3px;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--primary) 0%, #3730a3 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 20px;
+      box-shadow: 0 4px 10px rgba(79, 70, 229, 0.25);
+    }
+
+    .brand-badge {
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      color: #b45309;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-link {
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-body);
+      padding: 8px 14px;
+      border-radius: 10px;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-link:hover {
+      background: var(--bg-app);
+      color: var(--primary);
+    }
+
+    .nav-link.active {
+      background: var(--primary-light);
+      color: var(--primary);
+      border: 1px solid #c7d2fe;
+    }
+
+    .user-menu {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-app);
+      padding: 6px 14px 6px 8px;
+      border-radius: 9999px;
+      border: 1px solid var(--border-color);
+    }
+
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .user-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-heading);
+    }
+
+    .btn-logout {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-logout:hover {
+      background: #fee2e2;
+      color: var(--danger-text);
+    }
+
+    /* Main Container */
+    .main-container {
+      max-width: 1240px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 36px 24px;
+      flex: 1;
+    }
+
+    /* Page Header */
+    .page-header {
+      margin-bottom: 28px;
+    }
+
+    .page-title {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--text-heading);
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .page-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .stat-icon.indigo { background: #e0e7ff; color: #4338ca; }
+    .stat-icon.amber { background: #fef3c7; color: #b45309; }
+    .stat-icon.emerald { background: #d1fae5; color: #047857; }
+    .stat-icon.sky { background: #e0f2fe; color: #0369a1; }
+
+    .stat-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text-heading);
+      line-height: 1.1;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Toolbar */
+    .toolbar-container {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 16px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .search-box {
+      position: relative;
+      flex: 1;
+      min-width: 260px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 15px;
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 10px 16px 10px 40px;
+      font-size: 14px;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      outline: none;
+      font-family: inherit;
+      background: var(--bg-app);
+      transition: all 0.2s ease;
+    }
+
+    .search-input:focus {
+      background: #ffffff;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .select-filter {
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      background: #ffffff;
+      color: var(--text-body);
+      outline: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .select-filter:focus {
+      border-color: var(--border-focus);
+    }
+
+    /* Table Surface */
+    .table-container {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    thead {
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      padding: 14px 20px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid #f1f5f9;
+      transition: background 0.15s ease;
+    }
+
+    tbody tr:hover {
+      background: #f8fafc;
+    }
+
+    tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    td {
+      padding: 16px 20px;
+      font-size: 14px;
+      vertical-align: middle;
+    }
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-profile-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--primary) 0%, #3730a3 100%);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 15px;
+      box-shadow: 0 2px 6px rgba(79, 70, 229, 0.2);
+    }
+
+    .user-profile-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .user-profile-name {
+      font-weight: 700;
+      color: var(--text-heading);
+    }
+
+    .user-profile-username {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .role-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-right: 4px;
+      margin-bottom: 4px;
+    }
+
+    .role-badge.admin {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+    }
+
+    .role-badge.organizer {
+      background: #e0e7ff;
+      color: #3730a3;
+      border: 1px solid #c7d2fe;
+    }
+
+    .role-badge.customer {
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .status-badge.active {
+      background: var(--success-bg);
+      color: var(--success-text);
+      border: 1px solid var(--success-border);
+    }
+
+    .status-badge.inactive {
+      background: var(--danger-bg);
+      color: var(--danger-text);
+      border: 1px solid var(--danger-border);
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .status-badge.active .status-dot { background: var(--success-text); }
+    .status-badge.inactive .status-dot { background: var(--danger-text); }
+
+    .actions-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-action {
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: #ffffff;
+      color: var(--text-body);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-action:hover {
+      background: var(--primary-light);
+      border-color: #c7d2fe;
+      color: var(--primary);
+    }
+
+    .btn-action.btn-lock {
+      color: var(--danger-text);
+    }
+
+    .btn-action.btn-lock:hover {
+      background: var(--danger-bg);
+      border-color: var(--danger-border);
+    }
+
+    .btn-action.btn-unlock {
+      color: var(--success-text);
+    }
+
+    .btn-action.btn-unlock:hover {
+      background: var(--success-bg);
+      border-color: var(--success-border);
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.5);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal-box {
+      background: var(--bg-surface);
+      border-radius: 20px;
+      max-width: 500px;
+      width: 100%;
+      padding: 28px;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      animation: modalSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalSlide {
+      from { transform: translateY(12px) scale(0.97); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .modal-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text-heading);
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      font-size: 20px;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .role-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .role-option:hover {
+      background: #f8fafc;
+      border-color: var(--border-focus);
+    }
+
+    .role-option.checked {
+      background: var(--primary-light);
+      border-color: #a5b4fc;
+    }
+
+    .role-option input[type="checkbox"] {
+      margin-top: 3px;
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+    }
+
+    .role-option-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .role-option-title {
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text-heading);
+    }
+
+    .role-option-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .btn-modal-cancel {
+      padding: 10px 18px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: #ffffff;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .btn-modal-save {
+      padding: 10px 22px;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(135deg, var(--primary) 0%, #4338ca 100%);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    }
+
+    .btn-modal-save:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Alerts */
+    .alert-banner {
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      display: none;
+    }
+
+    .alert-banner.success {
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+      color: var(--success-text);
+    }
+
+    .alert-banner.danger {
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      color: var(--danger-text);
+    }
+
+    .empty-state {
+      padding: 50px 20px;
+      text-align: center;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <a href="./admin-users.html" class="brand">
+      <div class="brand-icon" style="background: linear-gradient(135deg, #3525cd 0%, #4f46e5 100%);">👑</div>
+      <span>EventPulse</span>
+      <span class="brand-badge">Admin Portal</span>
+    </a>
+    <div class="nav-links">
+      <a href="./events.html" class="nav-link">🎪 Quản lý Sự kiện</a>
+      <a href="./admin-users.html" class="nav-link active">👥 Quản lý Người dùng</a>
+      <a href="./public-events.html" class="nav-link">🌐 Đặt vé Public</a>
+    </div>
+    <div class="user-menu">
+      <div class="user-chip">
+        <div class="user-avatar" id="navAvatar">A</div>
+        <span class="user-name" id="navUsername">Admin</span>
+      </div>
+      <button class="btn-logout" onclick="logout()">Đăng xuất</button>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="main-container">
+
+    <div id="alertBanner" class="alert-banner"></div>
+
+    <div class="page-header">
+      <h1 class="page-title">👥 Quản Trị Người Dùng & Phân Quyền</h1>
+      <p class="page-subtitle">Xem toàn bộ tài khoản, thay đổi quyền hạn (Customer, Organizer, Admin) và quản lý trạng thái kích hoạt.</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon indigo">👥</div>
+        <div class="stat-info">
+          <span class="stat-value" id="statTotalUsers">0</span>
+          <span class="stat-label">Tổng người dùng</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon amber">👑</div>
+        <div class="stat-info">
+          <span class="stat-value" id="statTotalAdmins">0</span>
+          <span class="stat-label">Quản trị viên (Admin)</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon sky">🎪</div>
+        <div class="stat-info">
+          <span class="stat-value" id="statTotalOrganizers">0</span>
+          <span class="stat-label">Ban tổ chức (Organizer)</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon emerald">🎟️</div>
+        <div class="stat-info">
+          <span class="stat-value" id="statTotalCustomers">0</span>
+          <span class="stat-label">Khách hàng (Customer)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search Toolbar -->
+    <div class="toolbar-container">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="Tìm theo email, tên đăng nhập hoặc họ tên..." oninput="handleFilterChange()">
+      </div>
+      <div class="filter-group">
+        <select id="roleFilter" class="select-filter" onchange="handleFilterChange()">
+          <option value="">-- Tất cả vai trò --</option>
+          <option value="Admin">Admin</option>
+          <option value="Organizer">Organizer</option>
+          <option value="Customer">Customer</option>
+        </select>
+        <select id="statusFilter" class="select-filter" onchange="handleFilterChange()">
+          <option value="">-- Tất cả trạng thái --</option>
+          <option value="active">Hoạt động</option>
+          <option value="inactive">Đã khóa</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Người dùng</th>
+            <th>Email</th>
+            <th>Vai trò (Roles)</th>
+            <th>Trạng thái</th>
+            <th>Sự kiện</th>
+            <th>Ngày tạo</th>
+            <th style="text-align: right;">Hành động</th>
+          </tr>
+        </thead>
+        <tbody id="userTableBody">
+          <tr>
+            <td colspan="7" class="empty-state">⌛ Đang tải danh sách người dùng...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+
+  <!-- Modal Edit Roles -->
+  <div class="modal-overlay" id="roleModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">🛡️ Phân quyền người dùng</h3>
+        <button class="modal-close" onclick="closeRoleModal()">✕</button>
+      </div>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">
+        Đang chỉnh sửa quyền cho: <strong id="modalTargetUser" style="color: var(--text-heading);">user@example.com</strong>
+      </p>
+
+      <form id="roleForm" onsubmit="handleSaveRoles(event)">
+        <input type="hidden" id="modalUserId">
+
+        <label class="role-option" id="optCustomer">
+          <input type="checkbox" name="roles" value="Customer" id="chkCustomer">
+          <div class="role-option-info">
+            <span class="role-option-title">Customer</span>
+            <span class="role-option-desc">Khách hàng tiêu chuẩn: đặt vé, giữ ghế và thanh toán.</span>
+          </div>
+        </label>
+
+        <label class="role-option" id="optOrganizer">
+          <input type="checkbox" name="roles" value="Organizer" id="chkOrganizer">
+          <div class="role-option-info">
+            <span class="role-option-title">Organizer</span>
+            <span class="role-option-desc">Ban tổ chức: tạo sự kiện, thiết lập sơ đồ ghế và mở bán suất diễn.</span>
+          </div>
+        </label>
+
+        <label class="role-option" id="optAdmin">
+          <input type="checkbox" name="roles" value="Admin" id="chkAdmin">
+          <div class="role-option-info">
+            <span class="role-option-title">Admin</span>
+            <span class="role-option-desc">Quản trị viên tối cao: toàn quyền quản lý hệ thống, sự kiện và tài khoản.</span>
+          </div>
+        </label>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-modal-cancel" onclick="closeRoleModal()">Hủy</button>
+          <button type="submit" class="btn-modal-save" id="btnSaveRole">Lưu phân quyền</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+    let token = localStorage.getItem('access_token');
+    let allUsers = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Kiểm tra đăng nhập
+      if (!token) {
+        window.location.href = './login.html?returnUrl=' + encodeURIComponent(window.location.pathname);
+        return;
+      }
+
+      const userInfoRaw = localStorage.getItem('user_info');
+      if (userInfoRaw) {
+        try {
+          const user = JSON.parse(userInfoRaw);
+          const name = user.fullName || user.username || user.email;
+          document.getElementById('navUsername').textContent = name;
+          document.getElementById('navAvatar').textContent = name.charAt(0).toUpperCase();
+
+          const roles = (user.roles || []).map(r => (r || '').toLowerCase());
+          const isAdmin = roles.includes('admin');
+          if (!isAdmin) {
+            alert('Bạn không có quyền truy cập trang Quản trị Người dùng (Chỉ dành riêng cho Admin).');
+            if (roles.includes('organizer') || roles.includes('staff')) {
+              window.location.href = './events.html';
+            } else {
+              window.location.href = './public-events.html';
+            }
+            return;
+          }
+        } catch (e) {}
+      }
+
+      loadUsers();
+    });
+
+    async function loadUsers() {
+      showAlert('', false);
+      const tbody = document.getElementById('userTableBody');
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">⌛ Đang tải dữ liệu từ máy chủ...</td></tr>';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/users`, {
+          headers: {
+            'Authorization': 'Bearer ' + token
+          }
+        });
+
+        if (res.status === 401) {
+          logout();
+          return;
+        }
+
+        if (res.status === 403) {
+          tbody.innerHTML = '<tr><td colspan="7" class="empty-state" style="color: var(--danger-text);">⛔ Bạn không có quyền truy cập (Yêu cầu tài khoản Admin).</td></tr>';
+          return;
+        }
+
+        const json = await res.json().catch(() => ({}));
+        if (res.ok && json.data) {
+          allUsers = json.data;
+          updateStats(allUsers);
+          renderTable(filterUsers(allUsers));
+        } else {
+          tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color: var(--danger-text);">Lỗi: ${json.message || 'Không thể tải người dùng'}</td></tr>`;
+        }
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state" style="color: var(--danger-text);">Lỗi kết nối máy chủ API.</td></tr>';
+      }
+    }
+
+    function updateStats(users) {
+      document.getElementById('statTotalUsers').textContent = users.length;
+      document.getElementById('statTotalAdmins').textContent = users.filter(u => u.roles.some(r => r.toLowerCase() === 'admin')).length;
+      document.getElementById('statTotalOrganizers').textContent = users.filter(u => u.roles.some(r => r.toLowerCase() === 'organizer')).length;
+      document.getElementById('statTotalCustomers').textContent = users.filter(u => u.roles.some(r => r.toLowerCase() === 'customer')).length;
+    }
+
+    function handleFilterChange() {
+      const filtered = filterUsers(allUsers);
+      renderTable(filtered);
+    }
+
+    function filterUsers(users) {
+      const search = document.getElementById('searchInput').value.toLowerCase().trim();
+      const role = document.getElementById('roleFilter').value.toLowerCase();
+      const status = document.getElementById('statusFilter').value;
+
+      return users.filter(u => {
+        const matchesSearch = !search ||
+          (u.email && u.email.toLowerCase().includes(search)) ||
+          (u.username && u.username.toLowerCase().includes(search)) ||
+          (u.fullName && u.fullName.toLowerCase().includes(search));
+
+        const matchesRole = !role || u.roles.some(r => r.toLowerCase() === role);
+
+        const matchesStatus = !status ||
+          (status === 'active' && u.isActive) ||
+          (status === 'inactive' && !u.isActive);
+
+        return matchesSearch && matchesRole && matchesStatus;
+      });
+    }
+
+    function renderTable(users) {
+      const tbody = document.getElementById('userTableBody');
+      if (!users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Không tìm thấy người dùng nào phù hợp.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = users.map(u => {
+        const avatarLetter = (u.fullName || u.username || u.email).charAt(0).toUpperCase();
+        const roleBadges = u.roles.map(r => {
+          const rLower = r.toLowerCase();
+          return `<span class="role-badge ${rLower}">${escapeHtml(r)}</span>`;
+        }).join('');
+
+        const statusHtml = u.isActive
+          ? `<span class="status-badge active"><span class="status-dot"></span> Hoạt động</span>`
+          : `<span class="status-badge inactive"><span class="status-dot"></span> Đã khóa</span>`;
+
+        const lockBtn = u.isActive
+          ? `<button class="btn-action btn-lock" onclick="toggleUserStatus('${u.id}', false)">🔒 Khóa</button>`
+          : `<button class="btn-action btn-unlock" onclick="toggleUserStatus('${u.id}', true)">🔓 Mở khóa</button>`;
+
+        return `
+          <tr>
+            <td>
+              <div class="user-profile">
+                <div class="user-profile-avatar">${avatarLetter}</div>
+                <div class="user-profile-info">
+                  <span class="user-profile-name">${escapeHtml(u.fullName || u.username)}</span>
+                  <span class="user-profile-username">@${escapeHtml(u.username)}</span>
+                </div>
+              </div>
+            </td>
+            <td><strong>${escapeHtml(u.email)}</strong></td>
+            <td>${roleBadges || '<span style="color:var(--text-muted); font-size:12px;">Chưa có</span>'}</td>
+            <td>${statusHtml}</td>
+            <td><span style="font-weight:700; color:var(--primary);">${u.totalEvents}</span> sự kiện</td>
+            <td style="color:var(--text-muted); font-size:13px;">${formatDate(u.createdAt)}</td>
+            <td style="text-align: right;">
+              <div class="actions-cell" style="justify-content: flex-end;">
+                <button class="btn-action" onclick="openRoleModal('${u.id}')">🛡️ Phân quyền</button>
+                ${lockBtn}
+                <button class="btn-action btn-delete" style="color: #ef4444;" onclick="deleteUser('${u.id}')">🗑️ Xóa</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Modal Phân quyền
+    function openRoleModal(userId) {
+      const user = allUsers.find(u => u.id === userId);
+      if (!user) return;
+
+      document.getElementById('modalUserId').value = user.id;
+      document.getElementById('modalTargetUser').textContent = `${user.fullName || user.username} (${user.email})`;
+
+      const roles = user.roles.map(r => r.toLowerCase());
+      document.getElementById('chkCustomer').checked = roles.includes('customer');
+      document.getElementById('chkOrganizer').checked = roles.includes('organizer');
+      document.getElementById('chkAdmin').checked = roles.includes('admin');
+
+      updateRoleOptionStyles();
+
+      document.getElementById('roleModal').style.display = 'flex';
+    }
+
+    function closeRoleModal() {
+      document.getElementById('roleModal').style.display = 'none';
+    }
+
+    function updateRoleOptionStyles() {
+      ['Customer', 'Organizer', 'Admin'].forEach(r => {
+        const chk = document.getElementById('chk' + r);
+        const opt = document.getElementById('opt' + r);
+        if (chk && opt) {
+          if (chk.checked) opt.classList.add('checked');
+          else opt.classList.remove('checked');
+        }
+      });
+    }
+
+    document.querySelectorAll('.role-option input[type="checkbox"]').forEach(chk => {
+      chk.addEventListener('change', updateRoleOptionStyles);
+    });
+
+    async function handleSaveRoles(e) {
+      e.preventDefault();
+      const userId = document.getElementById('modalUserId').value;
+      const chkBoxes = document.querySelectorAll('input[name="roles"]:checked');
+      const selectedRoles = Array.from(chkBoxes).map(c => c.value);
+
+      if (selectedRoles.length === 0) {
+        alert('Người dùng phải có ít nhất 1 vai trò.');
+        return;
+      }
+
+      const btnSave = document.getElementById('btnSaveRole');
+      btnSave.disabled = true;
+      btnSave.textContent = '⌛ Đang lưu...';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/users/${userId}/roles`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ roles: selectedRoles })
+        });
+
+        const json = await res.json().catch(() => ({}));
+        if (res.ok) {
+          closeRoleModal();
+          showAlert('Đã cập nhật phân quyền thành công!', 'success');
+          loadUsers();
+        } else {
+          alert('Lỗi: ' + (json.message || 'Không thể cập nhật phân quyền.'));
+        }
+      } catch (err) {
+        alert('Lỗi kết nối máy chủ API.');
+      } finally {
+        btnSave.disabled = false;
+        btnSave.textContent = 'Lưu phân quyền';
+      }
+    }
+
+    async function toggleUserStatus(userId, newStatus) {
+      const user = allUsers.find(u => u.id === userId);
+      const actionName = newStatus ? 'kích hoạt' : 'khóa';
+      if (!confirm(`Bạn có chắc chắn muốn ${actionName} tài khoản "${user?.email || userId}"?`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/users/${userId}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ isActive: newStatus })
+        });
+
+        const json = await res.json().catch(() => ({}));
+        if (res.ok) {
+          showAlert(`Đã ${actionName} tài khoản thành công!`, 'success');
+          loadUsers();
+        } else {
+          showAlert(json.message || `Không thể ${actionName} tài khoản.`, 'danger');
+        }
+      } catch (err) {
+        showAlert('Lỗi kết nối máy chủ API.', 'danger');
+      }
+    }
+
+    async function deleteUser(userId) {
+      const user = allUsers.find(u => u.id === userId);
+      const displayName = user?.fullName || user?.username || user?.email || userId;
+      if (!confirm(`⚠️ BẠN CÓ CHẮC CHẮN MUỐN XÓA TÀI KHOẢN:\n"${displayName}"?\n\nThao tác này sẽ xóa vĩnh viễn tài khoản khỏi hệ thống!`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': 'Bearer ' + token
+          }
+        });
+
+        const json = await res.json().catch(() => ({}));
+        if (res.ok) {
+          showAlert('Đã xóa tài khoản thành công!', 'success');
+          loadUsers();
+        } else {
+          showAlert(json.message || 'Không thể xóa tài khoản này.', 'danger');
+        }
+      } catch (err) {
+        showAlert('Lỗi kết nối máy chủ API.', 'danger');
+      }
+    }
+
+    function showAlert(msg, type = 'success') {
+      const banner = document.getElementById('alertBanner');
+      if (!msg) {
+        banner.style.display = 'none';
+        return;
+      }
+      banner.className = `alert-banner ${type}`;
+      banner.textContent = msg;
+      banner.style.display = 'block';
+      setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function logout() {
+      localStorage.clear();
+      window.location.href = './login.html';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+name: CI Pipeline (.NET 9)
+
+on:
+  push:
+    branches: [ main, develop, "feature/**" ]
+  pull_request:
+    branches: [ main, develop, "feature/**" ]
+
+jobs:
+  ci-build-lint-test:
+    name: Build, Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore EventTicketBooking.sln
+
+      - name: Build Solution
+        run: dotnet build EventTicketBooking.sln --no-restore --configuration Release
+
+      - name: Check Code Formatting & Lint
+        run: dotnet format EventTicketBooking.sln --verify-no-changes --verbosity diagnostic
+
+      - name: Run Tests
+        run: dotnet test EventTicketBooking.sln --no-build --configuration Release --verbosity normal
