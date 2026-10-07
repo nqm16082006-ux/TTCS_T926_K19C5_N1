@@ -252,7 +252,8 @@ namespace EventTicketBooking.Tests
                     Assert.Equal(1, dto.SeatNumber);
                     Assert.Equal("A1", dto.SeatName);
                     Assert.Equal(ticket.TicketCode, dto.TicketCode);
-                    Assert.Equal(ticket.TicketCode, dto.QrPayload);
+                    Assert.NotNull(dto.QrPayload);
+                    Assert.Contains(ticket.TicketCode, dto.QrPayload);
                 }
             }
             finally

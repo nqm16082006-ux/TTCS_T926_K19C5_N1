@@ -290,7 +290,8 @@ namespace EventTicketBooking.Api.Controllers
                 return Ok(ApiResponse<List<TicketDto>>.SuccessResult(new List<TicketDto>(), "Đơn hàng chưa thanh toán. Không có vé nào."));
             }
 
-            // S-25: Đơn đã Paid -> Trả về danh sách vé (READ-ONLY tuyệt đối, không tự tạo missing tickets)
+            // S-25 & S-26: Đơn đã Paid -> Trả về danh sách vé kèm mã QR có chữ ký số (ECDSA P-256)
+            var showtimeId = order.ShowtimeId;
             var tickets = order.OrderItems
                 .Where(oi => oi.Ticket != null)
                 .Select(oi => new TicketDto
@@ -298,6 +299,7 @@ namespace EventTicketBooking.Api.Controllers
                     Id = oi.Ticket!.Id,
                     OrderItemId = oi.Id,
                     TicketCode = oi.Ticket.TicketCode,
+                    QrPayload = _ticketService.GenerateQrPayload(oi.Ticket.TicketCode, showtimeId),
                     EventTitle = order.Showtime?.Event?.Title,
                     EventLocation = order.Showtime?.Event?.Location,
                     ShowtimeStartTime = order.Showtime?.StartTime,

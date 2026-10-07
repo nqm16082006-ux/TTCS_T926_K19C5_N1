@@ -11,6 +11,12 @@ namespace EventTicketBooking.Api.Services.Implementations
     {
         // Bộ 32 ký tự alphanumeric loại bỏ các ký tự gây nhầm lẫn: 0/O, 1/I/L
         private static readonly char[] Base32Alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ".ToCharArray();
+        private readonly IQrSignatureService _qrSignatureService;
+
+        public TicketService(IQrSignatureService? qrSignatureService = null)
+        {
+            _qrSignatureService = qrSignatureService ?? new QrSignatureService();
+        }
 
         public string GenerateTicketCode()
         {
@@ -46,6 +52,11 @@ namespace EventTicketBooking.Api.Services.Implementations
             }
 
             return tickets;
+        }
+
+        public string GenerateQrPayload(string ticketCode, Guid showtimeId)
+        {
+            return _qrSignatureService.SignTicket(ticketCode, showtimeId);
         }
     }
 }
