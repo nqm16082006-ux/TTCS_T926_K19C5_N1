@@ -964,19 +964,19 @@
                   <span class="text-outline-variant font-code-mono">•</span>
                   <span class="font-headline-sm text-headline-sm text-outline font-semibold">${dt.dayName}, ${dt.date}</span>
                 </div>
-                <p class="font-body-sm text-body-sm text-outline">Toàn bộ chỗ đã được đặt</p>
+                <p class="font-body-sm text-body-sm text-outline">${isOnSale ? 'Hiện không còn ghế trống để chọn' : 'Suất diễn hiện không mở bán'}</p>
               </div>
               <span class="px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-semibold shrink-0">
-                Đã bán hết
+                ${isOnSale ? 'Hết ghế trống' : 'Đã đóng bán'}
               </span>
             </div>
             <div class="flex items-center justify-between pt-space-md mt-space-sm border-t border-surface-container-high/40">
               <div class="space-y-0.5">
                 <div class="font-label-sm text-label-sm text-outline">Tình trạng vé</div>
-                <div class="font-label-md text-label-md text-outline font-semibold">0 chỗ trống</div>
+                <div class="font-label-md text-label-md text-outline font-semibold"> ${available.toLocaleString('vi-VN')} chỗ trống</div>
               </div>
               <button disabled type="button" class="h-11 px-5 rounded-lg bg-surface-container-high text-outline cursor-not-allowed font-label-lg text-label-lg font-bold">
-                Hết vé
+                ${isOnSale ? 'Hết vé' : 'Không mở bán'}
               </button>
             </div>
           `;

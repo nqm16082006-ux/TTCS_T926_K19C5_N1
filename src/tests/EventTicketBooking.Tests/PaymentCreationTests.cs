@@ -347,7 +347,7 @@ namespace EventTicketBooking.Tests
                 SimulatedPaymentUrl = "https://pay.sandbox.vn/checkout-order"
             };
             var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance);
-            var controller = new PaymentsController(paymentService, NullLogger<PaymentsController>.Instance, _context);
+            var controller = new PaymentsController(paymentService, fakeGateway, NullLogger<PaymentsController>.Instance, _context);
 
             // Mock User Claims
             var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, _defaultUserId.ToString()) };

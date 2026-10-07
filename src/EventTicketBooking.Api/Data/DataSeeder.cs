@@ -23,9 +23,11 @@ namespace EventTicketBooking.Api.Data
             var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
             var logger = scope.ServiceProvider.GetService<ILogger<AppDbContext>>();
 
+            // Migration failures must stop startup rather than be swallowed as seed warnings.
+            await context.Database.MigrateAsync();
+
             try
             {
-                await context.Database.MigrateAsync();
 
                 if (context.Database.IsNpgsql())
                 {

@@ -104,36 +104,7 @@ namespace EventTicketBooking.Api.Controllers
             bool hasMore = rawList.Count > limit;
             var itemsToReturn = hasMore ? rawList.Take(limit).ToList() : rawList;
 
-            // Tính RemainingSeats cho tất cả showtime trong 1 query aggregate (tránh N+1)
-            var showtimeIds = itemsToReturn.Select(s => s.Id).ToList();
-
-            // Số ghế đang bị hold active (chưa hết hạn), group theo ShowtimeId
-            // Dùng join tường minh để tương thích cả PostgreSQL và InMemory test provider
-            var activeHeldCountByShowtime = await (
-                from sh in _context.SeatHold.AsNoTracking()
-                join seat in _context.Seats.AsNoTracking() on sh.SeatId equals seat.Id
-                where sh.Status == "ACTIVE" && sh.ExpiresAt > now && showtimeIds.Contains(seat.ShowtimeId)
-                group sh by seat.ShowtimeId into g
-                select new { ShowtimeId = g.Key, Count = g.Count() }
-            ).ToDictionaryAsync(x => x.ShowtimeId, x => x.Count);
-
-            // Số ghế đã bán (paid orders), group theo ShowtimeId
-            var paidSeatCountByShowtime = await (
-                from oi in _context.OrderItems.AsNoTracking()
-                join o in _context.Orders.AsNoTracking() on oi.OrderId equals o.Id
-                where o.Status == OrderStatus.Paid && showtimeIds.Contains(o.ShowtimeId)
-                group oi by o.ShowtimeId into g
-                select new { ShowtimeId = g.Key, Count = g.Count() }
-            ).ToDictionaryAsync(x => x.ShowtimeId, x => x.Count);
-
-            // Tổng số ghế thực tế trong DB theo showtime
-            var totalSeatCountByShowtime = await _context.Seats
-                .AsNoTracking()
-                .Where(s => showtimeIds.Contains(s.ShowtimeId))
-                .GroupBy(s => s.ShowtimeId)
-                .Select(g => new { ShowtimeId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.ShowtimeId, x => x.Count);
-
+            var remainingSeats = await GetRemainingSeatsAsync(itemsToReturn);
 
             var ownerIds = itemsToReturn.Where(s => s.Event != null).Select(s => s.Event.OwnerId).Distinct().ToList();
             var ownerNames = await _context.Users.AsNoTracking().Where(u => ownerIds.Contains(u.Id))
@@ -141,12 +112,7 @@ namespace EventTicketBooking.Api.Controllers
             var dtoList = itemsToReturn.Select(s =>
             {
                 int totalSeats = s.Event?.TotalSeats ?? 0;
-                int heldCount = activeHeldCountByShowtime.GetValueOrDefault(s.Id, 0);
-                int soldCount = paidSeatCountByShowtime.GetValueOrDefault(s.Id, 0);
-                int actualTotalSeats = totalSeatCountByShowtime.GetValueOrDefault(s.Id, 0);
-                // Nếu đã import ghế thì dùng số ghế thực tế; chưa import thì dùng totalSeats event
-                int baseSeatCount = actualTotalSeats > 0 ? actualTotalSeats : totalSeats;
-                int remaining = Math.Max(0, baseSeatCount - heldCount - soldCount);
+                int remaining = remainingSeats[s.Id];
 
                 return new PublicShowtimeDto
                 {
@@ -226,6 +192,7 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy sự kiện."));
             }
 
+            var remainingSeats = await GetRemainingSeatsAsync(ev.Showtimes.ToList());
             var showtimesList = ev.Showtimes
                 .OrderBy(s => s.StartTime)
                 .Select(s => new PublicShowtimeDto
@@ -241,6 +208,7 @@ namespace EventTicketBooking.Api.Controllers
                     EndTime = s.EndTime,
                     AvailableSeats = s.AvailableSeats,
                     TotalSeats = ev.TotalSeats,
+                    RemainingSeats = remainingSeats[s.Id],
                     Status = s.Status.ToString(),
                     MinPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Min(sc => sc.Price) ?? 0) : 0m,
                     MaxPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Max(sc => sc.Price) ?? 0) : 0m
@@ -297,6 +265,7 @@ namespace EventTicketBooking.Api.Controllers
 
             var ownerName = showtime.Event != null ? await _context.Users.AsNoTracking()
                 .Where(u => u.Id == showtime.Event.OwnerId).Select(u => u.FullName ?? u.Username).FirstOrDefaultAsync() : null;
+            var remainingSeats = await GetRemainingSeatsAsync(new List<Showtime> { showtime });
             var dto = new PublicShowtimeDto
             {
                 Id = showtime.Id,
@@ -310,12 +279,51 @@ namespace EventTicketBooking.Api.Controllers
                 EndTime = showtime.EndTime,
                 AvailableSeats = showtime.AvailableSeats,
                 TotalSeats = showtime.Event?.TotalSeats ?? 0,
+                RemainingSeats = remainingSeats[showtime.Id],
                 Status = showtime.Status.ToString(),
                 MinPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? (showtime.SeatCategories.Min(sc => sc.Price) ?? 0) : 0m,
                 MaxPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? (showtime.SeatCategories.Max(sc => sc.Price) ?? 0) : 0m
             };
 
             return Ok(ApiResponse<PublicShowtimeDto>.SuccessResult(dto, "Lấy thông tin chi tiết suất chiếu thành công."));
+        }
+
+        private async Task<Dictionary<Guid, int>> GetRemainingSeatsAsync(List<Showtime> showtimes)
+        {
+            var now = DateTime.UtcNow;
+            var showtimeIds = showtimes.Select(s => s.Id).ToList();
+            // Số ghế đang bị hold active (chưa hết hạn), group theo ShowtimeId
+            // Dùng join tường minh để tương thích cả PostgreSQL và InMemory test provider
+            var activeHeldCountByShowtime = await (
+                from sh in _context.SeatHold.AsNoTracking()
+                join seat in _context.Seats.AsNoTracking() on sh.SeatId equals seat.Id
+                where sh.Status == "ACTIVE" && sh.ExpiresAt > now && showtimeIds.Contains(seat.ShowtimeId)
+                group sh by seat.ShowtimeId into g
+                select new { ShowtimeId = g.Key, Count = g.Count() }
+            ).ToDictionaryAsync(x => x.ShowtimeId, x => x.Count);
+
+            // Số ghế đã bán (paid orders), group theo ShowtimeId
+            var paidSeatCountByShowtime = await (
+                from oi in _context.OrderItems.AsNoTracking()
+                join o in _context.Orders.AsNoTracking() on oi.OrderId equals o.Id
+                where o.Status == OrderStatus.Paid && showtimeIds.Contains(o.ShowtimeId)
+                group oi by o.ShowtimeId into g
+                select new { ShowtimeId = g.Key, Count = g.Count() }
+            ).ToDictionaryAsync(x => x.ShowtimeId, x => x.Count);
+
+            // Tổng số ghế thực tế trong DB theo showtime
+            var totalSeatCountByShowtime = await _context.Seats
+                .AsNoTracking()
+                .Where(s => showtimeIds.Contains(s.ShowtimeId))
+                .GroupBy(s => s.ShowtimeId)
+                .Select(g => new { ShowtimeId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.ShowtimeId, x => x.Count);
+
+
+            return showtimes.ToDictionary(s => s.Id, s => Math.Max(0,
+                (totalSeatCountByShowtime.GetValueOrDefault(s.Id, 0) is var actual && actual > 0 ? actual : s.Event?.TotalSeats ?? 0)
+                - activeHeldCountByShowtime.GetValueOrDefault(s.Id, 0)
+                - paidSeatCountByShowtime.GetValueOrDefault(s.Id, 0)));
         }
 
         #region Cursor Encoding/Decoding Helpers
