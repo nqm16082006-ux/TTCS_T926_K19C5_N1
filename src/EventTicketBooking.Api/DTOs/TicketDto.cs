@@ -11,7 +11,7 @@ namespace EventTicketBooking.Api.DTOs
         public Guid Id { get; set; }
         public Guid OrderItemId { get; set; }
         public string TicketCode { get; set; } = string.Empty;
-        
+
         /// <summary>
         /// Payload dùng để vẽ mã QR trên giao diện. Ở Story S-25 đúng bằng TicketCode.
         /// </summary>
