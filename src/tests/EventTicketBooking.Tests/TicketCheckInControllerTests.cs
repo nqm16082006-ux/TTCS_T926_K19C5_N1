@@ -67,13 +67,28 @@ namespace EventTicketBooking.Tests
         {
             // Arrange
             var ev = new Event { Id = Guid.NewGuid(), Title = "Today Event", Location = "Location" };
+            TimeZoneInfo vnTimeZone;
+            try
+            {
+                vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
+            }
+
+            var nowUtc = DateTime.UtcNow;
+            var nowVn = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, vnTimeZone);
+            var todayVnStartUtc = TimeZoneInfo.ConvertTimeToUtc(nowVn.Date, vnTimeZone);
+            var startTime = nowUtc.AddHours(-1) < todayVnStartUtc ? todayVnStartUtc.AddMinutes(1) : nowUtc.AddHours(-1);
+
             var showtime = new Showtime
             {
                 Id = Guid.NewGuid(),
                 EventId = ev.Id,
                 Event = ev,
-                StartTime = DateTime.UtcNow.AddHours(-1), // Đang diễn ra
-                EndTime = DateTime.UtcNow.AddHours(1)
+                StartTime = startTime,
+                EndTime = nowUtc.AddHours(1)
             };
 
             _context.Events.Add(ev);
