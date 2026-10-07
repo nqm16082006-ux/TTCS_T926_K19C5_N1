@@ -16,7 +16,9 @@ namespace EventTicketBooking.Api.Models
 
         public int AvailableSeats { get; set; }
 
-        public ShowtimeStatus Status { get; private set; } = ShowtimeStatus.Draft;
+		public int MaxTicketsPerUser { get; set; } = 4;
+
+		public ShowtimeStatus Status { get; private set; } = ShowtimeStatus.Draft;
 
         public Event Event { get; set; } = null!;
 
