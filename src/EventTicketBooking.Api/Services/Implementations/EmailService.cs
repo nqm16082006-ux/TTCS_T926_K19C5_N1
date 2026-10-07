@@ -90,6 +90,40 @@ public class EmailService : IEmailService
         await SendEmailInternalAsync(message, toEmail, $"Chào mừng thành viên mới ({registrationMethod})");
     }
 
+    /// <inheritdoc/>
+    public async Task SendTicketEmailAsync(string toEmail, string toName, string eventTitle, string location, string showtime, System.Collections.Generic.IEnumerable<string> seatNames, byte[] qrCodeBytes)
+    {
+        var settings = _configuration.GetSection("EmailSettings");
+
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(
+            settings["SenderName"] ?? "EventPulse Ticketing",
+            settings["SenderEmail"] ?? "noreply@eventticket.com"
+        ));
+        message.To.Add(new MailboxAddress(toName, toEmail));
+        message.Subject = $"🎫 Vé điện tử của bạn: {eventTitle}";
+
+        var builder = new BodyBuilder();
+
+        // Nhúng mã QR như là inline image (đính kèm nhưng hiển thị trực tiếp trong HTML)
+        var qrImage = builder.LinkedResources.Add("ticket-qr.png", qrCodeBytes);
+        qrImage.ContentId = "ticket-qr-code";
+
+        string seatsText = string.Join(", ", seatNames);
+
+        builder.HtmlBody = BuildTicketEmailBody(
+            System.Net.WebUtility.HtmlEncode(toName),
+            System.Net.WebUtility.HtmlEncode(eventTitle),
+            System.Net.WebUtility.HtmlEncode(location),
+            System.Net.WebUtility.HtmlEncode(showtime),
+            System.Net.WebUtility.HtmlEncode(seatsText)
+        );
+
+        message.Body = builder.ToMessageBody();
+
+        await SendEmailInternalAsync(message, toEmail, $"Vé sự kiện: {eventTitle}");
+    }
+
     private async Task SendEmailInternalAsync(MimeMessage message, string toEmail, string logDetail)
     {
         var settings = _configuration.GetSection("EmailSettings");
@@ -335,6 +369,85 @@ public class EmailService : IEmailService
                           Khám Phá Sự Kiện Ngay →
                         </a>
                       </div>
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f8fafc; padding: 20px 24px; text-align: center; border-top: 1px solid #f1f5f9;">
+                      <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+                        © 2026 EventPulse System. Hỗ trợ khách hàng: 1900 8899 | support@eventticket.com
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        """;
+
+    // ─── Template email Vé điện tử ──────────────────────────────────────────
+    private string BuildTicketEmailBody(string name, string eventTitle, string location, string showtime, string seats) => $"""
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="UTF-8"/>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center">
+                <table width="100%" style="max-width: 560px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+                  <!-- Header -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #3525cd 0%, #712ae2 100%); padding: 32px 24px; text-align: center;">
+                      <div style="font-size: 36px; line-height: 1;">🎫</div>
+                      <h1 style="color: #ffffff; margin: 8px 0 0 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">
+                        Vé Điện Tử Sự Kiện
+                      </h1>
+                      <p style="color: #e0e7ff; margin: 4px 0 0 0; font-size: 14px;">EventPulse Ticketing</p>
+                    </td>
+                  </tr>
+
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding: 32px 28px;">
+                      <p style="font-size: 16px; color: #1e293b; margin: 0 0 20px 0;">Xin chào <strong>{name}</strong>,</p>
+                      <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 20px 0;">
+                        Cảm ơn bạn đã đặt vé. Vui lòng lưu lại mã QR này và xuất trình tại cổng check-in sự kiện.
+                      </p>
+
+                      <!-- Ticket Info Card -->
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 0 0 24px 0;">
+                        <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #0f172a;">{eventTitle}</h2>
+                        <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13px; color: #475569;">
+                          <tr>
+                            <td width="30%" style="font-weight: 700; border-bottom: 1px solid #e2e8f0;">📍 Địa điểm:</td>
+                            <td style="border-bottom: 1px solid #e2e8f0;">{location}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700; border-bottom: 1px solid #e2e8f0;">⏰ Thời gian:</td>
+                            <td style="border-bottom: 1px solid #e2e8f0;">{showtime}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700;">💺 Số ghế:</td>
+                            <td><strong style="color: #3525cd;">{seats}</strong></td>
+                          </tr>
+                        </table>
+                      </div>
+
+                      <!-- QR Code Section -->
+                      <div style="text-align: center; margin: 0 0 20px 0; padding: 20px; border: 2px dashed #cbd5e1; border-radius: 12px;">
+                        <span style="display: block; font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 12px;">Mã QR Check-in</span>
+                        <img src="cid:ticket-qr-code" alt="QR Code" style="width: 200px; height: 200px; max-width: 100%;" />
+                      </div>
+
+                      <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; margin: 0;">
+                        * Vui lòng không chia sẻ mã QR này lên mạng xã hội để tránh bị người khác sử dụng.
+                      </p>
                     </td>
                   </tr>
 
