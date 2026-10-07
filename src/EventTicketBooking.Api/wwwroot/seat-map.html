@@ -623,7 +623,8 @@
           const user = JSON.parse(userStr);
           const roles = (user.roles || []).map(r => (r || '').toLowerCase());
           const isAdmin = roles.includes('admin');
-          const isOrganizer = roles.includes('organizer') || roles.includes('staff');
+          const isStaff = roles.includes('staff');
+          const isOrganizer = roles.includes('organizer');
 
           let portalLink = '';
           if (isAdmin) {

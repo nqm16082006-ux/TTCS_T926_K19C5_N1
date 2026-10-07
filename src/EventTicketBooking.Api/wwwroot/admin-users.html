@@ -966,7 +966,9 @@
           const isAdmin = roles.includes('admin');
           if (!isAdmin) {
             alert('Bạn không có quyền truy cập trang Quản trị Người dùng (Chỉ dành riêng cho Admin).');
-            if (roles.includes('organizer') || roles.includes('staff')) {
+            if (roles.includes('staff')) {
+              window.location.href = './staff-scanner.html';
+            } else if (roles.includes('organizer')) {
               window.location.href = './events.html';
             } else {
               window.location.href = './public-events.html';
