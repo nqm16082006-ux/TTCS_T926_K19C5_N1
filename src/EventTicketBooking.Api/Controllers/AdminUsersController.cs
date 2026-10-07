@@ -28,10 +28,110 @@ namespace EventTicketBooking.Api.Controllers
     public class AdminUsersController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly Services.Interfaces.IPasswordHasher _passwordHasher;
 
-        public AdminUsersController(AppDbContext context)
+        public AdminUsersController(AppDbContext context, Services.Interfaces.IPasswordHasher passwordHasher)
         {
             _context = context;
+            _passwordHasher = passwordHasher;
+        }
+
+        /// <summary>
+        /// Tạo tài khoản nhân viên mới và gán vai trò (S-28).
+        /// Password được băm bằng Argon2id ở Backend và không bao giờ được trả về trong response.
+        /// POST /api/admin/users
+        /// </summary>
+        [HttpPost]
+        [ProducesResponseType(typeof(ApiResponse<AdminUserResponseDto>), StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> CreateUser([FromBody] CreateAdminUserDto dto)
+        {
+            var username = dto.Username?.Trim() ?? string.Empty;
+            var email = dto.Email?.Trim() ?? string.Empty;
+
+            if (username.Length == 0 || username.Length > 50)
+                return BadRequest(ApiResponse<object>.FailureResult("Tên đăng nhập là bắt buộc và tối đa 50 ký tự."));
+            if (email.Length == 0 || !email.Contains('@'))
+                return BadRequest(ApiResponse<object>.FailureResult("Email không hợp lệ."));
+            if (string.IsNullOrWhiteSpace(dto.Password) || dto.Password.Length < 8)
+                return BadRequest(ApiResponse<object>.FailureResult("Mật khẩu phải có ít nhất 8 ký tự."));
+            if (dto.Roles == null || dto.Roles.Count == 0 || dto.Roles.Any(string.IsNullOrWhiteSpace))
+                return BadRequest(ApiResponse<object>.FailureResult("Tài khoản nhân viên phải có ít nhất một vai trò."));
+
+            if (await _context.Users.AnyAsync(u => u.Username == username))
+                return BadRequest(ApiResponse<object>.FailureResult("Tên đăng nhập đã tồn tại."));
+            if (await _context.Users.AnyAsync(u => u.Email == email))
+                return BadRequest(ApiResponse<object>.FailureResult("Email đã tồn tại."));
+
+            var requestedRoleNames = dto.Roles.Select(r => r.Trim()).Distinct().ToList();
+            var matchedRoles = await _context.Roles
+                .Where(r => requestedRoleNames.Contains(r.Name))
+                .ToListAsync();
+
+            if (matchedRoles.Count != requestedRoleNames.Count)
+            {
+                var invalidNames = requestedRoleNames.Except(matchedRoles.Select(r => r.Name)).ToList();
+                return BadRequest(ApiResponse<object>.FailureResult($"Các vai trò không tồn tại trong hệ thống: {string.Join(", ", invalidNames)}"));
+            }
+
+            // Tài khoản do Admin tạo: kích hoạt ngay để nhân viên đăng nhập được (không cần OTP).
+            var user = new User
+            {
+                Id = Guid.NewGuid(),
+                Username = username,
+                Email = email,
+                PasswordHash = _passwordHasher.Hash(dto.Password),
+                FullName = string.IsNullOrWhiteSpace(dto.FullName) ? null : dto.FullName.Trim(),
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            _context.Users.Add(user);
+
+            foreach (var role in matchedRoles)
+            {
+                _context.UserRoles.Add(new UserRole
+                {
+                    UserId = user.Id,
+                    RoleId = role.Id,
+                    AssignedAt = DateTime.UtcNow
+                });
+            }
+
+            // Ghi audit cho việc gán role ban đầu khi tạo tài khoản (S-28).
+            var actorId = GetCurrentUserId();
+            if (!actorId.HasValue)
+            {
+                return Unauthorized(ApiResponse<object>.FailureResult("Không xác định được danh tính người thao tác."));
+            }
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                ActorUserId = actorId.Value,
+                ActorUsername = await GetActorUsernameAsync(actorId.Value),
+                TargetUserId = user.Id,
+                OldRoles = string.Empty,
+                NewRoles = string.Join(",", matchedRoles.Select(r => r.Name).OrderBy(n => n)),
+                Action = "ROLE_CHANGED",
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+
+            var responseDto = new AdminUserResponseDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                FullName = user.FullName,
+                IsActive = user.IsActive,
+                CreatedAt = user.CreatedAt,
+                Roles = matchedRoles.Select(r => r.Name).OrderBy(n => n).ToList(),
+                TotalEvents = 0
+            };
+
+            return CreatedAtAction(nameof(GetUsers), new { id = user.Id },
+                ApiResponse<AdminUserResponseDto>.SuccessResult(responseDto, "Tạo tài khoản nhân viên thành công."));
         }
 
         /// <summary>
@@ -129,8 +229,14 @@ namespace EventTicketBooking.Api.Controllers
 
             var currentUserId = GetCurrentUserId();
 
+            // S-28: Actor phải lấy từ identity đã xác thực; không nhận actor từ body request.
+            if (!currentUserId.HasValue)
+            {
+                return Unauthorized(ApiResponse<object>.FailureResult("Không xác định được danh tính người thao tác."));
+            }
+
             // Bảo vệ an toàn: Admin không được tự xóa quyền Admin của chính mình
-            if (currentUserId.HasValue && currentUserId.Value == id)
+            if (currentUserId.Value == id)
             {
                 var hasAdmin = dto.Roles.Any(r => string.Equals(r, "Admin", StringComparison.OrdinalIgnoreCase));
                 if (!hasAdmin)
@@ -138,6 +244,9 @@ namespace EventTicketBooking.Api.Controllers
                     return BadRequest(ApiResponse<object>.FailureResult("Bạn không thể tự gỡ quyền Admin của chính tài khoản đang đăng nhập."));
                 }
             }
+
+            // Vai trò cũ trước khi thay đổi (dùng cho Audit Log S-28).
+            var oldRoleNames = user.UserRoles.Select(ur => ur.Role.Name).OrderBy(n => n).ToList();
 
             // Lấy các vai trò hợp lệ trong DB
             var requestedRoleNames = dto.Roles.Select(r => r.Trim()).Distinct().ToList();
@@ -166,6 +275,18 @@ namespace EventTicketBooking.Api.Controllers
                     AssignedAt = DateTime.UtcNow
                 });
             }
+
+            // S-28: Ghi Audit Log cho mọi thay đổi role (Actor lấy từ identity đã xác thực).
+            _context.AuditLogs.Add(new AuditLog
+            {
+                ActorUserId = currentUserId.Value,
+                ActorUsername = await GetActorUsernameAsync(currentUserId.Value),
+                TargetUserId = user.Id,
+                OldRoles = string.Join(",", oldRoleNames),
+                NewRoles = string.Join(",", matchedRoles.Select(r => r.Name).OrderBy(n => n)),
+                Action = "ROLE_CHANGED",
+                CreatedAt = DateTime.UtcNow
+            });
 
             await _context.SaveChangesAsync();
 
@@ -291,6 +412,18 @@ namespace EventTicketBooking.Api.Controllers
                 return userId;
             }
             return null;
+        }
+
+        /// <summary>
+        /// Lấy username của Actor (từ CSDL) để lưu snapshot vào Audit Log.
+        /// </summary>
+        private async Task<string> GetActorUsernameAsync(Guid actorId)
+        {
+            return await _context.Users
+                .AsNoTracking()
+                .Where(u => u.Id == actorId)
+                .Select(u => u.Username)
+                .FirstOrDefaultAsync() ?? string.Empty;
         }
     }
 }
