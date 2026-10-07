@@ -21,15 +21,18 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly AppDbContext _context;
         private readonly IPaymentGateway _paymentGateway;
         private readonly ILogger<PaymentService> _logger;
+        private readonly EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue _ticketEmailQueue;
 
         public PaymentService(
             AppDbContext context,
             IPaymentGateway paymentGateway,
-            ILogger<PaymentService> logger)
+            ILogger<PaymentService> logger,
+            EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue ticketEmailQueue)
         {
             _context = context;
             _paymentGateway = paymentGateway;
             _logger = logger;
+            _ticketEmailQueue = ticketEmailQueue;
         }
 
         public async Task<PaymentCreationResult> CreatePaymentForOrderAsync(Guid orderId, Guid userId, CancellationToken cancellationToken = default)
@@ -491,6 +494,16 @@ namespace EventTicketBooking.Api.Services.Implementations
                 if (dbTransaction != null)
                 {
                     await dbTransaction.CommitAsync(cancellationToken);
+                }
+
+                // Gửi email vé cho khách hàng (không làm chặn luồng thanh toán)
+                try
+                {
+                    await _ticketEmailQueue.EnqueueAsync(order.Id, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi khi đẩy job gửi vé email vào queue cho đơn hàng {OrderId}.", order.Id);
                 }
 
                 _logger.LogInformation("Giao dịch thanh toán thành công cho đơn hàng {OrderId}. Số ghế đã bán: {SeatsCount}, Giữ chỗ đã chuyển đổi: {HoldsCount}.",

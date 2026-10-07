@@ -157,6 +157,10 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IExpiredOrderCleanupService, EventTicketBooking.Api.Services.Implementations.ExpiredOrderCleanupService>();
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.ExpiredOrderCleanupWorker>();
 
+// S-27 Task 2: Background queue & worker for ticket emails
+builder.Services.AddSingleton<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue, EventTicketBooking.Api.BackgroundServices.TicketEmailQueue>();
+builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.TicketEmailWorker>();
+
 //T-27 Job nền quét và nhả ghế quá hạn, chạy lặp lại được
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.SeatHoldCleanupWorker>();
 

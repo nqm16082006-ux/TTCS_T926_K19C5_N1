@@ -28,6 +28,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<UserRole> UserRoles { get; set; } = null!;
         public DbSet<AuditLog> AuditLogs { get; set; } = null!;
+        public DbSet<EmailFailureLog> EmailFailureLogs { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -300,6 +301,19 @@ namespace EventTicketBooking.Api.Data
                 entity.HasIndex(pe => pe.TransactionId)
                       .IsUnique()
                       .HasDatabaseName("IX_payment_events_TransactionId_Unique");
+            });
+
+            // Cấu hình bảng EmailFailureLogs (Task S-27)
+            modelBuilder.Entity<EmailFailureLog>(entity =>
+            {
+                entity.ToTable("EmailFailureLogs");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.TargetEmail).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.ErrorMessage).IsRequired();
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.Attempts).IsRequired().HasDefaultValue(0);
+                entity.Property(e => e.Resolved).HasDefaultValue(false);
+                entity.HasIndex(e => e.OrderId);
             });
         }
     }
