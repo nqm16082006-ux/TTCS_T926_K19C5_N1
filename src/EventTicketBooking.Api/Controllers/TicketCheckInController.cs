@@ -8,11 +8,13 @@ using Microsoft.AspNetCore.Http;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.Models;
 
+using EventTicketBooking.Api.Middlewares;
+
 namespace EventTicketBooking.Api.Controllers
 {
     [ApiController]
     [Route("api/v1/checkin")]
-    [Authorize] // Yêu cầu đăng nhập. Thực tế có thể đổi thành [RequireRole] như dự án đang có.
+    [RequireRole("Admin", "Staff")]
     public class TicketCheckInController : ControllerBase
     {
         private readonly AppDbContext _context;
