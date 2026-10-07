@@ -193,6 +193,11 @@
     /* Page Header */
     .page-header {
       margin-bottom: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
     }
 
     .page-title {
@@ -719,8 +724,11 @@
     <div id="alertBanner" class="alert-banner"></div>
 
     <div class="page-header">
-      <h1 class="page-title">👥 Quản Trị Người Dùng & Phân Quyền</h1>
-      <p class="page-subtitle">Xem toàn bộ tài khoản, thay đổi quyền hạn (Customer, Organizer, Admin) và quản lý trạng thái kích hoạt.</p>
+      <div>
+        <h1 class="page-title">👥 Quản Trị Người Dùng & Phân Quyền</h1>
+        <p class="page-subtitle">Xem toàn bộ tài khoản, tạo tài khoản nhân viên, thay đổi vai trò (Staff, Auditor, Organizer, Admin, Customer) và quản lý trạng thái kích hoạt.</p>
+      </div>
+      <button class="btn-modal-save" onclick="openCreateModal()" style="height: fit-content;">＋ Tạo tài khoản nhân viên</button>
     </div>
 
     <!-- Stats -->
@@ -766,6 +774,8 @@
           <option value="">-- Tất cả vai trò --</option>
           <option value="Admin">Admin</option>
           <option value="Organizer">Organizer</option>
+          <option value="Staff">Staff (Soát vé)</option>
+          <option value="Auditor">Auditor (Kế toán)</option>
           <option value="Customer">Customer</option>
         </select>
         <select id="statusFilter" class="select-filter" onchange="handleFilterChange()">
@@ -822,6 +832,22 @@
           </div>
         </label>
 
+        <label class="role-option" id="optStaff">
+          <input type="checkbox" name="roles" value="Staff" id="chkStaff">
+          <div class="role-option-info">
+            <span class="role-option-title">Staff</span>
+            <span class="role-option-desc">Nhân viên soát vé: vận hành sự kiện và kiểm tra vé.</span>
+          </div>
+        </label>
+
+        <label class="role-option" id="optAuditor">
+          <input type="checkbox" name="roles" value="Auditor" id="chkAuditor">
+          <div class="role-option-info">
+            <span class="role-option-title">Auditor</span>
+            <span class="role-option-desc">Kế toán / kiểm toán: theo dõi doanh thu và đối soát.</span>
+          </div>
+        </label>
+
         <label class="role-option" id="optOrganizer">
           <input type="checkbox" name="roles" value="Organizer" id="chkOrganizer">
           <div class="role-option-info">
@@ -841,6 +867,76 @@
         <div class="modal-actions">
           <button type="button" class="btn-modal-cancel" onclick="closeRoleModal()">Hủy</button>
           <button type="submit" class="btn-modal-save" id="btnSaveRole">Lưu phân quyền</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Tạo tài khoản nhân viên (S-28) -->
+  <div class="modal-overlay" id="createModal" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">＋ Tạo tài khoản nhân viên</h3>
+        <button class="modal-close" onclick="closeCreateModal()">✕</button>
+      </div>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">
+        Tạo tài khoản cho nhân viên và gán vai trò ngay khi tạo. Mật khẩu được băm ở máy chủ.
+      </p>
+
+      <form id="createUserForm" onsubmit="handleCreateUser(event)">
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <label style="font-size: 13px; font-weight: 600;">Tên đăng nhập *
+            <input type="text" id="createUsername" required maxlength="50" placeholder="vd: nhanvien01"
+              style="margin-top: 5px; width: 100%; padding: 10px 12px; border: 1px solid var(--border-color, #d1d5db); border-radius: 10px; font-size: 14px;">
+          </label>
+          <label style="font-size: 13px; font-weight: 600;">Email *
+            <input type="email" id="createEmail" required maxlength="100" placeholder="vd: nhanvien01@eventticket.com"
+              style="margin-top: 5px; width: 100%; padding: 10px 12px; border: 1px solid var(--border-color, #d1d5db); border-radius: 10px; font-size: 14px;">
+          </label>
+          <label style="font-size: 13px; font-weight: 600;">Họ và tên
+            <input type="text" id="createFullName" maxlength="100" placeholder="Tên hiển thị"
+              style="margin-top: 5px; width: 100%; padding: 10px 12px; border: 1px solid var(--border-color, #d1d5db); border-radius: 10px; font-size: 14px;">
+          </label>
+          <label style="font-size: 13px; font-weight: 600;">Mật khẩu * <span style="font-weight: 400; color: var(--text-muted);">(tối thiểu 8 ký tự)</span>
+            <input type="password" id="createPassword" required minlength="8" autocomplete="new-password"
+              style="margin-top: 5px; width: 100%; padding: 10px 12px; border: 1px solid var(--border-color, #d1d5db); border-radius: 10px; font-size: 14px;">
+          </label>
+        </div>
+
+        <p style="font-size: 13px; font-weight: 700; margin: 18px 0 10px;">Vai trò nhân viên *</p>
+
+        <label class="role-option" id="optCreateStaff">
+          <input type="checkbox" name="createRoles" value="Staff" id="chkCreateStaff">
+          <div class="role-option-info">
+            <span class="role-option-title">Staff</span>
+            <span class="role-option-desc">Nhân viên soát vé.</span>
+          </div>
+        </label>
+        <label class="role-option" id="optCreateAuditor">
+          <input type="checkbox" name="createRoles" value="Auditor" id="chkCreateAuditor">
+          <div class="role-option-info">
+            <span class="role-option-title">Auditor</span>
+            <span class="role-option-desc">Kế toán.</span>
+          </div>
+        </label>
+        <label class="role-option" id="optCreateOrganizer">
+          <input type="checkbox" name="createRoles" value="Organizer" id="chkCreateOrganizer">
+          <div class="role-option-info">
+            <span class="role-option-title">Organizer</span>
+            <span class="role-option-desc">Ban tổ chức.</span>
+          </div>
+        </label>
+        <label class="role-option" id="optCreateAdmin">
+          <input type="checkbox" name="createRoles" value="Admin" id="chkCreateAdmin">
+          <div class="role-option-info">
+            <span class="role-option-title">Admin</span>
+            <span class="role-option-desc">Quản trị viên.</span>
+          </div>
+        </label>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-modal-cancel" onclick="closeCreateModal()">Hủy</button>
+          <button type="submit" class="btn-modal-save" id="btnCreateUser">Tạo tài khoản</button>
         </div>
       </form>
     </div>
@@ -1012,6 +1108,8 @@
       const roles = user.roles.map(r => r.toLowerCase());
       document.getElementById('chkCustomer').checked = roles.includes('customer');
       document.getElementById('chkOrganizer').checked = roles.includes('organizer');
+      document.getElementById('chkStaff').checked = roles.includes('staff');
+      document.getElementById('chkAuditor').checked = roles.includes('auditor');
       document.getElementById('chkAdmin').checked = roles.includes('admin');
 
       updateRoleOptionStyles();
@@ -1024,13 +1122,12 @@
     }
 
     function updateRoleOptionStyles() {
-      ['Customer', 'Organizer', 'Admin'].forEach(r => {
-        const chk = document.getElementById('chk' + r);
-        const opt = document.getElementById('opt' + r);
-        if (chk && opt) {
-          if (chk.checked) opt.classList.add('checked');
-          else opt.classList.remove('checked');
-        }
+      // Áp dụng chung cho mọi modal phân quyền (role modal & create modal).
+      document.querySelectorAll('.role-option').forEach(opt => {
+        const chk = opt.querySelector('input[type="checkbox"]');
+        if (!chk) return;
+        if (chk.checked) opt.classList.add('checked');
+        else opt.classList.remove('checked');
       });
     }
 
@@ -1076,6 +1173,69 @@
       } finally {
         btnSave.disabled = false;
         btnSave.textContent = 'Lưu phân quyền';
+      }
+    }
+
+    // Modal Tạo tài khoản nhân viên (S-28)
+    function openCreateModal() {
+      document.getElementById('createUserForm').reset();
+      ['chkCreateStaff', 'chkCreateAuditor', 'chkCreateOrganizer', 'chkCreateAdmin'].forEach(id => {
+        document.getElementById(id).checked = false;
+      });
+      updateRoleOptionStyles();
+      document.getElementById('createModal').style.display = 'flex';
+    }
+
+    function closeCreateModal() {
+      document.getElementById('createModal').style.display = 'none';
+    }
+
+    async function handleCreateUser(e) {
+      e.preventDefault();
+
+      const selectedRoles = Array.from(document.querySelectorAll('input[name="createRoles"]:checked'))
+        .map(c => c.value);
+
+      if (selectedRoles.length === 0) {
+        alert('Bạn phải chọn ít nhất 1 vai trò cho nhân viên.');
+        return;
+      }
+
+      const payload = {
+        username: document.getElementById('createUsername').value.trim(),
+        email: document.getElementById('createEmail').value.trim(),
+        fullName: document.getElementById('createFullName').value.trim() || null,
+        password: document.getElementById('createPassword').value,
+        roles: selectedRoles
+      };
+
+      const btn = document.getElementById('btnCreateUser');
+      btn.disabled = true;
+      btn.textContent = '⌛ Đang tạo...';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/users`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const json = await res.json().catch(() => ({}));
+        if (res.ok) {
+          closeCreateModal();
+          showAlert('Tạo tài khoản nhân viên thành công!', 'success');
+          loadUsers();
+        } else {
+          alert('Lỗi: ' + (json.message || 'Không thể tạo tài khoản nhân viên.'));
+        }
+      } catch (err) {
+        alert('Lỗi kết nối máy chủ API.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Tạo tài khoản';
       }
     }
 

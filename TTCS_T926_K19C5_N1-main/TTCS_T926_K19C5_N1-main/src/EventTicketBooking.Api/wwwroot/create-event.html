@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html class="h-full" lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <meta content="web_dashboard" name="shell-type">
+  <title>Tạo sự kiện mới - EventPulse Ban Tổ Chức</title>
+  
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+
+  <style>
+    @layer base {
+      html, body { margin: 0; padding: 0; }
+      body { overscroll-behavior: none; }
+      main > :first-child { margin-top: 0 !important; }
+      main > :last-child { margin-bottom: 0 !important; }
+    }
+    ::-webkit-scrollbar { display: none; }
+    [contenteditable]:empty:before {
+      content: attr(data-placeholder);
+      color: #94a3b8;
+    }
+  </style>
+
+  <!-- Tailwind CSS Configuration matching events.html & template -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-container-highest": "#dae2fd",
+            "on-tertiary": "#ffffff",
+            "on-primary-container": "#dad7ff",
+            "tertiary-fixed": "#89f5e7",
+            "on-primary": "#ffffff",
+            "on-secondary": "#ffffff",
+            "secondary-fixed": "#eaddff",
+            "tertiary-container": "#006c63",
+            "surface-container": "#eaedff",
+            "outline": "#777587",
+            "inverse-surface": "#283044",
+            "on-tertiary-fixed-variant": "#005049",
+            "secondary-container": "#8a4cfc",
+            "on-error-container": "#93000a",
+            "primary-fixed": "#e2dfff",
+            "primary": "#3525cd",
+            "on-primary-fixed-variant": "#3323cc",
+            "on-tertiary-fixed": "#00201d",
+            "surface-container-high": "#e2e7ff",
+            "outline-variant": "#c7c4d8",
+            "inverse-primary": "#c3c0ff",
+            "surface-dim": "#d2d9f4",
+            "secondary-fixed-dim": "#d2bbff",
+            "on-secondary-container": "#fffbff",
+            "surface-bright": "#faf8ff",
+            "tertiary": "#00524b",
+            "surface-variant": "#dae2fd",
+            "primary-fixed-dim": "#c3c0ff",
+            "secondary": "#712ae2",
+            "surface-container-lowest": "#ffffff",
+            "on-tertiary-container": "#81eddf",
+            "error-container": "#ffdad6",
+            "on-surface": "#131b2e",
+            "on-primary-fixed": "#0f0069",
+            "surface-container-low": "#f2f3ff",
+            "on-error": "#ffffff",
+            "background": "#faf8ff",
+            "surface": "#faf8ff",
+            "surface-tint": "#4d44e3",
+            "tertiary-fixed-dim": "#6bd8cb",
+            "on-surface-variant": "#464555",
+            "on-secondary-fixed": "#25005a",
+            "on-background": "#131b2e",
+            "error": "#ba1a1a",
+            "on-secondary-fixed-variant": "#5a00c6",
+            "primary-container": "#4f46e5",
+            "inverse-on-surface": "#eef0ff"
+          },
+          borderRadius: {
+            DEFAULT: "0.25rem",
+            lg: "0.5rem",
+            xl: "0.75rem",
+            full: "9999px"
+          },
+          spacing: {
+            "margin-lg": "2.5rem",
+            gutter: "1.5rem",
+            "space-xl": "2rem",
+            margin: "1.5rem",
+            "space-xs": "0.25rem",
+            "space-sm": "0.5rem",
+            "space-2xl": "3rem",
+            "gutter-sm": "0.75rem",
+            "space-lg": "1.5rem",
+            "margin-sm": "1rem",
+            "gutter-lg": "2rem",
+            "space-md": "1rem"
+          },
+          fontFamily: {
+            "display-lg-mobile": ["Plus Jakarta Sans"],
+            "label-lg": ["Plus Jakarta Sans"],
+            "headline-lg": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"],
+            "label-md": ["Plus Jakarta Sans"],
+            "headline-xl-mobile": ["Plus Jakarta Sans"],
+            "display-lg": ["Plus Jakarta Sans"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "headline-md": ["Plus Jakarta Sans"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "headline-sm": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "headline-xl": ["Plus Jakarta Sans"],
+            "code-mono": ["JetBrains Mono"]
+          },
+          fontSize: {
+            "display-lg-mobile": ["30px", { lineHeight: "38px", letterSpacing: "-0.02em", fontWeight: "800" }],
+            "label-lg": ["14px", { lineHeight: "20px", fontWeight: "600" }],
+            "headline-lg": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "700" }],
+            "body-md": ["14px", { lineHeight: "22px", fontWeight: "400" }],
+            "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.01em", fontWeight: "600" }],
+            "headline-xl-mobile": ["24px", { lineHeight: "32px", letterSpacing: "-0.015em", fontWeight: "700" }],
+            "display-lg": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "800" }],
+            "body-sm": ["12px", { lineHeight: "18px", fontWeight: "400" }],
+            "headline-md": ["20px", { lineHeight: "28px", letterSpacing: "-0.005em", fontWeight: "600" }],
+            "label-sm": ["11px", { lineHeight: "14px", letterSpacing: "0.02em", fontWeight: "600" }],
+            "headline-sm": ["16px", { lineHeight: "24px", fontWeight: "600" }],
+            "body-lg": ["16px", { lineHeight: "26px", fontWeight: "400" }],
+            "headline-xl": ["32px", { lineHeight: "40px", letterSpacing: "-0.015em", fontWeight: "700" }],
+            "code-mono": ["13px", { lineHeight: "18px", fontWeight: "500" }]
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-background font-body-md text-on-surface antialiased">
+
+  <!-- Sidebar Navigation matching template -->
+  <aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-low shadow-[1px_0_8px_rgba(0,0,0,0.03)] z-50 flex flex-col justify-between overflow-y-auto">
+    <div class="flex flex-col">
+      <!-- Logo Header -->
+      <div class="h-16 px-space-md flex items-center justify-between bg-surface-container-low">
+        <a href="./public-events.html" class="flex items-center gap-space-sm">
+          <img alt="EventPulse Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WTV6ECUtEUhk0z2OhrYrHSztCKcv9GeCNfmcT273KDmrGfvnfNjO-uFn7ATWOsV48K8VSD8RgaP6nA7UlHLZRqTI0Wp1hsKNBB2hCGvimywycHDhMKaCFgxRaIhinj6vXjrz4KX-RWUcFVmjpPY8KdEXLAiptD9n7k51M75Sc6w1aBY7AIYj55cuIhMogpGjtAb-tv4r8Mg5sBZlRk4SsC6WzXyCEM8aHQAZ3bI3WnX8ogB38-mTpVIKT9">
+          <div class="flex flex-col">
+            <span class="font-headline-sm text-headline-sm text-primary leading-tight">EventPulse</span>
+            <span class="font-label-sm text-label-sm text-secondary tracking-wider uppercase">Ban Tổ Chức</span>
+          </div>
+        </a>
+      </div>
+
+      <!-- Unit Information Card -->
+      <div class="px-space-md py-space-sm">
+        <div class="p-2.5 rounded-lg bg-surface-container flex items-center justify-between">
+          <div class="flex items-center gap-space-xs">
+            <span class="material-symbols-outlined text-[18px] text-primary">domain</span>
+            <div class="flex flex-col">
+              <span class="font-label-sm text-label-sm text-outline">Đơn vị quản trị</span>
+              <span class="font-label-md text-label-md text-on-surface truncate max-w-[130px]" id="sidebarOrgName">Event Organizer</span>
+            </div>
+          </div>
+          <span class="material-symbols-outlined text-[18px] text-outline">unfold_more</span>
+        </div>
+      </div>
+
+      <!-- Management Navigation Items -->
+      <div class="px-space-md py-space-xs">
+        <span class="font-label-sm text-label-sm uppercase tracking-wider text-outline px-2">Menu Quản trị</span>
+      </div>
+      <nav class="px-space-sm space-y-1" id="sidebar-nav">
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./overview.html" id="nav-tong-quan">
+          <span class="material-symbols-outlined text-[20px]">dashboard</span>Tổng quan
+        </a>
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./events.html" id="nav-quan-ly-su-kien">
+          <span class="material-symbols-outlined text-[20px]">event</span>Quản lý sự kiện
+        </a>
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg shadow-sm" href="./create-event.html" id="nav-tao-su-kien">
+          <span class="material-symbols-outlined text-[20px]">add_circle</span>Tạo sự kiện mới
+        </a>
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./events.html?action=showtimes" id="nav-danh-sach-suat-dien">
+          <span class="material-symbols-outlined text-[20px]">confirmation_number</span>Danh sách suất diễn
+        </a>
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./events.html?action=seats" id="nav-cau-hinh-ghe">
+          <span class="material-symbols-outlined text-[20px]">chair</span>Cấu hình ghế &amp; bảng giá
+        </a>
+      </nav>
+    </div>
+
+    <!-- Sidebar Bottom / Account Status & Logout -->
+    <div class="p-space-sm bg-surface-container-low">
+      <div class="px-space-xs py-space-xs">
+        <span class="font-label-sm text-label-sm uppercase tracking-wider text-outline px-2">Hệ thống</span>
+      </div>
+      <nav class="space-y-1">
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="javascript:void(0)" onclick="alert('Phiên bản hệ thống: EventPulse Organizer v2.5.0')">
+          <span class="material-symbols-outlined text-[20px]">settings</span>Cài đặt tổ chức
+        </a>
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-error hover:bg-error-container hover:text-on-error-container transition-all font-label-lg text-label-lg" href="javascript:void(0)" onclick="logout()">
+          <span class="material-symbols-outlined text-[20px]">logout</span>Đăng xuất
+        </a>
+      </nav>
+      <div class="mt-space-sm p-3 rounded-lg bg-surface-container flex items-center justify-between">
+        <a class="flex items-center gap-space-xs font-label-sm text-label-sm text-primary hover:text-on-primary-fixed transition-colors" href="./public-events.html">
+          <span class="material-symbols-outlined text-[16px]">arrow_back</span>Giao diện người mua
+        </a>
+        <span class="w-2 h-2 rounded-full bg-tertiary-fixed-dim animate-pulse" title="Hệ thống trực tuyến"></span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Body Content -->
+  <div class="pl-64">
+    <!-- Top Header -->
+    <header class="fixed top-0 left-64 right-0 h-16 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 px-space-lg flex items-center justify-between">
+      <div class="flex items-center gap-space-sm text-body-sm font-body-sm text-on-surface-variant">
+        <span class="material-symbols-outlined text-[18px] text-outline">corporate_fare</span>
+        <span>Ban Tổ Chức</span>
+        <span class="text-outline-variant">/</span>
+        <span class="font-label-md text-label-md text-on-surface" id="topHeaderOrg">Event Organizer</span>
+        <div class="ml-space-md hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-label-sm text-label-sm">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Hệ thống online
+        </div>
+      </div>
+
+      <div class="flex items-center gap-space-md">
+        <a class="hidden sm:flex items-center gap-space-xs px-3.5 py-2 rounded-lg bg-primary text-on-primary font-label-lg text-label-lg shadow-sm hover:bg-on-primary-fixed-variant transition-all active:scale-95" href="./create-event.html">
+          <span class="material-symbols-outlined text-[18px]">add</span>Tạo sự kiện mới
+        </a>
+        <button aria-label="Thông báo quản trị" class="relative p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" type="button" onclick="alert('Bạn chưa có thông báo mới.')">
+          <span class="material-symbols-outlined text-[20px]">notifications</span>
+          <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-secondary-container"></span>
+        </button>
+        <div class="flex items-center gap-space-sm pl-space-xs">
+          <div class="text-right hidden md:block">
+            <div class="font-label-md text-label-md text-on-surface leading-tight" id="topUserName">Event Organizer</div>
+            <div class="font-label-sm text-label-sm text-outline" id="topUserRole">Lead Organizer</div>
+          </div>
+          <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-bold text-sm shadow-sm" id="topUserAvatar">
+            E
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="relative pt-16 bg-surface w-full px-space-lg min-h-screen">
+      <div class="flex flex-col w-full pb-28">
+
+        <!-- Top Navigation Breadcrumb & Page Meta -->
+        <div class="flex flex-col gap-space-sm my-space-lg">
+          <nav class="flex items-center gap-space-xs text-on-surface-variant font-label-md text-label-md">
+            <a class="hover:text-primary transition-colors font-semibold" href="./events.html">Ban tổ chức</a>
+            <span class="material-symbols-outlined text-[16px] text-outline">chevron_right</span>
+            <a class="hover:text-primary transition-colors font-semibold" href="./events.html">Quản lý sự kiện</a>
+            <span class="material-symbols-outlined text-[16px] text-outline">chevron_right</span>
+            <span class="text-on-surface font-label-lg font-bold" id="breadcrumbCurrentAction">Tạo sự kiện mới</span>
+          </nav>
+          
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+            <div>
+              <h1 class="font-headline-xl text-headline-xl text-on-surface tracking-tight font-extrabold" id="pageTitleHeading">Tạo sự kiện mới</h1>
+              <p class="font-body-md text-body-md text-on-surface-variant mt-1" id="pageTitleSub">
+                Nhập thông tin cơ bản và hình ảnh để khởi tạo sự kiện. Bạn có thể cấu hình suất diễn và sơ đồ vé ở các bước kế tiếp.
+              </p>
+            </div>
+            <div class="flex items-center gap-space-sm shrink-0">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container font-label-sm text-label-sm text-on-surface-variant">
+                <span class="w-2 h-2 rounded-full bg-secondary-container"></span>
+                <span id="autoSaveStatus">Đang lưu tự động</span>
+              </span>
+              <button onclick="openPreviewModal()" class="px-4 py-2 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-lg text-label-lg transition-all flex items-center gap-1.5 font-bold" type="button">
+                <span class="material-symbols-outlined text-[18px]">visibility</span>
+                <span>Xem trước</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alert Notification Banner -->
+        <div id="statusAlert" class="hidden mb-6 p-4 rounded-xl text-sm font-semibold flex items-center justify-between shadow-sm"></div>
+
+        <!-- Stepper Progress Tracker -->
+        <div class="w-full bg-surface-container-lowest p-space-md rounded-xl shadow-sm mb-space-xl">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+            <!-- Step 1 (Active) -->
+            <div class="flex items-center gap-space-sm p-space-sm rounded-lg bg-primary/10">
+              <div class="w-9 h-9 rounded-lg bg-primary text-on-primary flex items-center justify-center font-headline-sm text-headline-sm shrink-0 shadow-sm font-bold">
+                1
+              </div>
+              <div class="flex flex-col min-w-0">
+                <span class="font-label-md text-label-md text-primary font-bold truncate">1. Thông tin sự kiện</span>
+                <span class="font-body-sm text-body-sm text-primary/80">Đang thực hiện</span>
+              </div>
+            </div>
+            <!-- Step 2 -->
+            <div class="flex items-center gap-space-sm p-space-sm rounded-lg opacity-60">
+              <div class="w-9 h-9 rounded-lg bg-surface-container text-on-surface-variant flex items-center justify-center font-headline-sm text-headline-sm shrink-0 font-bold">
+                2
+              </div>
+              <div class="flex flex-col min-w-0">
+                <span class="font-label-md text-label-md text-on-surface font-semibold truncate">2. Suất diễn &amp; Địa điểm</span>
+                <span class="font-body-sm text-body-sm text-outline">Chưa cấu hình</span>
+              </div>
+            </div>
+            <!-- Step 3 -->
+            <div class="flex items-center gap-space-sm p-space-sm rounded-lg opacity-60">
+              <div class="w-9 h-9 rounded-lg bg-surface-container text-on-surface-variant flex items-center justify-center font-headline-sm text-headline-sm shrink-0 font-bold">
+                3
+              </div>
+              <div class="flex flex-col min-w-0">
+                <span class="font-label-md text-label-md text-on-surface font-semibold truncate">3. Sơ đồ ghế &amp; Bảng giá</span>
+                <span class="font-body-sm text-body-sm text-outline">Chưa kích hoạt</span>
+              </div>
+            </div>
+            <!-- Step 4 -->
+            <div class="flex items-center gap-space-sm p-space-sm rounded-lg opacity-60">
+              <div class="w-9 h-9 rounded-lg bg-surface-container text-on-surface-variant flex items-center justify-center font-headline-sm text-headline-sm shrink-0 font-bold">
+                4
+              </div>
+              <div class="flex flex-col min-w-0">
+                <span class="font-label-md text-label-md text-on-surface font-semibold truncate">4. Kiểm duyệt &amp; Mở bán</span>
+                <span class="font-body-sm text-body-sm text-outline">Bước cuối</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Layout: Main 70% / Aside 30% -->
+        <form class="grid grid-cols-1 lg:grid-cols-12 gap-gutter-lg items-start" id="createEventForm" onsubmit="event.preventDefault(); handleSubmitEvent(true);">
+          
+          <!-- LEFT COLUMN (Main Content: 8 cols out of 12 ~ 67-70%) -->
+          <div class="lg:col-span-8 flex flex-col gap-space-lg">
+            
+            <!-- CARD 1: Thông tin cơ bản sự kiện -->
+            <div class="bg-surface-container-lowest p-space-xl rounded-xl shadow-sm flex flex-col gap-space-lg">
+              <div class="flex items-center gap-space-sm">
+                <div class="w-8 h-8 rounded-lg bg-primary-fixed flex items-center justify-center text-primary">
+                  <span class="material-symbols-outlined text-[20px]">music_note</span>
+                </div>
+                <div>
+                  <h2 class="font-headline-lg text-headline-lg text-on-surface leading-tight font-bold">Thông tin cơ bản</h2>
+                  <p class="font-body-sm text-body-sm text-on-surface-variant">Chi tiết giới thiệu sẽ hiển thị trực tiếp cho khán giả mua vé</p>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-space-md">
+                <!-- Event Name -->
+                <div class="flex flex-col gap-1.5">
+                  <div class="flex items-center justify-between">
+                    <label class="font-label-lg text-label-lg text-on-surface font-bold" for="eventName">
+                      Tên sự kiện <span class="text-error font-bold">*</span>
+                    </label>
+                    <span class="font-code-mono text-code-mono text-outline font-semibold" id="nameCounter">48/120</span>
+                  </div>
+                  <input class="h-11 px-3.5 rounded-lg bg-surface-container-lowest text-on-surface font-body-md shadow-sm border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary focus:bg-white transition" id="eventName" maxlength="120" placeholder="Ví dụ: Live Concert Những Bản Tình Ca 2025" required type="text" value="V-Concert Symphony: Những Bản Tình Ca Mùa Thu 2025">
+                  <span class="font-body-sm text-body-sm text-outline">Tên sự kiện hấp dẫn, rõ ràng giúp tăng 40% tỷ lệ tìm kiếm và chia sẻ.</span>
+                </div>
+
+                <!-- Category & Organizer Group -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+                  <!-- Event Category -->
+                  <div class="flex flex-col gap-1.5">
+                    <label class="font-label-lg text-label-lg text-on-surface font-bold" for="eventCategory">
+                      Thể loại sự kiện <span class="text-error font-bold">*</span>
+                    </label>
+                    <div class="relative">
+                      <select class="w-full h-11 px-3.5 pr-10 rounded-lg bg-surface-container-lowest text-on-surface font-body-md shadow-sm border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer" id="eventCategory">
+                        <option selected="" value="concert">Âm nhạc / Live Concert</option>
+                        <option value="theater">Nghệ thuật &amp; Nhạc kịch</option>
+                        <option value="conference">Hội nghị &amp; Hội thảo Quốc tế</option>
+                        <option value="sports">Giải đấu Thể thao &amp; E-Sports</option>
+                        <option value="exhibition">Triển lãm Nghệ thuật &amp; Công nghệ</option>
+                      </select>
+                      <span class="material-symbols-outlined pointer-events-none absolute right-3 top-2.5 text-outline text-[20px]">expand_more</span>
+                    </div>
+                  </div>
+
+                  <!-- Organizer Name Readonly with verified badge -->
+                  <div class="flex flex-col gap-1.5">
+                    <label class="font-label-lg text-label-lg text-on-surface font-bold">
+                      Đơn vị tổ chức đại diện
+                    </label>
+                    <div class="h-11 px-3.5 rounded-lg bg-surface-container-low flex items-center justify-between shadow-inner border border-outline-variant/30">
+                      <div class="flex items-center gap-space-xs min-w-0">
+                        <span class="material-symbols-outlined text-[18px] text-primary">verified</span>
+                        <span class="font-label-lg text-label-lg text-on-surface truncate font-semibold" id="formOrgName">V-Concert Media Corporation</span>
+                      </div>
+                      <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-label-sm text-label-sm font-bold shrink-0">Đã xác minh</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Short Description -->
+                <div class="flex flex-col gap-1.5">
+                  <div class="flex items-center justify-between">
+                    <label class="font-label-lg text-label-lg text-on-surface font-bold" for="shortDesc">
+                      Mô tả ngắn gọn (Teaser summary) <span class="text-error font-bold">*</span>
+                    </label>
+                    <span class="font-code-mono text-code-mono text-outline font-semibold" id="shortDescCounter">165/250</span>
+                  </div>
+                  <textarea class="p-3.5 rounded-lg bg-surface-container-lowest text-on-surface font-body-md shadow-sm border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary transition" id="shortDesc" maxlength="250" placeholder="Tóm tắt ngắn gọn trong 2-3 câu về tinh thần sự kiện và dàn line-up nghệ sĩ chính..." rows="3">Đại tiệc âm nhạc giao hưởng hòa quyện pop-ballad với sự góp mặt của Dàn nhạc Giao hưởng Quốc gia Việt Nam cùng các nghệ sĩ hàng đầu. Một đêm nhạc lãng mạn thăng hoa cảm xúc.</textarea>
+                </div>
+
+                <!-- Rich Text Detailed Description -->
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-label-lg text-label-lg text-on-surface font-bold">
+                    Mô tả chi tiết sự kiện &amp; Quy định tham dự <span class="text-error font-bold">*</span>
+                  </label>
+                  <div class="rounded-xl overflow-hidden shadow-sm bg-surface-container-lowest border border-outline-variant/40">
+                    <!-- Functional WYSIWYG Toolbar -->
+                    <div class="flex flex-wrap items-center gap-1 p-2 bg-surface-container-low border-b border-surface-container">
+                      <button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant font-bold text-sm w-7 h-7 flex items-center justify-center transition" onclick="formatDoc('bold')" title="In đậm (Bold)" type="button">B</button>
+                      <button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant italic text-sm w-7 h-7 flex items-center justify-center transition" onclick="formatDoc('italic')" title="In nghiêng (Italic)" type="button">I</button>
+                      <button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant underline text-sm w-7 h-7 flex items-center justify-center transition" onclick="formatDoc('underline')" title="Gạch chân (Underline)" type="button">U</button>
+                      <span class="w-[1px] h-4 bg-outline-variant mx-1"></span>
+                      <button class="px-2 py-1 rounded hover:bg-surface-container text-on-surface-variant font-label-md text-label-md font-bold transition" onclick="formatDoc('formatBlock', 'h2')" title="Tiêu đề 2 (H2)" type="button">H2</button>
+                      <button class="px-2 py-1 rounded hover:bg-surface-container text-on-surface-variant font-label-md text-label-md font-bold transition" onclick="formatDoc('formatBlock', 'h3')" title="Tiêu đề 3 (H3)" type="button">H3</button>
+                      <span class="w-[1px] h-4 bg-outline-variant mx-1"></span>
+                      <button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant w-7 h-7 flex items-center justify-center transition" onclick="formatDoc('insertUnorderedList')" title="Danh sách gạch đầu dòng" type="button">
+                        <span class="material-symbols-outlined text-[18px]">format_list_bulleted</span>
+                      </button>
+                      <button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant w-7 h-7 flex items-center justify-center transition" onclick="formatDoc('insertOrderedList')" title="Danh sách số thứ tự" type="button">
+                        <span class="material-symbols-outlined text-[18px]">format_list_numbered</span>
+                      </button>
+                      <button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant w-7 h-7 flex items-center justify-center transition" onclick="promptLink()" title="Thêm liên kết" type="button">
+                        <span class="material-symbols-outlined text-[18px]">link</span>
+                      </button>
+                      <button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant w-7 h-7 flex items-center justify-center transition" onclick="promptImage()" title="Chèn ảnh minh họa" type="button">
+                        <span class="material-symbols-outlined text-[18px]">image</span>
+                      </button>
+                      <div class="ml-auto flex items-center gap-1">
+                        <button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant w-7 h-7 flex items-center justify-center transition" onclick="formatDoc('undo')" title="Hoàn tác (Undo)" type="button">
+                          <span class="material-symbols-outlined text-[18px]">undo</span>
+                        </button>
+                        <button class="p-1.5 rounded hover:bg-surface-container text-on-surface-variant w-7 h-7 flex items-center justify-center transition" onclick="formatDoc('redo')" title="Làm lại (Redo)" type="button">
+                          <span class="material-symbols-outlined text-[18px]">redo</span>
+                        </button>
+                      </div>
+                    </div>
+                    <!-- Rich Content Area -->
+                    <div class="min-h-[220px] p-space-md font-body-md text-body-md text-on-surface focus:outline-none focus:bg-white leading-relaxed" contenteditable="true" id="detailedDesc" data-placeholder="Nhập chi tiết lịch trình, dàn nghệ sĩ và các quy định cho khán giả...">
+                      <p class="font-headline-sm text-headline-sm text-primary mb-2 font-bold">1. Giới thiệu chương trình</p>
+                      <p class="mb-3">
+                        <strong>V-Concert Symphony 2025</strong> là dự án âm nhạc giao thoa đỉnh cao, tái hiện hơn 20 tác phẩm bất hủ được chuyển soạn hoàn toàn mới cho dàn nhạc giao hưởng 60 nhạc công quốc tế.
+                      </p>
+                      <p class="font-headline-sm text-headline-sm text-primary mb-2 font-bold">2. Dàn nghệ sĩ khách mời đặc biệt</p>
+                      <ul class="list-disc pl-5 mb-3 text-on-surface-variant space-y-1">
+                        <li>Nghệ sĩ Piano quốc tế Tuấn Cường</li>
+                        <li>Diva Thanh Hà &amp; Giọng ca trữ tình Minh Quân</li>
+                        <li>Nhạc trưởng khách mời: Maestro Adrian Vance (Vienna Philharmonics)</li>
+                      </ul>
+                      <p class="font-headline-sm text-headline-sm text-primary mb-2 font-bold">3. Lưu ý &amp; Quy định tham dự</p>
+                      <p class="text-on-surface-variant">Khán giả vui lòng có mặt trước giờ diễn 45 phút để làm thủ tục soát vé và check-in chỗ ngồi. Không mang máy quay phim chuyên nghiệp và thức ăn ngoài vào khán phòng.</p>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- CARD 2: Địa điểm tổ chức -->
+            <div class="bg-surface-container-lowest p-space-xl rounded-xl shadow-sm flex flex-col gap-space-lg">
+              <div class="flex items-center gap-space-sm">
+                <div class="w-8 h-8 rounded-lg bg-tertiary-fixed flex items-center justify-center text-tertiary">
+                  <span class="material-symbols-outlined text-[20px]">location_on</span>
+                </div>
+                <div>
+                  <h2 class="font-headline-lg text-headline-lg text-on-surface leading-tight font-bold">Địa điểm tổ chức &amp; Thời gian</h2>
+                  <p class="font-body-sm text-body-sm text-on-surface-variant">Thiết lập vị trí diễn ra và khung giờ để khán giả thuận tiện tham gia</p>
+                </div>
+              </div>
+
+              <!-- Venue Type Selector -->
+              <div class="flex flex-col gap-space-xs">
+                <label class="font-label-lg text-label-lg text-on-surface font-bold">Hình thức tổ chức</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+                  <label class="cursor-pointer flex items-center gap-space-sm p-space-md rounded-lg bg-primary-fixed/20 hover:bg-primary-fixed/30 transition-all border border-primary/20" id="labelVenueOffline">
+                    <input checked="" class="w-4 h-4 text-primary focus:ring-primary accent-primary" name="venueType" type="radio" value="offline">
+                    <div class="flex flex-col">
+                      <span class="font-label-lg text-label-lg text-on-surface font-bold">Sự kiện trực tiếp (Offline)</span>
+                      <span class="font-body-sm text-body-sm text-on-surface-variant">Có địa điểm thực tế và sơ đồ ghế ngồi vật lý</span>
+                    </div>
+                  </label>
+                  <label class="cursor-pointer flex items-center gap-space-sm p-space-md rounded-lg bg-surface-container-low hover:bg-surface-container transition-all border border-outline-variant/30" id="labelVenueOnline">
+                    <input class="w-4 h-4 text-primary focus:ring-primary accent-primary" name="venueType" type="radio" value="online">
+                    <div class="flex flex-col">
+                      <span class="font-label-lg text-label-lg text-on-surface font-semibold">Sự kiện trực tuyến (Livestream)</span>
+                      <span class="font-body-sm text-body-sm text-on-surface-variant">Phát sóng trực tuyến qua link streaming bảo mật</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+                <!-- Venue Name -->
+                <div class="flex flex-col gap-1.5 md:col-span-2">
+                  <label class="font-label-lg text-label-lg text-on-surface font-bold" for="venueName">
+                    Tên trung tâm / Sân vận động / Nhà hát <span class="text-error font-bold">*</span>
+                  </label>
+                  <div class="relative">
+                    <input class="w-full h-11 pl-10 pr-3.5 rounded-lg bg-surface-container-lowest text-on-surface font-body-md shadow-sm border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary" id="venueName" placeholder="Ví dụ: Trung tâm Hội nghị Quốc gia Hà Nội" required type="text" value="Trung tâm Hội nghị Quốc gia Việt Nam (NCC)">
+                    <span class="material-symbols-outlined pointer-events-none absolute left-3 top-2.5 text-outline text-[20px]">stadium</span>
+                  </div>
+                </div>
+
+                <!-- City Dropdown -->
+                <div class="flex flex-col gap-1.5" id="venueCityContainer">
+                  <label class="font-label-lg text-label-lg text-on-surface font-bold" for="venueCity">
+                    Tỉnh / Thành phố <span class="text-error font-bold">*</span>
+                  </label>
+                  <div class="relative">
+                    <select class="w-full h-11 px-3.5 pr-10 rounded-lg bg-surface-container-lowest text-on-surface font-body-md shadow-sm border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer" id="venueCity">
+                      <option selected="" value="Hà Nội">Hà Nội</option>
+                      <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
+                      <option value="Đà Nẵng">Đà Nẵng</option>
+                      <option value="Hải Phòng">Hải Phòng</option>
+                      <option value="Cần Thơ">Cần Thơ</option>
+                      <option value="Khác">Tỉnh thành khác</option>
+                    </select>
+                    <span class="material-symbols-outlined pointer-events-none absolute right-3 top-2.5 text-outline text-[20px]">arrow_drop_down</span>
+                  </div>
+                </div>
+
+                <!-- Detailed Street Address -->
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-label-lg text-label-lg text-on-surface font-bold" for="venueAddress" id="labelVenueAddress">
+                    Địa chỉ chi tiết <span class="text-error font-bold">*</span>
+                  </label>
+                  <input class="h-11 px-3.5 rounded-lg bg-surface-container-lowest text-on-surface font-body-md shadow-sm border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary" id="venueAddress" placeholder="Số nhà, tên đường, phường/xã..." required type="text" value="Cổng số 1, Đại lộ Thăng Long, Mễ Trì, Nam Từ Liêm">
+                </div>
+              </div>
+
+              <!-- Start Time & End Time (Fully wired for backend) -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-space-md pt-1">
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-label-lg text-label-lg text-on-surface font-bold flex items-center gap-1" for="eventStartTime">
+                    <span class="material-symbols-outlined text-[18px] text-primary">event_available</span>
+                    <span>Thời gian bắt đầu <span class="text-error font-bold">*</span></span>
+                  </label>
+                  <input class="h-11 px-3.5 rounded-lg bg-surface-container-lowest text-on-surface font-body-md shadow-sm border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary" id="eventStartTime" required type="datetime-local">
+                  <span class="font-body-sm text-body-sm text-outline">Giờ mở cửa đón khách &amp; bắt đầu diễn</span>
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-label-lg text-label-lg text-on-surface font-bold flex items-center gap-1" for="eventEndTime">
+                    <span class="material-symbols-outlined text-[18px] text-primary">event_busy</span>
+                    <span>Thời gian kết thúc dự kiến <span class="text-error font-bold">*</span></span>
+                  </label>
+                  <input class="h-11 px-3.5 rounded-lg bg-surface-container-lowest text-on-surface font-body-md shadow-sm border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary" id="eventEndTime" required type="datetime-local">
+                  <span class="font-body-sm text-body-sm text-outline">Thời gian hạ màn và bế mạc</span>
+                </div>
+              </div>
+
+              <!-- Venue Static Location Map Preview -->
+              <div class="flex flex-col gap-2" id="venueMapContainer">
+                <span class="font-label-sm text-label-sm text-outline font-bold">Bản đồ định vị tự động:</span>
+                <div class="w-full h-44 bg-cover bg-center rounded-lg shadow-inner relative overflow-hidden flex items-end p-space-md" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDh1wUkIat7_Ws8JbjqzMVY3LEHRNpsSx0yrLAZrzfet-NKcganyDzQMCbrEMcs3RSgo9VMfbo_MS4UB3DwPRp-BCjbpLu40CHRr_0fijpLkuGlU0AFHx6BpzMU70lf2X2aiPQU7DRU6Iymqq-YMZHTu-KRORswPWolEuIwflfb8Dsieldy72Ral_veCeZNGSSWM-QfT6pGZVEnAWD7GnVS_6yaBoWdezPxKDGZMQuOR1ZhLJ1us4Q1iQ')">
+                  <div class="bg-surface-container-lowest/90 backdrop-blur-md px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[16px] text-primary">pin_drop</span>
+                    <span class="font-label-sm text-label-sm text-on-surface font-semibold" id="mapCoordinatesLabel">Tọa độ: 21.0069° N, 105.7865° E (Đã khớp địa chỉ thực tế)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CARD 3: Phân loại & Hashtags -->
+            <div class="bg-surface-container-lowest p-space-xl rounded-xl shadow-sm flex flex-col gap-space-lg">
+              <div class="flex items-center gap-space-sm">
+                <div class="w-8 h-8 rounded-lg bg-secondary-fixed flex items-center justify-center text-secondary">
+                  <span class="material-symbols-outlined text-[20px]">label</span>
+                </div>
+                <div>
+                  <h2 class="font-headline-lg text-headline-lg text-on-surface leading-tight font-bold">Phân loại &amp; Tìm kiếm</h2>
+                  <p class="font-body-sm text-body-sm text-on-surface-variant">Tối ưu thẻ tìm kiếm và độ tuổi phù hợp cho khán giả</p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+                <!-- Age Restriction -->
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-label-lg text-label-lg text-on-surface font-bold" for="ageLimit">
+                    Độ tuổi tham dự khuyến nghị
+                  </label>
+                  <div class="relative">
+                    <select class="w-full h-11 px-3.5 pr-10 rounded-lg bg-surface-container-lowest text-on-surface font-body-md shadow-sm border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer" id="ageLimit">
+                      <option value="all">Tất cả mọi lứa tuổi (All Ages)</option>
+                      <option selected="" value="12+">Từ 12 tuổi trở lên (Phổ biến cho Concert)</option>
+                      <option value="16+">Từ 16 tuổi trở lên</option>
+                      <option value="18+">Giới hạn 18+ (Cần xuất trình CCCD)</option>
+                    </select>
+                    <span class="material-symbols-outlined pointer-events-none absolute right-3 top-2.5 text-outline text-[20px]">expand_more</span>
+                  </div>
+                </div>
+
+                <!-- Expected Capacity -->
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-label-lg text-label-lg text-on-surface font-bold" for="capacity">
+                    Dự kiến tổng quy mô khán giả (Tổng số ghế) <span class="text-error font-bold">*</span>
+                  </label>
+                  <div class="relative">
+                    <input class="w-full h-11 px-3.5 rounded-lg bg-surface-container-lowest text-on-surface font-body-md shadow-sm border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary font-bold" id="capacity" placeholder="Ví dụ: 3500" required type="text" value="3.500">
+                    <span class="absolute right-3.5 top-3 font-label-sm text-label-sm text-outline font-bold">Ghế</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tags / Keywords -->
+              <div class="flex flex-col gap-2">
+                <label class="font-label-lg text-label-lg text-on-surface font-bold">
+                  Thẻ Hashtag tìm kiếm liên quan
+                </label>
+                <div class="p-2 rounded-lg bg-surface-container-low flex flex-wrap items-center gap-2 border border-outline-variant/30" id="tagsContainer">
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary text-on-primary font-label-sm text-label-sm font-semibold hashtag-pill" data-tag="#ConcertSymphony">
+                    <span>#ConcertSymphony</span>
+                    <button class="hover:text-primary-fixed leading-none font-bold ml-0.5" onclick="removeTag(this)" type="button">×</button>
+                  </span>
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary text-on-primary font-label-sm text-label-sm font-semibold hashtag-pill" data-tag="#LiveMusicHanoi">
+                    <span>#LiveMusicHanoi</span>
+                    <button class="hover:text-primary-fixed leading-none font-bold ml-0.5" onclick="removeTag(this)" type="button">×</button>
+                  </span>
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary text-on-primary font-label-sm text-label-sm font-semibold hashtag-pill" data-tag="#GiaoHuong2025">
+                    <span>#GiaoHuong2025</span>
+                    <button class="hover:text-primary-fixed leading-none font-bold ml-0.5" onclick="removeTag(this)" type="button">×</button>
+                  </span>
+                  <input class="flex-1 min-w-[200px] h-8 px-2 bg-transparent text-on-surface font-body-sm text-body-sm focus:outline-none" id="newTagInput" placeholder="Nhập hashtag mới và nhấn Enter..." type="text">
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="font-body-sm text-body-sm text-outline font-medium">Gợi ý nhanh:</span>
+                  <button class="font-label-sm text-label-sm text-primary hover:underline font-bold" onclick="addSuggestedTag('#Acoustic')" type="button">#Acoustic</button>
+                  <span class="text-outline-variant">•</span>
+                  <button class="font-label-sm text-label-sm text-primary hover:underline font-bold" onclick="addSuggestedTag('#TicketSale')" type="button">#TicketSale</button>
+                  <span class="text-outline-variant">•</span>
+                  <button class="font-label-sm text-label-sm text-primary hover:underline font-bold" onclick="addSuggestedTag('#Orchestra')" type="button">#Orchestra</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RIGHT COLUMN (Sidebar Actions, Media & Tips: 4 cols out of 12 ~ 30-33%) -->
+          <div class="lg:col-span-4 flex flex-col gap-space-lg">
+            
+            <!-- STICKY ACTION CARD (Publication Status) -->
+            <div class="bg-surface-container-lowest p-space-lg rounded-xl shadow-md lg:sticky lg:top-20 z-20 flex flex-col gap-space-md border border-outline-variant/20">
+              <div class="flex items-center justify-between">
+                <span class="font-headline-sm text-headline-sm text-on-surface font-bold">Xuất bản sự kiện</span>
+                <span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-label-sm text-label-sm font-bold flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                  <span>Bản nháp (Draft)</span>
+                </span>
+              </div>
+
+              <div class="p-3 rounded-lg bg-surface-container-low flex items-center gap-2.5 border border-outline-variant/30">
+                <span class="material-symbols-outlined text-[18px] text-tertiary">cloud_done</span>
+                <div class="flex flex-col">
+                  <span class="font-label-sm text-label-sm text-on-surface font-bold">Đã tự động lưu nháp</span>
+                  <span class="font-body-sm text-body-sm text-outline" id="lastSavedTime">Vừa xong • Bản xem xét v1.2</span>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-2.5 pt-1">
+                <button class="w-full h-11 rounded-lg bg-primary hover:bg-on-primary-fixed-variant text-on-primary font-label-lg text-label-lg shadow transition-all flex items-center justify-center gap-2 group active:scale-[0.99] font-bold" id="btnSubmitPrimary" type="submit">
+                  <span id="btnSubmitText">Lưu &amp; Tiếp tục: Tạo suất diễn</span>
+                  <span class="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform" id="btnSubmitIcon">arrow_forward</span>
+                </button>
+                <button class="w-full h-10 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-lg text-label-lg transition-colors flex items-center justify-center gap-1.5 font-bold" onclick="handleSubmitEvent(false)" type="button">
+                  <span class="material-symbols-outlined text-[18px]">save</span>
+                  <span>Lưu bản nháp ngay</span>
+                </button>
+                <a class="text-center font-label-md text-label-md text-outline hover:text-error transition-colors py-1 font-semibold" href="./events.html">
+                  Hủy bỏ và quay lại danh sách
+                </a>
+              </div>
+            </div>
+
+            <!-- CARD: Media Uploads (Poster & Horizontal Banner) -->
+            <div class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col gap-space-md border border-outline-variant/20">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-space-xs">
+                  <span class="material-symbols-outlined text-primary text-[22px]">image</span>
+                  <h2 class="font-headline-sm text-headline-sm text-on-surface font-bold">Hình ảnh &amp; Poster</h2>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm font-bold">Bắt buộc</span>
+              </div>
+
+              <!-- Mode Selection Tabs -->
+              <div class="flex rounded-lg bg-surface-container p-1 gap-1 text-sm font-semibold">
+                <button type="button" id="tabUploadBtn" onclick="switchImageMode('upload')" class="flex-1 py-2 px-3 rounded-md bg-white text-primary shadow-xs font-label-md text-label-md flex items-center justify-center gap-1.5 transition-all">
+                  <span class="material-symbols-outlined text-[18px]">upload_file</span>
+                  <span>Tải ảnh từ máy</span>
+                </button>
+                <button type="button" id="tabUrlBtn" onclick="switchImageMode('url')" class="flex-1 py-2 px-3 rounded-md text-on-surface-variant hover:text-on-surface font-label-md text-label-md flex items-center justify-center gap-1.5 transition-all">
+                  <span class="material-symbols-outlined text-[18px]">link</span>
+                  <span>Dán link ảnh URL</span>
+                </button>
+              </div>
+
+              <!-- Upload Area (Mode: File Upload) -->
+              <div id="imageUploadPanel" class="flex flex-col gap-2">
+                <div id="dropZone" onclick="triggerPosterUpload()" class="border-2 border-dashed border-outline-variant/60 hover:border-primary rounded-xl p-5 text-center cursor-pointer transition-colors bg-surface-container-low hover:bg-surface-container flex flex-col items-center justify-center gap-2 group">
+                  <div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                    <span class="material-symbols-outlined text-[24px]">cloud_upload</span>
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="font-label-md text-label-md text-on-surface font-bold">Kéo thả tệp hoặc bấm vào đây để tải ảnh</span>
+                    <span class="font-body-sm text-body-sm text-outline mt-0.5">Hỗ trợ JPG, PNG, WebP (Tối đa 10MB)</span>
+                  </div>
+                </div>
+                <input accept="image/*" class="hidden" id="posterFileInput" onchange="handlePosterFile(event)" type="file">
+              </div>
+
+              <!-- URL Input Area (Mode: Direct URL) -->
+              <div id="imageUrlPanel" class="hidden flex-col gap-2">
+                <label class="font-label-sm text-label-sm text-on-surface font-bold" for="posterUrlInput">
+                  Đường dẫn liên kết hình ảnh trực tiếp (Image URL):
+                </label>
+                <div class="flex gap-2">
+                  <div class="relative flex-1">
+                    <input class="w-full h-10 pl-9 pr-3 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-primary" id="posterUrlInput" placeholder="https://images.unsplash.com/... hoặc link ảnh bất kỳ" type="url" oninput="handleUrlInputChange(this.value)">
+                    <span class="material-symbols-outlined pointer-events-none absolute left-2.5 top-2.5 text-outline text-[18px]">link</span>
+                  </div>
+                  <button type="button" onclick="applyPosterUrl()" class="px-3.5 h-10 rounded-lg bg-primary hover:bg-on-primary-fixed-variant text-on-primary font-label-md text-label-md font-semibold transition shrink-0">
+                    Áp dụng
+                  </button>
+                </div>
+                <span class="font-body-sm text-body-sm text-outline text-[12px]">Hỗ trợ ảnh từ Google Drive, Imgur, Unsplash, Facebook hoặc bất kỳ website nào.</span>
+              </div>
+
+              <!-- Quick Presets -->
+              <div class="flex flex-col gap-1.5 pt-1 border-t border-outline-variant/20">
+                <span class="font-label-sm text-label-sm text-outline font-semibold">Hoặc chọn nhanh ảnh mẫu:</span>
+                <div class="flex flex-wrap gap-1.5">
+                  <button type="button" onclick="applyPresetImage('https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80', 'Giao Hưởng')" class="px-2.5 py-1 rounded-full bg-surface-container hover:bg-primary-fixed text-on-surface font-label-sm text-label-sm transition flex items-center gap-1">
+                    <span>🎻</span> Concert Giao Hưởng
+                  </button>
+                  <button type="button" onclick="applyPresetImage('https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&q=80', 'EDM Festival')" class="px-2.5 py-1 rounded-full bg-surface-container hover:bg-primary-fixed text-on-surface font-label-sm text-label-sm transition flex items-center gap-1">
+                    <span>🔥</span> EDM Festival
+                  </button>
+                  <button type="button" onclick="applyPresetImage('https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&q=80', 'Acoustic Night')" class="px-2.5 py-1 rounded-full bg-surface-container hover:bg-primary-fixed text-on-surface font-label-sm text-label-sm transition flex items-center gap-1">
+                    <span>🎸</span> Acoustic Night
+                  </button>
+                  <button type="button" onclick="applyPresetImage('https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=1200&q=80', 'Hội Thảo Tech')" class="px-2.5 py-1 rounded-full bg-surface-container hover:bg-primary-fixed text-on-surface font-label-sm text-label-sm transition flex items-center gap-1">
+                    <span>💻</span> Hội Thảo Tech
+                  </button>
+                </div>
+              </div>
+
+              <!-- Uploading Indicator -->
+              <div id="posterUploadSpinner" class="hidden p-3 rounded-lg bg-primary-fixed/20 text-primary text-sm font-semibold flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] animate-spin">sync</span>
+                <span>Đang xử lý và tải ảnh lên máy chủ...</span>
+              </div>
+
+              <!-- Image Live Preview Box -->
+              <div class="flex flex-col gap-1.5 pt-1">
+                <div class="flex items-center justify-between text-label-sm font-label-sm">
+                  <span class="text-on-surface font-bold">Xem trước hiển thị thực tế (Dọc 3:4):</span>
+                  <span id="previewStatusBadge" class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold text-[11px] border border-emerald-200">
+                    Sẵn sàng
+                  </span>
+                </div>
+
+                <div class="relative group rounded-xl overflow-hidden shadow-sm bg-surface-container-low aspect-[3/4] flex flex-col items-center justify-center text-center border border-outline-variant/30">
+                  <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" id="posterImgPreview" src="https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80" alt="Poster sự kiện" onerror="handlePosterImageError()">
+                  
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent flex flex-col justify-end p-4 text-left">
+                    <span class="px-2.5 py-1 rounded-full bg-black/70 text-white font-label-sm text-label-sm w-fit mb-2 backdrop-blur-md max-w-[240px] truncate" id="posterFileNameLabel">
+                      Ảnh mẫu mặc định
+                    </span>
+                    <div class="flex items-center gap-2">
+                      <button onclick="triggerPosterUpload()" class="px-3 py-1.5 rounded-lg bg-white/95 backdrop-blur text-on-surface font-label-sm text-label-sm hover:bg-white flex items-center gap-1 shadow-sm font-bold transition" type="button">
+                        <span class="material-symbols-outlined text-[16px]">upload</span>
+                        <span>Đổi ảnh</span>
+                      </button>
+                      <button onclick="openPreviewModal()" class="px-3 py-1.5 rounded-lg bg-white/95 backdrop-blur text-on-surface font-label-sm text-label-sm hover:bg-white flex items-center gap-1 shadow-sm font-bold transition" type="button">
+                        <span class="material-symbols-outlined text-[16px]">visibility</span>
+                        <span>Xem chi tiết</span>
+                      </button>
+                      <button onclick="clearPosterImage()" class="p-1.5 rounded-lg bg-rose-600/90 text-white hover:bg-rose-700 shadow-sm transition" title="Khôi phục ảnh mặc định" type="button">
+                        <span class="material-symbols-outlined text-[16px]">refresh</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CARD: Tips Callout Guide -->
+            <div class="bg-gradient-to-br from-primary/5 via-secondary/5 to-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col gap-space-sm border border-outline-variant/30">
+              <div class="flex items-center gap-2 text-primary">
+                <span class="material-symbols-outlined text-[22px]">lightbulb</span>
+                <span class="font-headline-sm text-headline-sm font-bold">Mẹo tạo sự kiện thu hút</span>
+              </div>
+              <ul class="space-y-2.5 font-body-sm text-body-sm text-on-surface-variant">
+                <li class="flex items-start gap-2">
+                  <span class="material-symbols-outlined text-[18px] text-tertiary shrink-0 mt-0.5">check_circle</span>
+                  <span><strong>Hình ảnh sắc nét:</strong> Poster có hình nghệ sĩ rõ nét giúp tăng tỉ lệ click đặt vé lên 2.5 lần.</span>
+                </li>
+                <li class="flex items-start gap-2">
+                  <span class="material-symbols-outlined text-[18px] text-tertiary shrink-0 mt-0.5">check_circle</span>
+                  <span><strong>Tiêu đề ngắn &amp; trọng tâm:</strong> Tránh viết hoa toàn bộ ký tự; thêm năm tổ chức để khán giả dễ nhận diện.</span>
+                </li>
+                <li class="flex items-start gap-2">
+                  <span class="material-symbols-outlined text-[18px] text-tertiary shrink-0 mt-0.5">check_circle</span>
+                  <span><strong>Địa chỉ rõ ràng:</strong> Cung cấp chính xác cổng vào hoặc nhà thi đấu để khán giả không bị trễ giờ diễn.</span>
+                </li>
+              </ul>
+            </div>
+
+          </div>
+        </form>
+
+        <!-- Sticky Bottom Floating Navigation Bar -->
+        <div class="fixed bottom-0 left-64 right-0 bg-surface/95 backdrop-blur-md shadow-[0_-2px_10px_rgba(0,0,0,0.06)] px-space-lg py-3 z-30 flex items-center justify-between border-t border-outline-variant/30">
+          <div class="flex items-center gap-space-sm">
+            <a class="px-4 py-2 rounded-lg hover:bg-surface-container text-on-surface-variant font-label-md text-label-md transition-colors font-bold" href="./events.html">
+              Hủy bỏ
+            </a>
+            <span class="hidden sm:inline-block font-body-sm text-body-sm text-outline" id="bottomLastSaved">Bản nháp lưu lần cuối: 15:42</span>
+          </div>
+          <div class="flex items-center gap-space-sm">
+            <button onclick="handleSubmitEvent(false)" class="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-all font-bold" type="button">
+              <span class="material-symbols-outlined text-[16px]">save</span>
+              <span>Lưu nháp</span>
+            </button>
+            <button id="btnSubmitBottom" onclick="handleSubmitEvent(true)" class="px-6 py-2.5 rounded-lg bg-primary hover:bg-on-primary-fixed-variant text-on-primary font-label-lg text-label-lg shadow-sm transition-all flex items-center gap-2 group font-bold" type="button">
+              <span id="btnSubmitBottomText">Lưu &amp; Tiếp tục</span>
+              <span id="btnSubmitBottomIcon" class="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Preview Modal -->
+  <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" id="previewModal">
+    <div class="bg-surface rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-outline-variant/30">
+      <div class="flex items-center justify-between pb-4 border-b border-outline-variant/20 mb-4">
+        <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary">visibility</span>
+          <span>Xem trước thẻ sự kiện công khai</span>
+        </h3>
+        <button onclick="closePreviewModal()" class="w-8 h-8 rounded-full hover:bg-surface-container text-on-surface-variant flex items-center justify-center transition">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <div class="rounded-2xl overflow-hidden shadow-lg border border-outline-variant/30 bg-surface-container-lowest">
+        <div class="relative h-64 w-full bg-black">
+          <img id="modalPreviewImg" class="w-full h-full object-cover" src="" alt="Poster preview">
+          <div class="absolute top-3 left-3 px-3 py-1 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-tertiary font-bold text-xs shadow">
+            Đang mở bán
+          </div>
+        </div>
+        <div class="p-6">
+          <h2 class="text-2xl font-black text-on-surface mb-2" id="modalPreviewTitle">Tiêu đề</h2>
+          <div class="flex flex-wrap items-center gap-4 text-xs text-on-surface-variant mb-4">
+            <span class="flex items-center gap-1 font-semibold text-primary" id="modalPreviewTime">
+              <span class="material-symbols-outlined text-[16px]">calendar_clock</span>
+              <span>19:00 - 15/11/2026</span>
+            </span>
+            <span class="flex items-center gap-1" id="modalPreviewLocation">
+              <span class="material-symbols-outlined text-[16px]">location_on</span>
+              <span>Hà Nội</span>
+            </span>
+            <span class="flex items-center gap-1 font-bold text-emerald-700" id="modalPreviewSeats">
+              <span class="material-symbols-outlined text-[16px]">chair</span>
+              <span>3.500 vé</span>
+            </span>
+          </div>
+          <p class="text-xs text-on-surface-variant leading-relaxed line-clamp-3 mb-4" id="modalPreviewDesc">
+            Mô tả sự kiện...
+          </p>
+          <div class="flex flex-wrap gap-1.5" id="modalPreviewTags"></div>
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-end">
+        <button onclick="closePreviewModal()" class="px-5 py-2.5 rounded-xl bg-primary text-white font-bold text-xs shadow hover:bg-primary-container transition">
+          Đóng xem trước
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT LOGIC -->
+  <script>
+    const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:5012' : '';
+    let token = localStorage.getItem('access_token');
+    let currentPosterUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuD5BeuDSNhed6YSukUGH4tRPe-CcJL2BEEqSGi2zphmeHuFOkA9hM5bBeH63-Us_Pf0DWJjisfton9WHqAbFBhkCE-cj9J9u8nIhsL8K8a_kU3dTUEkMEFyGNmiDbxL9kIgPnsSF8Mxgd4MgMNvu3Vh52Ba5C8bdJyg_SzQa4PjZYki1XqdLIQA2w7gs14DkCCRkiBgpQHapoqDtIf3UJcUsd2Qrr5aoSCvJzuNfqFfFWuMMZ2zNMb91w";
+    let isSubmitting = false;
+    let editEventId = null;
+
+    // Check login & role
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!token) {
+        window.location.href = './login.html?returnUrl=' + encodeURIComponent(window.location.pathname);
+        return;
+      }
+
+      const userStr = localStorage.getItem('user_info');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          const roles = (user.roles || []).map(r => (r || '').toLowerCase());
+          const isAllowed = roles.includes('organizer') || roles.includes('admin') || roles.includes('staff');
+          
+          if (!isAllowed) {
+            alert('Bạn không có quyền truy cập trang Quản lý sự kiện (Chỉ dành cho Ban Tổ Chức / Admin).');
+            window.location.href = './public-events.html';
+            return;
+          }
+
+          const name = user.fullName || user.username || user.email;
+          document.getElementById('topUserName').textContent = name;
+          document.getElementById('topUserAvatar').textContent = name.charAt(0).toUpperCase();
+          document.getElementById('topUserRole').textContent = roles.includes('admin') ? 'Quản Trị Viên (Admin)' : 'Lead Organizer';
+          document.getElementById('formOrgName').textContent = user.fullName ? `${user.fullName} Media` : 'V-Concert Media Corporation';
+          document.getElementById('topHeaderOrg').textContent = user.fullName ? user.fullName : 'V-Concert Media';
+          document.getElementById('sidebarOrgName').textContent = user.fullName ? user.fullName : 'V-Concert Media';
+        } catch (e) {}
+      } else {
+        window.location.href = './login.html?returnUrl=' + encodeURIComponent(window.location.pathname);
+        return;
+      }
+
+      // Check edit mode via URL parameter
+      const urlParams = new URLSearchParams(window.location.search);
+      editEventId = urlParams.get('id');
+
+      if (editEventId) {
+        document.title = "Chỉnh sửa sự kiện - EventPulse Ban Tổ Chức";
+        document.getElementById('pageTitleHeading').textContent = "Chỉnh sửa thông tin sự kiện";
+        document.getElementById('pageTitleSub').textContent = "Cập nhật các thông tin cơ bản, địa điểm, thời gian và quy mô sự kiện.";
+        document.getElementById('breadcrumbCurrentAction').textContent = "Chỉnh sửa sự kiện";
+        document.getElementById('btnSubmitBottomText').textContent = "Lưu cập nhật sự kiện";
+        document.getElementById('btnSubmitBottomIcon').textContent = "save";
+        loadEventForEdit(editEventId);
+      } else {
+        // Pre-fill sensible future dates
+        initDefaultDates();
+      }
+
+      // Setup live character counters
+      initCharCounters();
+
+      // Setup venue type toggle
+      initVenueToggle();
+
+      // Setup Hashtags
+      initHashtags();
+
+      // Setup Image DropZone
+      initDropZone();
+    });
+
+    async function loadEventForEdit(id) {
+      try {
+        const res = await fetch(`${API_BASE}/api/events/${id}`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (res.status === 401) {
+          window.location.href = './login.html';
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.data) {
+          const ev = data.data;
+          document.getElementById('eventName').value = ev.title || '';
+          document.getElementById('nameCounter').textContent = `${(ev.title || '').length}/120`;
+
+          // Location parsing
+          const loc = ev.location || '';
+          if (loc.startsWith('Trực tuyến:')) {
+            const onlineRadio = document.querySelector('input[name="venueType"][value="online"]');
+            if (onlineRadio) {
+              onlineRadio.checked = true;
+              onlineRadio.dispatchEvent(new Event('change'));
+            }
+            document.getElementById('venueAddress').value = loc.replace('Trực tuyến:', '').trim();
+          } else {
+            const parts = loc.split(' - ');
+            if (parts.length >= 2) {
+              document.getElementById('venueName').value = parts[0].trim();
+              const subparts = parts[1].split(', ');
+              if (subparts.length >= 2) {
+                document.getElementById('venueCity').value = subparts[subparts.length - 1].trim();
+                document.getElementById('venueAddress').value = subparts.slice(0, subparts.length - 1).join(', ').trim();
+              } else {
+                document.getElementById('venueAddress').value = parts[1].trim();
+              }
+            } else {
+              document.getElementById('venueName').value = loc;
+              document.getElementById('venueAddress').value = loc;
+            }
+          }
+
+          // Times & Capacity
+          document.getElementById('eventStartTime').value = formatInputDate(new Date(ev.startTime));
+          document.getElementById('eventEndTime').value = formatInputDate(new Date(ev.endTime));
+          document.getElementById('capacity').value = (ev.totalSeats || 0).toLocaleString('vi-VN');
+
+          // Description parsing
+          const desc = ev.description || '';
+          const descParts = desc.split('\n\n');
+          if (descParts.length > 0) {
+            document.getElementById('shortDesc').value = descParts[0].trim();
+            document.getElementById('shortDescCounter').textContent = `${descParts[0].length}/250`;
+          }
+          if (descParts.length > 1) {
+            document.getElementById('detailedDesc').innerHTML = descParts[1].trim();
+          }
+
+          // Poster image loading
+          if (ev.imageUrl) {
+            currentPosterUrl = ev.imageUrl;
+            const preview = document.getElementById('posterImgPreview');
+            if (preview) preview.src = currentPosterUrl;
+            const urlInput = document.getElementById('posterUrlInput');
+            if (urlInput) urlInput.value = currentPosterUrl;
+            const nameLabel = document.getElementById('posterFileNameLabel');
+            if (nameLabel) nameLabel.textContent = 'Ảnh hiện tại của sự kiện';
+          }
+
+          document.getElementById('pageTitleHeading').textContent = `Chỉnh sửa sự kiện: ${ev.title}`;
+          document.getElementById('breadcrumbCurrentAction').textContent = `Chỉnh sửa (${ev.title})`;
+        } else {
+          showAlert(data.message || 'Không thể tải thông tin sự kiện cần sửa.', 'error');
+        }
+      } catch (err) {
+        console.error('Lỗi khi tải thông tin sự kiện:', err);
+        showAlert('Lỗi kết nối máy chủ API.', 'error');
+      }
+    }
+
+    function formatInputDate(d) {
+      if (!d || isNaN(d.getTime())) return '';
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${mins}`;
+    }
+
+    function initDefaultDates() {
+      const now = new Date();
+      // Bắt đầu sau 14 ngày lúc 19:00
+      const start = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      start.setHours(19, 0, 0, 0);
+
+      // Kết thúc sau 4 tiếng lúc 23:00
+      const end = new Date(start.getTime() + 4 * 60 * 60 * 1000);
+
+      document.getElementById('eventStartTime').value = formatInputDate(start);
+      document.getElementById('eventEndTime').value = formatInputDate(end);
+    }
+
+    function initCharCounters() {
+      const eventNameInput = document.getElementById('eventName');
+      const nameCounter = document.getElementById('nameCounter');
+      if (eventNameInput && nameCounter) {
+        nameCounter.textContent = `${eventNameInput.value.length}/120`;
+        eventNameInput.addEventListener('input', function() {
+          nameCounter.textContent = `${this.value.length}/120`;
+        });
+      }
+
+      const shortDesc = document.getElementById('shortDesc');
+      const shortDescCounter = document.getElementById('shortDescCounter');
+      if (shortDesc && shortDescCounter) {
+        shortDescCounter.textContent = `${shortDesc.value.length}/250`;
+        shortDesc.addEventListener('input', function() {
+          shortDescCounter.textContent = `${this.value.length}/250`;
+        });
+      }
+    }
+
+    function initVenueToggle() {
+      const venueRadios = document.querySelectorAll('input[name="venueType"]');
+      const venueCity = document.getElementById('venueCity');
+      const venueAddress = document.getElementById('venueAddress');
+      const labelVenueAddress = document.getElementById('labelVenueAddress');
+      const labelOffline = document.getElementById('labelVenueOffline');
+      const labelOnline = document.getElementById('labelVenueOnline');
+      const venueMapContainer = document.getElementById('venueMapContainer');
+
+      venueRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+          if (this.value === 'online') {
+            labelOffline.className = 'cursor-pointer flex items-center gap-space-sm p-space-md rounded-lg bg-surface-container-low hover:bg-surface-container transition-all border border-outline-variant/30';
+            labelOnline.className = 'cursor-pointer flex items-center gap-space-sm p-space-md rounded-lg bg-primary-fixed/20 hover:bg-primary-fixed/30 transition-all border border-primary/20';
+
+            if (labelVenueAddress) labelVenueAddress.innerHTML = 'Liên kết phát sóng trực tiếp (Livestream URL) <span class="text-error font-bold">*</span>';
+            if (venueAddress) {
+              venueAddress.placeholder = "Link Zoom / Microsoft Teams hoặc hệ thống Live Stream riêng...";
+              venueAddress.value = "https://stream.eventpulse.vn/live/vconcert-2025";
+            }
+            if (venueCity) venueCity.disabled = true;
+            if (venueMapContainer) venueMapContainer.classList.add('hidden');
+          } else {
+            labelOnline.className = 'cursor-pointer flex items-center gap-space-sm p-space-md rounded-lg bg-surface-container-low hover:bg-surface-container transition-all border border-outline-variant/30';
+            labelOffline.className = 'cursor-pointer flex items-center gap-space-sm p-space-md rounded-lg bg-primary-fixed/20 hover:bg-primary-fixed/30 transition-all border border-primary/20';
+
+            if (labelVenueAddress) labelVenueAddress.innerHTML = 'Địa chỉ chi tiết <span class="text-error font-bold">*</span>';
+            if (venueAddress) {
+              venueAddress.placeholder = "Số nhà, tên đường, phường/xã...";
+              venueAddress.value = "Cổng số 1, Đại lộ Thăng Long, Mễ Trì, Nam Từ Liêm";
+            }
+            if (venueCity) venueCity.disabled = false;
+            if (venueMapContainer) venueMapContainer.classList.remove('hidden');
+          }
+        });
+      });
+    }
+
+    // WYSIWYG Editor Commands
+    function formatDoc(cmd, val = null) {
+      document.execCommand(cmd, false, val);
+      document.getElementById('detailedDesc').focus();
+    }
+
+    function promptLink() {
+      const url = prompt('Nhập địa chỉ URL liên kết:', 'https://');
+      if (url) formatDoc('createLink', url);
+    }
+
+    function promptImage() {
+      const url = prompt('Nhập địa chỉ URL hình ảnh:', 'https://images.unsplash.com/');
+      if (url) formatDoc('insertImage', url);
+    }
+
+    // Hashtags Logic
+    function initHashtags() {
+      const input = document.getElementById('newTagInput');
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          let val = input.value.trim();
+          if (val) {
+            if (!val.startsWith('#')) val = '#' + val;
+            addHashtagPill(val);
+            input.value = '';
+          }
+        }
+      });
+    }
+
+    function addHashtagPill(tagText) {
+      const container = document.getElementById('tagsContainer');
+      const input = document.getElementById('newTagInput');
+
+      // Kiểm tra trùng
+      const existing = Array.from(container.querySelectorAll('.hashtag-pill span')).map(s => s.textContent);
+      if (existing.includes(tagText)) return;
+
+      const span = document.createElement('span');
+      span.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary text-on-primary font-label-sm text-label-sm font-semibold hashtag-pill';
+      span.dataset.tag = tagText;
+      span.innerHTML = `<span>${escapeHtml(tagText)}</span><button class="hover:text-primary-fixed leading-none font-bold ml-0.5" onclick="removeTag(this)" type="button">×</button>`;
+
+      container.insertBefore(span, input);
+    }
+
+    function removeTag(btn) {
+      const pill = btn.closest('.hashtag-pill');
+      if (pill) pill.remove();
+    }
+
+    function addSuggestedTag(tagText) {
+      addHashtagPill(tagText);
+    }
+
+    // Image Upload & URL Handling
+    function switchImageMode(mode) {
+      currentImageMode = mode;
+      const tabUploadBtn = document.getElementById('tabUploadBtn');
+      const tabUrlBtn = document.getElementById('tabUrlBtn');
+      const imageUploadPanel = document.getElementById('imageUploadPanel');
+      const imageUrlPanel = document.getElementById('imageUrlPanel');
+
+      if (mode === 'upload') {
+        tabUploadBtn.className = 'flex-1 py-2 px-3 rounded-md bg-white text-primary shadow-xs font-label-md text-label-md flex items-center justify-center gap-1.5 transition-all font-bold';
+        tabUrlBtn.className = 'flex-1 py-2 px-3 rounded-md text-on-surface-variant hover:text-on-surface font-label-md text-label-md flex items-center justify-center gap-1.5 transition-all';
+        imageUploadPanel.classList.remove('hidden');
+        imageUploadPanel.classList.add('flex');
+        imageUrlPanel.classList.add('hidden');
+        imageUrlPanel.classList.remove('flex');
+      } else {
+        tabUrlBtn.className = 'flex-1 py-2 px-3 rounded-md bg-white text-primary shadow-xs font-label-md text-label-md flex items-center justify-center gap-1.5 transition-all font-bold';
+        tabUploadBtn.className = 'flex-1 py-2 px-3 rounded-md text-on-surface-variant hover:text-on-surface font-label-md text-label-md flex items-center justify-center gap-1.5 transition-all';
+        imageUrlPanel.classList.remove('hidden');
+        imageUrlPanel.classList.add('flex');
+        imageUploadPanel.classList.add('hidden');
+        imageUploadPanel.classList.remove('flex');
+        const urlInput = document.getElementById('posterUrlInput');
+        if (urlInput) urlInput.focus();
+      }
+    }
+
+    function initDropZone() {
+      const dropZone = document.getElementById('dropZone');
+      if (!dropZone) return;
+
+      ['dragenter', 'dragover'].forEach(name => {
+        dropZone.addEventListener(name, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropZone.classList.add('border-primary', 'bg-surface-container');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(name => {
+        dropZone.addEventListener(name, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropZone.classList.remove('border-primary', 'bg-surface-container');
+        });
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files && files.length > 0) {
+          handlePosterFile({ target: { files: files } });
+        }
+      });
+    }
+
+    function triggerPosterUpload() {
+      document.getElementById('posterFileInput').click();
+    }
+
+    async function handlePosterFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (file.size > 10 * 1024 * 1024) {
+        showAlert('Dung lượng tệp ảnh không được vượt quá 10MB.', 'error');
+        return;
+      }
+
+      // Preview immediately via local FileReader
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        document.getElementById('posterImgPreview').src = evt.target.result;
+        document.getElementById('posterFileNameLabel').textContent = `Đang tải: ${file.name}`;
+      };
+      reader.readAsDataURL(file);
+
+      // Upload file to Backend API
+      const formData = new FormData();
+      formData.append('file', file);
+      setPosterUploading(true);
+
+      try {
+        const res = await fetch(`${API_BASE}/api/upload/image`, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token
+          },
+          body: formData
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success && data.data) {
+          currentPosterUrl = data.data.url;
+          document.getElementById('posterImgPreview').src = currentPosterUrl;
+          const urlInput = document.getElementById('posterUrlInput');
+          if (urlInput) urlInput.value = currentPosterUrl;
+          document.getElementById('posterFileNameLabel').textContent = `Đã tải lên: ${file.name}`;
+          document.getElementById('previewStatusBadge').className = 'text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold text-[11px] border border-emerald-200';
+          document.getElementById('previewStatusBadge').textContent = 'Đã lưu trên máy chủ';
+          showAlert('🎉 Tải ảnh sự kiện lên hệ thống thành công!', 'success');
+        } else {
+          showAlert(data.message || 'Không thể tải ảnh lên máy chủ. Bạn có thể sử dụng tính năng dán URL.', 'error');
+        }
+      } catch (err) {
+        showAlert('Lỗi kết nối máy chủ khi upload ảnh.', 'error');
+      } finally {
+        setPosterUploading(false);
+      }
+    }
+
+    function setPosterUploading(uploading) {
+      const spinner = document.getElementById('posterUploadSpinner');
+      const dropZone = document.getElementById('dropZone');
+      if (spinner) {
+        spinner.className = uploading
+          ? 'p-3 rounded-lg bg-primary-fixed/30 text-primary text-sm font-semibold flex items-center gap-2'
+          : 'hidden';
+      }
+      if (dropZone) {
+        dropZone.style.opacity = uploading ? '0.5' : '1';
+        dropZone.style.pointerEvents = uploading ? 'none' : 'auto';
+      }
+    }
+
+    function handleUrlInputChange(val) {
+      const url = (val || '').trim();
+      if (!url) return;
+      if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/')) {
+        currentPosterUrl = url;
+        document.getElementById('posterImgPreview').src = url;
+        document.getElementById('posterFileNameLabel').textContent = `Link ngoài: ${url.length > 30 ? url.substring(0, 30) + '...' : url}`;
+        document.getElementById('previewStatusBadge').className = 'text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full font-bold text-[11px] border border-blue-200';
+        document.getElementById('previewStatusBadge').textContent = 'Đang dùng link URL';
+      }
+    }
+
+    function applyPosterUrl() {
+      const input = document.getElementById('posterUrlInput');
+      const url = (input.value || '').trim();
+      if (!url) {
+        showAlert('Vui lòng nhập đường dẫn URL ảnh (bắt đầu bằng https://).', 'error');
+        input.focus();
+        return;
+      }
+      if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('/')) {
+        showAlert('Đường dẫn URL ảnh phải bắt đầu bằng http:// hoặc https://', 'error');
+        input.focus();
+        return;
+      }
+      currentPosterUrl = url;
+      document.getElementById('posterImgPreview').src = url;
+      document.getElementById('posterFileNameLabel').textContent = `Link ngoài: ${url.length > 30 ? url.substring(0, 30) + '...' : url}`;
+      document.getElementById('previewStatusBadge').className = 'text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold text-[11px] border border-emerald-200';
+      document.getElementById('previewStatusBadge').textContent = 'Đã áp dụng link';
+      showAlert('Đã áp dụng link ảnh sự kiện thành công!', 'success');
+    }
+
+    function applyPresetImage(url, name) {
+      currentPosterUrl = url;
+      document.getElementById('posterImgPreview').src = url;
+      const urlInput = document.getElementById('posterUrlInput');
+      if (urlInput) urlInput.value = url;
+      document.getElementById('posterFileNameLabel').textContent = `Mẫu: ${name}`;
+      document.getElementById('previewStatusBadge').className = 'text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold text-[11px] border border-emerald-200';
+      document.getElementById('previewStatusBadge').textContent = `Mẫu: ${name}`;
+      showAlert(`Đã chọn ảnh mẫu "${name}" cho sự kiện!`, 'success');
+    }
+
+    function handlePosterImageError() {
+      document.getElementById('previewStatusBadge').className = 'text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full font-bold text-[11px] border border-rose-200';
+      document.getElementById('previewStatusBadge').textContent = 'Link ảnh không truy cập được';
+      document.getElementById('posterImgPreview').src = 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80';
+      document.getElementById('posterFileNameLabel').textContent = 'Tự động dùng ảnh dự phòng';
+    }
+
+    function clearPosterImage() {
+      if (confirm('Khôi phục lại hình ảnh poster mặc định?')) {
+        currentPosterUrl = 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80';
+        document.getElementById('posterImgPreview').src = currentPosterUrl;
+        const urlInput = document.getElementById('posterUrlInput');
+        if (urlInput) urlInput.value = '';
+        document.getElementById('posterFileNameLabel').textContent = 'Ảnh mẫu mặc định';
+        document.getElementById('previewStatusBadge').className = 'text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold text-[11px] border border-emerald-200';
+        document.getElementById('previewStatusBadge').textContent = 'Mặc định';
+      }
+    }
+
+    // Submit Event to Backend API
+    async function handleSubmitEvent(proceedToNext = true) {
+      if (isSubmitting) return;
+
+      const title = document.getElementById('eventName').value.trim();
+      const category = document.getElementById('eventCategory').value;
+      const shortDesc = document.getElementById('shortDesc').value.trim();
+      const detailedHtml = document.getElementById('detailedDesc').innerHTML.trim();
+      
+      const venueType = document.querySelector('input[name="venueType"]:checked').value;
+      const venueName = document.getElementById('venueName').value.trim();
+      const venueCity = document.getElementById('venueCity').value;
+      const venueAddress = document.getElementById('venueAddress').value.trim();
+
+      const startTimeVal = document.getElementById('eventStartTime').value;
+      const endTimeVal = document.getElementById('eventEndTime').value;
+      const capacityVal = document.getElementById('capacity').value.replace(/\D/g, '');
+
+      // Validation
+      if (!title) {
+        showAlert('Vui lòng nhập Tên sự kiện.', 'error');
+        document.getElementById('eventName').focus();
+        return;
+      }
+
+      if (!venueName) {
+        showAlert('Vui lòng nhập Tên trung tâm hoặc Địa điểm tổ chức.', 'error');
+        document.getElementById('venueName').focus();
+        return;
+      }
+
+      if (!startTimeVal || !endTimeVal) {
+        showAlert('Vui lòng chọn đầy đủ thời gian bắt đầu và kết thúc sự kiện.', 'error');
+        return;
+      }
+
+      const startDate = new Date(startTimeVal);
+      const endDate = new Date(endTimeVal);
+
+      if (endDate <= startDate) {
+        showAlert('Thời gian kết thúc phải lớn hơn thời gian bắt đầu.', 'error');
+        return;
+      }
+
+      const totalSeats = parseInt(capacityVal, 10);
+      if (isNaN(totalSeats) || totalSeats <= 0) {
+        showAlert('Dự kiến tổng quy mô khán giả (số ghế) phải lớn hơn 0.', 'error');
+        document.getElementById('capacity').focus();
+        return;
+      }
+
+      // Xây dựng địa điểm hoàn chỉnh
+      let fullLocation = venueName;
+      if (venueType === 'online') {
+        fullLocation = `Trực tuyến: ${venueAddress || 'Link livestream hệ thống'}`;
+      } else {
+        fullLocation = `${venueName} - ${venueAddress}, ${venueCity}`;
+      }
+
+      // Ghép toàn bộ mô tả chi tiết kèm thẻ hashtag
+      const tags = Array.from(document.querySelectorAll('.hashtag-pill span')).map(s => s.textContent).join(' ');
+      const combinedDescription = `${shortDesc}\n\n${detailedHtml}\n\n[Thẻ: ${tags}] [Thể loại: ${category}]`;
+
+      const requestPayload = {
+        title: title,
+        description: combinedDescription,
+        location: fullLocation,
+        imageUrl: currentPosterUrl,
+        startTime: startDate.toISOString(),
+        endTime: endDate.toISOString(),
+        totalSeats: totalSeats
+      };
+
+      setButtonLoading(true);
+      hideAlert();
+
+      const method = editEventId ? 'PUT' : 'POST';
+      const endpoint = editEventId ? `${API_BASE}/api/events/${editEventId}` : `${API_BASE}/api/events`;
+
+      try {
+        const res = await fetch(endpoint, {
+          method: method,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify(requestPayload)
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok && data.success) {
+          const newEvent = data.data;
+          const successMsg = editEventId
+            ? `🎉 Cập nhật thành công sự kiện "${escapeHtml(title)}"!`
+            : `🎉 Chúc mừng! Sự kiện "${escapeHtml(title)}" đã được khởi tạo thành công vào hệ thống.`;
+          showAlert(successMsg, 'success');
+
+          // Cập nhật timestamp lưu nháp
+          const nowStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+          const lastSaved = document.getElementById('lastSavedTime');
+          if (lastSaved) lastSaved.textContent = `Đã lưu lúc ${nowStr} • Thành công`;
+          const bottomSaved = document.getElementById('bottomLastSaved');
+          if (bottomSaved) bottomSaved.textContent = `Lưu lần cuối: ${nowStr}`;
+
+          setTimeout(() => {
+            if (editEventId) {
+              window.location.href = `./event-detail.html?id=${editEventId}`;
+            } else {
+              window.location.href = './events.html';
+            }
+          }, 1200);
+        } else {
+          showAlert(data.message || (editEventId ? 'Không thể cập nhật sự kiện.' : 'Không thể tạo sự kiện. Vui lòng kiểm tra lại thông tin.'), 'error');
+        }
+      } catch (err) {
+        showAlert('Lỗi kết nối máy chủ API.', 'error');
+      } finally {
+        setButtonLoading(false);
+      }
+    }
+
+    function setButtonLoading(loading) {
+      isSubmitting = loading;
+      const btn = document.getElementById('btnSubmitBottom') || document.getElementById('btnSubmitPrimary');
+      const text = document.getElementById('btnSubmitBottomText') || document.getElementById('btnSubmitText');
+      const icon = document.getElementById('btnSubmitBottomIcon') || document.getElementById('btnSubmitIcon');
+
+      if (btn) btn.disabled = loading;
+      if (loading) {
+        if (text) text.textContent = editEventId ? 'Đang cập nhật sự kiện...' : 'Đang khởi tạo sự kiện...';
+        if (icon) {
+          icon.textContent = 'sync';
+          icon.classList.add('animate-spin');
+        }
+      } else {
+        if (text) text.textContent = editEventId ? 'Lưu cập nhật sự kiện' : 'Lưu & Tiếp tục';
+        if (icon) {
+          icon.textContent = editEventId ? 'save' : 'arrow_forward';
+          icon.classList.remove('animate-spin');
+        }
+      }
+    }
+
+    function showAlert(msg, type = 'error') {
+      const banner = document.getElementById('statusAlert');
+      banner.className = `mb-6 p-4 rounded-xl text-sm font-semibold flex items-center justify-between shadow-sm transition-all ${
+        type === 'success' 
+          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+          : 'bg-rose-50 text-rose-800 border border-rose-200'
+      }`;
+      banner.innerHTML = `
+        <div class="flex items-center gap-2.5">
+          <span class="material-symbols-outlined text-[20px]">${type === 'success' ? 'check_circle' : 'error'}</span>
+          <span>${msg}</span>
+        </div>
+        <button onclick="hideAlert()" class="p-1 rounded-lg hover:bg-black/5 transition text-on-surface-variant">
+          <span class="material-symbols-outlined text-[16px]">close</span>
+        </button>
+      `;
+      banner.classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function hideAlert() {
+      document.getElementById('statusAlert').classList.add('hidden');
+    }
+
+    // Preview Modal Logic
+    function openPreviewModal() {
+      const title = document.getElementById('eventName').value || 'Tiêu đề sự kiện';
+      const shortDesc = document.getElementById('shortDesc').value || 'Mô tả ngắn...';
+      const venueName = document.getElementById('venueName').value || 'Địa điểm tổ chức';
+      const venueCity = document.getElementById('venueCity').value || 'Hà Nội';
+      const capacity = document.getElementById('capacity').value || '3.500';
+
+      document.getElementById('modalPreviewTitle').textContent = title;
+      document.getElementById('modalPreviewDesc').textContent = shortDesc;
+      document.getElementById('modalPreviewLocation').querySelector('span:last-child').textContent = `${venueName} (${venueCity})`;
+      document.getElementById('modalPreviewSeats').querySelector('span:last-child').textContent = `${capacity} ghế`;
+      document.getElementById('modalPreviewImg').src = currentPosterUrl;
+
+      const tagsContainer = document.getElementById('modalPreviewTags');
+      tagsContainer.innerHTML = '';
+      document.querySelectorAll('.hashtag-pill span:first-child').forEach(s => {
+        const badge = document.createElement('span');
+        badge.className = 'px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold text-[11px]';
+        badge.textContent = s.textContent;
+        tagsContainer.appendChild(badge);
+      });
+
+      document.getElementById('previewModal').classList.remove('hidden');
+    }
+
+    function closePreviewModal() {
+      document.getElementById('previewModal').classList.add('hidden');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function logout() {
+      localStorage.clear();
+      window.location.href = './login.html';
+    }
+  </script>
+  <!-- Shared Organizer Navigation & Session Script -->
+  <script src="./organizer-nav.js"></script>
+</body>
+</html>

@@ -27,6 +27,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<Role> Roles { get; set; } = null!;
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<UserRole> UserRoles { get; set; } = null!;
+        public DbSet<AuditLog> AuditLogs { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -195,6 +196,19 @@ namespace EventTicketBooking.Api.Data
                       .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasIndex(ur => ur.RoleId);
+            });
+
+            // Cấu hình bảng AuditLog (S-28): chỉ lưu thay đổi phân quyền
+            modelBuilder.Entity<AuditLog>(entity =>
+            {
+                entity.ToTable("AuditLogs");
+                entity.HasKey(a => a.Id);
+                entity.Property(a => a.ActorUsername).IsRequired().HasMaxLength(50);
+                entity.Property(a => a.OldRoles).IsRequired().HasMaxLength(500);
+                entity.Property(a => a.NewRoles).IsRequired().HasMaxLength(500);
+                entity.Property(a => a.Action).IsRequired().HasMaxLength(50);
+                entity.Property(a => a.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.HasIndex(a => a.TargetUserId);
             });
 
             // Cấu hình bảng Orders
