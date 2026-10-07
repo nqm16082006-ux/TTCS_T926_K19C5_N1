@@ -6,8 +6,9 @@ using System.Threading.Tasks;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.DTOs.Common;
-using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Middlewares;
+using EventTicketBooking.Api.Models;
+using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -49,6 +50,17 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy suất diễn."));
             if (showtime.Status != ShowtimeStatus.OnSale)
                 return Conflict(ApiResponse<object>.FailureResult("Suất diễn không đang mở bán."));
+            // S-42.2 Validation Guard: Kiểm tra tổng số vé đã giữ + đã mua
+            var seatHoldService = HttpContext.RequestServices.GetRequiredService<ISeatHoldService>();
+            int totalTickets = await seatHoldService.GetUserTicketCountForShowtimeAsync(showtimeId, userId);
+
+            int maxTickets = 4; // Cấu hình tối đa 4 vé cho mỗi người dùng
+
+            if (totalTickets > maxTickets)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult(
+                    $"Bạn đã vượt quá số lượng vé tối đa được phép mua cho suất chiếu này (Tối đa {maxTickets} vé)."));
+            }
 
             // 1. Chống bấm đúp: Trả về đơn chờ hiện tại nếu đã có
             var existingOrder = await _context.Orders
