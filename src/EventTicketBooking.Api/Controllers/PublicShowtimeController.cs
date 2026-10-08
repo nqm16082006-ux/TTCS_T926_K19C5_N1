@@ -48,10 +48,13 @@ namespace EventTicketBooking.Api.Controllers
         [HttpGet("test-db")]
         public IActionResult TestDb()
         {
-            try {
+            try
+            {
                 var query = _context.Events.AsNoTracking().Include(e => e.Owner).Include(e => e.Showtimes).ToList();
                 return Ok("Success, Count: " + query.Count);
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 return StatusCode(500, ex.ToString());
             }
         }
