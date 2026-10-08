@@ -113,16 +113,77 @@ public class EventControllerSalesTests : IDisposable
         Assert.Equal(3, report.TicketSoldCount);
         Assert.Equal(1, report.HeldSeatCount);
         Assert.Equal(3, report.AvailableSeatCount);
+        Assert.Equal(3, report.AvailableTickets);
+        Assert.Equal(3, report.RemainingTickets);
 
         var vipSales = Assert.Single(report.RevenueByCategory, category => category.Name == "VIP");
         Assert.Equal(vip.Id, vipSales.SeatCategoryId);
         Assert.Equal(2, vipSales.TicketSoldCount);
+        Assert.Equal(0, vipSales.AvailableQuantity);
+        Assert.Equal(0, vipSales.RemainingQuantity);
         Assert.Equal(360000, vipSales.Revenue);
 
         var standardSales = Assert.Single(report.RevenueByCategory, category => category.Name == "Standard");
         Assert.Equal(standard.Id, standardSales.SeatCategoryId);
         Assert.Equal(1, standardSales.TicketSoldCount);
+        Assert.Equal(3, standardSales.AvailableQuantity);
+        Assert.Equal(3, standardSales.RemainingQuantity);
         Assert.Equal(90000, standardSales.Revenue);
+    }
+
+    [Fact]
+    public async Task GetEventShowtimes_ReportsRemainingTicketsByCategoryAndShowtime()
+    {
+        var startTime = DateTime.UtcNow.AddDays(1);
+        var ev = CreateEvent(_organizerId, "Tồn vé theo hạng", startTime);
+        var showtime = CreateShowtime(ev, startTime, 5);
+        var vip = CreateCategory(showtime, "VIP", 200000);
+        var standard = CreateCategory(showtime, "Standard", 100000);
+        var seats = new[]
+        {
+            new Seat { ShowtimeId = showtime.Id, SeatCategoryId = vip.Id, Row = "A", SeatNumber = 1 },
+            new Seat { ShowtimeId = showtime.Id, SeatCategoryId = vip.Id, Row = "A", SeatNumber = 2 },
+            new Seat { ShowtimeId = showtime.Id, SeatCategoryId = vip.Id, Row = "A", SeatNumber = 3 },
+            new Seat { ShowtimeId = showtime.Id, SeatCategoryId = standard.Id, Row = "B", SeatNumber = 1 },
+            new Seat { ShowtimeId = showtime.Id, SeatCategoryId = standard.Id, Row = "B", SeatNumber = 2 }
+        };
+        var paidOrder = CreateOrder(showtime, OrderStatus.Paid);
+        _context.Events.Add(ev);
+        _context.Seats.AddRange(seats);
+        _context.Orders.Add(paidOrder);
+        _context.OrderItems.AddRange(
+            new OrderItem { OrderId = paidOrder.Id, SeatId = seats[0].Id, Price = 200000 },
+            new OrderItem { OrderId = paidOrder.Id, SeatId = seats[3].Id, Price = 100000 });
+        _context.SeatHold.Add(new SeatHolds
+        {
+            SeatId = seats[1].Id,
+            UserId = Guid.NewGuid(),
+            Status = "ACTIVE",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5)
+        });
+        await _context.SaveChangesAsync();
+
+        var actionResult = await CreateController(_organizerId, "Organizer").GetEventShowtimes(ev.Id);
+
+        var response = Assert.IsType<ApiResponse<List<ShowtimeResponseDto>>>(
+            Assert.IsType<OkObjectResult>(actionResult).Value);
+        var result = Assert.Single(response.Data!);
+        Assert.Equal(2, result.SoldSeatCount);
+        Assert.Equal(1, result.HeldSeatCount);
+        Assert.Equal(2, result.AvailableTickets);
+        Assert.Equal(2, result.RemainingTickets);
+
+        var vipResult = Assert.Single(result.SeatCategories, category => category.Id == vip.Id);
+        Assert.Equal(3, vipResult.TotalQuantity);
+        Assert.Equal(1, vipResult.HeldQuantity);
+        Assert.Equal(1, vipResult.AvailableQuantity);
+        Assert.Equal(1, vipResult.RemainingQuantity);
+
+        var standardResult = Assert.Single(result.SeatCategories, category => category.Id == standard.Id);
+        Assert.Equal(2, standardResult.TotalQuantity);
+        Assert.Equal(0, standardResult.HeldQuantity);
+        Assert.Equal(1, standardResult.AvailableQuantity);
+        Assert.Equal(1, standardResult.RemainingQuantity);
     }
 
     [Fact]
