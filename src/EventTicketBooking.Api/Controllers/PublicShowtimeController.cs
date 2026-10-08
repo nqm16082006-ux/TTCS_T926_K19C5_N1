@@ -45,6 +45,17 @@ namespace EventTicketBooking.Api.Controllers
             _logger = logger;
         }
 
+        [HttpGet("test-db")]
+        public IActionResult TestDb()
+        {
+            try {
+                var query = _context.Events.AsNoTracking().Include(e => e.Owner).Include(e => e.Showtimes).ToList();
+                return Ok("Success, Count: " + query.Count);
+            } catch (Exception ex) {
+                return StatusCode(500, ex.ToString());
+            }
+        }
+
         /// <summary>
         /// Truy vấn danh sách Suất chiếu đang mở bán (Status = OnSale).
         /// GET /api/public/showtimes?cursor={cursor}&limit={limit}
@@ -413,3 +424,4 @@ namespace EventTicketBooking.Api.Controllers
         }
     }
 }
+

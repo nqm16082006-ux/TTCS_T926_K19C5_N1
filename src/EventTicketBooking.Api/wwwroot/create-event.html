@@ -1482,7 +1482,7 @@
             if (editEventId) {
               window.location.href = `./event-detail.html?id=${editEventId}`;
             } else {
-              window.location.href = './events.html';
+              window.location.href = `./event-detail.html?id=${newEvent.id}`;
             }
           }, 1200);
         } else {

@@ -16,9 +16,9 @@ export const options = {
   }
 };
 
-const BASE_URL = 'http://localhost:5031';
+const BASE_URL = 'http://localhost:5012';
 // Bạn cần thay thế bằng một ShowtimeId có thật trong database của bạn
-const SHOWTIME_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6'; 
+const SHOWTIME_ID = '5541e680-423c-406e-9adb-c13b1390baf5'; 
 
 export default function () {
   // 1. Giả lập Load sơ đồ ghế khi vừa vào trang
@@ -33,7 +33,7 @@ export default function () {
   
   if (check(negotiateRes, { 'Negotiate is 200': (r) => r.status === 200 })) {
     const connectionToken = negotiateRes.json('connectionToken');
-    const wsUrl = `ws://localhost:5031/hubs/seat-status?id=${connectionToken}`;
+    const wsUrl = `ws://localhost:5012/hubs/seat-status?id=${connectionToken}`;
 
     // B2.2: Mở kết nối WebSocket
     const res = ws.connect(wsUrl, function (socket) {
