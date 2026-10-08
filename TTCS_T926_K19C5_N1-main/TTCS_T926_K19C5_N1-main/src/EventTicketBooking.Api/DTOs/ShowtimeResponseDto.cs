@@ -11,8 +11,11 @@ namespace EventTicketBooking.Api.DTOs
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
         public int AvailableSeats { get; set; }
+        public int RemainingTickets { get; set; }
+        public int AvailableTickets { get; set; }
         public int? ActualSeatCount { get; set; }
         public int SoldSeatCount { get; set; }
+        public int HeldSeatCount { get; set; }
         public EventTicketBooking.Api.Models.ShowtimeStatus Status { get; set; }
         public List<SeatCategoryPriceDto> SeatCategories { get; set; } = new();
         public bool CanOpenSale => Status == EventTicketBooking.Api.Models.ShowtimeStatus.Draft && AvailableSeats > 0 &&
@@ -65,4 +68,3 @@ namespace EventTicketBooking.Api.DTOs
         }
     }
 }
-

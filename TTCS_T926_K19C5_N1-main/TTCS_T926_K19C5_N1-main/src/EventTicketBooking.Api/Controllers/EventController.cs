@@ -382,31 +382,101 @@ namespace EventTicketBooking.Api.Controllers
 
             var ids = ev.Showtimes.Select(s => s.Id).ToList();
             var seatCounts = await _context.Seats.AsNoTracking().Where(s => ids.Contains(s.ShowtimeId))
-                .GroupBy(s => s.ShowtimeId).Select(g => new { Id = g.Key, Total = g.Count(), Sold = g.Count(s => s.Status == "SOLD") })
+                .GroupBy(s => s.ShowtimeId).Select(g => new { Id = g.Key, Total = g.Count() })
                 .ToDictionaryAsync(g => g.Id);
-            var showtimesDto = ev.Showtimes.Select(s => new ShowtimeResponseDto
+            var heldCounts = await _context.SeatHold
+                .AsNoTracking()
+                .Where(hold => hold.Status == "ACTIVE" && hold.ExpiresAt > DateTime.UtcNow && ids.Contains(hold.Seat.ShowtimeId))
+                .GroupBy(hold => hold.Seat.ShowtimeId)
+                .Select(group => new { ShowtimeId = group.Key, Total = group.Count() })
+                .ToDictionaryAsync(group => group.ShowtimeId, group => group.Total);
+            var categorySeatCounts = await _context.Seats
+                .AsNoTracking()
+                .Where(seat => ids.Contains(seat.ShowtimeId))
+                .GroupBy(seat => new { seat.ShowtimeId, seat.SeatCategoryId })
+                .Select(group => new
+                {
+                    group.Key.ShowtimeId,
+                    group.Key.SeatCategoryId,
+                    Total = group.Count()
+                })
+                .ToDictionaryAsync(group => (group.ShowtimeId, group.SeatCategoryId), group => group.Total);
+            var categoryHeldCounts = await _context.SeatHold
+                .AsNoTracking()
+                .Where(hold => hold.Status == "ACTIVE" &&
+                               hold.ExpiresAt > DateTime.UtcNow &&
+                               ids.Contains(hold.Seat.ShowtimeId))
+                .GroupBy(hold => new { hold.Seat.ShowtimeId, hold.Seat.SeatCategoryId })
+                .Select(group => new
+                {
+                    group.Key.ShowtimeId,
+                    group.Key.SeatCategoryId,
+                    Total = group.Count()
+                })
+                .ToDictionaryAsync(group => (group.ShowtimeId, group.SeatCategoryId), group => group.Total);
+            var paidCategorySales = await _context.OrderItems
+                .AsNoTracking()
+                .Where(item => item.Order.Status == OrderStatus.Paid && ids.Contains(item.Order.ShowtimeId))
+                .GroupBy(item => new
+                {
+                    ShowtimeId = item.Order.ShowtimeId,
+                    SeatCategoryId = item.Seat.SeatCategoryId
+                })
+                .Select(group => new
+                {
+                    group.Key.ShowtimeId,
+                    group.Key.SeatCategoryId,
+                    Total = group.Count()
+                })
+                .ToDictionaryAsync(group => (group.ShowtimeId, group.SeatCategoryId), group => group.Total);
+            var showtimesDto = ev.Showtimes.Select(s =>
             {
-                Id = s.Id,
-                EventId = s.EventId,
-                StartTime = s.StartTime,
-                EndTime = s.EndTime,
-                AvailableSeats = s.AvailableSeats,
-                ActualSeatCount = seatCounts.TryGetValue(s.Id, out var counts) ? counts.Total : 0,
-                SoldSeatCount = seatCounts.TryGetValue(s.Id, out var soldCounts) ? soldCounts.Sold : 0,
-                Status = s.Status,
-                SeatCategories = s.SeatCategories
+                var totalActualSeats = seatCounts.TryGetValue(s.Id, out var counts) ? counts.Total : 0;
+                var soldSeatCount = s.SeatCategories.Sum(category =>
+                    paidCategorySales.GetValueOrDefault((s.Id, category.Id)));
+                var heldSeatCount = heldCounts.GetValueOrDefault(s.Id);
+                var remainingSeatCount = Math.Max(0, totalActualSeats - soldSeatCount - heldSeatCount);
+                var categories = s.SeatCategories
                     .OrderBy(category => category.Name)
-                    .Select(category => new SeatCategoryPriceDto
+                    .Select(category =>
                     {
-                        Id = category.Id,
-                        Name = category.Name,
-                        Price = category.Price
+                        var categoryTotal = categorySeatCounts.GetValueOrDefault((s.Id, category.Id));
+                        var categorySold = paidCategorySales.GetValueOrDefault((s.Id, category.Id));
+                        var categoryHeld = categoryHeldCounts.GetValueOrDefault((s.Id, category.Id));
+                        var categoryAvailable = Math.Max(0, categoryTotal - categorySold - categoryHeld);
+
+                        return new SeatCategoryPriceDto
+                        {
+                            Id = category.Id,
+                            Name = category.Name,
+                            Price = category.Price,
+                            TotalQuantity = categoryTotal,
+                            HeldQuantity = categoryHeld,
+                            AvailableQuantity = categoryAvailable,
+                            RemainingQuantity = categoryAvailable
+                        };
                     })
-                    .ToList(),
-                StatusActionMessage = s.Status != ShowtimeStatus.Draft ? GetShowtimeStatusActionMessage(s) :
-                    !seatCounts.ContainsKey(s.Id) ? "Tải sơ đồ ghế trước khi mở bán." :
-                    s.SeatCategories.Count == 0 || s.SeatCategories.Any(c => c.Price is null or < 0) ? "Thiết lập giá cho tất cả hạng ghế trước khi mở bán." :
-                    GetShowtimeStatusActionMessage(s)
+                    .ToList();
+
+                return new ShowtimeResponseDto
+                {
+                    Id = s.Id,
+                    EventId = s.EventId,
+                    StartTime = s.StartTime,
+                    EndTime = s.EndTime,
+                    AvailableSeats = s.AvailableSeats,
+                    RemainingTickets = remainingSeatCount,
+                    AvailableTickets = remainingSeatCount,
+                    ActualSeatCount = totalActualSeats,
+                    SoldSeatCount = soldSeatCount,
+                    HeldSeatCount = heldSeatCount,
+                    Status = s.Status,
+                    SeatCategories = categories,
+                    StatusActionMessage = s.Status != ShowtimeStatus.Draft ? GetShowtimeStatusActionMessage(s) :
+                        !seatCounts.ContainsKey(s.Id) ? "Tải sơ đồ ghế trước khi mở bán." :
+                        s.SeatCategories.Count == 0 || s.SeatCategories.Any(c => c.Price is null or < 0) ? "Thiết lập giá cho tất cả hạng ghế trước khi mở bán." :
+                        GetShowtimeStatusActionMessage(s)
+                };
             }).ToList();
 
             return Ok(ApiResponse<List<ShowtimeResponseDto>>.SuccessResult(showtimesDto, "Lấy danh sách suất diễn thành công."));
@@ -478,6 +548,8 @@ namespace EventTicketBooking.Api.Controllers
                 StartTime = showtime.StartTime,
                 EndTime = showtime.EndTime,
                 AvailableSeats = showtime.AvailableSeats,
+                RemainingTickets = showtime.AvailableSeats,
+                AvailableTickets = showtime.AvailableSeats,
                 Status = showtime.Status,
                 SeatCategories = new List<SeatCategoryPriceDto>(),
                 StatusActionMessage = GetShowtimeStatusActionMessage(showtime)
@@ -550,6 +622,8 @@ namespace EventTicketBooking.Api.Controllers
                 StartTime = showtime.StartTime,
                 EndTime = showtime.EndTime,
                 AvailableSeats = showtime.AvailableSeats,
+                RemainingTickets = showtime.AvailableSeats,
+                AvailableTickets = showtime.AvailableSeats,
                 Status = showtime.Status,
                 StatusActionMessage = GetShowtimeStatusActionMessage(showtime)
             };
@@ -599,6 +673,13 @@ namespace EventTicketBooking.Api.Controllers
                 .Select(group => new { ShowtimeId = group.Key, Total = group.Count() })
                 .ToDictionaryAsync(group => group.ShowtimeId, group => group.Total);
 
+            var categorySeatCounts = await _context.Seats
+                .AsNoTracking()
+                .Where(seat => showtimeIds.Contains(seat.ShowtimeId))
+                .GroupBy(seat => new { seat.ShowtimeId, seat.SeatCategoryId })
+                .Select(group => new { group.Key.ShowtimeId, group.Key.SeatCategoryId, Total = group.Count() })
+                .ToDictionaryAsync(group => (group.ShowtimeId, group.SeatCategoryId), group => group.Total);
+
             var heldCounts = await _context.SeatHold
                 .AsNoTracking()
                 .Where(hold => hold.Status == "ACTIVE" &&
@@ -607,6 +688,15 @@ namespace EventTicketBooking.Api.Controllers
                 .GroupBy(hold => hold.Seat.ShowtimeId)
                 .Select(group => new { ShowtimeId = group.Key, Total = group.Count() })
                 .ToDictionaryAsync(group => group.ShowtimeId, group => group.Total);
+
+            var heldCountsByCategory = await _context.SeatHold
+                .AsNoTracking()
+                .Where(hold => hold.Status == "ACTIVE" &&
+                               hold.ExpiresAt > now &&
+                               showtimeIds.Contains(hold.Seat.ShowtimeId))
+                .GroupBy(hold => new { hold.Seat.ShowtimeId, hold.Seat.SeatCategoryId })
+                .Select(group => new { group.Key.ShowtimeId, group.Key.SeatCategoryId, Total = group.Count() })
+                .ToDictionaryAsync(group => (group.ShowtimeId, group.SeatCategoryId), group => group.Total);
 
             var paidSales = await _context.OrderItems
                 .AsNoTracking()
@@ -636,11 +726,20 @@ namespace EventTicketBooking.Api.Controllers
                     .Select(category =>
                     {
                         salesByCategory.TryGetValue((showtime.Id, category.Id), out var sale);
+                        var categorySoldCount = sale?.TicketSoldCount ?? 0;
+                        var categoryTotal = categorySeatCounts.GetValueOrDefault((showtime.Id, category.Id), 0);
+                        var categoryHeldCount = heldCountsByCategory.GetValueOrDefault((showtime.Id, category.Id), 0);
+                        var categoryAvailable = Math.Max(0, categoryTotal - categorySoldCount - categoryHeldCount);
+
                         return new SeatCategorySalesDto
                         {
                             SeatCategoryId = category.Id,
                             Name = category.Name,
-                            TicketSoldCount = sale?.TicketSoldCount ?? 0,
+                            TotalQuantity = categoryTotal,
+                            TicketSoldCount = categorySoldCount,
+                            HeldQuantity = categoryHeldCount,
+                            AvailableQuantity = categoryAvailable,
+                            RemainingQuantity = categoryAvailable,
                             Revenue = sale?.Revenue ?? 0
                         };
                     })
@@ -648,6 +747,7 @@ namespace EventTicketBooking.Api.Controllers
                 var soldCount = categories.Sum(category => category.TicketSoldCount);
                 var heldCount = heldCounts.GetValueOrDefault(showtime.Id);
                 var totalSeats = seatCounts.GetValueOrDefault(showtime.Id);
+                var availableSeats = Math.Max(0, totalSeats - soldCount - heldCount);
 
                 return new ShowtimeSalesDto
                 {
@@ -657,7 +757,9 @@ namespace EventTicketBooking.Api.Controllers
                     EndTime = showtime.EndTime,
                     TicketSoldCount = soldCount,
                     HeldSeatCount = heldCount,
-                    AvailableSeatCount = Math.Max(0, totalSeats - soldCount - heldCount),
+                    AvailableSeatCount = availableSeats,
+                    RemainingTickets = availableSeats,
+                    AvailableTickets = availableSeats,
                     RevenueByCategory = categories
                 };
             }).ToList();
@@ -894,10 +996,12 @@ namespace EventTicketBooking.Api.Controllers
                     StartTime = showtime.StartTime,
                     EndTime = showtime.EndTime,
                     AvailableSeats = showtime.AvailableSeats,
-                    Status = showtime.Status,
-                    StatusActionMessage = GetShowtimeStatusActionMessage(showtime)
-                };
-                return Ok(ApiResponse<ShowtimeResponseDto>.SuccessResult(responseDto, "Mở bán suất diễn thành công."));
+                        RemainingTickets = showtime.AvailableSeats,
+                        AvailableTickets = showtime.AvailableSeats,
+                        Status = showtime.Status,
+                        StatusActionMessage = GetShowtimeStatusActionMessage(showtime)
+                    };
+                    return Ok(ApiResponse<ShowtimeResponseDto>.SuccessResult(responseDto, "Mở bán suất diễn thành công."));
             }
             catch (InvalidOperationException ex)
             {
@@ -957,6 +1061,8 @@ namespace EventTicketBooking.Api.Controllers
                     StartTime = showtime.StartTime,
                     EndTime = showtime.EndTime,
                     AvailableSeats = showtime.AvailableSeats,
+                    RemainingTickets = showtime.AvailableSeats,
+                    AvailableTickets = showtime.AvailableSeats,
                     Status = showtime.Status,
                     StatusActionMessage = GetShowtimeStatusActionMessage(showtime)
                 };

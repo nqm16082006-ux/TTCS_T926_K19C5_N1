@@ -12,11 +12,16 @@ public class ShowtimeSalesDto
     public string EventTitle { get; set; } = string.Empty;
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
+    public int TotalSeats { get; set; }
     public int TicketSoldCount { get; set; }
     public int HeldSeatCount { get; set; }
     public int AvailableSeatCount { get; set; }
     public int RemainingTickets { get; set; }
-    public int AvailableTickets { get; set; }
+    public int AvailableTickets
+    {
+        get => RemainingTickets;
+        set => RemainingTickets = value;
+    }
     public List<SeatCategorySalesDto> RevenueByCategory { get; set; } = new();
 }
 
@@ -26,8 +31,17 @@ public class SeatCategorySalesDto
     public string Name { get; set; } = string.Empty;
     public int TotalQuantity { get; set; }
     public int TicketSoldCount { get; set; }
-    public int HeldQuantity { get; set; }
+    public int HeldCount { get; set; }
     public int AvailableQuantity { get; set; }
-    public int RemainingQuantity { get; set; }
+    public int AvailableTickets
+    {
+        get => AvailableQuantity;
+        set => AvailableQuantity = value;
+    }
+    public int RemainingQuantity
+    {
+        get => AvailableQuantity;
+        set => AvailableQuantity = value;
+    }
     public long Revenue { get; set; }
 }

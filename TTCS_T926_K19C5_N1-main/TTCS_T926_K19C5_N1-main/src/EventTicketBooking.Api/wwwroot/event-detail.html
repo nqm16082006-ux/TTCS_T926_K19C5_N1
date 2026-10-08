@@ -1143,12 +1143,26 @@
         const isClosed = s.status === 3 || s.status === 'Closed';
         const totalSeats = s.actualSeatCount ?? s.availableSeats;
         const hasSeats = totalSeats > 0;
-        const avail = s.availableSeats;
+        const avail = Number(s.availableTickets ?? s.remainingTickets ?? s.availableSeatCount ?? s.availableSeats ?? 0);
         const sold = s.soldSeatCount ?? Math.max(0, totalSeats - avail);
+        const held = Number(s.heldSeatCount || 0);
         let pct = totalSeats > 0 ? Math.round((sold / totalSeats) * 100) : 0;
 
         // Seat category info & pricing
         const categories = s.seatCategories || [];
+        const categoryInventory = categories.length
+          ? categories.map(category => {
+              const categoryTotal = Number(category.totalQuantity || 0);
+              const categoryAvailable = Number(category.availableQuantity ?? category.remainingQuantity ?? 0);
+              const categoryHeld = Number(category.heldQuantity || 0);
+              const categorySold = Math.max(0, categoryTotal - categoryAvailable - categoryHeld);
+
+              return `<div class="flex items-center justify-between gap-3 rounded-md bg-surface-container-low px-2.5 py-1.5 text-xs">
+                <span class="font-semibold text-on-surface">${escapeHtml(category.name)}</span>
+                <span class="whitespace-nowrap text-on-surface-variant">Đã bán ${categorySold.toLocaleString('vi-VN')} • Giữ ${categoryHeld.toLocaleString('vi-VN')} • Còn ${categoryAvailable.toLocaleString('vi-VN')}</span>
+              </div>`;
+            }).join('')
+          : '';
         const hasPrices = categories.length > 0 && categories.every(c => c.price !== null && c.price >= 0);
         let priceRangeText = 'Chưa thiết lập';
         if (hasPrices) {
@@ -1235,6 +1249,7 @@
                     + Cài đặt bảng giá
                   </button>
                 `}
+                ${categoryInventory ? `<div class="mt-1 w-full space-y-1">${categoryInventory}</div>` : ''}
               </div>
             </td>
 
@@ -1248,7 +1263,7 @@
                 <div class="w-full bg-surface-container-high rounded-full h-1.5 overflow-hidden">
                   <div class="${pct >= 80 ? 'bg-secondary' : 'bg-emerald-600'} h-1.5 rounded-full transition-all" style="width: ${pct}%"></div>
                 </div>
-                <span class="text-on-surface-variant font-body-sm text-body-sm">Còn lại: ${Math.max(0, totalSeats - sold).toLocaleString('vi-VN')} chỗ</span>
+                <span class="text-on-surface-variant font-body-sm text-body-sm">Còn khả dụng: ${avail.toLocaleString('vi-VN')} • Đang giữ: ${held.toLocaleString('vi-VN')}</span>
               </div>
             </td>
 

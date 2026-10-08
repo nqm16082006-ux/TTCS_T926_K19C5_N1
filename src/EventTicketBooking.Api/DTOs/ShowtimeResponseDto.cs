@@ -11,7 +11,12 @@ namespace EventTicketBooking.Api.DTOs
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
         public int AvailableSeats { get; set; }
-        public int MaxTicketsPerUser { get; set; } = 10;
+        public int RemainingTickets { get; set; }
+        public int AvailableTickets
+        {
+            get => RemainingTickets;
+            set => RemainingTickets = value;
+        }
         public int? ActualSeatCount { get; set; }
         public int SoldSeatCount { get; set; }
         public EventTicketBooking.Api.Models.ShowtimeStatus Status { get; set; }

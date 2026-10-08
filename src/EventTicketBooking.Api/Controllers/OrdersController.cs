@@ -74,10 +74,15 @@ namespace EventTicketBooking.Api.Controllers
 
             var now = DateTimeOffset.UtcNow;
 
-            using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
 
             try
             {
+                if (_context.Database.IsRelational())
+                {
+                    transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+                }
+
                 // 2. Lấy giữ chỗ (Không nhận danh sách ghế từ client)
                 var holds = await _context.SeatHold
                     .Include(sh => sh.Seat)
@@ -184,22 +189,38 @@ namespace EventTicketBooking.Api.Controllers
                 _context.Orders.Add(order);
                 await _context.SaveChangesAsync();
 
-                await transaction.CommitAsync();
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync();
+                }
 
                 return Ok(ApiResponse<OrderDto>.SuccessResult(MapToDto(order), "Tạo đơn hàng thành công."));
             }
             catch (DbUpdateException ex)
             {
-                await transaction.RollbackAsync();
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                }
                 _context.ChangeTracker.Clear();
                 _logger.LogWarning(ex, "Concurrent order creation for User {UserId}", userId);
                 return Conflict(ApiResponse<object>.FailureResult("Trạng thái đặt vé vừa thay đổi. Vui lòng tải lại và thử lại."));
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                }
                 _logger.LogError(ex, "Lỗi khi tạo đơn hàng từ giữ chỗ cho User {UserId}", userId);
                 return StatusCode(500, ApiResponse<object>.FailureResult("Đã xảy ra lỗi hệ thống."));
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync();
+                }
             }
         }
 
@@ -402,5 +423,4 @@ namespace EventTicketBooking.Api.Controllers
         }
     }
 }
-
 

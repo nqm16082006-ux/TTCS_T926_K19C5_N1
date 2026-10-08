@@ -287,6 +287,162 @@
       background: var(--bg-surface);
       margin-top: auto;
     }
+
+    /* Outdoor Visibility & S-30 High-Contrast Result Styles */
+    .result-card-outdoor {
+      border-radius: 16px;
+      padding: 24px 20px;
+      margin-bottom: 24px;
+      text-align: center;
+      transition: all 0.25s ease-in-out;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+    }
+
+    .result-card-success {
+      background: #ecfdf5;
+      border: 3px solid #059669;
+      color: #064e3b;
+    }
+
+    .result-card-error {
+      background: #fef2f2;
+      border: 3px solid #dc2626;
+      color: #7f1d1d;
+    }
+
+    .result-card-pending {
+      background: #fffbeb;
+      border: 3px solid #d97706;
+      color: #78350f;
+    }
+
+    .badge-valid-outdoor {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #059669;
+      color: #ffffff;
+      padding: 10px 22px;
+      border-radius: 9999px;
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+    }
+
+    .badge-invalid-outdoor {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #dc2626;
+      color: #ffffff;
+      padding: 10px 22px;
+      border-radius: 9999px;
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
+    }
+
+    .badge-pending-outdoor {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #d97706;
+      color: #ffffff;
+      padding: 10px 22px;
+      border-radius: 9999px;
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35);
+    }
+
+    .seat-highlight-grid {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin: 16px 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      border: 2px solid #a7f3d0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    @media (max-width: 540px) {
+      .seat-highlight-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .seat-highlight-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .seat-highlight-label {
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: #047857;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .seat-highlight-value {
+      font-size: 2rem;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .meta-row-outdoor {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-top: 14px;
+      border-top: 2px dashed #6ee7b7;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #065f46;
+    }
+
+    .btn-next-scan {
+      margin-top: 18px;
+      padding: 12px 28px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+      border: none;
+      background: #0f172a;
+      color: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      transition: all 0.2s;
+    }
+
+    .btn-next-scan:hover {
+      background: #1e293b;
+      transform: translateY(-1px);
+    }
+    .btn-next-scan:active {
+      transform: translateY(0);
+    }
   </style>
 </head>
 <body>
@@ -478,25 +634,46 @@
       async function handleScan() {
         if (isProcessing) return;
 
-        const ticketId = document.getElementById('ticketInput').value.trim();
+        const rawInput = document.getElementById('ticketInput').value.trim();
         const showtimeId = document.getElementById('showtimeSelect').value;
-        const gateName = document.getElementById('gateInput').value.trim();
+        const gateName = document.getElementById('gateInput').value.trim() || 'Gate 1';
         const resultDiv = document.getElementById('scanResult');
 
         resultDiv.style.display = 'block';
         
-        if (!ticketId) {
-          showResult('error', 'Vui lòng nhập mã vé (Ticket ID).');
+        if (!rawInput) {
+          showErrorResult('Vui lòng quét mã QR hoặc nhập mã vé.');
           return;
         }
         if (!showtimeId) {
-          showResult('error', 'Vui lòng chọn suất diễn.');
+          showErrorResult('Vui lòng chọn suất diễn hiện tại trước khi soát vé.');
           return;
         }
 
         isProcessing = true;
         resultDiv.className = 'info-alert';
-        resultDiv.innerHTML = '<span class="material-symbols-outlined">sync</span> Đang kiểm tra...';
+        resultDiv.innerHTML = '<span class="material-symbols-outlined" style="animation: spin 1s linear infinite;">sync</span> <span>Đang xác thực vé...</span>';
+
+        // Xây dựng payload phù hợp với định dạng quét
+        const bodyPayload = {
+          selectedShowtimeId: showtimeId,
+          gateName: gateName
+        };
+
+        if (rawInput.startsWith('TICKET|') || rawInput.includes('|')) {
+          bodyPayload.qrPayload = rawInput;
+        } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawInput)) {
+          bodyPayload.ticketId = rawInput;
+        } else {
+          bodyPayload.ticketCode = rawInput;
+        }
+
+        // S-30: Quá 3 giây chưa có phản hồi → hiển thị "Đang chờ...", không đứng im
+        let pendingTimeout = setTimeout(() => {
+          if (isProcessing) {
+            showPendingNotice();
+          }
+        }, 3000);
 
         try {
           const res = await fetch('/api/v1/checkin/scan', {
@@ -505,46 +682,173 @@
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({
-              ticketId,
-              selectedShowtimeId: showtimeId,
-              gateName
-            })
+            body: JSON.stringify(bodyPayload)
           });
 
-          const data = await res.json();
+          const data = await res.json().catch(() => ({}));
+          clearTimeout(pendingTimeout);
 
           if (res.ok) {
-            showResult('success', `
-              <strong>✅ ${data.message}</strong><br>
-              Ghế: ${data.seatInfo} | Cửa: ${data.gate}
-            `);
-            document.getElementById('ticketInput').value = ''; // clear for next scan
-            document.getElementById('ticketInput').focus();
+            showSuccessResult(data, gateName);
+            document.getElementById('ticketInput').value = ''; // clear cho vé tiếp theo
           } else {
-            showResult('error', `<strong>❌ Lỗi:</strong> ${data.message}`);
+            showErrorResult(data.message || 'Mã vé không hợp lệ hoặc bị từ chối.');
           }
         } catch (error) {
+          clearTimeout(pendingTimeout);
           console.error(error);
-          showResult('error', 'Lỗi kết nối đến máy chủ.');
+          showErrorResult('Lỗi kết nối máy chủ. Vui lòng thử lại.');
         } finally {
-          isProcessing = false;
+          clearTimeout(pendingTimeout);
+          // Mở khóa quét sau thời gian ngắn để staff có thể quét tiếp ngay
+          setTimeout(() => {
+            isProcessing = false;
+            const inputEl = document.getElementById('ticketInput');
+            if (inputEl) inputEl.focus();
+          }, 800);
         }
       }
 
-      function showResult(type, html) {
+      function showPendingNotice() {
         const resultDiv = document.getElementById('scanResult');
         resultDiv.style.display = 'block';
-        if (type === 'success') {
-          resultDiv.style.background = 'var(--success-bg)';
-          resultDiv.style.border = '1px solid var(--success-border)';
-          resultDiv.style.color = 'var(--success-text)';
-        } else {
-          resultDiv.style.background = 'var(--danger-bg)';
-          resultDiv.style.border = '1px solid var(--danger-border)';
-          resultDiv.style.color = 'var(--danger-text)';
+        resultDiv.innerHTML = `
+          <div class="result-card-outdoor result-card-pending">
+            <div class="badge-pending-outdoor">
+              <span class="material-symbols-outlined" style="font-size: 26px; animation: spin 1.2s linear infinite;">sync</span>
+              <span>Đang chờ…</span>
+            </div>
+            <p style="font-size: 1.05rem; font-weight: 800; margin: 10px 0 0 0;">
+              Hệ thống đang kết nối kiểm tra dữ liệu vé, vui lòng giữ vé ổn định...
+            </p>
+          </div>
+        `;
+      }
+
+      function showSuccessResult(data, gateFallback) {
+        playAudioCue('success');
+        const resultDiv = document.getElementById('scanResult');
+        resultDiv.style.display = 'block';
+
+        const category = data.categoryName || 'TIÊU CHUẨN';
+        const seatStr = data.seatInfo || (data.seatRow ? `${data.seatRow}${data.seatNumber}` : 'Hợp lệ');
+        const gateStr = data.gate || gateFallback || 'Gate 1';
+        const checkInTimeStr = data.checkInTime ? formatDateTime(data.checkInTime) : formatDateTime(new Date());
+
+        resultDiv.innerHTML = `
+          <div class="result-card-outdoor result-card-success">
+            <div class="badge-valid-outdoor">
+              <span class="material-symbols-outlined" style="font-size: 28px;">check_circle</span>
+              <span>VÉ HỢP LỆ — CHECK-IN THÀNH CÔNG</span>
+            </div>
+
+            <div class="seat-highlight-grid">
+              <div class="seat-highlight-col">
+                <span class="seat-highlight-label">Hạng Vé</span>
+                <span class="seat-highlight-value" style="color: #047857;">${escapeHtml(category)}</span>
+              </div>
+              <div class="seat-highlight-col">
+                <span class="seat-highlight-label">Vị Trí Ghế</span>
+                <span class="seat-highlight-value" style="color: #0f172a;">GHẾ ${escapeHtml(seatStr)}</span>
+              </div>
+            </div>
+
+            <div class="meta-row-outdoor">
+              <div>📍 <span>Cửa soát:</span> <strong>${escapeHtml(gateStr)}</strong></div>
+              <div>⏰ <span>Thời điểm:</span> <strong>${escapeHtml(checkInTimeStr)}</strong></div>
+              ${data.ticketCode ? `<div>🎟️ <span>Mã vé:</span> <strong>${escapeHtml(data.ticketCode)}</strong></div>` : ''}
+            </div>
+
+            <div>
+              <button type="button" class="btn-next-scan" onclick="resetForNextScan()">
+                <span class="material-symbols-outlined">qr_code_scanner</span>
+                <span>Quét vé tiếp theo</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      function showErrorResult(errorMessage) {
+        playAudioCue('error');
+        const resultDiv = document.getElementById('scanResult');
+        resultDiv.style.display = 'block';
+
+        resultDiv.innerHTML = `
+          <div class="result-card-outdoor result-card-error">
+            <div class="badge-invalid-outdoor">
+              <span class="material-symbols-outlined" style="font-size: 28px;">cancel</span>
+              <span>TỪ CHỐI VÉ — KHÔNG HỢP LỆ</span>
+            </div>
+
+            <div style="background: #ffffff; border-radius: 12px; padding: 16px 20px; margin: 16px 0; border: 2px solid #fecaca; text-align: center;">
+              <div style="font-size: 0.8rem; font-weight: 800; color: #dc2626; text-transform: uppercase; margin-bottom: 6px;">Lý do từ chối:</div>
+              <div style="font-size: 1.15rem; font-weight: 800; color: #991b1b; line-height: 1.4;">${escapeHtml(errorMessage)}</div>
+            </div>
+
+            <div>
+              <button type="button" class="btn-next-scan" onclick="resetForNextScan()">
+                <span class="material-symbols-outlined">refresh</span>
+                <span>Quét vé tiếp theo</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      window.resetForNextScan = function () {
+        isProcessing = false;
+        const input = document.getElementById('ticketInput');
+        if (input) {
+          input.value = '';
+          input.focus();
         }
-        resultDiv.innerHTML = html;
+        const resultDiv = document.getElementById('scanResult');
+        if (resultDiv) {
+          resultDiv.style.display = 'none';
+        }
+      };
+
+      function formatDateTime(dateVal) {
+        try {
+          const d = new Date(dateVal);
+          return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ' +
+                 d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        } catch (_) {
+          return String(dateVal);
+        }
+      }
+
+      function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+      }
+
+      function playAudioCue(type) {
+        try {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContext) return;
+          const ctx = new AudioContext();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          if (type === 'success') {
+            osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+            osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.25);
+          } else {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(220, ctx.currentTime);
+            osc.frequency.setValueAtTime(164.81, ctx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.25, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.35);
+          }
+        } catch (_) {}
       }
 
     })();

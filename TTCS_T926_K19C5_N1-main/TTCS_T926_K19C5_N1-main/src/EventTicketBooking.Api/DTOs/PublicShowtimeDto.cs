@@ -25,6 +25,10 @@ namespace EventTicketBooking.Api.DTOs
 
         public int AvailableSeats { get; set; }
 
+        public int AvailableTickets { get; set; }
+
+        public int RemainingTickets { get; set; }
+
         public int TotalSeats { get; set; }
 
         /// <summary>

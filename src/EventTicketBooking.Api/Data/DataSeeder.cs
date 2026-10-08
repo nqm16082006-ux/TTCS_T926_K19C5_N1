@@ -24,7 +24,10 @@ namespace EventTicketBooking.Api.Data
             var logger = scope.ServiceProvider.GetService<ILogger<AppDbContext>>();
 
             // Migration failures must stop startup rather than be swallowed as seed warnings.
-            await context.Database.MigrateAsync();
+            if (context.Database.IsRelational())
+            {
+                await context.Database.MigrateAsync();
+            }
 
             try
             {
