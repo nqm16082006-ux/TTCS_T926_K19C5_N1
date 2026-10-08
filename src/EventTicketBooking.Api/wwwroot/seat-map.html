@@ -148,6 +148,18 @@
         </div>
       </div>
 
+      <!-- Connection Status Toast (SignalR) -->
+      <div id="connection-toast-wrapper" class="max-w-7xl mx-auto px-margin w-full pt-space-md hidden transition-all duration-300">
+        <div class="flex items-center justify-between gap-space-md p-space-md rounded-xl bg-amber-50 text-amber-900 border border-amber-200 shadow-md">
+          <div class="flex items-center gap-space-sm min-w-0">
+            <span class="material-symbols-outlined text-amber-600 flex-shrink-0 animate-pulse">wifi_off</span>
+            <p class="font-body-md text-body-md font-semibold text-amber-900 truncate" id="connection-toast-msg">
+              Mất kết nối thời gian thực. Đang tự động thử lại và chuyển sang chế độ làm mới định kỳ...
+            </p>
+          </div>
+        </div>
+      </div>
+
       <!-- Success Toast Notification -->
       <div id="success-toast-wrapper" class="max-w-7xl mx-auto px-margin w-full pt-space-md hidden transition-all duration-300">
         <div class="flex items-center justify-between gap-space-md p-space-md rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-200 shadow-md">
@@ -1679,6 +1691,40 @@
       initSignalR();
     }
 
+    let fallbackPollingInterval = null;
+
+    function showConnectionStatus(msg, isError = true) {
+      const wrapper = document.getElementById('connection-toast-wrapper');
+      const msgEl = document.getElementById('connection-toast-msg');
+      if (wrapper && msgEl) {
+        msgEl.textContent = msg;
+        wrapper.classList.remove('hidden');
+        if (!isError) {
+          setTimeout(() => wrapper.classList.add('hidden'), 3000);
+        }
+      }
+    }
+    
+    function hideConnectionStatus() {
+      const wrapper = document.getElementById('connection-toast-wrapper');
+      if (wrapper) wrapper.classList.add('hidden');
+    }
+
+    function startFallbackPolling() {
+      if (!fallbackPollingInterval) {
+        fallbackPollingInterval = setInterval(() => {
+          loadSeats();
+        }, 3000); // Poll mỗi 3 giây khi mất kết nối realtime
+      }
+    }
+
+    function stopFallbackPolling() {
+      if (fallbackPollingInterval) {
+        clearInterval(fallbackPollingInterval);
+        fallbackPollingInterval = null;
+      }
+    }
+
     function initSignalR() {
       if (!showtimeId || !window.signalR) return;
 
@@ -1686,6 +1732,27 @@
         .withUrl(`${API_BASE}/hubs/seat-status`)
         .withAutomaticReconnect()
         .build();
+
+      connection.onreconnecting((error) => {
+        console.warn("SignalR đang thử kết nối lại...", error);
+        showConnectionStatus("Đang thử kết nối lại máy chủ... Hệ thống chuyển sang chế độ tải định kỳ (Polling).");
+        startFallbackPolling();
+      });
+
+      connection.onreconnected((connectionId) => {
+        console.log("SignalR đã kết nối lại. Connection ID:", connectionId);
+        hideConnectionStatus();
+        stopFallbackPolling();
+        showSuccessToast("Đã khôi phục kết nối thời gian thực!");
+        connection.invoke("JoinShowtimeGroup", showtimeId);
+        loadSeats(); // Tải lại 1 lần để chắc chắn đồng bộ
+      });
+
+      connection.onclose((error) => {
+        console.error("SignalR mất kết nối hoàn toàn.", error);
+        showConnectionStatus("Mất kết nối máy chủ hoàn toàn. Hệ thống đang dùng chế độ tải định kỳ (Polling).");
+        startFallbackPolling();
+      });
 
       connection.on("SeatStatusChanged", (data) => {
         if (!data || !data.seatId || !data.status) return;
@@ -1719,7 +1786,11 @@
           console.log("Đã kết nối Real-time Seat Status");
           connection.invoke("JoinShowtimeGroup", showtimeId);
         })
-        .catch(err => console.error("Lỗi kết nối SignalR:", err));
+        .catch(err => {
+          console.error("Lỗi kết nối SignalR (khởi tạo):", err);
+          showConnectionStatus("Không thể kết nối thời gian thực. Hệ thống chuyển sang chế độ tải định kỳ (Polling).");
+          startFallbackPolling();
+        });
     }
 
     document.addEventListener('DOMContentLoaded', initPage);
