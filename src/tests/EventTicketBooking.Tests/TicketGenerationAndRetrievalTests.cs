@@ -209,7 +209,7 @@ namespace EventTicketBooking.Tests
                 {
                     var fakeGateway = new FakePaymentGateway();
                     var mockQueue = new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>();
-                    var paymentService = new PaymentService(processContext, fakeGateway, NullLogger<PaymentService>.Instance, mockQueue.Object);
+                    var paymentService = new PaymentService(processContext, fakeGateway, NullLogger<PaymentService>.Instance, new Moq.Mock<Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>>().Object, mockQueue.Object);
 
                     var result = await paymentService.HandlePaymentResultAsync(new PaymentResultDto
                     {
@@ -286,7 +286,7 @@ namespace EventTicketBooking.Tests
                 {
                     var fakeGateway = new FakePaymentGateway();
                     var mockQueue = new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>();
-                    var paymentService = new PaymentService(processContext, fakeGateway, NullLogger<PaymentService>.Instance, mockQueue.Object);
+                    var paymentService = new PaymentService(processContext, fakeGateway, NullLogger<PaymentService>.Instance, new Moq.Mock<Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>>().Object, mockQueue.Object);
 
                     var result = await paymentService.HandlePaymentResultAsync(new PaymentResultDto
                     {
@@ -677,7 +677,7 @@ namespace EventTicketBooking.Tests
                 {
                     using var loopContext = CreateSqliteDbContext(dbPath);
                     var mockQueue = new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>();
-                    var service = new PaymentService(loopContext, fakeGateway, NullLogger<PaymentService>.Instance, mockQueue.Object);
+                    var service = new PaymentService(loopContext, fakeGateway, NullLogger<PaymentService>.Instance, new Moq.Mock<Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>>().Object, mockQueue.Object);
                     bool ok = await service.ProcessPaymentWebhookAsync(payload, sig);
                     Assert.True(ok);
                 }
@@ -729,7 +729,7 @@ namespace EventTicketBooking.Tests
                 {
                     using var threadContext = CreateSqliteDbContext(dbPath);
                     var mockQueue = new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>();
-                    var service = new PaymentService(threadContext, fakeGateway, NullLogger<PaymentService>.Instance, mockQueue.Object);
+                    var service = new PaymentService(threadContext, fakeGateway, NullLogger<PaymentService>.Instance, new Moq.Mock<Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>>().Object, mockQueue.Object);
                     return await service.ProcessPaymentWebhookAsync(payload, sig);
                 }).ToArray();
 
