@@ -67,7 +67,8 @@ namespace EventTicketBooking.Api.Services.Implementations
             if (order.ExpiresAt <= DateTimeOffset.UtcNow)
             {
                 var cleanup = new ExpiredOrderCleanupService(_context,
-                    Microsoft.Extensions.Logging.Abstractions.NullLogger<ExpiredOrderCleanupService>.Instance);
+                    Microsoft.Extensions.Logging.Abstractions.NullLogger<ExpiredOrderCleanupService>.Instance,
+                    _hubContext);
                 await cleanup.CleanupExpiredOrdersAsync(cancellationToken: cancellationToken);
                 return PaymentCreationResult.CreateFailure("Đơn hàng đã hết hạn thanh toán.");
             }
