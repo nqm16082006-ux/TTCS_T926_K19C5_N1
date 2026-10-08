@@ -37,6 +37,8 @@ namespace EventTicketBooking.Api.DTOs
         public decimal MinPrice { get; set; }
 
         public decimal MaxPrice { get; set; }
+
+        public int MaxTicketsPerUser { get; set; } = 10;
     }
 
     public class PublicEventDetailDto
@@ -60,6 +62,8 @@ namespace EventTicketBooking.Api.DTOs
         public int TotalSeats { get; set; }
 
         public int AvailableSeats { get; set; }
+
+        public int MaxTicketsPerUser { get; set; } = 10;
 
         public decimal MinPrice { get; set; }
 

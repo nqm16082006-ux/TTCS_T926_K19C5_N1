@@ -104,6 +104,10 @@ namespace EventTicketBooking.Api.Controllers
             var startTimeUtc = dto.StartTime.Kind == DateTimeKind.Utc ? dto.StartTime : dto.StartTime.ToUniversalTime();
             var endTimeUtc = dto.EndTime.Kind == DateTimeKind.Utc ? dto.EndTime : dto.EndTime.ToUniversalTime();
 
+            var maxTickets = dto.MaxTicketsPerUser.HasValue && dto.MaxTicketsPerUser.Value > 0
+                ? dto.MaxTicketsPerUser.Value
+                : 10;
+
             var newEvent = new Event
             {
                 Id = Guid.NewGuid(),
@@ -115,6 +119,7 @@ namespace EventTicketBooking.Api.Controllers
                 StartTime = startTimeUtc,
                 EndTime = endTimeUtc,
                 TotalSeats = dto.TotalSeats,
+                MaxTicketsPerUser = maxTickets,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -126,7 +131,8 @@ namespace EventTicketBooking.Api.Controllers
                 EventId = newEvent.Id,
                 StartTime = newEvent.StartTime,
                 EndTime = newEvent.EndTime,
-                AvailableSeats = newEvent.TotalSeats
+                AvailableSeats = newEvent.TotalSeats,
+                MaxTicketsPerUser = newEvent.MaxTicketsPerUser
             };
 
             newEvent.Showtimes.Add(defaultShowtime);
@@ -167,7 +173,8 @@ namespace EventTicketBooking.Api.Controllers
                 Location = source.Location,
                 StartTime = source.StartTime,
                 EndTime = source.EndTime,
-                TotalSeats = source.TotalSeats
+                TotalSeats = source.TotalSeats,
+                MaxTicketsPerUser = source.MaxTicketsPerUser
             };
             foreach (var original in source.Showtimes)
             {
@@ -177,7 +184,8 @@ namespace EventTicketBooking.Api.Controllers
                     EventId = copy.Id,
                     StartTime = original.StartTime,
                     EndTime = original.EndTime,
-                    AvailableSeats = originalSeats.Count > 0 ? originalSeats.Count : original.AvailableSeats
+                    AvailableSeats = originalSeats.Count > 0 ? originalSeats.Count : original.AvailableSeats,
+                    MaxTicketsPerUser = original.MaxTicketsPerUser
                 };
                 var categories = original.SeatCategories.ToDictionary(c => c.Id, c => new SeatCategory
                 {
@@ -297,6 +305,14 @@ namespace EventTicketBooking.Api.Controllers
             ev.StartTime = startTimeUtc;
             ev.EndTime = endTimeUtc;
             ev.TotalSeats = dto.TotalSeats;
+            if (dto.MaxTicketsPerUser.HasValue && dto.MaxTicketsPerUser.Value > 0)
+            {
+                ev.MaxTicketsPerUser = dto.MaxTicketsPerUser.Value;
+                foreach (var s in ev.Showtimes)
+                {
+                    s.MaxTicketsPerUser = ev.MaxTicketsPerUser;
+                }
+            }
             ev.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -391,6 +407,7 @@ namespace EventTicketBooking.Api.Controllers
                 StartTime = s.StartTime,
                 EndTime = s.EndTime,
                 AvailableSeats = s.AvailableSeats,
+                MaxTicketsPerUser = s.MaxTicketsPerUser,
                 ActualSeatCount = seatCounts.TryGetValue(s.Id, out var counts) ? counts.Total : 0,
                 SoldSeatCount = seatCounts.TryGetValue(s.Id, out var soldCounts) ? soldCounts.Sold : 0,
                 Status = s.Status,
@@ -465,7 +482,8 @@ namespace EventTicketBooking.Api.Controllers
                 EventId = ev.Id,
                 StartTime = startTimeUtc,
                 EndTime = endTimeUtc,
-                AvailableSeats = dto.AvailableSeats > 0 ? dto.AvailableSeats : ev.TotalSeats
+                AvailableSeats = dto.AvailableSeats > 0 ? dto.AvailableSeats : ev.TotalSeats,
+                MaxTicketsPerUser = dto.MaxTicketsPerUser.HasValue && dto.MaxTicketsPerUser.Value > 0 ? dto.MaxTicketsPerUser.Value : ev.MaxTicketsPerUser
             };
 
             _context.Showtimes.Add(showtime);
@@ -478,6 +496,7 @@ namespace EventTicketBooking.Api.Controllers
                 StartTime = showtime.StartTime,
                 EndTime = showtime.EndTime,
                 AvailableSeats = showtime.AvailableSeats,
+                MaxTicketsPerUser = showtime.MaxTicketsPerUser,
                 Status = showtime.Status,
                 SeatCategories = new List<SeatCategoryPriceDto>(),
                 StatusActionMessage = GetShowtimeStatusActionMessage(showtime)
@@ -540,6 +559,10 @@ namespace EventTicketBooking.Api.Controllers
             {
                 showtime.AvailableSeats = dto.AvailableSeats.Value;
             }
+            if (dto.MaxTicketsPerUser.HasValue && dto.MaxTicketsPerUser.Value > 0)
+            {
+                showtime.MaxTicketsPerUser = dto.MaxTicketsPerUser.Value;
+            }
 
             await _context.SaveChangesAsync();
 
@@ -550,6 +573,7 @@ namespace EventTicketBooking.Api.Controllers
                 StartTime = showtime.StartTime,
                 EndTime = showtime.EndTime,
                 AvailableSeats = showtime.AvailableSeats,
+                MaxTicketsPerUser = showtime.MaxTicketsPerUser,
                 Status = showtime.Status,
                 StatusActionMessage = GetShowtimeStatusActionMessage(showtime)
             };
@@ -922,6 +946,7 @@ namespace EventTicketBooking.Api.Controllers
                 StartTime = ev.StartTime,
                 EndTime = ev.EndTime,
                 TotalSeats = ev.TotalSeats,
+                MaxTicketsPerUser = ev.MaxTicketsPerUser,
                 CreatedAt = ev.CreatedAt,
                 UpdatedAt = ev.UpdatedAt,
                 Showtimes = ev.Showtimes?.Select(s => new ShowtimeResponseDto
@@ -931,6 +956,7 @@ namespace EventTicketBooking.Api.Controllers
                     StartTime = s.StartTime,
                     EndTime = s.EndTime,
                     AvailableSeats = s.AvailableSeats,
+                    MaxTicketsPerUser = s.MaxTicketsPerUser,
                     Status = s.Status,
                     StatusActionMessage = GetShowtimeStatusActionMessage(s)
                 }).ToList() ?? new List<ShowtimeResponseDto>()

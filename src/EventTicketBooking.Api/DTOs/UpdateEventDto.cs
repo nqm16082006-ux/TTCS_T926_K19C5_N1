@@ -27,6 +27,9 @@ namespace EventTicketBooking.Api.DTOs
         [Range(1, int.MaxValue, ErrorMessage = "Tổng số ghế phải lớn hơn 0.")]
         public int TotalSeats { get; set; }
 
+        [Range(1, int.MaxValue, ErrorMessage = "Số lượng vé tối đa mỗi người mua có thể đặt phải lớn hơn 0.")]
+        public int? MaxTicketsPerUser { get; set; }
+
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
             if (EndTime <= StartTime)

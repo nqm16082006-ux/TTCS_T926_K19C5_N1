@@ -46,6 +46,7 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(e => e.Location).IsRequired().HasMaxLength(500);
                 entity.Property(e => e.ImageUrl).HasColumnType("text").HasMaxLength(2000);
                 entity.Property(e => e.TotalSeats).IsRequired();
+                entity.Property(e => e.MaxTicketsPerUser).IsRequired().HasDefaultValue(10);
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
@@ -63,6 +64,7 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(s => s.StartTime).IsRequired();
                 entity.Property(s => s.EndTime).IsRequired();
                 entity.Property(s => s.AvailableSeats).IsRequired();
+                entity.Property(s => s.MaxTicketsPerUser).IsRequired().HasDefaultValue(10);
                 entity.Property(s => s.Status)
                       .HasConversion<string>();
 

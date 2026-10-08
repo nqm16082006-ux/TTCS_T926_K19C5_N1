@@ -49,7 +49,7 @@ namespace EventTicketBooking.Api.Controllers
                 return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
 
             // Kiểm tra suất diễn
-            var showtime = await _context.Showtimes.FirstOrDefaultAsync(s => s.Id == showtimeId);
+            var showtime = await _context.Showtimes.Include(s => s.Event).FirstOrDefaultAsync(s => s.Id == showtimeId);
             if (showtime == null)
                 return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy suất diễn."));
             if (showtime.Status != ShowtimeStatus.OnSale)
@@ -85,6 +85,24 @@ namespace EventTicketBooking.Api.Controllers
                 if (!holds.Any())
                 {
                     return BadRequest(ApiResponse<object>.FailureResult("Bạn không giữ chỗ nào hoặc giữ chỗ đã hết hạn."));
+                }
+
+                // S-42: Kiểm tra giới hạn số lượng vé tối đa mỗi người mua cho suất diễn
+                int maxTickets = showtime.MaxTicketsPerUser > 0
+                    ? showtime.MaxTicketsPerUser
+                    : (showtime.Event != null && showtime.Event.MaxTicketsPerUser > 0 ? showtime.Event.MaxTicketsPerUser : 10);
+
+                var purchasedCount = await _context.OrderItems
+                    .AsNoTracking()
+                    .CountAsync(oi => oi.Order.ShowtimeId == showtimeId &&
+                                      oi.Order.UserId == userId &&
+                                      oi.Order.Status != OrderStatus.Cancelled &&
+                                      oi.Order.Status != OrderStatus.Expired);
+
+                if (holds.Count + purchasedCount > maxTickets)
+                {
+                    return BadRequest(ApiResponse<object>.FailureResult(
+                        $"Bạn không thể đặt thêm vé. Tổng số ghế đang giữ ({holds.Count}) cộng đã mua ({purchasedCount}) của tài khoản vượt giới hạn {maxTickets} vé trong suất này (Tối đa {maxTickets} vé)."));
                 }
 
                 if (holds.Any(h => h.Seat.Status == "SOLD" || h.Seat.SeatCategory.ShowtimeId != showtimeId || h.Seat.SeatCategory.Price < 0))
