@@ -11,6 +11,7 @@ namespace EventTicketBooking.Api.DTOs
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
         public int AvailableSeats { get; set; }
+        public int MaxTicketsPerUser { get; set; } = 10;
         public int RemainingTickets { get; set; }
         public int AvailableTickets
         {
@@ -37,6 +38,9 @@ namespace EventTicketBooking.Api.DTOs
 
         public int AvailableSeats { get; set; }
 
+        [Range(1, int.MaxValue, ErrorMessage = "Số lượng vé tối đa mỗi người mua phải lớn hơn 0.")]
+        public int? MaxTicketsPerUser { get; set; }
+
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
             if (EndTime <= StartTime)
@@ -58,6 +62,9 @@ namespace EventTicketBooking.Api.DTOs
         public DateTime EndTime { get; set; }
 
         public int? AvailableSeats { get; set; }
+
+        [Range(1, int.MaxValue, ErrorMessage = "Số lượng vé tối đa mỗi người mua phải lớn hơn 0.")]
+        public int? MaxTicketsPerUser { get; set; }
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {

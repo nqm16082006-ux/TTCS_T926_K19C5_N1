@@ -376,7 +376,7 @@
                 <div class="flex items-center gap-2">
                   <span class="material-symbols-outlined text-primary">shopping_bag</span>
                   <h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">
-                    Ghế Đã Chọn (<span class="text-primary font-code-mono" id="selectedSeatsCountText">0</span>)
+                    Ghế Đã Chọn (<span class="text-primary font-code-mono" id="selectedSeatsCountText">0</span><span class="text-outline font-normal text-xs" id="maxTicketsDisplay">/10</span>)
                   </h3>
                 </div>
                 <button onclick="clearAllSelections()" id="btnClearAll" class="font-label-sm text-label-sm text-error hover:underline flex items-center gap-0.5 font-semibold transition-opacity opacity-50 cursor-not-allowed">
@@ -386,6 +386,10 @@
               </div>
 
               <!-- Seat Items List Container -->
+              <div id="userAllowanceInfo" class="hidden text-xs text-on-surface-variant bg-surface-container-low px-2.5 py-1.5 rounded-lg border border-outline-variant/30 flex items-center justify-between">
+                <span class="font-medium">Giới hạn suất: <span id="allowanceLimitText" class="font-bold text-primary">10 vé</span></span>
+                <span id="allowancePurchasedText" class="text-outline font-semibold">Đã mua: 0</span>
+              </div>
               <div class="flex flex-col gap-space-sm min-h-[100px] max-h-80 overflow-y-auto pr-1" id="selectedSeatsListContainer">
                 <div class="text-center py-8 text-on-surface-variant text-sm font-medium flex flex-col items-center justify-center">
                   <span class="material-symbols-outlined text-outline text-3xl mb-1">airline_seat_recline_extra</span>
@@ -565,6 +569,8 @@
     let currentZoom = 1.0;
     let activeCategoryFilter = '';
     let bookingActionInFlight = false;
+    let maxTicketsPerUser = 10;  // Giới hạn vé tối đa mỗi người trong suất này (Task S-42)
+    let purchasedCountForUser = 0; // Số vé tài khoản đã mua thành công trong suất này (Task S-42)
 
     // Timer state
     let holdTimerInterval = null;
@@ -865,6 +871,15 @@
       const organizer = data.organizerName || 'Live Nation VN & EventPulse';
       document.getElementById('organizerNameMini').textContent = organizer;
 
+      // Cập nhật giới hạn vé tối đa từ API
+      if (data.maxTicketsPerUser && data.maxTicketsPerUser > 0) {
+        maxTicketsPerUser = data.maxTicketsPerUser;
+      }
+      const maxEl = document.getElementById('maxTicketsDisplay');
+      if (maxEl) {
+        maxEl.textContent = `/${maxTicketsPerUser}`;
+      }
+
       // Update back button link
       if (data.eventId || eventId) {
         const evId = data.eventId || eventId;
@@ -1086,8 +1101,9 @@
       if (selectedSeatIds.has(seat.id)) {
         selectedSeatIds.delete(seat.id);
       } else {
-        if (selectedSeatIds.size + myHeldSeatIds.size >= 10) {
-          alert("Quý khách chỉ được chọn tối đa 10 ghế mỗi lượt đặt vé.");
+        const totalAfter = selectedSeatIds.size + myHeldSeatIds.size + purchasedCountForUser;
+        if (totalAfter >= maxTicketsPerUser) {
+          showConflictToast(`Tổng ghế đang giữ (${myHeldSeatIds.size}) cộng đã mua (${purchasedCountForUser}) của bạn đã đạt giới hạn tối đa (${maxTicketsPerUser} vé) trong suất này. Không thể giữ thêm được.`);
           return;
         }
         selectedSeatIds.add(seat.id);
@@ -1146,6 +1162,15 @@
 
       const totalCount = selectedSeatIds.size + myHeldSeatIds.size;
       countEl.textContent = totalCount;
+
+      const allowanceInfo = document.getElementById('userAllowanceInfo');
+      const allowanceLimit = document.getElementById('allowanceLimitText');
+      const allowancePurchased = document.getElementById('allowancePurchasedText');
+      if (allowanceInfo) {
+        allowanceInfo.classList.remove('hidden');
+        if (allowanceLimit) allowanceLimit.textContent = `${maxTicketsPerUser} vé`;
+        if (allowancePurchased) allowancePurchased.textContent = `Đã mua: ${purchasedCountForUser} • Đang giữ: ${myHeldSeatIds.size}`;
+      }
 
       if (totalCount > 0) {
         btnClearAll.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -1291,6 +1316,14 @@
         if (res.ok && json && json.success) {
           const data = json.data;
           const newlyHeld = data.seatIds || [];
+          if (data.maxTicketsPerUser && data.maxTicketsPerUser > 0) {
+            maxTicketsPerUser = data.maxTicketsPerUser;
+          }
+          if (data.purchasedCount !== undefined) {
+            purchasedCountForUser = data.purchasedCount;
+          }
+          const maxEl = document.getElementById('maxTicketsDisplay');
+          if (maxEl) maxEl.textContent = `/${maxTicketsPerUser}`;
 
           newlyHeld.forEach(id => {
             myHeldSeatIds.add(id);
@@ -1631,6 +1664,15 @@
             const expiresAt = json.data.expiresAt;
             const serverTime = json.data.serverTime;
             const httpDate = res.headers.get('Date');
+
+            if (json.data.maxTicketsPerUser && json.data.maxTicketsPerUser > 0) {
+              maxTicketsPerUser = json.data.maxTicketsPerUser;
+            }
+            if (json.data.purchasedCount !== undefined) {
+              purchasedCountForUser = json.data.purchasedCount;
+            }
+            const maxEl = document.getElementById('maxTicketsDisplay');
+            if (maxEl) maxEl.textContent = `/${maxTicketsPerUser}`;
 
             myHeldSeatIds.clear();
 
