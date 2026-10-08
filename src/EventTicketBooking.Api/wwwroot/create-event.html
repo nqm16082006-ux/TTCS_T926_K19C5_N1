@@ -912,7 +912,12 @@
         try {
           const user = JSON.parse(userStr);
           const roles = (user.roles || []).map(r => (r || '').toLowerCase());
-          const isAllowed = roles.includes('organizer') || roles.includes('admin') || roles.includes('staff');
+          if (roles.includes('staff') && !roles.includes('organizer') && !roles.includes('admin')) {
+            window.location.href = './staff-scanner.html';
+            return;
+          }
+
+          const isAllowed = roles.includes('organizer') || roles.includes('admin');
           
           if (!isAllowed) {
             alert('Bạn không có quyền truy cập trang Quản lý sự kiện (Chỉ dành cho Ban Tổ Chức / Admin).');
