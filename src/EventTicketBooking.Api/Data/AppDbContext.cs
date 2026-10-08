@@ -24,10 +24,12 @@ namespace EventTicketBooking.Api.Data
         public DbSet<OrderItem> OrderItems { get; set; } = null!;
         public DbSet<PaymentTransaction> PaymentTransactions { get; set; } = null!;
         public DbSet<PaymentEvent> PaymentEvents { get; set; } = null!;
+        public DbSet<Ticket> Tickets { get; set; } = null!;
         public DbSet<Role> Roles { get; set; } = null!;
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<UserRole> UserRoles { get; set; } = null!;
         public DbSet<AuditLog> AuditLogs { get; set; } = null!;
+        public DbSet<EmailFailureLog> EmailFailureLogs { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -300,6 +302,46 @@ namespace EventTicketBooking.Api.Data
                 entity.HasIndex(pe => pe.TransactionId)
                       .IsUnique()
                       .HasDatabaseName("IX_payment_events_TransactionId_Unique");
+            });
+
+            // Cấu hình bảng EmailFailureLogs (Task S-27)
+            modelBuilder.Entity<EmailFailureLog>(entity =>
+            {
+                entity.ToTable("EmailFailureLogs");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.TargetEmail).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.ErrorMessage).IsRequired();
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.Attempts).IsRequired().HasDefaultValue(0);
+                entity.Property(e => e.Resolved).HasDefaultValue(false);
+                entity.HasIndex(e => e.OrderId);
+            });
+
+            // Cấu hình bảng tickets (Story S-25)
+            modelBuilder.Entity<Ticket>(entity =>
+            {
+                entity.ToTable("tickets");
+                entity.HasKey(t => t.Id);
+
+                entity.Property(t => t.TicketCode)
+                      .IsRequired()
+                      .HasMaxLength(64);
+
+                entity.Property(t => t.CreatedAt)
+                      .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(t => t.OrderItem)
+                      .WithOne(oi => oi.Ticket)
+                      .HasForeignKey<Ticket>(t => t.OrderItemId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(t => t.OrderItemId)
+                      .IsUnique()
+                      .HasDatabaseName("IX_tickets_OrderItemId_Unique");
+
+                entity.HasIndex(t => t.TicketCode)
+                      .IsUnique()
+                      .HasDatabaseName("IX_tickets_TicketCode_Unique");
             });
         }
     }

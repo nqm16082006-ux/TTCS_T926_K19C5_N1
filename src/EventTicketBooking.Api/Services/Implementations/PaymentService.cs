@@ -24,17 +24,23 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly IPaymentGateway _paymentGateway;
         private readonly ILogger<PaymentService> _logger;
         private readonly IHubContext<SeatStatusHub> _hubContext;
+        private readonly EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue _ticketEmailQueue;
+        private readonly ITicketService _ticketService;
 
         public PaymentService(
             AppDbContext context,
             IPaymentGateway paymentGateway,
             ILogger<PaymentService> logger,
-            IHubContext<SeatStatusHub> hubContext)
+            IHubContext<SeatStatusHub> hubContext,
+            EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue ticketEmailQueue,
+            ITicketService? ticketService = null)
         {
             _context = context;
             _paymentGateway = paymentGateway;
             _logger = logger;
             _hubContext = hubContext;
+            _ticketEmailQueue = ticketEmailQueue;
+            _ticketService = ticketService ?? new TicketService();
         }
 
         public async Task<PaymentCreationResult> CreatePaymentForOrderAsync(Guid orderId, Guid userId, CancellationToken cancellationToken = default)
@@ -498,6 +504,29 @@ namespace EventTicketBooking.Api.Services.Implementations
                     hold.Status = "CONVERTED";
                 }
 
+                // E. Sinh vé điện tử cho từng ghế trong đơn hàng (Story S-25)
+                var existingTicketItemIds = await _context.Tickets
+                    .Where(t => order.OrderItems.Select(oi => oi.Id).Contains(t.OrderItemId))
+                    .Select(t => t.OrderItemId)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var item in order.OrderItems)
+                {
+                    if (!existingTicketItemIds.Contains(item.Id) && item.Ticket == null)
+                    {
+                        var ticket = new Ticket
+                        {
+                            Id = Guid.NewGuid(),
+                            OrderItemId = item.Id,
+                            TicketCode = _ticketService.GenerateTicketCode(),
+                            CreatedAt = DateTimeOffset.UtcNow,
+                            OrderItem = item
+                        };
+                        _context.Tickets.Add(ticket);
+                        item.Ticket = ticket;
+                    }
+                }
+
                 await _context.SaveChangesAsync(cancellationToken);
 
                 // Broadcast real-time update
@@ -510,6 +539,16 @@ namespace EventTicketBooking.Api.Services.Implementations
                 if (dbTransaction != null)
                 {
                     await dbTransaction.CommitAsync(cancellationToken);
+                }
+
+                // Gửi email vé cho khách hàng (không làm chặn luồng thanh toán)
+                try
+                {
+                    await _ticketEmailQueue.EnqueueAsync(order.Id, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi khi đẩy job gửi vé email vào queue cho đơn hàng {OrderId}.", order.Id);
                 }
 
                 _logger.LogInformation("Giao dịch thanh toán thành công cho đơn hàng {OrderId}. Số ghế đã bán: {SeatsCount}, Giữ chỗ đã chuyển đổi: {HoldsCount}.",

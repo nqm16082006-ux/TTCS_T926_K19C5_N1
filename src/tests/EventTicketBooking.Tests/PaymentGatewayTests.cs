@@ -225,7 +225,7 @@ namespace EventTicketBooking.Tests
                 SimulatedPaymentUrl = "https://fake-checkout.local/order/500k"
             };
 
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act
             var result = await paymentService.CreatePaymentForOrderAsync(order.Id, userId);
@@ -279,11 +279,11 @@ namespace EventTicketBooking.Tests
             await _context.SaveChangesAsync();
 
             // Act 1: Dùng Gateway 1 cho Order 1
-            var serviceWithGateway1 = new PaymentService(_context, fakeGateway1, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var serviceWithGateway1 = new PaymentService(_context, fakeGateway1, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
             var res1 = await serviceWithGateway1.CreatePaymentForOrderAsync(order1.Id, userId);
 
             // Act 2: Đổi sang Gateway 2 cho Order 2 mà KHÔNG đổi một dòng code nào trong PaymentService
-            var serviceWithGateway2 = new PaymentService(_context, fakeGateway2, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var serviceWithGateway2 = new PaymentService(_context, fakeGateway2, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
             var res2 = await serviceWithGateway2.CreatePaymentForOrderAsync(order2.Id, userId);
 
             // Assert
@@ -324,7 +324,7 @@ namespace EventTicketBooking.Tests
                 )
             };
 
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act
             bool isProcessed = await paymentService.ProcessPaymentWebhookAsync("valid_webhook_payload", "valid_signature");
@@ -359,7 +359,7 @@ namespace EventTicketBooking.Tests
                 ShouldVerifySignature = false // Chữ ký không hợp lệ
             };
 
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act
             bool isProcessed = await paymentService.ProcessPaymentWebhookAsync("tampered_payload", "fake_signature");

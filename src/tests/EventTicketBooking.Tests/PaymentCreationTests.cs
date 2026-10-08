@@ -74,7 +74,7 @@ namespace EventTicketBooking.Tests
                 SimulatedPaymentUrl = "https://pay.payos.vn/web/test-checkout-url-123",
                 SimulatedTransactionId = "TXN_T41_01"
             };
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act
             var result = await paymentService.CreatePaymentForOrderAsync(order.Id, _defaultUserId);
@@ -95,7 +95,7 @@ namespace EventTicketBooking.Tests
         {
             // Arrange
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act
             var result = await paymentService.CreatePaymentForOrderAsync(Guid.NewGuid(), _defaultUserId);
@@ -114,7 +114,7 @@ namespace EventTicketBooking.Tests
             // Arrange
             var order = CreateTestOrder(totalAmount: 250000, expiryMinutes: -5); // Hết hạn 5 phút trước
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act
             var result = await paymentService.CreatePaymentForOrderAsync(order.Id, _defaultUserId);
@@ -137,7 +137,7 @@ namespace EventTicketBooking.Tests
             // Arrange
             var order = CreateTestOrder(totalAmount: 300000, status: OrderStatus.Paid);
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act
             var result = await paymentService.CreatePaymentForOrderAsync(order.Id, _defaultUserId);
@@ -160,7 +160,7 @@ namespace EventTicketBooking.Tests
                 SimulatedPaymentUrl = "https://pay.sandbox.vn/checkout-500k",
                 SimulatedTransactionId = "TXN_FIRST_CALL"
             };
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act
             var result = await paymentService.CreatePaymentForOrderAsync(order.Id, _defaultUserId);
@@ -189,7 +189,7 @@ namespace EventTicketBooking.Tests
                 SimulatedPaymentUrl = "https://pay.sandbox.vn/reused-checkout",
                 SimulatedTransactionId = "TXN_REUSED"
             };
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act 1: Lần 1
             var res1 = await paymentService.CreatePaymentForOrderAsync(order.Id, _defaultUserId);
@@ -223,7 +223,7 @@ namespace EventTicketBooking.Tests
             {
                 SimulatedPaymentUrl = "https://pay.sandbox.vn/concurrent-checkout"
             };
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act: Giả lập 2 request gần như đồng thời (User double-click)
             var task1 = paymentService.CreatePaymentForOrderAsync(order.Id, _defaultUserId);
@@ -254,7 +254,7 @@ namespace EventTicketBooking.Tests
                 ShouldSucceed = false,
                 SimulatedErrorMessage = "Cổng thanh toán Sandbox phản hồi lỗi 503."
             };
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act
             var result = await paymentService.CreatePaymentForOrderAsync(order.Id, _defaultUserId);
@@ -282,7 +282,7 @@ namespace EventTicketBooking.Tests
             int expectedAmount = 750000;
             var order = CreateTestOrder(totalAmount: expectedAmount);
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act
             var result = await paymentService.CreatePaymentForOrderAsync(order.Id, _defaultUserId);
@@ -303,7 +303,7 @@ namespace EventTicketBooking.Tests
             {
                 SimulatedPaymentUrl = "https://offline-sandbox.local/pay"
             };
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act
             var result = await paymentService.CreatePaymentForOrderAsync(order.Id, _defaultUserId);
@@ -324,7 +324,7 @@ namespace EventTicketBooking.Tests
             var maliciousUserId = Guid.NewGuid(); // User B
 
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act
             var result = await paymentService.CreatePaymentForOrderAsync(order.Id, maliciousUserId);
@@ -346,7 +346,7 @@ namespace EventTicketBooking.Tests
             {
                 SimulatedPaymentUrl = "https://pay.sandbox.vn/checkout-order"
             };
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
             var controller = new PaymentsController(paymentService, fakeGateway, NullLogger<PaymentsController>.Instance, _context);
 
             // Mock User Claims

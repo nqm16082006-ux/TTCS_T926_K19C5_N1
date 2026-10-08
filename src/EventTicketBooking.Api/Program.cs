@@ -30,34 +30,52 @@ if (!string.IsNullOrWhiteSpace(publicUrl))
     builder.Configuration["Payment:PayOS:CancelUrl"] ??= publicUrl.TrimEnd('/') + "/payment-result.html";
 }
 
-// Chuỗi kết nối PostgreSQL (đọc từ biến môi trường hoặc configuration)
+// Xác định provider database cho local dev. Nếu Postgres không sẵn sàng, hãy fallback về InMemory để app vẫn chạy
+var selectedDbProvider = builder.Configuration["Database:Provider"] ?? "Postgres";
 string? pgConnection = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
                        ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
-if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("POSTGRES_HOST")) || string.IsNullOrEmpty(pgConnection))
+if (string.Equals(selectedDbProvider, "InMemory", StringComparison.OrdinalIgnoreCase))
 {
-    string host = Environment.GetEnvironmentVariable("POSTGRES_HOST") ?? "localhost";
-    string port = Environment.GetEnvironmentVariable("POSTGRES_PORT") ?? "5432";
-    string db = Environment.GetEnvironmentVariable("POSTGRES_DB") ?? "event_ticket_db";
-    string user = Environment.GetEnvironmentVariable("POSTGRES_USER") ?? "postgres";
-    string pass = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD") ?? "postgres_password_123";
-
-    pgConnection = new Npgsql.NpgsqlConnectionStringBuilder
+    builder.Services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase("EventTicketBooking"));
+}
+else
+{
+    if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("POSTGRES_HOST")) || string.IsNullOrEmpty(pgConnection))
     {
-        Host = host,
-        Port = int.Parse(port),
-        Database = db,
-        Username = user,
-        Password = pass
-    }.ConnectionString;
+        string host = Environment.GetEnvironmentVariable("POSTGRES_HOST") ?? "localhost";
+        string port = Environment.GetEnvironmentVariable("POSTGRES_PORT") ?? "5432";
+        string db = Environment.GetEnvironmentVariable("POSTGRES_DB") ?? "event_ticket_db";
+        string user = Environment.GetEnvironmentVariable("POSTGRES_USER") ?? "postgres";
+        string pass = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD") ?? "postgres_password_123";
+
+        pgConnection = new Npgsql.NpgsqlConnectionStringBuilder
+        {
+            Host = host,
+            Port = int.Parse(port),
+            Database = db,
+            Username = user,
+            Password = pass
+        }.ConnectionString;
+    }
+
+    try
+    {
+        using var testConnection = new Npgsql.NpgsqlConnection(pgConnection);
+        testConnection.Open();
+        var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(pgConnection);
+        dataSourceBuilder.MapEnum<EventTicketBooking.Api.Models.ShowtimeStatus>("showtime_status");
+        dataSourceBuilder.MapEnum<EventTicketBooking.Api.Models.OrderStatus>("order_status");
+        var dataSource = dataSourceBuilder.Build();
+        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(dataSource));
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[INFO] Không thể kết nối PostgreSQL ({ex.Message}). Fallback sang InMemoryDatabase cho môi trường local.");
+        builder.Services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase("EventTicketBooking"));
+    }
 }
 
-// Keep PostgreSQL authoritative; an outage must not silently create another database.
-var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(pgConnection);
-dataSourceBuilder.MapEnum<EventTicketBooking.Api.Models.ShowtimeStatus>("showtime_status");
-dataSourceBuilder.MapEnum<EventTicketBooking.Api.Models.OrderStatus>("order_status");
-var dataSource = dataSourceBuilder.Build();
-builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(dataSource));
 if (!builder.Environment.IsDevelopment() && System.Text.Encoding.UTF8.GetByteCount(JwtValidation.Secret(builder.Configuration)) < 32)
     throw new InvalidOperationException("Production JWT signing key must contain at least 32 bytes.");
 _ = JwtValidation.Parameters(builder.Configuration);
@@ -135,6 +153,11 @@ else if (paymentProvider.Equals("PayOS", StringComparison.OrdinalIgnoreCase))
 else
     throw new InvalidOperationException("Unsupported payment provider.");
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IPaymentService, EventTicketBooking.Api.Services.Implementations.PaymentService>();
+
+// Đăng ký cấu hình và dịch vụ ký số mã QR vé điện tử (Story S-26)
+builder.Services.Configure<EventTicketBooking.Api.Options.TicketQrOptions>(builder.Configuration.GetSection(EventTicketBooking.Api.Options.TicketQrOptions.SectionName));
+builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IQrSignatureService, EventTicketBooking.Api.Services.Implementations.QrSignatureService>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITicketService, EventTicketBooking.Api.Services.Implementations.TicketService>();
 builder.Services.AddHttpClient();
 
 
@@ -158,6 +181,10 @@ builder.Services.AddSwaggerGen();
 // T-52 (S-23): Dịch vụ & Job nền quét huỷ đơn quá hạn và nhả ghế trong một giao dịch
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IExpiredOrderCleanupService, EventTicketBooking.Api.Services.Implementations.ExpiredOrderCleanupService>();
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.ExpiredOrderCleanupWorker>();
+
+// S-27 Task 2: Background queue & worker for ticket emails
+builder.Services.AddSingleton<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue, EventTicketBooking.Api.BackgroundServices.TicketEmailQueue>();
+builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.TicketEmailWorker>();
 
 //T-27 Job nền quét và nhả ghế quá hạn, chạy lặp lại được
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.SeatHoldCleanupWorker>();

@@ -1,0 +1,14 @@
+.git
+.env*
+**/bin
+**/obj
+**/TestResults
+**/logs
+**/*.user
+**/*.db*
+audit-*
+demo-*.jpg
+data
+src/tests
+**/wwwroot/uploads
+*.sql

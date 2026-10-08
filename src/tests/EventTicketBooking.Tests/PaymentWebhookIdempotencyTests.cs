@@ -233,7 +233,7 @@ namespace EventTicketBooking.Tests
                 for (int i = 0; i < 5; i++)
                 {
                     using var loopContext = CreateSqliteDbContext(dbPath);
-                    var paymentService = new PaymentService(loopContext, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+                    var paymentService = new PaymentService(loopContext, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
                     bool result = await paymentService.ProcessPaymentWebhookAsync(webhookPayload, signature);
                     Assert.True(result, $"Lần gửi {i + 1} phải trả về true (200 OK)");
                 }
@@ -291,7 +291,7 @@ namespace EventTicketBooking.Tests
                 var tasks = Enumerable.Range(0, 5).Select(async _ =>
                 {
                     using var threadContext = CreateSqliteDbContext(dbPath);
-                    var paymentService = new PaymentService(threadContext, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+                    var paymentService = new PaymentService(threadContext, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
                     return await paymentService.ProcessPaymentWebhookAsync(webhookPayload, signature);
                 }).ToArray();
 
@@ -353,7 +353,7 @@ namespace EventTicketBooking.Tests
 
                 // Act
                 using var context = CreateSqliteDbContext(dbPath);
-                var paymentService = new PaymentService(context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+                var paymentService = new PaymentService(context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
                 bool processed = await paymentService.ProcessPaymentWebhookAsync(webhookPayload, signature);
 
                 // Assert

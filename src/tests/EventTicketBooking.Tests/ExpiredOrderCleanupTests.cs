@@ -253,7 +253,7 @@ namespace EventTicketBooking.Tests
             var paymentTx = await _context.PaymentTransactions.FirstAsync(pt => pt.OrderId == order.Id);
 
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var webhookResult = new PaymentResultDto
             {

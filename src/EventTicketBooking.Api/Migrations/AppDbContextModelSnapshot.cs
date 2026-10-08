@@ -66,6 +66,46 @@ namespace EventTicketBooking.Api.Migrations
                     b.ToTable("AuditLogs", (string)null);
                 });
 
+            modelBuilder.Entity("EventTicketBooking.Api.Models.EmailFailureLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("ErrorMessage")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Resolved")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("TargetEmail")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.ToTable("EmailFailureLogs", (string)null);
+                });
+
             modelBuilder.Entity("EventTicketBooking.Api.Models.Event", b =>
                 {
                     b.Property<Guid>("Id")
@@ -438,6 +478,38 @@ namespace EventTicketBooking.Api.Migrations
                     b.ToTable("Showtimes", (string)null);
                 });
 
+            modelBuilder.Entity("EventTicketBooking.Api.Models.Ticket", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("OrderItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TicketCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderItemId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_tickets_OrderItemId_Unique");
+
+                    b.HasIndex("TicketCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_tickets_TicketCode_Unique");
+
+                    b.ToTable("tickets", (string)null);
+                });
+
             modelBuilder.Entity("EventTicketBooking.Api.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -635,6 +707,17 @@ namespace EventTicketBooking.Api.Migrations
                     b.Navigation("Event");
                 });
 
+            modelBuilder.Entity("EventTicketBooking.Api.Models.Ticket", b =>
+                {
+                    b.HasOne("EventTicketBooking.Api.Models.OrderItem", "OrderItem")
+                        .WithOne("Ticket")
+                        .HasForeignKey("EventTicketBooking.Api.Models.Ticket", "OrderItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OrderItem");
+                });
+
             modelBuilder.Entity("EventTicketBooking.Api.Models.UserRole", b =>
                 {
                     b.HasOne("EventTicketBooking.Api.Models.Role", "Role")
@@ -664,6 +747,11 @@ namespace EventTicketBooking.Api.Migrations
                     b.Navigation("OrderItems");
 
                     b.Navigation("PaymentTransaction");
+                });
+
+            modelBuilder.Entity("EventTicketBooking.Api.Models.OrderItem", b =>
+                {
+                    b.Navigation("Ticket");
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.Role", b =>

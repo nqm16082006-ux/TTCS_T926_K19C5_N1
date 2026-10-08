@@ -167,7 +167,7 @@ namespace EventTicketBooking.Tests
             // Arrange
             var (_, _, seats, order, paymentTx, holds) = await SeedFullOrderGraphAsync(500000);
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var resultDto = PaymentResultDto.CreateSuccess(
                 orderCode: paymentTx.OrderCode,
@@ -215,7 +215,7 @@ namespace EventTicketBooking.Tests
             // Arrange
             var (_, _, seats, order, paymentTx, holds) = await SeedFullOrderGraphAsync(500000);
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Gateway gửi về số tiền 400.000 thay vì 500.000
             var resultDto = PaymentResultDto.CreateSuccess(
@@ -268,7 +268,7 @@ namespace EventTicketBooking.Tests
             await _context.SaveChangesAsync();
 
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var duplicateResult = PaymentResultDto.CreateSuccess(
                 orderCode: paymentTx.OrderCode,
@@ -301,7 +301,7 @@ namespace EventTicketBooking.Tests
             // Arrange
             var (_, _, seats, order, paymentTx, holds) = await SeedFullOrderGraphAsync(500000);
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var cancelResult = new PaymentResultDto
             {
@@ -338,7 +338,7 @@ namespace EventTicketBooking.Tests
             // Arrange
             var (_, _, seats, order, paymentTx, holds) = await SeedFullOrderGraphAsync(500000);
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var failedResult = new PaymentResultDto
             {
@@ -392,7 +392,7 @@ namespace EventTicketBooking.Tests
                 )
             };
 
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act
             bool processed = await paymentService.ProcessPaymentWebhookAsync("valid_payload", "valid_sig");
@@ -421,7 +421,7 @@ namespace EventTicketBooking.Tests
                 ShouldVerifySignature = false
             };
 
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Act
             bool processed = await paymentService.ProcessPaymentWebhookAsync("fake_payload", "invalid_sig");
@@ -457,7 +457,7 @@ namespace EventTicketBooking.Tests
                 )
             };
 
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             // Client gửi query param có kèm status
             var query = new PaymentReturnQueryDto
@@ -497,7 +497,7 @@ namespace EventTicketBooking.Tests
                 SimulatedQueryResult = null
             };
 
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var fakeClientQuery = new PaymentReturnQueryDto
             {
@@ -540,7 +540,7 @@ namespace EventTicketBooking.Tests
                 )
             };
 
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var query = new PaymentReturnQueryDto
             {
@@ -567,7 +567,7 @@ namespace EventTicketBooking.Tests
             var (_, _, seats, order, paymentTx, holds) = await SeedFullOrderGraphAsync(600000, OrderStatus.Paid);
             var fakeGateway = new FakePaymentGateway(); // Không cần query gateway
 
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var query = new PaymentReturnQueryDto
             {
@@ -602,7 +602,7 @@ namespace EventTicketBooking.Tests
                 )
             };
 
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
             var controller = new PaymentsController(paymentService, fakeGateway, NullLogger<PaymentsController>.Instance, _context);
 
             var query = new PaymentReturnQueryDto
@@ -632,7 +632,7 @@ namespace EventTicketBooking.Tests
                 SimulatedQueryResult = null // Không xác nhận được
             };
 
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
             var controller = new PaymentsController(paymentService, fakeGateway, NullLogger<PaymentsController>.Instance, _context);
 
             var query = new PaymentReturnQueryDto
@@ -665,7 +665,7 @@ namespace EventTicketBooking.Tests
                 )
             };
 
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
             var controller = new PaymentsController(paymentService, fakeGateway, NullLogger<PaymentsController>.Instance, _context);
 
             var userPrincipal = new ClaimsPrincipal(new ClaimsIdentity(new[]
@@ -700,7 +700,7 @@ namespace EventTicketBooking.Tests
             // Arrange
             var (_, _, seats, order, paymentTx, holds) = await SeedFullOrderGraphAsync(300000);
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var foreignResult = PaymentResultDto.CreateSuccess(
                 orderCode: 9999999999L, // Không tồn tại trong hệ thống
@@ -731,7 +731,7 @@ namespace EventTicketBooking.Tests
             // Arrange
             var (_, _, seats, order, paymentTx, holds) = await SeedFullOrderGraphAsync(300000);
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var resultDto = PaymentResultDto.CreateSuccess(
                 orderCode: paymentTx.OrderCode,

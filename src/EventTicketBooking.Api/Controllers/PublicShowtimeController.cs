@@ -138,6 +138,8 @@ namespace EventTicketBooking.Api.Controllers
                     EndTime = s.EndTime,
                     AvailableSeats = s.AvailableSeats,
                     TotalSeats = totalSeats,
+                    RemainingTickets = remaining,
+                    AvailableTickets = remaining,
                     RemainingSeats = remaining,
                     Status = s.Status.ToString(),
                     MinPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Min(sc => sc.Price) ?? 0) : 0m,
@@ -203,6 +205,11 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy sự kiện."));
             }
 
+            foreach (var s in ev.Showtimes)
+            {
+                s.Event = ev;
+            }
+
             var remainingSeats = await GetRemainingSeatsAsync(ev.Showtimes.ToList());
             var showtimesList = ev.Showtimes
                 .OrderBy(s => s.StartTime)
@@ -219,6 +226,8 @@ namespace EventTicketBooking.Api.Controllers
                     EndTime = s.EndTime,
                     AvailableSeats = s.AvailableSeats,
                     TotalSeats = ev.TotalSeats,
+                    RemainingTickets = remainingSeats[s.Id],
+                    AvailableTickets = remainingSeats[s.Id],
                     RemainingSeats = remainingSeats[s.Id],
                     Status = s.Status.ToString(),
                     MinPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Min(sc => sc.Price) ?? 0) : 0m,
@@ -290,6 +299,8 @@ namespace EventTicketBooking.Api.Controllers
                 EndTime = showtime.EndTime,
                 AvailableSeats = showtime.AvailableSeats,
                 TotalSeats = showtime.Event?.TotalSeats ?? 0,
+                RemainingTickets = remainingSeats[showtime.Id],
+                AvailableTickets = remainingSeats[showtime.Id],
                 RemainingSeats = remainingSeats[showtime.Id],
                 Status = showtime.Status.ToString(),
                 MinPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? (showtime.SeatCategories.Min(sc => sc.Price) ?? 0) : 0m,
@@ -331,10 +342,31 @@ namespace EventTicketBooking.Api.Controllers
                 .ToDictionaryAsync(x => x.ShowtimeId, x => x.Count);
 
 
-            return showtimes.ToDictionary(s => s.Id, s => Math.Max(0,
-                (totalSeatCountByShowtime.GetValueOrDefault(s.Id, 0) is var actual && actual > 0 ? actual : s.Event?.TotalSeats ?? 0)
-                - activeHeldCountByShowtime.GetValueOrDefault(s.Id, 0)
-                - paidSeatCountByShowtime.GetValueOrDefault(s.Id, 0)));
+            return showtimes.ToDictionary(s => s.Id, s =>
+            {
+                int baseSeatCount;
+                if (totalSeatCountByShowtime.TryGetValue(s.Id, out int actual) && actual > 0)
+                {
+                    baseSeatCount = actual;
+                }
+                else if (s.AvailableSeats > 0)
+                {
+                    baseSeatCount = s.AvailableSeats;
+                }
+                else if (s.Event != null && s.Event.TotalSeats > 0)
+                {
+                    baseSeatCount = s.Event.TotalSeats;
+                }
+                else
+                {
+                    baseSeatCount = 0;
+                }
+
+                int held = activeHeldCountByShowtime.GetValueOrDefault(s.Id, 0);
+                int sold = paidSeatCountByShowtime.GetValueOrDefault(s.Id, 0);
+
+                return Math.Max(0, baseSeatCount - held - sold);
+            });
         }
 
         #region Cursor Encoding/Decoding Helpers
