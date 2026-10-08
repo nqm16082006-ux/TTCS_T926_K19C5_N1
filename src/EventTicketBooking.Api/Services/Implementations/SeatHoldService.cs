@@ -464,35 +464,6 @@ namespace EventTicketBooking.Api.Services.Implementations
                 _logger.LogError(ex, "Lỗi khi thực thi hoán tác xóa có điều kiện Redis keys cho User {UserId}.", userId);
             }
         }
-        /// <summary>
-        /// Đếm tổng số vé của người dùng cho một suất chiếu (Bao gồm các ghế đang ACTIVE HOLD + Các ghế đã MUA/ĐẶT THÀNH CÔNG).
-        /// </summary>
-        public async Task<int> GetUserTicketCountForShowtimeAsync(
-            Guid showtimeId,
-            Guid userId,
-            CancellationToken cancellationToken = default)
-        {
-            var now = DateTime.UtcNow;
-
-            // 1. Đếm số lượng ghế đang được người dùng giữ chỗ (ACTIVE hold)
-            var activeHoldsCount = await (from sh in _context.SeatHold
-                                          join s in _context.Seats on sh.SeatId equals s.Id
-                                          where s.ShowtimeId == showtimeId &&
-                                                sh.UserId == userId &&
-                                                sh.Status == "ACTIVE" &&
-                                                sh.ExpiresAt > now
-                                          select sh.Id).CountAsync(cancellationToken);
-
-            // 2. Đếm số lượng vé/ghế đã đặt thành công (trong các Order không bị CANCELLED/EXPIRED)
-            var purchasedTicketsCount = await (from o in _context.Orders
-                                               join oi in _context.OrderItems on o.Id equals oi.OrderId
-                                               where o.ShowtimeId == showtimeId &&
-                                                     o.UserId == userId &&
-                                                     o.Status != OrderStatus.Cancelled &&
-                                                     o.Status != OrderStatus.Expired
-                                               select oi.Id).CountAsync(cancellationToken);
-
-            return activeHoldsCount + purchasedTicketsCount;
-        }
+        
     }
 }
