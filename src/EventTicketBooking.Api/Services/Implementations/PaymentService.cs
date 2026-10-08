@@ -367,16 +367,16 @@ namespace EventTicketBooking.Api.Services.Implementations
 
                     // Release seats immediately
                     var releaseSeatIds = order.OrderItems.Select(oi => oi.SeatId).Distinct().ToList();
-                    
+
                     var holdsToCancel = await _context.SeatHold
                         .Where(h => releaseSeatIds.Contains(h.SeatId) && h.UserId == order.UserId && h.Status == "ACTIVE")
                         .ToListAsync(cancellationToken);
-                    foreach(var hold in holdsToCancel) hold.Status = "CANCELLED";
-                    
+                    foreach (var hold in holdsToCancel) hold.Status = "CANCELLED";
+
                     var seatsToRelease = await _context.Seats
                         .Where(s => releaseSeatIds.Contains(s.Id) && s.Status == "HELD")
                         .ToListAsync(cancellationToken);
-                    foreach(var s in seatsToRelease) s.Status = "AVAILABLE";
+                    foreach (var s in seatsToRelease) s.Status = "AVAILABLE";
 
                     await _context.SaveChangesAsync(cancellationToken);
 
