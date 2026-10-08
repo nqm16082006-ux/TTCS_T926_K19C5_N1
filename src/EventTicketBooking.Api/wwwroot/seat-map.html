@@ -1448,12 +1448,11 @@
     function startHoldCountdown(expiresAtIso, serverTimeIso, httpDateHeader, expireIfElapsed = true) {
       stopHoldCountdown();
 
-      // A hold deadline must identify an absolute instant; never guess its timezone.
-      if (!/(Z|[+-]\d{2}:\d{2})$/i.test(expiresAtIso || "") ||
-          (serverTimeIso && !/(Z|[+-]\d{2}:\d{2})$/i.test(serverTimeIso))) {
-        console.warn("Thời gian giữ ghế thiếu múi giờ; không tạo bộ đếm.");
-        return;
-      }
+      // Đảm bảo UTC cho các chuỗi thời gian trả về từ Backend (vì EF Core đôi khi làm mất Kind=Utc)
+      const fixUtc = (d) => (d && !/(Z|[+-]\d{2}:\d{2})$/i.test(d)) ? d + 'Z' : d;
+      expiresAtIso = fixUtc(expiresAtIso);
+      serverTimeIso = fixUtc(serverTimeIso);
+
       let serverTimeMs = 0;
       if (serverTimeIso) {
         serverTimeMs = new Date(serverTimeIso).getTime();
@@ -1628,10 +1627,15 @@
             const httpDate = res.headers.get('Date');
 
             myHeldSeatIds.clear();
-            const absoluteDeadline = /(Z|[+-]\d{2}:\d{2})$/i.test(expiresAt || "");
-            const referenceTime = new Date(serverTime || httpDate || Date.now()).getTime();
-            const deadline = new Date(expiresAt).getTime();
-            if (heldIds.length > 0 && absoluteDeadline && Number.isFinite(deadline) && deadline > referenceTime) {
+
+            // Đảm bảo UTC cho chuỗi thời gian
+            const fixUtc = (d) => (d && !/(Z|[+-]\d{2}:\d{2})$/i.test(d)) ? d + 'Z' : d;
+            const fixedExpiresAt = fixUtc(expiresAt);
+            const fixedServerTime = fixUtc(serverTime);
+
+            const referenceTime = new Date(fixedServerTime || httpDate || Date.now()).getTime();
+            const deadline = new Date(fixedExpiresAt).getTime();
+            if (heldIds.length > 0 && Number.isFinite(deadline) && deadline > referenceTime) {
               heldIds.forEach(id => {
                 myHeldSeatIds.add(id);
                 selectedSeatIds.delete(id);
@@ -1641,7 +1645,7 @@
               });
 
               updateCartPanel();
-              startHoldCountdown(expiresAt, serverTime, httpDate, false);
+              startHoldCountdown(fixedExpiresAt, fixedServerTime, httpDate, false);
             } else {
               stopHoldCountdown();
               updateCartPanel();
