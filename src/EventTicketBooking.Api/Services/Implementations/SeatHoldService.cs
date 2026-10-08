@@ -392,6 +392,36 @@ namespace EventTicketBooking.Api.Services.Implementations
         }
 
         /// <summary>
+        /// Tính tổng số vé mà 1 người dùng đang nắm giữ trong 1 suất diễn (Task S-42.1).
+        /// Tổng vé = Số ghế đang giữ chỗ còn hạn (SeatHold ACTIVE) + Số ghế trong các đơn hàng đã mua/chờ thanh toán.
+        /// </summary>
+        public async Task<int> GetUserTicketCountForShowtimeAsync(
+            Guid showtimeId,
+            Guid userId,
+            CancellationToken cancellationToken = default)
+        {
+            var now = DateTime.UtcNow;
+
+            // 1. Đếm số ghế người dùng đang giữ chỗ tạm thời (ACTIVE và chưa hết hạn)
+            var activeHoldCount = await _context.SeatHold
+                .AsNoTracking()
+                .CountAsync(sh => sh.Seat.ShowtimeId == showtimeId &&
+                                  sh.UserId == userId &&
+                                  sh.Status == "ACTIVE" &&
+                                  sh.ExpiresAt > now, cancellationToken);
+
+            // 2. Đếm số vé/ghế đã đặt nằm trong các đơn hàng không bị hủy (Pending, Completed/Paid)
+            var purchasedCount = await _context.OrderItems
+                .AsNoTracking()
+                .CountAsync(oi => oi.Order.ShowtimeId == showtimeId &&
+                                  oi.Order.UserId == userId &&
+                                  oi.Order.Status != OrderStatus.Cancelled &&
+                                  oi.Order.Status != OrderStatus.Expired, cancellationToken);
+
+            return activeHoldCount + purchasedCount;
+        }
+
+        /// <summary>
         /// Giải phóng hoán tác (compensation) Redis keys CÓ ĐIỀU KIỆN bằng Lua Script.
         /// Chỉ xóa key nếu giá trị hiện tại trên Redis bằng chính userId của request.
         /// </summary>
