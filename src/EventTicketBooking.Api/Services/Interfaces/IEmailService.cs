@@ -28,5 +28,17 @@ public interface IEmailService
     /// <param name="toName">Tên hiển thị người nhận.</param>
     /// <param name="registrationMethod">Phương thức đăng ký ("Email & Mật khẩu" hoặc "Tài khoản Google").</param>
     Task SendWelcomeEmailAsync(string toEmail, string toName, string registrationMethod);
+
+    /// <summary>
+    /// Gửi vé điện tử qua email kèm mã QR (S-27).
+    /// </summary>
+    Task SendTicketEmailAsync(
+        string toEmail,
+        string toName,
+        string eventTitle,
+        string location,
+        string showtime,
+        System.Collections.Generic.IEnumerable<string> seatNames,
+        byte[] qrCodeBytes);
 }
 
