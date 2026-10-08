@@ -132,7 +132,8 @@ namespace EventTicketBooking.Api.Controllers
                     RemainingSeats = remaining,
                     Status = s.Status.ToString(),
                     MinPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Min(sc => sc.Price) ?? 0) : 0m,
-                    MaxPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Max(sc => sc.Price) ?? 0) : 0m
+                    MaxPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Max(sc => sc.Price) ?? 0) : 0m,
+                    MaxTicketsPerUser = s.MaxTicketsPerUser > 0 ? s.MaxTicketsPerUser : (s.Event != null && s.Event.MaxTicketsPerUser > 0 ? s.Event.MaxTicketsPerUser : 10)
                 };
             }).ToList();
 
@@ -220,7 +221,8 @@ namespace EventTicketBooking.Api.Controllers
                     RemainingSeats = remainingSeats[s.Id],
                     Status = s.Status.ToString(),
                     MinPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Min(sc => sc.Price) ?? 0) : 0m,
-                    MaxPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Max(sc => sc.Price) ?? 0) : 0m
+                    MaxPrice = s.SeatCategories != null && s.SeatCategories.Any() ? (s.SeatCategories.Max(sc => sc.Price) ?? 0) : 0m,
+                    MaxTicketsPerUser = s.MaxTicketsPerUser > 0 ? s.MaxTicketsPerUser : (ev.MaxTicketsPerUser > 0 ? ev.MaxTicketsPerUser : 10)
                 }).ToList();
 
             decimal overallMinPrice = showtimesList.Any(s => s.MinPrice > 0)
@@ -244,6 +246,7 @@ namespace EventTicketBooking.Api.Controllers
                 EndTime = ev.EndTime,
                 TotalSeats = ev.TotalSeats,
                 AvailableSeats = availableSeats,
+                MaxTicketsPerUser = ev.MaxTicketsPerUser > 0 ? ev.MaxTicketsPerUser : 10,
                 MinPrice = overallMinPrice,
                 MaxPrice = overallMaxPrice,
                 Showtimes = showtimesList
@@ -254,18 +257,26 @@ namespace EventTicketBooking.Api.Controllers
 
         /// <summary>
         /// Lấy thông tin chi tiết Suất chiếu công khai theo Event ID và Showtime ID (Dùng cho T-18).
-        /// GET /api/public/events/{eventId}/showtimes/{showtimeId}
+        /// GET /api/public/events/{eventId}/showtimes/{showtimeId} hoặc GET /api/public/showtimes/{showtimeId}
         /// </summary>
         [HttpGet("events/{eventId:guid}/showtimes/{showtimeId:guid}")]
+        [HttpGet("showtimes/{showtimeId:guid}")]
         [ProducesResponseType(typeof(ApiResponse<PublicShowtimeDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> GetPublicShowtimeDetail(Guid eventId, Guid showtimeId)
+        public async Task<IActionResult> GetPublicShowtimeDetail(Guid? eventId, Guid showtimeId)
         {
-            var showtime = await _context.Showtimes
+            var query = _context.Showtimes
                 .AsNoTracking()
                 .Include(s => s.Event)
                 .Include(s => s.SeatCategories)
-                .FirstOrDefaultAsync(s => s.EventId == eventId && s.Id == showtimeId);
+                .Where(s => s.Id == showtimeId);
+
+            if (eventId.HasValue)
+            {
+                query = query.Where(s => s.EventId == eventId.Value);
+            }
+
+            var showtime = await query.FirstOrDefaultAsync();
 
             if (showtime == null)
             {
@@ -293,7 +304,8 @@ namespace EventTicketBooking.Api.Controllers
                 RemainingSeats = remainingSeats[showtime.Id],
                 Status = showtime.Status.ToString(),
                 MinPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? (showtime.SeatCategories.Min(sc => sc.Price) ?? 0) : 0m,
-                MaxPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? (showtime.SeatCategories.Max(sc => sc.Price) ?? 0) : 0m
+                MaxPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? (showtime.SeatCategories.Max(sc => sc.Price) ?? 0) : 0m,
+                MaxTicketsPerUser = showtime.MaxTicketsPerUser > 0 ? showtime.MaxTicketsPerUser : (showtime.Event != null && showtime.Event.MaxTicketsPerUser > 0 ? showtime.Event.MaxTicketsPerUser : 10)
             };
 
             return Ok(ApiResponse<PublicShowtimeDto>.SuccessResult(dto, "Lấy thông tin chi tiết suất chiếu thành công."));

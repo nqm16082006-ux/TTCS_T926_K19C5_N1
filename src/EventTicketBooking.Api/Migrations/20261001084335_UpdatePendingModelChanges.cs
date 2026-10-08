@@ -139,15 +139,21 @@ namespace EventTicketBooking.Api.Migrations
                 oldClrType: typeof(string),
                 oldType: "TEXT");
 
-            migrationBuilder.AlterColumn<ShowtimeStatus>(
-                name: "Status",
-                table: "Showtimes",
-                type: "showtime_status",
-                nullable: false,
-                defaultValueSql: "'draft'::showtime_status",
-                oldClrType: typeof(string),
-                oldType: "TEXT",
-                oldDefaultValue: "Draft");
+            migrationBuilder.Sql("""
+                DO $$ BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'showtime_status') THEN
+                        CREATE TYPE showtime_status AS ENUM ('draft', 'on_sale', 'closed');
+                    END IF;
+                END $$;
+                ALTER TABLE "Showtimes" ALTER COLUMN "Status" DROP DEFAULT;
+                ALTER TABLE "Showtimes" ALTER COLUMN "Status" TYPE showtime_status USING
+                    (CASE lower(replace("Status"::text, '_', ''))
+                        WHEN 'onsale' THEN 'on_sale'
+                        WHEN 'closed' THEN 'closed'
+                        ELSE 'draft'
+                    END)::showtime_status;
+                ALTER TABLE "Showtimes" ALTER COLUMN "Status" SET DEFAULT 'draft'::showtime_status;
+            """);
 
             migrationBuilder.AlterColumn<DateTime>(
                 name: "StartTime",
@@ -468,9 +474,16 @@ namespace EventTicketBooking.Api.Migrations
                 oldClrType: typeof(int),
                 oldType: "INTEGER");
 
-            migrationBuilder.Sql("ALTER TABLE orders ALTER COLUMN \"Status\" DROP DEFAULT;");
-            migrationBuilder.Sql("ALTER TABLE orders ALTER COLUMN \"Status\" TYPE order_status USING LOWER(\"Status\")::order_status;");
-            migrationBuilder.Sql("ALTER TABLE orders ALTER COLUMN \"Status\" SET DEFAULT 'pending'::order_status;");
+            migrationBuilder.Sql("""
+                DO $$ BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'order_status') THEN
+                        CREATE TYPE order_status AS ENUM ('pending', 'paid', 'cancelled', 'expired', 'needs_attention');
+                    END IF;
+                END $$;
+                ALTER TABLE orders ALTER COLUMN "Status" DROP DEFAULT;
+                ALTER TABLE orders ALTER COLUMN "Status" TYPE order_status USING LOWER("Status")::order_status;
+                ALTER TABLE orders ALTER COLUMN "Status" SET DEFAULT 'pending'::order_status;
+            """);
 
             migrationBuilder.AlterColumn<Guid>(
                 name: "ShowtimeId",

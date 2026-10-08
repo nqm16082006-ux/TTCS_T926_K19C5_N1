@@ -727,9 +727,18 @@
           </div>
         </div>
 
-        <div>
-          <label class="block font-label-md text-label-md text-on-surface mb-1.5" for="eventTotalSeats">Tổng số ghế dự kiến *</label>
-          <input type="number" id="eventTotalSeats" required min="1" class="w-full h-11 px-4 rounded-lg bg-surface-container-low border border-outline-variant/40 text-body-md font-body-md focus:bg-white focus:border-primary outline-none transition">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block font-label-md text-label-md text-on-surface mb-1.5" for="eventTotalSeats">Tổng số ghế dự kiến *</label>
+            <input type="number" id="eventTotalSeats" required min="1" class="w-full h-11 px-4 rounded-lg bg-surface-container-low border border-outline-variant/40 text-body-md font-body-md focus:bg-white focus:border-primary outline-none transition">
+          </div>
+          <div>
+            <label class="block font-label-md text-label-md text-on-surface mb-1.5" for="eventMaxTicketsPerUser">
+              Giới hạn vé mỗi tài khoản trong một suất
+              <span class="text-outline font-normal text-xs">(Mặc định: 10 vé/suất)</span>
+            </label>
+            <input type="number" id="eventMaxTicketsPerUser" min="1" max="100" placeholder="10" class="w-full h-11 px-4 rounded-lg bg-surface-container-low border border-outline-variant/40 text-body-md font-body-md focus:bg-white focus:border-primary outline-none transition">
+          </div>
         </div>
 
         <div class="flex items-center justify-end gap-3 pt-4 border-t border-outline-variant/30">
@@ -1556,6 +1565,7 @@
                     <td class="py-3.5 px-4 whitespace-nowrap">
                       <div class="font-bold text-on-surface flex items-center gap-1.5 font-label-md text-label-md">
                         <span>${s.availableSeats.toLocaleString('vi-VN')} ghế</span>
+                        <span class="text-[10px] text-primary bg-primary-fixed/30 px-2 py-0.5 rounded-full font-bold border border-primary/20">Tối đa ${s.maxTicketsPerUser || 10} vé/người</span>
                         ${hasSeats ? '<span class="text-[10px] text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200">Đã có sơ đồ ghế</span>' : '<span class="text-[10px] text-amber-900 bg-amber-50 px-2 py-0.5 rounded-full font-bold border border-amber-200">Chưa nạp ghế</span>'}
                       </div>
                       <div class="mt-1">
@@ -2028,6 +2038,7 @@
           document.getElementById('eventStartTime').value = formatDateTimeLocal(e.startTime);
           document.getElementById('eventEndTime').value = formatDateTimeLocal(e.endTime);
           document.getElementById('eventTotalSeats').value = e.totalSeats;
+          document.getElementById('eventMaxTicketsPerUser').value = e.maxTicketsPerUser || 10;
           document.getElementById('eventModal').classList.add('active');
         } else {
           showAlert(result.message || 'Không thể tải thông tin sự kiện.', 'error');
@@ -2041,6 +2052,7 @@
           document.getElementById('eventStartTime').value = formatDateTimeLocal(e.startTime);
           document.getElementById('eventEndTime').value = formatDateTimeLocal(e.endTime);
           document.getElementById('eventTotalSeats').value = e.totalSeats;
+          document.getElementById('eventMaxTicketsPerUser').value = e.maxTicketsPerUser || 10;
           document.getElementById('eventModal').classList.add('active');
         }
       }
@@ -2089,13 +2101,17 @@
       btnSave.innerHTML = '⌛ Đang lưu...';
       isSubmitting = true;
 
+      const maxTicketsVal = parseInt(document.getElementById('eventMaxTicketsPerUser').value, 10);
+      const maxTicketsPerUser = (!isNaN(maxTicketsVal) && maxTicketsVal > 0) ? maxTicketsVal : 10;
+
       const payload = {
         title,
         description,
         location,
         startTime: startDate.toISOString(),
         endTime: endDate.toISOString(),
-        totalSeats
+        totalSeats,
+        maxTicketsPerUser
       };
 
       try {

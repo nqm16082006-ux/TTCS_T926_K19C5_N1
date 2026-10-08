@@ -263,7 +263,10 @@
                   <span class="w-1.5 h-6 rounded-full bg-secondary inline-block"></span>
                   Sơ đồ tổng quan khán phòng
                 </h2>
-                <span class="font-label-sm text-label-sm text-outline font-code-mono" id="totalSeatsBadge">Quy mô: 3.500 ghế</span>
+                <div class="flex items-center gap-2">
+                  <span class="font-label-sm text-label-sm text-outline font-code-mono" id="totalSeatsBadge">Quy mô: 3.500 ghế</span>
+                  <span class="px-2 py-0.5 rounded-full bg-primary-fixed/30 text-primary font-label-sm text-xs font-bold" id="eventMaxTicketsBadge">Tối đa 10 vé/người</span>
+                </div>
               </div>
 
               <div class="relative bg-surface-container-low rounded-lg p-space-md overflow-hidden flex flex-col items-center">
@@ -861,6 +864,10 @@
       // 7. Quy mô & Sơ đồ ghế
       const totalSeats = ev.totalSeats ?? 0;
       document.getElementById('totalSeatsBadge').innerText = `Quy mô: ${totalSeats.toLocaleString('vi-VN')} ghế`;
+      const maxTicketsBadge = document.getElementById('eventMaxTicketsBadge');
+      if (maxTicketsBadge) {
+        maxTicketsBadge.innerText = `Tối đa ${ev.maxTicketsPerUser || 10} vé/suất`;
+      }
       document.getElementById('legendVip').innerText = `VIP: ${formatCurrency(maxP)}`;
       document.getElementById('legendStandard').innerText = `Standard: ${formatCurrency(minP)}`;
       document.getElementById('legendPlatinum').innerText = 'Giá từng hạng ghế được hiển thị tại sơ đồ ghế';
@@ -949,6 +956,10 @@
                   Còn ${available.toLocaleString('vi-VN')} ghế trống
                 </div>
                 <div class="font-label-md text-label-md text-on-surface font-code-mono font-semibold">${priceText}</div>
+                <div class="text-[11px] text-outline font-semibold flex items-center gap-1 mt-0.5">
+                  <span class="material-symbols-outlined text-[14px] text-primary">confirmation_number</span>
+                  <span>Tối đa ${st.maxTicketsPerUser || (currentEvent && currentEvent.maxTicketsPerUser) || 10} vé/suất</span>
+                </div>
               </div>
               <a href="${seatMapUrl}" class="h-11 px-5 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-1.5 shadow-sm hover:shadow active:scale-95 transition-all font-bold shrink-0">
                 <span>Chọn ghế ngay</span>

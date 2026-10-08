@@ -713,6 +713,16 @@
                       <span class="font-body-sm text-body-sm text-on-surface-variant">Cổng thanh toán: PayOS, MoMo, Thẻ Quốc tế Visa/Master</span>
                     </div>
                   </div>
+
+                  <!-- Max Tickets Limit (Task S-42) -->
+                  <div class="flex items-start gap-space-sm">
+                    <span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">confirmation_number</span>
+                    <div class="flex flex-col">
+                      <span class="font-label-sm text-label-sm text-outline">Giới hạn số vé mỗi tài khoản trong một suất</span>
+                      <span id="sideMaxTickets" class="font-label-lg text-label-lg text-on-surface font-semibold">Tối đa 10 vé / suất</span>
+                      <span class="font-body-sm text-body-sm text-on-surface-variant">Tổng ghế đang giữ + đã mua không được vượt quá</span>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Edit Event Meta CTA Button (Connects directly to create-event.html in edit mode) -->
@@ -784,6 +794,11 @@
           <input id="showtimeAvailableSeats" type="number" min="1" placeholder="Mặc định theo sự kiện" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-body-md focus:outline-none focus:ring-2 focus:ring-primary">
           <p class="text-[11px] text-outline mt-1">Để trống sẽ tự động lấy theo tổng số ghế của sự kiện.</p>
         </div>
+        <div>
+          <label class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Giới hạn vé mỗi tài khoản trong suất này</label>
+          <input id="showtimeMaxTicketsPerUser" type="number" min="1" max="100" placeholder="Mặc định: 10" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-body-md focus:outline-none focus:ring-2 focus:ring-primary">
+          <p class="text-[11px] text-outline mt-1">Để trống sẽ kế thừa từ giới hạn sự kiện (Mặc định: 10 vé/suất). Tổng ghế đang giữ + đã mua không được vượt quá.</p>
+        </div>
 
         <div id="addShowtimeAlert" class="hidden p-3 rounded-lg text-sm font-semibold"></div>
 
@@ -821,6 +836,11 @@
         <div>
           <label class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Số lượng ghế khả dụng</label>
           <input id="editAvailableSeats" type="number" min="1" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-body-md focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+        <div>
+          <label class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Giới hạn vé mỗi tài khoản trong suất này</label>
+          <input id="editMaxTicketsPerUser" type="number" min="1" max="100" placeholder="Mặc định: 10" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-body-md focus:outline-none focus:ring-2 focus:ring-primary">
+          <p class="text-[11px] text-outline mt-1">Tổng ghế đang giữ cộng đã mua của tài khoản vượt giới hạn thì không giữ thêm được.</p>
         </div>
 
         <div id="editShowtimeAlert" class="hidden p-3 rounded-lg text-sm font-semibold"></div>
@@ -1059,6 +1079,10 @@
       const startDate = formatDate(ev.startTime);
       const endDate = formatDate(ev.endTime);
       document.getElementById('sideTimeRange').textContent = `${startDate} - ${endDate}`;
+      const sideMaxEl = document.getElementById('sideMaxTickets');
+      if (sideMaxEl) {
+        sideMaxEl.textContent = `Tối đa ${ev.maxTicketsPerUser || 10} vé / suất`;
+      }
 
       // Poster Image
       if (ev.imageUrl) {
@@ -1191,6 +1215,9 @@
                     <span class="material-symbols-outlined text-[13px]">check_circle</span>
                     ${totalSeats.toLocaleString('vi-VN')} ghế (Hội trường)
                   </span>
+                  <span class="text-[11px] font-semibold text-primary bg-primary-fixed/30 px-2 py-0.5 rounded-full w-fit">
+                    Tối đa ${s.maxTicketsPerUser || (currentEvent && currentEvent.maxTicketsPerUser) || 10} vé/người
+                  </span>
                   <a class="font-label-sm text-label-sm text-primary hover:underline inline-flex items-center gap-0.5 font-semibold" href="./seat-map.html?showtimeId=${s.id}" target="_blank">
                     <span class="material-symbols-outlined text-[14px]">map</span>
                     Xem trước sơ đồ
@@ -1202,6 +1229,9 @@
                   <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-label-sm text-label-sm font-semibold">
                     <span class="material-symbols-outlined text-[13px] text-amber-700">warning</span>
                     Chưa có sơ đồ ghế
+                  </span>
+                  <span class="text-[11px] font-semibold text-primary bg-primary-fixed/30 px-2 py-0.5 rounded-full w-fit">
+                    Tối đa ${s.maxTicketsPerUser || (currentEvent && currentEvent.maxTicketsPerUser) || 10} vé/người
                   </span>
                   <button onclick="openSeatImportModal('${s.id}', false)" class="font-label-sm text-label-sm text-primary hover:underline flex items-center gap-0.5 font-semibold" type="button">
                     <span class="material-symbols-outlined text-[14px]">upload_file</span>
@@ -1433,6 +1463,7 @@
       if (currentEvent && currentEvent.totalSeats) {
         document.getElementById('showtimeAvailableSeats').value = currentEvent.totalSeats;
       }
+      document.getElementById('showtimeMaxTicketsPerUser').value = (currentEvent && currentEvent.maxTicketsPerUser) ? currentEvent.maxTicketsPerUser : 10;
       openModal('addShowtimeModal');
     }
 
@@ -1462,10 +1493,14 @@
       btn.textContent = 'Đang thêm...';
 
       try {
+        const maxTicketsVal = parseInt(document.getElementById('showtimeMaxTicketsPerUser').value, 10);
+        const maxTickets = (!isNaN(maxTicketsVal) && maxTicketsVal > 0) ? maxTicketsVal : (currentEvent && currentEvent.maxTicketsPerUser ? currentEvent.maxTicketsPerUser : 10);
+
         const payload = {
           startTime: sDate.toISOString(),
           endTime: eDate.toISOString(),
-          availableSeats: !isNaN(seatsVal) && seatsVal > 0 ? seatsVal : (currentEvent ? currentEvent.totalSeats : 1000)
+          availableSeats: !isNaN(seatsVal) && seatsVal > 0 ? seatsVal : (currentEvent ? currentEvent.totalSeats : 1000),
+          maxTicketsPerUser: maxTickets
         };
 
         const res = await fetch(`${API_BASE}/api/events/${currentEventId}/showtimes`, {
@@ -1504,6 +1539,7 @@
       document.getElementById('editStartTime').value = formatDateTimeLocal(showtime.startTime);
       document.getElementById('editEndTime').value = formatDateTimeLocal(showtime.endTime);
       document.getElementById('editAvailableSeats').value = showtime.availableSeats;
+      document.getElementById('editMaxTicketsPerUser').value = showtime.maxTicketsPerUser || (currentEvent && currentEvent.maxTicketsPerUser) || 10;
       document.getElementById('editShowtimeAlert').className = 'hidden p-3 rounded-lg text-sm font-semibold';
 
       openModal('editShowtimeModal');
@@ -1530,10 +1566,14 @@
       btn.textContent = 'Đang lưu...';
 
       try {
+        const maxTicketsVal = parseInt(document.getElementById('editMaxTicketsPerUser').value, 10);
+        const maxTickets = (!isNaN(maxTicketsVal) && maxTicketsVal > 0) ? maxTicketsVal : null;
+
         const payload = {
           startTime: sDate.toISOString(),
           endTime: eDate.toISOString(),
-          availableSeats: !isNaN(seatsVal) && seatsVal > 0 ? seatsVal : null
+          availableSeats: !isNaN(seatsVal) && seatsVal > 0 ? seatsVal : null,
+          maxTicketsPerUser: maxTickets
         };
 
         const res = await fetch(`${API_BASE}/api/events/${currentEventId}/showtimes/${showtimeId}`, {
