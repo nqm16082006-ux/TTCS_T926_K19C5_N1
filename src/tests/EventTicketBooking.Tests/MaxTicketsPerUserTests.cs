@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
+using Moq;
+using EventTicketBooking.Api.Hubs;
 using EventTicketBooking.Api.Controllers;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
@@ -202,7 +205,7 @@ namespace EventTicketBooking.Tests
         {
             // Arrange
             var (showtime, seats) = await SeedShowtimeWithSeatsAsync(maxTickets: 3, seatCount: 5);
-            var seatHoldService = new SeatHoldService(_context, NullLogger<SeatHoldService>.Instance);
+            var seatHoldService = new SeatHoldService(_context, NullLogger<SeatHoldService>.Instance, new Mock<IHubContext<SeatStatusHub>>().Object);
 
             var requestedSeatIds = new List<Guid> { seats[0].Id, seats[1].Id, seats[2].Id, seats[3].Id }; // 4 seats > limit 3
 
@@ -219,7 +222,7 @@ namespace EventTicketBooking.Tests
         {
             // Arrange
             var (showtime, seats) = await SeedShowtimeWithSeatsAsync(maxTickets: 3, seatCount: 5);
-            var seatHoldService = new SeatHoldService(_context, NullLogger<SeatHoldService>.Instance);
+            var seatHoldService = new SeatHoldService(_context, NullLogger<SeatHoldService>.Instance, new Mock<IHubContext<SeatStatusHub>>().Object);
 
             var requestedSeatIds = new List<Guid> { seats[0].Id, seats[1].Id, seats[2].Id }; // 3 seats == limit 3
 
@@ -241,7 +244,7 @@ namespace EventTicketBooking.Tests
         {
             // Arrange
             var (showtime, seats) = await SeedShowtimeWithSeatsAsync(maxTickets: 3, seatCount: 5);
-            var seatHoldService = new SeatHoldService(_context, NullLogger<SeatHoldService>.Instance);
+            var seatHoldService = new SeatHoldService(_context, NullLogger<SeatHoldService>.Instance, new Mock<IHubContext<SeatStatusHub>>().Object);
 
             // First hold 2 seats
             var firstHold = await seatHoldService.HoldSeatsAsync(showtime.Id, new List<Guid> { seats[0].Id, seats[1].Id }, _buyerId);
@@ -260,7 +263,7 @@ namespace EventTicketBooking.Tests
         {
             // Arrange
             var (showtime, seats) = await SeedShowtimeWithSeatsAsync(maxTickets: 3, seatCount: 5);
-            var seatHoldService = new SeatHoldService(_context, NullLogger<SeatHoldService>.Instance);
+            var seatHoldService = new SeatHoldService(_context, NullLogger<SeatHoldService>.Instance, new Mock<IHubContext<SeatStatusHub>>().Object);
 
             // Hold 2 seats
             var initial = await seatHoldService.HoldSeatsAsync(showtime.Id, new List<Guid> { seats[0].Id, seats[1].Id }, _buyerId);
@@ -278,7 +281,7 @@ namespace EventTicketBooking.Tests
         {
             // Arrange
             var (showtime, seats) = await SeedShowtimeWithSeatsAsync(maxTickets: 3, seatCount: 5);
-            var seatHoldService = new SeatHoldService(_context, NullLogger<SeatHoldService>.Instance);
+            var seatHoldService = new SeatHoldService(_context, NullLogger<SeatHoldService>.Instance, new Mock<IHubContext<SeatStatusHub>>().Object);
 
             // Seed an existing paid order with 2 tickets for this buyer
             var order = new Order
@@ -366,7 +369,7 @@ namespace EventTicketBooking.Tests
         {
             // Arrange
             var (showtime, seats) = await SeedShowtimeWithSeatsAsync(maxTickets: 4, seatCount: 5);
-            var seatHoldService = new SeatHoldService(_context, NullLogger<SeatHoldService>.Instance);
+            var seatHoldService = new SeatHoldService(_context, NullLogger<SeatHoldService>.Instance, new Mock<IHubContext<SeatStatusHub>>().Object);
 
             // Seed 1 paid ticket
             var order = new Order
