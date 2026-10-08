@@ -463,6 +463,6 @@ namespace EventTicketBooking.Api.Services.Implementations
             {
                 _logger.LogError(ex, "Lỗi khi thực thi hoán tác xóa có điều kiện Redis keys cho User {UserId}.", userId);
             }
-        }       
+        }
     }
 }
