@@ -11,7 +11,8 @@ namespace EventTicketBooking.Api.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
+                        migrationBuilder.Sql("CREATE TYPE order_status AS ENUM ('pending', 'paid', 'cancelled', 'expired', 'needs_attention');");
+migrationBuilder.CreateTable(
                 name: "payment_events",
                 columns: table => new
                 {
@@ -40,3 +41,4 @@ namespace EventTicketBooking.Api.Migrations
         }
     }
 }
+
