@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EventTicketBooking.Api.BackgroundServices;
 using EventTicketBooking.Api.Controllers;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Xunit;
 
 namespace EventTicketBooking.Tests;
@@ -76,7 +78,11 @@ public sealed class OrdersControllerTests
         });
         await context.SaveChangesAsync();
 
-        var controller = new OrdersController(context, NullLogger<OrdersController>.Instance)
+        var mockTicketEmailQueue = new Mock<ITicketEmailQueue>();
+        var controller = new OrdersController(
+            context,
+            NullLogger<OrdersController>.Instance,
+            mockTicketEmailQueue.Object)
         {
             ControllerContext = new ControllerContext
             {
