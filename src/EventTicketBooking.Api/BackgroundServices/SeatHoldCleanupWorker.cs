@@ -14,12 +14,12 @@ public class SeatHoldCleanupWorker : BackgroundService
 {
     private readonly ILogger<SeatHoldCleanupWorker> _logger;
     private readonly IServiceProvider _serviceProvider;
-    private readonly IHubContext<SeatStatusHub> _hubContext;
+    private readonly IHubContext<SeatStatusHub>? _hubContext;
 
     public SeatHoldCleanupWorker(
         ILogger<SeatHoldCleanupWorker> logger,
         IServiceProvider serviceProvider,
-        IHubContext<SeatStatusHub> hubContext)
+        IHubContext<SeatStatusHub>? hubContext = null)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
@@ -78,11 +78,17 @@ public class SeatHoldCleanupWorker : BackgroundService
 
                 await transaction.CommitAsync(stoppingToken);
 
-                var grouped = expiredSeatsInfo.GroupBy(x => x.ShowtimeId);
-                foreach (var group in grouped)
+                if (_hubContext != null && _hubContext.Clients != null)
                 {
-                    await _hubContext.Clients.Group(group.Key.ToString())
-                        .SendAsync("SeatReleased", new { ShowtimeId = group.Key, SeatIds = group.Select(x => x.SeatId).ToList() }, stoppingToken);
+                    var grouped = expiredSeatsInfo.GroupBy(x => x.ShowtimeId);
+                    foreach (var group in grouped)
+                    {
+                        var groupClient = _hubContext.Clients.Group(group.Key.ToString());
+                        if (groupClient != null)
+                        {
+                            await groupClient.SendAsync("SeatReleased", new { ShowtimeId = group.Key, SeatIds = group.Select(x => x.SeatId).ToList() }, stoppingToken);
+                        }
+                    }
                 }
 
                 _logger.LogInformation("Đã nhả thành công {Count} ghế quá hạn giữ chỗ.", expiredSeatIds.Count);

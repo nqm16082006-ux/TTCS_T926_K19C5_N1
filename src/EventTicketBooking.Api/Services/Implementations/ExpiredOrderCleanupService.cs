@@ -124,13 +124,16 @@ namespace EventTicketBooking.Api.Services.Implementations
                     }
                     await _dbContext.SaveChangesAsync(cancellationToken);
 
-                    if (_hubContext != null)
+                    if (_hubContext != null && _hubContext.Clients != null)
                     {
                         var grouped = heldSeats.GroupBy(s => s.ShowtimeId);
                         foreach (var group in grouped)
                         {
-                            await _hubContext.Clients.Group(group.Key.ToString())
-                                .SendAsync("SeatReleased", new { ShowtimeId = group.Key, SeatIds = group.Select(s => s.Id).ToList() }, cancellationToken);
+                            var groupClient = _hubContext.Clients.Group(group.Key.ToString());
+                            if (groupClient != null)
+                            {
+                                await groupClient.SendAsync("SeatReleased", new { ShowtimeId = group.Key, SeatIds = group.Select(s => s.Id).ToList() }, cancellationToken);
+                            }
                         }
                     }
                 }

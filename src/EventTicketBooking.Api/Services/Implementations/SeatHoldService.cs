@@ -26,14 +26,14 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly AppDbContext _context;
         private readonly IConnectionMultiplexer? _redis;
         private readonly ILogger<SeatHoldService> _logger;
-        private readonly IHubContext<SeatStatusHub> _hubContext;
+        private readonly IHubContext<SeatStatusHub>? _hubContext;
 
         public const int DefaultHoldTtlSeconds = 600; // 10 phút
 
         public SeatHoldService(
             AppDbContext context,
             ILogger<SeatHoldService> logger,
-            IHubContext<SeatStatusHub> hubContext,
+            IHubContext<SeatStatusHub>? hubContext = null,
             IConnectionMultiplexer? redis = null)
         {
             _context = context;
@@ -270,7 +270,14 @@ namespace EventTicketBooking.Api.Services.Implementations
                 ServerTime = now
             };
 
-            await _hubContext.Clients.Group(showtimeId.ToString()).SendAsync("SeatHeld", new { ShowtimeId = showtimeId, SeatIds = seatIds, ExpiresAt = expiresAt });
+            if (_hubContext != null && _hubContext.Clients != null)
+            {
+                var groupClient = _hubContext.Clients.Group(showtimeId.ToString());
+                if (groupClient != null)
+                {
+                    await groupClient.SendAsync("SeatHeld", new { ShowtimeId = showtimeId, SeatIds = seatIds, ExpiresAt = expiresAt });
+                }
+            }
 
             return HoldSeatsResult.SuccessResult(responseData, "Giữ chỗ ghế thành công.");
         }
@@ -323,7 +330,14 @@ namespace EventTicketBooking.Api.Services.Implementations
                 await ReleaseRedisHoldConditionalAsync(new[] { redisKey }, userId);
             }
 
-            await _hubContext.Clients.Group(showtimeId.ToString()).SendAsync("SeatReleased", new { ShowtimeId = showtimeId, SeatIds = new List<Guid> { seatId } });
+            if (_hubContext != null && _hubContext.Clients != null)
+            {
+                var groupClient = _hubContext.Clients.Group(showtimeId.ToString());
+                if (groupClient != null)
+                {
+                    await groupClient.SendAsync("SeatReleased", new { ShowtimeId = showtimeId, SeatIds = new List<Guid> { seatId } });
+                }
+            }
 
             return HoldSeatsResult.SuccessResult(null!, "Huỷ giữ ghế thành công.");
         }
