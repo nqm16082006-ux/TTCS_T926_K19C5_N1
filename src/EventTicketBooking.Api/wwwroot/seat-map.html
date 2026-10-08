@@ -357,6 +357,11 @@
               </p>
             </div>
 
+            <div id="bookingRateLimitNotice" role="status" aria-live="polite" aria-atomic="true" class="hidden rounded-xl p-space-md bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+              <p id="bookingRateLimitMessage"></p>
+              <p class="mt-2 text-xs">Thời gian giữ vé vẫn tiếp tục chạy theo đồng hồ phía trên.</p>
+            </div>
+
             <!-- Selected Seats Detail Panel -->
             <div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg flex flex-col gap-space-md border border-surface-container-high/60">
               <div class="flex items-center justify-between">
@@ -551,6 +556,8 @@
     let currentZoom = 1.0;
     let activeCategoryFilter = '';
     let bookingActionInFlight = false;
+    const bookingRateLimits = new Map();
+    let bookingRateLimitTimer = null;
 
     // Timer state
     let holdTimerInterval = null;
@@ -1150,6 +1157,7 @@
         totalPaymentPrice.textContent = `0 ₫`;
         btnAction.disabled = true;
         btnActionText.textContent = "Tiến hành giữ vé & thanh toán";
+        updateBookingRateLimitUI();
         return;
       }
 
@@ -1184,6 +1192,60 @@
       } else if (myHeldSeatIds.size > 0) {
         btnActionText.textContent = "Xác nhận & Chuyển sang thanh toán";
       }
+      updateBookingRateLimitUI();
+    }
+
+    function currentBookingPolicy() {
+      return selectedSeatIds.size > 0 ? 'seat-hold' : 'order-create';
+    }
+
+    function bookingRetrySeconds(policy) {
+      return Math.max(0, Math.ceil(((bookingRateLimits.get(policy)?.until || 0) - Date.now()) / 1000));
+    }
+
+    function updateBookingRateLimitUI() {
+      const policy = currentBookingPolicy();
+      const remaining = bookingRetrySeconds(policy);
+      const notice = document.getElementById('bookingRateLimitNotice');
+      const message = document.getElementById('bookingRateLimitMessage');
+      const button = document.getElementById('btnPrimaryAction');
+      const text = document.getElementById('btnPrimaryActionText') || button.querySelector('span');
+      notice.classList.toggle('hidden', remaining === 0);
+      if (remaining > 0) {
+        const label = policy === 'seat-hold' ? 'giữ vé' : 'tạo đơn';
+        const reason = bookingRateLimits.get(policy).unavailable
+          ? 'Hệ thống đang bận.' : `Bạn yêu cầu ${label} quá nhanh.`;
+        message.textContent = `${reason} Vui lòng thử lại sau ${remaining} giây.`;
+      }
+      if (!bookingActionInFlight) {
+        button.disabled = remaining > 0 || (selectedSeatIds.size + myHeldSeatIds.size === 0);
+        text.textContent = remaining > 0 ? `Thử lại sau ${remaining} giây`
+          : selectedSeatIds.size > 0 || myHeldSeatIds.size === 0
+            ? 'Tiến hành giữ vé & thanh toán' : 'Xác nhận & Chuyển sang thanh toán';
+      }
+      if (![...bookingRateLimits.keys()].some(key => bookingRetrySeconds(key) > 0)) {
+        clearInterval(bookingRateLimitTimer);
+        bookingRateLimitTimer = null;
+        bookingRateLimits.clear();
+      }
+    }
+
+    function handleBookingRateLimit(response, body, policy) {
+      const unavailable = response.status === 503 && body?.code === 'RATE_LIMIT_UNAVAILABLE';
+      if (response.status !== 429 && !unavailable) return false;
+      let seconds = Number(body?.retryAfterSeconds);
+      if (!Number.isFinite(seconds) || seconds <= 0) {
+        const header = response.headers.get('Retry-After');
+        seconds = header && /^\d+$/.test(header.trim()) ? Number(header)
+          : header ? (Date.parse(header) - Date.now()) / 1000 : NaN;
+      }
+      if (!Number.isFinite(seconds) || seconds <= 0) seconds = unavailable ? 5 : 60;
+      // Only block this operation; never clear the cart or retry automatically.
+      bookingRateLimits.set(policy, { until: Date.now() + Math.ceil(seconds) * 1000, unavailable });
+      if (bookingRateLimitTimer === null)
+        bookingRateLimitTimer = setInterval(updateBookingRateLimitUI, 1000);
+      updateBookingRateLimitUI();
+      return true;
     }
 
     function createCartItemCard(seat, isHeldOnServer) {
@@ -1222,6 +1284,10 @@
     // --- 6. Hold & Release Server API Integration ---
     async function handlePrimaryAction() {
       if (bookingActionInFlight) return;
+      if (bookingRetrySeconds(currentBookingPolicy()) > 0) {
+        updateBookingRateLimitUI();
+        return;
+      }
       bookingActionInFlight = true;
       try {
         await performPrimaryAction();
@@ -1232,6 +1298,7 @@
     }
 
     async function performPrimaryAction() {
+      if (bookingRetrySeconds(currentBookingPolicy()) > 0) return;
       // TH1: Đã giữ chỗ thành công trên server (myHeldSeatIds > 0) và không có ghế nháp mới
       if (selectedSeatIds.size === 0 && myHeldSeatIds.size > 0) {
         await createOrderAndProceed();
@@ -1271,6 +1338,11 @@
         const httpDateHeader = res.headers.get('Date');
         let json = null;
         try { json = await res.json(); } catch {}
+
+        if (handleBookingRateLimit(res, json, 'seat-hold')) {
+          btn.innerHTML = originalText;
+          return;
+        }
 
         if (res.ok && json && json.success) {
           const data = json.data;
@@ -1328,6 +1400,10 @@
     }
 
     async function createOrderAndProceed() {
+      if (bookingRetrySeconds('order-create') > 0) {
+        updateBookingRateLimitUI();
+        return;
+      }
       const btn = document.getElementById('btnPrimaryAction');
       const originalText = btn.innerHTML;
       btn.disabled = true;
@@ -1356,6 +1432,11 @@
 
         let json = null;
         try { json = await res.json(); } catch {}
+
+        if (handleBookingRateLimit(res, json, 'order-create')) {
+          btn.innerHTML = originalText;
+          return;
+        }
 
         if (res.ok && json && json.success && json.data) {
           const order = json.data;
