@@ -61,7 +61,7 @@ public class SeatHoldCleanupWorker : BackgroundService
                 .Where(sh => sh.Status == "ACTIVE" && sh.ExpiresAt <= now)
                 .Select(sh => new { sh.SeatId, sh.Seat.ShowtimeId })
                 .ToListAsync(stoppingToken);
-            
+
             var expiredSeatIds = expiredSeatsInfo.Select(x => x.SeatId).ToList();
 
             if (expiredSeatIds.Any())
