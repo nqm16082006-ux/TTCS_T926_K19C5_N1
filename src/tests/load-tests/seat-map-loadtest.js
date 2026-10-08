@@ -18,7 +18,7 @@ export const options = {
 
 const BASE_URL = 'http://localhost:5012';
 // Bạn cần thay thế bằng một ShowtimeId có thật trong database của bạn
-const SHOWTIME_ID = '5541e680-423c-406e-9adb-c13b1390baf5'; 
+const SHOWTIME_ID = 'f9f8037b-4f0e-48dc-95d2-d08837a21faf'; 
 
 export default function () {
   // 1. Giả lập Load sơ đồ ghế khi vừa vào trang
