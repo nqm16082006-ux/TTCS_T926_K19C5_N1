@@ -147,7 +147,8 @@ public class EmailService : IEmailService
             var port = int.Parse(settings["SmtpPort"] ?? "587");
 
             using var client = new SmtpClient();
-            // Bỏ qua chứng chỉ SSL nếu chạy localhost debug
+            client.CheckCertificateRevocation = false;
+            client.ServerCertificateValidationCallback = (s, c, h, e) => true;
 
             await client.ConnectAsync(host, port, SecureSocketOptions.StartTls);
             await client.AuthenticateAsync(user, pass);
