@@ -36,8 +36,12 @@
       try {
         const user = JSON.parse(userInfoRaw);
         const roles = (user.roles || []).map(r => (r || '').toLowerCase());
-        const canAccess = roles.includes('organizer') || roles.includes('staff') || roles.includes('admin');
+        if (roles.includes('staff') && !roles.includes('organizer') && !roles.includes('admin')) {
+          window.location.href = './staff-scanner.html';
+          return;
+        }
 
+        const canAccess = roles.includes('organizer') || roles.includes('admin');
         if (!canAccess) {
           alert('Bạn không có quyền truy cập khu vực Ban tổ chức.');
           window.location.href = './public-events.html';

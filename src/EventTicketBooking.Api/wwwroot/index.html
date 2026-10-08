@@ -323,18 +323,24 @@
         try {
           const user = JSON.parse(userStr);
           const roles = user.roles || [];
-          const isAdminOrOrg = roles.some(r => {
+          const isStaff = roles.some(r => (r || '').toLowerCase() === 'staff');
+          const isOrgOrAdmin = roles.some(r => {
             const low = (r || '').toLowerCase();
-            return low === 'admin' || low === 'organizer' || low === 'staff';
+            return low === 'admin' || low === 'organizer';
           });
 
           container.innerHTML = `
-            ${isAdminOrOrg ? `
+            ${isStaff ? `
+              <a href="./staff-scanner.html" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-fixed text-on-primary-fixed text-xs font-bold hover:bg-primary-fixed-dim transition">
+                <span class="material-symbols-outlined text-[16px]">qr_code_scanner</span>
+                <span>Soát vé</span>
+              </a>
+            ` : (isOrgOrAdmin ? `
               <a href="./events.html" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-xs font-bold hover:bg-secondary-fixed-dim transition">
                 <span class="material-symbols-outlined text-[16px]">domain</span>
                 <span>Quản trị sự kiện</span>
               </a>
-            ` : ''}
+            ` : '')}
             <div class="flex items-center gap-2 pl-2 border-l border-surface-container-high">
               <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white">
                 <span class="material-symbols-outlined text-[18px]">person</span>
