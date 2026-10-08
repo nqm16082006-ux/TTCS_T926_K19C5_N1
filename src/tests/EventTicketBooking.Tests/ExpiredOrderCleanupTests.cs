@@ -9,6 +9,9 @@ using EventTicketBooking.Api.Services.Implementations;
 using EventTicketBooking.Tests.Mocks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using Microsoft.AspNetCore.SignalR;
+using EventTicketBooking.Api.Hubs;
 using Xunit;
 
 namespace EventTicketBooking.Tests
@@ -33,7 +36,7 @@ namespace EventTicketBooking.Tests
                 .Options;
 
             _context = new AppDbContext(options);
-            _cleanupService = new ExpiredOrderCleanupService(_context, NullLogger<ExpiredOrderCleanupService>.Instance);
+            _cleanupService = new ExpiredOrderCleanupService(_context, NullLogger<ExpiredOrderCleanupService>.Instance, new Mock<IHubContext<SeatStatusHub>>().Object);
         }
 
         public void Dispose()
