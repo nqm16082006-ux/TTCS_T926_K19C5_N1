@@ -28,7 +28,7 @@ public class SeatHoldCleanupWorker : BackgroundService
     {
         _logger.LogInformation("Job nền quét và nhả ghế quá hạn (T-27) đã khởi động.");
 
-        using PeriodicTimer timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        using PeriodicTimer timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
 
         while (!stoppingToken.IsCancellationRequested && await timer.WaitForNextTickAsync(stoppingToken))
         {

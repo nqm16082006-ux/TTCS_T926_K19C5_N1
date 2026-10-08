@@ -60,8 +60,16 @@ namespace EventTicketBooking.Api.Controllers
             if (existingOrder != null)
             {
                 if (existingOrder.ExpiresAt <= DateTimeOffset.UtcNow)
-                    return Conflict(ApiResponse<object>.FailureResult("Đơn hàng trước đã hết hạn, vui lòng chờ hệ thống giải phóng và đặt lại."));
-                return Ok(ApiResponse<OrderDto>.SuccessResult(MapToDto(existingOrder), "Đã tồn tại đơn hàng đang chờ thanh toán."));
+                {
+                    existingOrder.Status = OrderStatus.Expired;
+                    existingOrder.UpdatedAt = DateTimeOffset.UtcNow;
+                    await _context.SaveChangesAsync();
+                    // Continue to create a new order since the old one is expired
+                }
+                else
+                {
+                    return Ok(ApiResponse<OrderDto>.SuccessResult(MapToDto(existingOrder), "Đã tồn tại đơn hàng đang chờ thanh toán."));
+                }
             }
 
             var now = DateTimeOffset.UtcNow;

@@ -25,7 +25,7 @@ namespace EventTicketBooking.Api.BackgroundServices
         {
             _logger.LogInformation("Job nền quét và huỷ đơn quá hạn (T-52) đã khởi động.");
 
-            using PeriodicTimer timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+            using PeriodicTimer timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
 
             while (!stoppingToken.IsCancellationRequested && await timer.WaitForNextTickAsync(stoppingToken))
             {

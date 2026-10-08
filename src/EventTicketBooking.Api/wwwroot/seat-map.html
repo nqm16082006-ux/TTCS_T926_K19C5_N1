@@ -1397,6 +1397,12 @@
           window.location.href = payment.data.paymentUrl;
         } else {
           alert((json && json.message) || "Không thể tạo đơn hàng. Vui lòng kiểm tra lại trạng thái ghế.");
+          if (res.status === 400 || res.status === 409) {
+            myHeldSeatIds.clear();
+            selectedSeatIds.clear();
+            updateCartPanel();
+            loadShowtimeSeats();
+          }
           btn.innerHTML = originalText;
           btn.disabled = false;
         }
@@ -1770,8 +1776,20 @@
         // Chuẩn hóa case do C# serialize Guid thành chữ thường, nhưng phòng hờ
         const sid = data.seatId.toLowerCase();
 
-        // Bỏ qua nếu ghế thuộc về mình đang giữ, HOẶC mình đang gửi yêu cầu giữ ghế này (để tránh race condition)
-        if (myHeldSeatIds.has(sid) || pendingHoldSeatIds.has(sid)) return;
+        const isAvailable = (data.status.toUpperCase() === 'AVAILABLE');
+
+        // Bỏ qua nếu backend báo HELD/SOLD nhưng mình đang giữ hoặc đang xin giữ (tránh race condition)
+        if (!isAvailable && (myHeldSeatIds.has(sid) || pendingHoldSeatIds.has(sid))) return;
+
+        // Nếu backend báo AVAILABLE mà mình đang giữ, tức là đã bị hết hạn/thu hồi từ server
+        if (isAvailable && myHeldSeatIds.has(sid)) {
+            myHeldSeatIds.delete(sid);
+            if (myHeldSeatIds.size === 0) {
+                stopHoldCountdown();
+                alert("Thời gian giữ chỗ đã hết hoặc đơn hàng bị huỷ, ghế đã được trả về hệ thống.");
+            }
+            updateCartPanel();
+        }
 
         const s = seatMap.get(sid);
         if (s) {
