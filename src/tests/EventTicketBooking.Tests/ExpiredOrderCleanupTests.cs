@@ -33,7 +33,7 @@ namespace EventTicketBooking.Tests
                 .Options;
 
             _context = new AppDbContext(options);
-            _cleanupService = new ExpiredOrderCleanupService(_context, NullLogger<ExpiredOrderCleanupService>.Instance);
+            _cleanupService = new ExpiredOrderCleanupService(_context, NullLogger<ExpiredOrderCleanupService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
         }
 
         public void Dispose()
@@ -253,7 +253,7 @@ namespace EventTicketBooking.Tests
             var paymentTx = await _context.PaymentTransactions.FirstAsync(pt => pt.OrderId == order.Id);
 
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance);
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
 
             var webhookResult = new PaymentResultDto
             {

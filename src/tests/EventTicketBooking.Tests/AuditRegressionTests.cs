@@ -174,7 +174,7 @@ public class AuditRegressionTests : IDisposable
         var (show, seat, user) = await SeatGraph();
         seat.Status = "SOLD";
         await db.SaveChangesAsync();
-        var result = await new SeatHoldService(db, NullLogger<SeatHoldService>.Instance).HoldSeatsAsync(show.Id, new() { seat.Id }, user.Id);
+        var result = await new SeatHoldService(db, NullLogger<SeatHoldService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create()).HoldSeatsAsync(show.Id, new() { seat.Id }, user.Id);
         Assert.Equal(HoldSeatsResultStatus.Conflict, result.Status);
         Assert.Empty(db.SeatHold);
     }
@@ -183,7 +183,7 @@ public class AuditRegressionTests : IDisposable
     public async Task Hold_DraftShowtime_IsRejected()
     {
         var (show, seat, user) = await SeatGraph(false);
-        var result = await new SeatHoldService(db, NullLogger<SeatHoldService>.Instance).HoldSeatsAsync(show.Id, new() { seat.Id }, user.Id);
+        var result = await new SeatHoldService(db, NullLogger<SeatHoldService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create()).HoldSeatsAsync(show.Id, new() { seat.Id }, user.Id);
         Assert.Equal(HoldSeatsResultStatus.InvalidRequest, result.Status);
         Assert.Empty(db.SeatHold);
     }
@@ -192,7 +192,7 @@ public class AuditRegressionTests : IDisposable
     public async Task Hold_ReplayedRequest_ReturnsExistingHoldWithoutExtension()
     {
         var (show, seat, user) = await SeatGraph();
-        var service = new SeatHoldService(db, NullLogger<SeatHoldService>.Instance);
+        var service = new SeatHoldService(db, NullLogger<SeatHoldService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
         var first = await service.HoldSeatsAsync(show.Id, new() { seat.Id }, user.Id);
         var second = await service.HoldSeatsAsync(show.Id, new() { seat.Id }, user.Id);
         Assert.Equal(HoldSeatsResultStatus.Success, second.Status);
@@ -207,7 +207,7 @@ public class AuditRegressionTests : IDisposable
         var other = new Showtime { EventId = show.EventId };
         db.Showtimes.Add(other);
         await db.SaveChangesAsync();
-        var service = new SeatHoldService(db, NullLogger<SeatHoldService>.Instance);
+        var service = new SeatHoldService(db, NullLogger<SeatHoldService>.Instance, EventTicketBooking.Tests.Mocks.FakeHubContext.Create());
         await service.HoldSeatsAsync(show.Id, new() { seat.Id }, user.Id);
         var result = await service.CancelSeatHoldAsync(other.Id, seat.Id, user.Id);
         Assert.Equal(HoldSeatsResultStatus.NotFound, result.Status);

@@ -43,7 +43,7 @@ namespace EventTicketBooking.Tests
             var logger = NullLogger<ShowtimeSeatsController>.Instance;
             var serviceLogger = NullLogger<SeatHoldService>.Instance;
 
-            var seatHoldService = new SeatHoldService(_context, serviceLogger, redis: null);
+            var seatHoldService = new SeatHoldService(_context, serviceLogger, EventTicketBooking.Tests.Mocks.FakeHubContext.Create(), redis: null);
             var importService = new SeatImportService(_context);
 
             var controller = new ShowtimeSeatsController(importService, seatHoldService, logger);

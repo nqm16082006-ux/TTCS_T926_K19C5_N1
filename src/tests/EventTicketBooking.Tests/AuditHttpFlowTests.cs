@@ -44,6 +44,7 @@ public class AuditHttpFlowTests
         builder.Services.AddScoped<ISeatHoldService, SeatHoldService>();
         builder.Services.AddScoped<IPaymentService, PaymentService>();
         builder.Services.AddScoped<IPaymentGateway, DevelopmentMockPaymentGateway>();
+        builder.Services.AddSignalR();
         await using var app = builder.Build();
         app.UseRouting();
         app.UseMiddleware<RoleAuthorizationMiddleware>();
