@@ -15,5 +15,6 @@ namespace EventTicketBooking.Api.Models
 
         public Order Order { get; set; } = null!;
         public Seat Seat { get; set; } = null!;
+        public Ticket? Ticket { get; set; }
     }
 }

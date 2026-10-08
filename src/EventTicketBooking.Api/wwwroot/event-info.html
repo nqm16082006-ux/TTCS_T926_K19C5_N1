@@ -635,7 +635,8 @@
           const user = JSON.parse(userStr);
           const roles = (user.roles || []).map(r => (r || '').toLowerCase());
           const isAdmin = roles.includes('admin');
-          const isOrganizer = roles.includes('organizer') || roles.includes('staff');
+          const isStaff = roles.includes('staff');
+          const isOrganizer = roles.includes('organizer');
 
           let portalLinkHtml = '';
           if (isAdmin) {
@@ -903,8 +904,10 @@
 
       showtimes.forEach((st, idx) => {
         const dt = formatDateTime(st.startTime);
-        const isOnSale = st.status === 'OnSale';
-        const available = st.remainingSeats ?? st.availableSeats ?? 0;
+        const isOnSale = !st.status || st.status.toLowerCase() === 'onsale';
+        const available = (typeof st.remainingSeats === 'number' && st.remainingSeats >= 0)
+          ? st.remainingSeats
+          : (st.availableSeats ?? 0);
         const isSoldOut = available <= 0;
 
         const minP = st.minPrice ?? defaultMin;

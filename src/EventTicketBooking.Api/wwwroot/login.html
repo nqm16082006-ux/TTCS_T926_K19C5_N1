@@ -340,17 +340,28 @@
         const urlParams = new URLSearchParams(window.location.search);
         const returnUrl = urlParams.get('returnUrl') || urlParams.get('redirect');
         const safeReturn = safeLocalReturnUrl(returnUrl);
-        if (returnUrl && safeReturn) {
-          window.location.href = safeReturn;
-          return;
-        }
 
         const roles = (user && user.roles) ? user.roles.map(r => (r || '').toLowerCase()) : [];
         if (roles.includes('admin')) {
+          if (returnUrl && safeReturn) {
+            window.location.href = safeReturn;
+            return;
+          }
           window.location.href = './admin-users.html';
-        } else if (roles.includes('organizer') || roles.includes('staff')) {
+        } else if (roles.includes('staff')) {
+          // Nhân viên soát vé chỉ thấy màn hình quét vé (S-28 AC)
+          window.location.href = './staff-scanner.html';
+        } else if (roles.includes('organizer')) {
+          if (returnUrl && safeReturn) {
+            window.location.href = safeReturn;
+            return;
+          }
           window.location.href = './events.html';
         } else {
+          if (returnUrl && safeReturn) {
+            window.location.href = safeReturn;
+            return;
+          }
           window.location.href = './public-events.html';
         }
       }, 500);
