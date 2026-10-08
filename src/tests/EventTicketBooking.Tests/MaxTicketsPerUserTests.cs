@@ -83,7 +83,8 @@ namespace EventTicketBooking.Tests
             var principal = new ClaimsPrincipal(identity);
             var httpContext = new DefaultHttpContext { User = principal };
 
-            return new OrdersController(_context, NullLogger<OrdersController>.Instance)
+            var mockQueue = new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>();
+            return new OrdersController(_context, NullLogger<OrdersController>.Instance, mockQueue.Object)
             {
                 ControllerContext = new ControllerContext { HttpContext = httpContext }
             };

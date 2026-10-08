@@ -163,7 +163,8 @@ namespace EventTicketBooking.Tests
 
         private OrdersController CreateOrdersController(AppDbContext context, Guid? currentUserId = null, bool isAdmin = false)
         {
-            var controller = new OrdersController(context, NullLogger<OrdersController>.Instance, new TicketService());
+            var mockQueue = new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>();
+            var controller = new OrdersController(context, NullLogger<OrdersController>.Instance, mockQueue.Object, new TicketService());
             var httpContext = new DefaultHttpContext();
 
             if (currentUserId.HasValue)
@@ -207,7 +208,8 @@ namespace EventTicketBooking.Tests
                 using (var processContext = CreateSqliteDbContext(dbPath))
                 {
                     var fakeGateway = new FakePaymentGateway();
-                    var paymentService = new PaymentService(processContext, fakeGateway, NullLogger<PaymentService>.Instance);
+                    var mockQueue = new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>();
+                    var paymentService = new PaymentService(processContext, fakeGateway, NullLogger<PaymentService>.Instance, mockQueue.Object);
 
                     var result = await paymentService.HandlePaymentResultAsync(new PaymentResultDto
                     {
@@ -283,7 +285,8 @@ namespace EventTicketBooking.Tests
                 using (var processContext = CreateSqliteDbContext(dbPath))
                 {
                     var fakeGateway = new FakePaymentGateway();
-                    var paymentService = new PaymentService(processContext, fakeGateway, NullLogger<PaymentService>.Instance);
+                    var mockQueue = new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>();
+                    var paymentService = new PaymentService(processContext, fakeGateway, NullLogger<PaymentService>.Instance, mockQueue.Object);
 
                     var result = await paymentService.HandlePaymentResultAsync(new PaymentResultDto
                     {
@@ -673,7 +676,8 @@ namespace EventTicketBooking.Tests
                 for (int i = 0; i < 5; i++)
                 {
                     using var loopContext = CreateSqliteDbContext(dbPath);
-                    var service = new PaymentService(loopContext, fakeGateway, NullLogger<PaymentService>.Instance);
+                    var mockQueue = new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>();
+                    var service = new PaymentService(loopContext, fakeGateway, NullLogger<PaymentService>.Instance, mockQueue.Object);
                     bool ok = await service.ProcessPaymentWebhookAsync(payload, sig);
                     Assert.True(ok);
                 }
@@ -724,7 +728,8 @@ namespace EventTicketBooking.Tests
                 var tasks = Enumerable.Range(0, 5).Select(async _ =>
                 {
                     using var threadContext = CreateSqliteDbContext(dbPath);
-                    var service = new PaymentService(threadContext, fakeGateway, NullLogger<PaymentService>.Instance);
+                    var mockQueue = new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>();
+                    var service = new PaymentService(threadContext, fakeGateway, NullLogger<PaymentService>.Instance, mockQueue.Object);
                     return await service.ProcessPaymentWebhookAsync(payload, sig);
                 }).ToArray();
 

@@ -21,15 +21,18 @@ namespace EventTicketBooking.Api.Controllers
     {
         private readonly AppDbContext _context;
         private readonly ILogger<OrdersController> _logger;
+        private readonly EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue? _ticketEmailQueue;
         private readonly EventTicketBooking.Api.Services.Interfaces.ITicketService _ticketService;
 
         public OrdersController(
             AppDbContext context,
             ILogger<OrdersController> logger,
+            EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue? ticketEmailQueue = null,
             EventTicketBooking.Api.Services.Interfaces.ITicketService? ticketService = null)
         {
             _context = context;
             _logger = logger;
+            _ticketEmailQueue = ticketEmailQueue;
             _ticketService = ticketService ?? new EventTicketBooking.Api.Services.Implementations.TicketService();
         }
 
@@ -266,6 +269,40 @@ namespace EventTicketBooking.Api.Controllers
             Response.Headers["Pragma"] = "no-cache";
 
             return Ok(ApiResponse<OrderStatusResponseDto>.SuccessResult(new OrderStatusResponseDto { Status = order.Status.ToString() }, "Lấy trạng thái thành công."));
+        }
+
+        /// <summary>
+        /// S-27 Task 2: Gửi lại email vé điện tử
+        /// POST /api/v1/orders/{orderId}/resend-tickets
+        /// </summary>
+        [HttpPost("{orderId:guid}/resend-tickets")]
+        [RequireRole]
+        public async Task<IActionResult> ResendTickets(Guid orderId)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+
+            var order = await _context.Orders
+                .AsNoTracking()
+
+                .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
+
+            if (order.UserId != userId)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền gửi lại vé cho đơn hàng này."));
+
+            if (order.Status != OrderStatus.Paid)
+                return BadRequest(ApiResponse<object>.FailureResult("Chỉ có thể gửi lại vé cho đơn hàng đã thanh toán."));
+
+            if (_ticketEmailQueue != null)
+            {
+                await _ticketEmailQueue.EnqueueAsync(orderId);
+            }
+
+            return Ok(ApiResponse<object>.SuccessResult(null, "Yêu cầu gửi lại vé đã được tiếp nhận."));
         }
 
         /// <summary>
