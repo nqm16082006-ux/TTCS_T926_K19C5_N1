@@ -530,10 +530,16 @@ namespace EventTicketBooking.Api.Services.Implementations
                 await _context.SaveChangesAsync(cancellationToken);
 
                 // Broadcast real-time update
-                foreach (var seat in seats)
+                if (_hubContext?.Clients != null)
                 {
-                    await _hubContext.Clients.Group($"Showtime_{seat.ShowtimeId}")
-                        .SendAsync("SeatStatusChanged", new { SeatId = seat.Id, Status = "Booked" }, cancellationToken);
+                    foreach (var seat in seats)
+                    {
+                        var group = _hubContext.Clients.Group($"Showtime_{seat.ShowtimeId}");
+                        if (group != null)
+                        {
+                            await group.SendAsync("SeatStatusChanged", new { SeatId = seat.Id, Status = "Booked" }, cancellationToken);
+                        }
+                    }
                 }
 
                 if (dbTransaction != null)
