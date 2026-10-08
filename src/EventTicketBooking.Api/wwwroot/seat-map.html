@@ -561,6 +561,7 @@
     let seatMap = new Map();
     let selectedSeatIds = new Set();  // Ghế chọn nháp trên client
     let myHeldSeatIds = new Set();    // Ghế đã giữ trên server bởi user này
+    let pendingHoldSeatIds = new Set(); // Các ghế đang gửi yêu cầu giữ chỗ để tránh trùng lặp thông báo SignalR
     let currentZoom = 1.0;
     let activeCategoryFilter = '';
     let bookingActionInFlight = false;
@@ -1272,6 +1273,7 @@
 
       try {
         const seatIdsToHold = Array.from(selectedSeatIds);
+        seatIdsToHold.forEach(id => pendingHoldSeatIds.add(id));
 
         const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/seats/hold`, {
           method: 'POST',
@@ -1293,6 +1295,7 @@
           newlyHeld.forEach(id => {
             myHeldSeatIds.add(id);
             selectedSeatIds.delete(id);
+            pendingHoldSeatIds.delete(id);
             const s = seatMap.get(id);
             if (s) s.status = 'HELD';
             updateSeatButtonState(id);
@@ -1322,12 +1325,14 @@
         } else if (res.status === 409) {
           showConflictToast((json && json.message) || "Một hoặc nhiều ghế đã được khán giả khác nhanh tay chọn trước. Vui lòng chọn vị trí khác!");
           selectedSeatIds.clear();
+          pendingHoldSeatIds.clear();
           await loadSeats();
           updateCartPanel();
           btn.innerHTML = originalText;
           btn.disabled = false;
         } else {
           showConflictToast((json && json.message) || "Không thể thực hiện giữ ghế. Vui lòng thử lại.");
+          pendingHoldSeatIds.clear();
           await loadSeats();
           updateCartPanel();
           btn.innerHTML = originalText;
@@ -1336,6 +1341,7 @@
       } catch (err) {
         console.error("Lỗi khi giữ ghế:", err);
         showConflictToast("Không thể kết nối máy chủ để giữ ghế. Vui lòng kiểm tra lại mạng hoặc thử lại!");
+        pendingHoldSeatIds.clear();
         btn.innerHTML = originalText;
         btn.disabled = false;
       }
@@ -1757,10 +1763,13 @@
       connection.on("SeatStatusChanged", (data) => {
         if (!data || !data.seatId || !data.status) return;
 
-        // Bỏ qua nếu ghế thuộc về mình đang giữ
-        if (myHeldSeatIds.has(data.seatId)) return;
+        // Chuẩn hóa case do C# serialize Guid thành chữ thường, nhưng phòng hờ
+        const sid = data.seatId.toLowerCase();
 
-        const s = seatMap.get(data.seatId);
+        // Bỏ qua nếu ghế thuộc về mình đang giữ, HOẶC mình đang gửi yêu cầu giữ ghế này (để tránh race condition)
+        if (myHeldSeatIds.has(sid) || pendingHoldSeatIds.has(sid)) return;
+
+        const s = seatMap.get(sid);
         if (s) {
           if (data.status === 'Held' || data.status === 'HELD') {
             s.status = 'HELD';
@@ -1771,13 +1780,13 @@
           }
           
           // Bỏ chọn nếu ghế nháp bị người khác giữ
-          if (selectedSeatIds.has(data.seatId) && s.status !== 'AVAILABLE') {
-            selectedSeatIds.delete(data.seatId);
+          if (selectedSeatIds.has(sid) && s.status !== 'AVAILABLE') {
+            selectedSeatIds.delete(sid);
             showConflictToast(`Ghế ${s.row}${String(s.seatNumber).padStart(2, '0')} vừa bị người khác chọn.`);
             updateCartPanel();
           }
 
-          updateSeatButtonState(data.seatId);
+          updateSeatButtonState(sid);
         }
       });
 
