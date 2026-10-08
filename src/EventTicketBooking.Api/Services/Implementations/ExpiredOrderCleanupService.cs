@@ -8,6 +8,8 @@ using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.SignalR;
+using EventTicketBooking.Api.Hubs;
 
 namespace EventTicketBooking.Api.Services.Implementations
 {
@@ -19,13 +21,16 @@ namespace EventTicketBooking.Api.Services.Implementations
     {
         private readonly AppDbContext _dbContext;
         private readonly ILogger<ExpiredOrderCleanupService> _logger;
+        private readonly IHubContext<SeatStatusHub> _hubContext;
 
         public ExpiredOrderCleanupService(
             AppDbContext dbContext,
-            ILogger<ExpiredOrderCleanupService> logger)
+            ILogger<ExpiredOrderCleanupService> logger,
+            IHubContext<SeatStatusHub> hubContext)
         {
             _dbContext = dbContext;
             _logger = logger;
+            _hubContext = hubContext;
         }
 
         public async Task<int> CleanupExpiredOrdersAsync(DateTimeOffset? fakeNow = null, CancellationToken cancellationToken = default)
@@ -96,6 +101,7 @@ namespace EventTicketBooking.Api.Services.Implementations
 
                 seatIdsToRelease = seatIdsToRelease.Distinct().ToList();
 
+                List<Seat> releasedSeats = new();
                 if (seatIdsToRelease.Any())
                 {
                     // 1. Chuyển giữ chỗ của các ghế tương ứng sang EXPIRED
@@ -109,17 +115,24 @@ namespace EventTicketBooking.Api.Services.Implementations
                     }
 
                     // 2. Chuyển trạng thái ghế từ HELD về AVAILABLE
-                    var heldSeats = await _dbContext.Seats
+                    releasedSeats = await _dbContext.Seats
                         .Where(s => seatIdsToRelease.Contains(s.Id) && s.Status == "HELD")
                         .ToListAsync(cancellationToken);
 
-                    foreach (var seat in heldSeats)
+                    foreach (var seat in releasedSeats)
                     {
                         seat.Status = "AVAILABLE";
                     }
                 }
 
                 await _dbContext.SaveChangesAsync(cancellationToken);
+
+                // Broadcast
+                foreach (var seat in releasedSeats)
+                {
+                    await _hubContext.Clients.Group($"Showtime_{seat.ShowtimeId}")
+                        .SendAsync("SeatStatusChanged", new { SeatId = seat.Id, Status = "Available" }, cancellationToken);
+                }
 
                 if (transaction != null)
                 {

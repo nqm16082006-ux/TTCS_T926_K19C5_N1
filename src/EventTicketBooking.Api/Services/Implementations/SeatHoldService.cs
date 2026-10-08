@@ -10,6 +10,8 @@ using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
+using Microsoft.AspNetCore.SignalR;
+using EventTicketBooking.Api.Hubs;
 
 namespace EventTicketBooking.Api.Services.Implementations
 {
@@ -24,16 +26,19 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly AppDbContext _context;
         private readonly IConnectionMultiplexer? _redis;
         private readonly ILogger<SeatHoldService> _logger;
+        private readonly IHubContext<SeatStatusHub> _hubContext;
 
         public const int DefaultHoldTtlSeconds = 600; // 10 phút
 
         public SeatHoldService(
             AppDbContext context,
             ILogger<SeatHoldService> logger,
+            IHubContext<SeatStatusHub> hubContext,
             IConnectionMultiplexer? redis = null)
         {
             _context = context;
             _logger = logger;
+            _hubContext = hubContext;
             _redis = redis;
         }
 
@@ -217,6 +222,13 @@ namespace EventTicketBooking.Api.Services.Implementations
             {
                 _context.SeatHold.AddRange(newHolds);
                 await _context.SaveChangesAsync(cancellationToken);
+
+                // Broadcast real-time update
+                foreach (var hold in newHolds)
+                {
+                    await _hubContext.Clients.Group($"Showtime_{showtimeId}")
+                        .SendAsync("SeatStatusChanged", new { SeatId = hold.SeatId, Status = "Held" }, cancellationToken);
+                }
             }
             catch (DbUpdateException ex)
             {
@@ -309,6 +321,10 @@ namespace EventTicketBooking.Api.Services.Implementations
 
             _context.SeatHold.Remove(hold);
             await _context.SaveChangesAsync(cancellationToken);
+
+            // Broadcast real-time update
+            await _hubContext.Clients.Group($"Showtime_{showtimeId}")
+                .SendAsync("SeatStatusChanged", new { SeatId = seatId, Status = "Available" }, cancellationToken);
 
             if (_redis != null && _redis.IsConnected)
             {

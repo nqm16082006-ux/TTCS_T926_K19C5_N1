@@ -85,6 +85,7 @@
   </script>
 <link rel="stylesheet" href="./seat-map-ui.css">
   <script src="./seat-map-theme.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between">
 
@@ -1675,6 +1676,50 @@
       await loadSeats();
       restorePendingSeats();
       await restoreMyHoldsOnLoad();
+      initSignalR();
+    }
+
+    function initSignalR() {
+      if (!showtimeId || !window.signalR) return;
+
+      const connection = new signalR.HubConnectionBuilder()
+        .withUrl(`${API_BASE}/hubs/seat-status`)
+        .withAutomaticReconnect()
+        .build();
+
+      connection.on("SeatStatusChanged", (data) => {
+        if (!data || !data.seatId || !data.status) return;
+
+        // Bỏ qua nếu ghế thuộc về mình đang giữ
+        if (myHeldSeatIds.has(data.seatId)) return;
+
+        const s = seatMap.get(data.seatId);
+        if (s) {
+          if (data.status === 'Held' || data.status === 'HELD') {
+            s.status = 'HELD';
+          } else if (data.status === 'Booked' || data.status === 'SOLD') {
+            s.status = 'SOLD';
+          } else {
+            s.status = 'AVAILABLE';
+          }
+          
+          // Bỏ chọn nếu ghế nháp bị người khác giữ
+          if (selectedSeatIds.has(data.seatId) && s.status !== 'AVAILABLE') {
+            selectedSeatIds.delete(data.seatId);
+            showConflictToast(`Ghế ${s.row}${String(s.seatNumber).padStart(2, '0')} vừa bị người khác chọn.`);
+            updateCartPanel();
+          }
+
+          updateSeatButtonState(data.seatId);
+        }
+      });
+
+      connection.start()
+        .then(() => {
+          console.log("Đã kết nối Real-time Seat Status");
+          connection.invoke("JoinShowtimeGroup", showtimeId);
+        })
+        .catch(err => console.error("Lỗi kết nối SignalR:", err));
     }
 
     document.addEventListener('DOMContentLoaded', initPage);

@@ -8,6 +8,8 @@ using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.SignalR;
+using EventTicketBooking.Api.Hubs;
 
 namespace EventTicketBooking.Api.Services.Implementations
 {
@@ -21,15 +23,18 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly AppDbContext _context;
         private readonly IPaymentGateway _paymentGateway;
         private readonly ILogger<PaymentService> _logger;
+        private readonly IHubContext<SeatStatusHub> _hubContext;
 
         public PaymentService(
             AppDbContext context,
             IPaymentGateway paymentGateway,
-            ILogger<PaymentService> logger)
+            ILogger<PaymentService> logger,
+            IHubContext<SeatStatusHub> hubContext)
         {
             _context = context;
             _paymentGateway = paymentGateway;
             _logger = logger;
+            _hubContext = hubContext;
         }
 
         public async Task<PaymentCreationResult> CreatePaymentForOrderAsync(Guid orderId, Guid userId, CancellationToken cancellationToken = default)
@@ -399,6 +404,12 @@ namespace EventTicketBooking.Api.Services.Implementations
                     foreach (var seat in expiredSeats) seat.Status = "AVAILABLE";
 
                     await _context.SaveChangesAsync(cancellationToken);
+
+                    foreach (var seat in expiredSeats)
+                    {
+                        await _hubContext.Clients.Group($"Showtime_{seat.ShowtimeId}")
+                            .SendAsync("SeatStatusChanged", new { SeatId = seat.Id, Status = "Available" }, cancellationToken);
+                    }
                     if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
 
                     _logger.LogWarning("Webhook thanh toán tới cho đơn hàng đã hết hạn hoặc bị hủy {OrderId}. Trạng thái Order: {OrderStatus}, Transaction: {TxStatus}", order.Id, order.Status, paymentTxExpired?.Status);
@@ -487,6 +498,13 @@ namespace EventTicketBooking.Api.Services.Implementations
                 }
 
                 await _context.SaveChangesAsync(cancellationToken);
+
+                // Broadcast real-time update
+                foreach (var seat in seats)
+                {
+                    await _hubContext.Clients.Group($"Showtime_{seat.ShowtimeId}")
+                        .SendAsync("SeatStatusChanged", new { SeatId = seat.Id, Status = "Booked" }, cancellationToken);
+                }
 
                 if (dbTransaction != null)
                 {

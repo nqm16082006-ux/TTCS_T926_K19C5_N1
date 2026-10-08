@@ -7,6 +7,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.SignalR;
+using EventTicketBooking.Api.Hubs;
 namespace EventTicketBooking.Api.BackgroundServices;
 
 public class SeatHoldCleanupWorker : BackgroundService
@@ -60,6 +62,11 @@ public class SeatHoldCleanupWorker : BackgroundService
 
             if (expiredSeatIds.Any())
             {
+                var expiredSeats = await dbContext.Seats
+                    .AsNoTracking()
+                    .Where(s => expiredSeatIds.Contains(s.Id))
+                    .ToListAsync(stoppingToken);
+
                 // 2. Chuyển trạng thái lượt giữ chỗ sang EXPIRED (nhả ghế)
                 await dbContext.SeatHold
                     .Where(sh => sh.Status == "ACTIVE" && sh.ExpiresAt <= now)
@@ -71,6 +78,13 @@ public class SeatHoldCleanupWorker : BackgroundService
                     .ExecuteUpdateAsync(s => s.SetProperty(seat => seat.Status, "AVAILABLE"), stoppingToken);
 
                 await transaction.CommitAsync(stoppingToken);
+
+                var hubContext = scope.ServiceProvider.GetRequiredService<IHubContext<SeatStatusHub>>();
+                foreach (var seat in expiredSeats)
+                {
+                    await hubContext.Clients.Group($"Showtime_{seat.ShowtimeId}")
+                        .SendAsync("SeatStatusChanged", new { SeatId = seat.Id, Status = "Available" }, stoppingToken);
+                }
 
                 _logger.LogInformation("Đã nhả thành công {Count} ghế quá hạn giữ chỗ.", expiredSeatIds.Count);
             }
