@@ -12,9 +12,9 @@ namespace EventTicketBooking.Api.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-                        migrationBuilder.DropIndex(
-                name: "IX_orders_UserId_ShowtimeId_Pending",
-                table: "orders");
+            migrationBuilder.DropIndex(
+    name: "IX_orders_UserId_ShowtimeId_Pending",
+    table: "orders");
 
             migrationBuilder.AlterColumn<DateTime>(
                 name: "VerificationCodeExpiresAt",
@@ -627,7 +627,7 @@ namespace EventTicketBooking.Api.Migrations
                 oldClrType: typeof(string),
                 oldType: "TEXT");
 
-            
+
 
             migrationBuilder.CreateIndex(
                 name: "IX_orders_UserId_ShowtimeId_Pending",
@@ -636,13 +636,13 @@ namespace EventTicketBooking.Api.Migrations
                 unique: true,
                 filter: "\"Status\" = 'pending'");
 
-            
+
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            
+
 
             migrationBuilder.DropIndex(
                 name: "IX_orders_UserId_ShowtimeId_Pending",
