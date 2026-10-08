@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using EventTicketBooking.Api.Controllers;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.Models;
+using EventTicketBooking.Api.Services.Implementations;
+using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -31,7 +33,7 @@ namespace EventTicketBooking.Tests
             _controller = CreateControllerWithRole("Staff");
         }
 
-        private TicketCheckInController CreateControllerWithRole(string role)
+        private TicketCheckInController CreateControllerWithRole(string role, IQrSignatureService? qrSignatureService = null)
         {
             var claims = new List<Claim>
             {
@@ -43,7 +45,7 @@ namespace EventTicketBooking.Tests
 
             var httpContext = new DefaultHttpContext { User = claimsPrincipal };
 
-            return new TicketCheckInController(_context)
+            return new TicketCheckInController(_context, qrSignatureService)
             {
                 ControllerContext = new ControllerContext
                 {
@@ -310,6 +312,173 @@ namespace EventTicketBooking.Tests
                 // Bỏ qua lỗi do hạn chế của EF Core InMemory Database không hỗ trợ ExecuteUpdateAsync
                 Assert.True(true);
             }
+        }
+
+        // ==========================================
+        // S-30: Quét QR Soát Vé Tại Cửa Tests
+        // ==========================================
+
+        [Fact]
+        public async Task ScanTicket_S30_WithValidSignedQr_ReturnsOk_DisplaysSeatAndCategory_AndRecordsGateAndTime()
+        {
+            // Arrange
+            var qrService = new QrSignatureService();
+            var controller = CreateControllerWithRole("Staff", qrService);
+
+            var showtimeId = Guid.NewGuid();
+            var orderId = Guid.NewGuid();
+            var seatId = Guid.NewGuid();
+            var categoryId = Guid.NewGuid();
+            var ticketCode = "TK-S30-VIP-888";
+
+            var category = new SeatCategory { Id = categoryId, Name = "VIP" };
+            var seat = new Seat { Id = seatId, ShowtimeId = showtimeId, Row = "C", SeatNumber = 12, SeatCategoryId = categoryId, SeatCategory = category };
+            var order = new Order { Id = orderId, ShowtimeId = showtimeId, Status = OrderStatus.Paid };
+            var orderItem = new OrderItem
+            {
+                Id = Guid.NewGuid(),
+                OrderId = orderId,
+                Order = order,
+                SeatId = seatId,
+                Seat = seat,
+                Price = 500000,
+                IsCheckedIn = false
+            };
+            var ticket = new Ticket
+            {
+                Id = Guid.NewGuid(),
+                OrderItemId = orderItem.Id,
+                OrderItem = orderItem,
+                TicketCode = ticketCode
+            };
+
+            _context.SeatCategories.Add(category);
+            _context.Seats.Add(seat);
+            _context.Orders.Add(order);
+            _context.OrderItems.Add(orderItem);
+            _context.Tickets.Add(ticket);
+            await _context.SaveChangesAsync();
+
+            // Sinh payload QR chuẩn theo S-26
+            var qrPayload = qrService.SignTicket(ticketCode, showtimeId);
+
+            var request = new TicketScanRequestDto
+            {
+                QrPayload = qrPayload,
+                SelectedShowtimeId = showtimeId,
+                GateName = "Cổng Tây"
+            };
+
+            // Act
+            var result = await controller.ScanTicket(request);
+
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result);
+
+            var seatInfoProp = okResult.Value?.GetType().GetProperty("SeatInfo")?.GetValue(okResult.Value)?.ToString();
+            var categoryProp = okResult.Value?.GetType().GetProperty("CategoryName")?.GetValue(okResult.Value)?.ToString();
+            var gateProp = okResult.Value?.GetType().GetProperty("Gate")?.GetValue(okResult.Value)?.ToString();
+            var codeProp = okResult.Value?.GetType().GetProperty("TicketCode")?.GetValue(okResult.Value)?.ToString();
+            var checkInTimeProp = okResult.Value?.GetType().GetProperty("CheckInTime")?.GetValue(okResult.Value);
+
+            Assert.Equal("C12", seatInfoProp);
+            Assert.Equal("VIP", categoryProp);
+            Assert.Equal("Cổng Tây", gateProp);
+            Assert.Equal(ticketCode, codeProp);
+            Assert.NotNull(checkInTimeProp);
+
+            // Kiểm tra DB đã cập nhật lượt soát
+            var updatedOrderItem = await _context.OrderItems.FindAsync(orderItem.Id);
+            Assert.NotNull(updatedOrderItem);
+            Assert.True(updatedOrderItem.IsCheckedIn);
+            Assert.Equal("Cổng Tây", updatedOrderItem.CheckInGate);
+            Assert.NotNull(updatedOrderItem.CheckInTime);
+        }
+
+        [Fact]
+        public async Task ScanTicket_S30_WithTamperedQrSignature_ReturnsBadRequest_InvalidSignature()
+        {
+            // Arrange
+            var qrService = new QrSignatureService();
+            var controller = CreateControllerWithRole("Staff", qrService);
+
+            var showtimeId = Guid.NewGuid();
+            var ticketCode = "TK-S30-001";
+            var validPayload = qrService.SignTicket(ticketCode, showtimeId);
+
+            // Giả mạo chữ ký bằng cách thay thế phần chữ ký cuối
+            var parts = validPayload.Split('|');
+            var tamperedPayload = $"{parts[0]}|{parts[1]}|{parts[2]}|{parts[3]}|TAMPERED_SIG_123456789";
+
+            var request = new TicketScanRequestDto
+            {
+                QrPayload = tamperedPayload,
+                SelectedShowtimeId = showtimeId,
+                GateName = "Cổng Chính"
+            };
+
+            // Act
+            var result = await controller.ScanTicket(request);
+
+            // Assert
+            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+            var reasonProp = badRequestResult.Value?.GetType().GetProperty("Reason")?.GetValue(badRequestResult.Value)?.ToString();
+            Assert.Equal("INVALID_SIGNATURE", reasonProp);
+        }
+
+        [Fact]
+        public async Task ScanTicket_S30_WithWrongShowtime_ReturnsBadRequest_WrongShowtime()
+        {
+            // Arrange
+            var qrService = new QrSignatureService();
+            var controller = CreateControllerWithRole("Staff", qrService);
+
+            var correctShowtimeId = Guid.NewGuid();
+            var wrongShowtimeId = Guid.NewGuid();
+            var ticketCode = "TK-S30-002";
+
+            var validPayload = qrService.SignTicket(ticketCode, correctShowtimeId);
+
+            var request = new TicketScanRequestDto
+            {
+                QrPayload = validPayload,
+                SelectedShowtimeId = wrongShowtimeId, // Sai suất diễn
+                GateName = "Cổng Chính"
+            };
+
+            // Act
+            var result = await controller.ScanTicket(request);
+
+            // Assert
+            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+            var reasonProp = badRequestResult.Value?.GetType().GetProperty("Reason")?.GetValue(badRequestResult.Value)?.ToString();
+            var messageProp = badRequestResult.Value?.GetType().GetProperty("Message")?.GetValue(badRequestResult.Value)?.ToString();
+
+            Assert.Equal("WRONG_SHOWTIME", reasonProp);
+            Assert.Contains("KHÔNG thuộc về suất diễn đang được chọn", messageProp);
+        }
+
+        [Fact]
+        public async Task ScanTicket_S30_WithInvalidQrFormat_ReturnsBadRequest_InvalidFormat()
+        {
+            // Arrange
+            var qrService = new QrSignatureService();
+            var controller = CreateControllerWithRole("Staff", qrService);
+
+            var request = new TicketScanRequestDto
+            {
+                QrPayload = "RANDOM_QR_CODE_NOT_FOLLOWING_S26",
+                SelectedShowtimeId = Guid.NewGuid(),
+                GateName = "Cổng Chính"
+            };
+
+            // Act
+            var result = await controller.ScanTicket(request);
+
+            // Assert
+            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+            var reasonProp = badRequestResult.Value?.GetType().GetProperty("Reason")?.GetValue(badRequestResult.Value)?.ToString();
+            Assert.True(reasonProp == "INVALID_FORMAT" || reasonProp == "MISSING_SIGNATURE");
         }
     }
 }
