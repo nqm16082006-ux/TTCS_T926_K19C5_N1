@@ -153,7 +153,7 @@ public class StaffScannerS28Tests : IDisposable
     }
 
     [Fact]
-    public void Test2_StaffUI_ContainsScannerPlaceholder_AndNoAdminNavigation()
+    public void Test2_StaffUI_ContainsScannerUI_AndNoAdminNavigation()
     {
         // Kiểm tra file staff-scanner.html có tồn tại và thỏa mãn AC
         var projectDir = AppContext.BaseDirectory;
@@ -172,10 +172,10 @@ public class StaffScannerS28Tests : IDisposable
 
         var htmlContent = File.ReadAllText(scannerFilePath);
 
-        // Chứa tiêu đề và placeholder quét vé
+        // Chứa tiêu đề và giao diện quét vé (đã được làm thật ở S-29)
         Assert.Contains("Soát vé", htmlContent);
-        Assert.Contains("Khu vực quét vé", htmlContent);
-        Assert.Contains("Chức năng quét vé sẽ được triển khai trong S-29", htmlContent);
+        Assert.Contains("Quét mã vé", htmlContent);
+        Assert.Contains("Chọn suất diễn hiện tại", htmlContent);
 
         // Không chứa link admin
         Assert.DoesNotContain("admin-users.html", htmlContent);
