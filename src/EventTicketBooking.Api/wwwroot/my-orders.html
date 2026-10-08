@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html class="h-full" lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Lịch sử đơn hàng của tôi - EventPulse</title>
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-container-highest": "#dae2fd", "on-tertiary": "#ffffff", "on-primary-container": "#dad7ff",
+            "tertiary-fixed": "#89f5e7", "on-primary": "#ffffff", "on-secondary": "#ffffff",
+            "secondary-fixed": "#eaddff", "tertiary-container": "#006c63", "surface-container": "#eaedff",
+            "outline": "#777587", "inverse-surface": "#283044", "on-tertiary-fixed-variant": "#005049",
+            "secondary-container": "#8a4cfc", "on-error-container": "#93000a", "primary-fixed": "#e2dfff",
+            "primary": "#3525cd", "on-primary-fixed-variant": "#3323cc", "on-tertiary-fixed": "#00201d",
+            "surface-container-high": "#e2e7ff", "outline-variant": "#c7c4d8", "inverse-primary": "#c3c0ff",
+            "surface-dim": "#d2d9f4", "secondary-fixed-dim": "#d2bbff", "on-secondary-container": "#fffbff",
+            "surface-bright": "#faf8ff", "tertiary": "#00524b", "surface-variant": "#dae2fd",
+            "primary-fixed-dim": "#c3c0ff", "secondary": "#712ae2", "surface-container-lowest": "#ffffff",
+            "on-tertiary-container": "#81eddf", "error-container": "#ffdad6", "on-surface": "#131b2e",
+            "on-primary-fixed": "#0f0069", "surface-container-low": "#f2f3ff", "on-error": "#ffffff",
+            "background": "#faf8ff", "surface": "#faf8ff", "surface-tint": "#4d44e3",
+            "tertiary-fixed-dim": "#6bd8cb", "on-surface-variant": "#464555", "on-secondary-fixed": "#25005a",
+            "on-background": "#131b2e", "error": "#ba1a1a", "on-secondary-fixed-variant": "#5a00c6",
+            "primary-container": "#4f46e5", "inverse-on-surface": "#eef0ff"
+          },
+          fontFamily: {
+            "body": ["Plus Jakarta Sans", "sans-serif"],
+            "mono": ["JetBrains Mono", "monospace"]
+          }
+        }
+      }
+    };
+  </script>
+  <script src="./security.js"></script>
+  <script src="./qrcode.min.js"></script>
+</head>
+<body class="bg-[#f8f9fc] font-body text-slate-800 antialiased min-h-screen flex flex-col justify-between">
+
+  <!-- Top Navigation Header -->
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
+    <div class="h-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-6">
+        <a class="flex items-center gap-2.5 group" href="./public-events.html">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-primary text-white flex items-center justify-center shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+            <span class="material-symbols-outlined text-[22px]">confirmation_number</span>
+          </div>
+          <span class="text-xl tracking-tight font-extrabold bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent">EventPulse</span>
+        </a>
+        <nav class="hidden md:flex items-center gap-1">
+          <a class="px-3.5 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:text-primary hover:bg-slate-50 transition" href="./public-events.html">Khám phá sự kiện</a>
+          <a class="px-3.5 py-2 rounded-lg text-sm font-bold text-primary bg-indigo-50 transition flex items-center gap-1.5" href="./my-orders.html">
+            <span class="material-symbols-outlined text-[18px]">receipt_long</span>
+            <span>Đơn hàng của tôi</span>
+          </a>
+        </nav>
+      </div>
+
+      <!-- Right Nav: Auth Controls -->
+      <div class="flex items-center gap-3" id="navAuthContainer">
+        <div class="w-8 h-8 rounded-full bg-slate-200 animate-pulse"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
+    
+    <!-- Hero / Breadcrumb Header -->
+    <div class="mb-8">
+      <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-400 mb-2">
+        <a href="./public-events.html" class="hover:text-primary transition flex items-center gap-1">
+          <span class="material-symbols-outlined text-[14px]">home</span>
+          Trang chủ
+        </a>
+        <span>/</span>
+        <span class="text-slate-600">Lịch sử đơn hàng</span>
+      </div>
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+            <span>Lịch sử đơn hàng của tôi</span>
+            <span id="totalBadge" class="hidden text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700">0 đơn</span>
+          </h1>
+          <p class="text-sm text-slate-500 mt-1">Tra cứu danh sách vé đã mua, trạng thái thanh toán và mã QR soát vé tại cửa.</p>
+        </div>
+        <div class="flex items-center gap-2.5">
+          <button onclick="loadOrders(true)" class="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl border border-slate-200 shadow-sm transition active:scale-95">
+            <span class="material-symbols-outlined text-[18px]" id="refreshSpinner">refresh</span>
+            <span>Làm mới</span>
+          </button>
+          <a href="./public-events.html" class="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md shadow-indigo-500/20 transition active:scale-95">
+            <span class="material-symbols-outlined text-[18px]">add_shopping_cart</span>
+            <span>Mua vé sự kiện mới</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter & Search Controls Bar -->
+    <div class="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-sm mb-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      
+      <!-- Status Tabs -->
+      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none" id="statusTabs">
+        <button onclick="setStatusFilter('all')" data-status="all" class="status-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap bg-primary text-white shadow-sm">
+          Tất cả
+        </button>
+        <button onclick="setStatusFilter('Paid')" data-status="Paid" class="status-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200/70">
+          Đã thanh toán
+        </button>
+        <button onclick="setStatusFilter('Pending')" data-status="Pending" class="status-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200/70">
+          Chờ thanh toán
+        </button>
+        <button onclick="setStatusFilter('Expired')" data-status="Expired" class="status-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200/70">
+          Đã hết hạn
+        </button>
+        <button onclick="setStatusFilter('Cancelled')" data-status="Cancelled" class="status-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200/70">
+          Đã huỷ
+        </button>
+      </div>
+
+      <!-- Search & PageSize Selector -->
+      <div class="flex items-center gap-3">
+        <div class="relative flex-1 md:w-64">
+          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+          <input type="text" id="searchInput" oninput="handleSearch(this.value)" placeholder="Tìm mã đơn, sự kiện..." class="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-primary focus:bg-white transition placeholder:text-slate-400">
+        </div>
+        <div class="flex items-center gap-1.5 text-xs text-slate-500 font-semibold whitespace-nowrap">
+          <span>Xem:</span>
+          <select id="pageSizeSelect" onchange="changePageSize(this.value)" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-2 py-1.5 outline-none cursor-pointer">
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content Area: Orders List -->
+    <div id="ordersContainer">
+      <!-- Loading State -->
+      <div id="loadingState" class="py-20 flex flex-col items-center justify-center">
+        <div class="w-12 h-12 border-4 border-indigo-200 border-t-primary rounded-full animate-spin mb-4"></div>
+        <p class="text-sm font-semibold text-slate-500">Đang tải lịch sử đơn hàng...</p>
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden bg-white rounded-3xl border border-slate-200/80 p-12 text-center max-w-lg mx-auto my-6 shadow-sm">
+        <div class="w-20 h-20 mx-auto rounded-2xl bg-indigo-50 text-primary flex items-center justify-center mb-4">
+          <span class="material-symbols-outlined text-[42px]">receipt_long</span>
+        </div>
+        <h3 class="text-lg font-bold text-slate-800 mb-1">Chưa có đơn hàng nào</h3>
+        <p class="text-sm text-slate-500 mb-6">Bạn chưa đặt mua vé sự kiện nào hoặc không có đơn hàng nào khớp với bộ lọc hiện tại.</p>
+        <a href="./public-events.html" class="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md shadow-indigo-500/20 transition active:scale-95">
+          <span class="material-symbols-outlined text-[18px]">explore</span>
+          <span>Khám phá sự kiện ngay</span>
+        </a>
+      </div>
+
+      <!-- Unauthorized State -->
+      <div id="unauthState" class="hidden bg-white rounded-3xl border border-slate-200/80 p-12 text-center max-w-md mx-auto my-6 shadow-sm">
+        <div class="w-20 h-20 mx-auto rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4">
+          <span class="material-symbols-outlined text-[42px]">lock</span>
+        </div>
+        <h3 class="text-lg font-bold text-slate-800 mb-1">Yêu cầu đăng nhập</h3>
+        <p class="text-sm text-slate-500 mb-6">Vui lòng đăng nhập vào tài khoản của bạn để xem lại lịch sử đơn hàng và vé đã mua.</p>
+        <a href="./login.html" class="inline-flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md shadow-indigo-500/20 transition active:scale-95">
+          <span>Đăng nhập ngay</span>
+          <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+        </a>
+      </div>
+
+      <!-- Orders List Container -->
+      <div id="ordersList" class="space-y-4">
+        <!-- Rendered dynamically by JS -->
+      </div>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div id="paginationContainer" class="hidden mt-8 pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="text-xs sm:text-sm text-slate-500 font-semibold" id="paginationInfo">
+        Hiển thị trang 1 / 1
+      </div>
+      <div class="flex items-center gap-2" id="paginationButtons">
+        <!-- Injected by JS -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modal: Xem vé điện tử & Mã QR đã ký số (Story S-25, S-26) -->
+  <div id="ticketModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all my-8 animate-fadeIn">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-primary text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white">
+            <span class="material-symbols-outlined text-[24px]">qr_code_2</span>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-white">Vé điện tử & Mã QR Soát Vé</h3>
+            <p class="text-xs text-indigo-200 font-medium">Mã QR có chữ ký số mã hoá ECDSA P-256 chống làm giả</p>
+          </div>
+        </div>
+        <button onclick="closeTicketModal()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 max-h-[75vh] overflow-y-auto space-y-6" id="ticketModalBody">
+        <!-- Ticket cards injected here -->
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+        <span class="text-xs text-slate-400 font-medium flex items-center gap-1">
+          <span class="material-symbols-outlined text-[16px] text-emerald-600">verified</span>
+          Vé hợp lệ cho cổng soát vé
+        </span>
+        <button onclick="closeTicketModal()" class="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold rounded-xl transition">
+          Đóng
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 hidden bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 flex items-center gap-2.5 text-sm font-semibold transition-all">
+    <span class="material-symbols-outlined text-[20px] text-emerald-400" id="toastIcon">check_circle</span>
+    <span id="toastMessage">Thông báo</span>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200/80 py-6 mt-12 text-center text-xs text-slate-400 font-medium">
+    <p>© 2026 EventPulse - Hệ Thống Bán Vé Sự Kiện Trực Tuyến Thời Gian Thực. Bảo lưu mọi quyền.</p>
+  </footer>
+
+  <!-- Core Javascript -->
+  <script>
+    let currentPage = 1;
+    let currentPageSize = 10;
+    let currentStatusFilter = 'all';
+    let searchQuery = '';
+    let totalItems = 0;
+    let totalPages = 1;
+    let allOrdersCache = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderNavAuth();
+      loadOrders();
+    });
+
+    // Xác thực Nav Header
+    function renderNavAuth() {
+      const container = document.getElementById('navAuthContainer');
+      const token = localStorage.getItem('access_token');
+      const userStr = localStorage.getItem('user_info');
+
+      if (!token || !userStr) {
+        container.innerHTML = `
+          <a href="./login.html" class="px-4 py-2 rounded-xl text-sm font-bold text-primary bg-indigo-50 hover:bg-indigo-100 transition">Đăng nhập</a>
+          <a href="./register.html" class="px-4 py-2 rounded-xl text-sm font-bold text-white bg-primary hover:bg-indigo-700 transition shadow-sm">Đăng ký</a>
+        `;
+        return;
+      }
+
+      try {
+        const user = JSON.parse(userStr);
+        const roles = user.roles || (user.role ? [user.role] : ['Customer']);
+        const isAdmin = roles.includes('Admin');
+        const isOrganizer = roles.includes('EventOrganizer');
+        const isStaff = roles.includes('Staff');
+
+        let portalBadge = '';
+        if (isAdmin) {
+          portalBadge = `<a href="./admin-users.html" class="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-800 text-xs font-bold hover:bg-amber-100 transition"><span class="material-symbols-outlined text-[15px]">manage_accounts</span>Quản trị Admin</a>`;
+        } else if (isOrganizer) {
+          portalBadge = `<a href="./events.html" class="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-800 text-xs font-bold hover:bg-purple-100 transition"><span class="material-symbols-outlined text-[15px]">event</span>Quản lý sự kiện</a>`;
+        }
+
+        container.innerHTML = `
+          ${portalBadge}
+          <div class="flex items-center gap-2.5 pl-2 sm:border-l border-slate-200">
+            <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-xs shadow-sm">
+              ${escapeHtml((user.fullName || user.username || 'U')[0].toUpperCase())}
+            </div>
+            <div class="text-left hidden md:block">
+              <div class="text-xs font-bold text-slate-800 leading-tight">${escapeHtml(user.fullName || user.username)}</div>
+              <div class="text-[11px] text-slate-400">${escapeHtml(roles[0] || 'Khách hàng')}</div>
+            </div>
+            <button onclick="handleLogout()" title="Đăng xuất" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition ml-1">
+              <span class="material-symbols-outlined text-[18px]">logout</span>
+            </button>
+          </div>
+        `;
+      } catch {
+        localStorage.clear();
+        window.location.reload();
+      }
+    }
+
+    function handleLogout() {
+      localStorage.clear();
+      window.location.href = './login.html';
+    }
+
+    // Tải danh sách đơn hàng
+    async function loadOrders(isRefresh = false) {
+      const token = localStorage.getItem('access_token');
+      const loadingState = document.getElementById('loadingState');
+      const emptyState = document.getElementById('emptyState');
+      const unauthState = document.getElementById('unauthState');
+      const ordersList = document.getElementById('ordersList');
+      const paginationContainer = document.getElementById('paginationContainer');
+      const refreshSpinner = document.getElementById('refreshSpinner');
+
+      if (isRefresh && refreshSpinner) {
+        refreshSpinner.classList.add('animate-spin');
+      }
+
+      if (!token) {
+        loadingState.classList.add('hidden');
+        ordersList.classList.add('hidden');
+        paginationContainer.classList.add('hidden');
+        unauthState.classList.remove('hidden');
+        if (refreshSpinner) refreshSpinner.classList.remove('animate-spin');
+        return;
+      }
+
+      unauthState.classList.add('hidden');
+      loadingState.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+      ordersList.innerHTML = '';
+
+      try {
+        let url = `/api/v1/orders/my-orders?page=${currentPage}&pageSize=${currentPageSize}`;
+        if (currentStatusFilter && currentStatusFilter !== 'all') {
+          url += `&status=${encodeURIComponent(currentStatusFilter)}`;
+        }
+
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (res.status === 401) {
+          localStorage.removeItem('access_token');
+          loadingState.classList.add('hidden');
+          unauthState.classList.remove('hidden');
+          return;
+        }
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          showToast(data.message || 'Không thể tải đơn hàng.', true);
+          loadingState.classList.add('hidden');
+          emptyState.classList.remove('hidden');
+          return;
+        }
+
+        const pagedData = data.data;
+        allOrdersCache = pagedData.items || [];
+        totalItems = pagedData.totalItems;
+        totalPages = pagedData.totalPages || 1;
+
+        // Cập nhật badge tổng số đơn
+        const totalBadge = document.getElementById('totalBadge');
+        if (totalBadge) {
+          totalBadge.textContent = `${totalItems} đơn`;
+          totalBadge.classList.remove('hidden');
+        }
+
+        // Lọc theo search input client-side nếu có
+        let filtered = allOrdersCache;
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          filtered = filtered.filter(o => 
+            (o.id && o.id.toLowerCase().includes(q)) ||
+            (o.eventTitle && o.eventTitle.toLowerCase().includes(q)) ||
+            (o.seatNames && o.seatNames.some(s => s.toLowerCase().includes(q)))
+          );
+        }
+
+        loadingState.classList.add('hidden');
+
+        if (filtered.length === 0) {
+          ordersList.classList.add('hidden');
+          emptyState.classList.remove('hidden');
+          paginationContainer.classList.add('hidden');
+        } else {
+          emptyState.classList.add('hidden');
+          ordersList.classList.remove('hidden');
+          renderOrderCards(filtered);
+          renderPagination(pagedData);
+        }
+
+      } catch (err) {
+        console.error("Lỗi fetch đơn hàng:", err);
+        loadingState.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        showToast('Lỗi kết nối máy chủ.', true);
+      } finally {
+        if (refreshSpinner) refreshSpinner.classList.remove('animate-spin');
+      }
+    }
+
+    // Hiển thị danh sách card đơn hàng
+    function renderOrderCards(orders) {
+      const container = document.getElementById('ordersList');
+      container.innerHTML = '';
+
+      orders.forEach(order => {
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden";
+
+        const statusInfo = getStatusDisplay(order.status);
+        const eventImage = order.eventImageUrl || 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=600&q=80';
+        const formattedDate = formatDateTime(order.createdAt);
+        const formattedTotal = formatCurrency(order.totalAmount);
+        const seatCount = order.seatCount || (order.items ? order.items.length : 0);
+        const seatNamesStr = (order.seatNames && order.seatNames.length > 0) 
+          ? order.seatNames.join(', ') 
+          : (order.items ? order.items.map(i => i.seatName).filter(Boolean).join(', ') : 'Chưa định vị');
+
+        // Tạo nút hành động theo trạng thái
+        let actionButtonsHtml = '';
+        if (order.status === 'Paid') {
+          actionButtonsHtml = `
+            <button onclick="openTicketsModal('${order.id}')" class="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm shadow-emerald-500/20 transition flex items-center gap-1.5 active:scale-95">
+              <span class="material-symbols-outlined text-[18px]">qr_code_2</span>
+              <span>Xem vé điện tử (QR)</span>
+            </button>
+            <a href="./order-details.html?orderId=${order.id}" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
+              <span class="material-symbols-outlined text-[18px]">receipt</span>
+              <span>Chi tiết</span>
+            </a>
+          `;
+        } else if (order.status === 'Pending') {
+          actionButtonsHtml = `
+            <a href="./order-details.html?orderId=${order.id}" class="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-primary hover:from-indigo-700 hover:to-primary text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm shadow-indigo-500/20 transition flex items-center gap-1.5 active:scale-95">
+              <span class="material-symbols-outlined text-[18px]">credit_card</span>
+              <span>Thanh toán ngay</span>
+            </a>
+            <a href="./order-details.html?orderId=${order.id}" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
+              <span class="material-symbols-outlined text-[18px]">info</span>
+              <span>Chi tiết</span>
+            </a>
+          `;
+        } else {
+          actionButtonsHtml = `
+            <a href="./order-details.html?orderId=${order.id}" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
+              <span class="material-symbols-outlined text-[18px]">receipt_long</span>
+              <span>Xem lại chi tiết</span>
+            </a>
+          `;
+        }
+
+        // Timer badge nếu đơn Pending
+        let pendingTimerNotice = '';
+        if (order.status === 'Pending' && order.expiresAt) {
+          const expiresDate = new Date(order.expiresAt);
+          const isExpiredNow = expiresDate <= new Date();
+          if (!isExpiredNow) {
+            pendingTimerNotice = `
+              <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-[11px] font-bold border border-amber-200">
+                <span class="material-symbols-outlined text-[14px]">timer</span>
+                <span>Hết hạn lúc: ${formatTime(order.expiresAt)}</span>
+              </div>
+            `;
+          }
+        }
+
+        card.innerHTML = `
+          <!-- Card Top Bar: Order ID, Date, Status -->
+          <div class="px-5 py-3.5 bg-slate-50/70 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-1.5 font-mono font-bold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                <span>Mã đơn: #${order.id.substring(0, 8).toUpperCase()}</span>
+                <button onclick="copyToClipboard('${order.id}')" title="Sao chép toàn bộ mã đơn" class="text-slate-400 hover:text-primary transition p-0.5">
+                  <span class="material-symbols-outlined text-[14px]">content_copy</span>
+                </button>
+              </div>
+              <span class="text-slate-400 hidden sm:inline">•</span>
+              <span class="text-slate-500 font-medium hidden sm:inline flex items-center gap-1">
+                <span class="material-symbols-outlined text-[14px] text-slate-400">schedule</span>
+                ${formattedDate}
+              </span>
+            </div>
+            
+            <div class="flex items-center gap-2">
+              ${pendingTimerNotice}
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${statusInfo.badgeClass}">
+                <span class="material-symbols-outlined text-[14px]">${statusInfo.icon}</span>
+                <span>${statusInfo.text}</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Card Main Body -->
+          <div class="p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            
+            <!-- Left: Event Image & Details -->
+            <div class="flex items-start gap-4 flex-1 min-w-0">
+              <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200 shadow-2xs">
+                <img src="${escapeHtml(eventImage)}" alt="${escapeHtml(order.eventTitle || 'Sự kiện')}" class="w-full h-full object-cover">
+              </div>
+
+              <div class="flex-1 min-w-0">
+                <h4 class="text-base sm:text-lg font-bold text-slate-900 truncate hover:text-primary transition">
+                  <a href="./order-details.html?orderId=${order.id}">${escapeHtml(order.eventTitle || 'Sự kiện chưa xác định')}</a>
+                </h4>
+                
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 font-medium mt-1">
+                  ${order.eventLocation ? `
+                    <span class="flex items-center gap-1 truncate">
+                      <span class="material-symbols-outlined text-[15px] text-slate-400 shrink-0">location_on</span>
+                      <span class="truncate">${escapeHtml(order.eventLocation)}</span>
+                    </span>
+                  ` : ''}
+
+                  ${order.showtimeStartTime ? `
+                    <span class="flex items-center gap-1">
+                      <span class="material-symbols-outlined text-[15px] text-slate-400 shrink-0">calendar_month</span>
+                      <span>${formatDateTime(order.showtimeStartTime)}</span>
+                    </span>
+                  ` : ''}
+                </div>
+
+                <!-- Seat Chips -->
+                <div class="mt-3 flex flex-wrap items-center gap-1.5">
+                  <span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-xs font-bold">
+                    ${seatCount} ghế
+                  </span>
+                  <span class="text-xs text-slate-600 font-semibold bg-slate-100 px-2.5 py-0.5 rounded-md truncate max-w-xs">
+                    Vị trí: ${escapeHtml(seatNamesStr)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Total Price & Actions -->
+            <div class="w-full md:w-auto pt-4 md:pt-0 border-t md:border-t-0 border-slate-100 flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 shrink-0">
+              <div class="text-left md:text-right">
+                <span class="text-xs text-slate-400 block font-medium">Tổng thanh toán</span>
+                <span class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">${formattedTotal}</span>
+              </div>
+
+              <div class="flex items-center gap-2">
+                ${actionButtonsHtml}
+              </div>
+            </div>
+
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    // Render nút phân trang
+    function renderPagination(data) {
+      const container = document.getElementById('paginationContainer');
+      const info = document.getElementById('paginationInfo');
+      const buttons = document.getElementById('paginationButtons');
+
+      if (!data || data.totalItems === 0) {
+        container.classList.add('hidden');
+        return;
+      }
+
+      container.classList.remove('hidden');
+      info.textContent = `Hiển thị trang ${data.page} / ${data.totalPages} (Tổng ${data.totalItems} đơn hàng)`;
+
+      buttons.innerHTML = '';
+
+      // Nút Previous
+      const prevBtn = document.createElement('button');
+      prevBtn.disabled = !data.hasPreviousPage;
+      prevBtn.className = `px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 border transition ${data.hasPreviousPage ? 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200' : 'bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed'}`;
+      prevBtn.innerHTML = `<span class="material-symbols-outlined text-[16px]">chevron_left</span> Trước`;
+      prevBtn.onclick = () => { if (data.hasPreviousPage) goToPage(data.page - 1); };
+      buttons.appendChild(prevBtn);
+
+      // Các nút số trang (hiển thị tối đa 5 trang xung quanh trang hiện tại)
+      const maxButtons = 5;
+      let startPage = Math.max(1, data.page - Math.floor(maxButtons / 2));
+      let endPage = Math.min(data.totalPages, startPage + maxButtons - 1);
+      if (endPage - startPage + 1 < maxButtons) {
+        startPage = Math.max(1, endPage - maxButtons + 1);
+      }
+
+      for (let p = startPage; p <= endPage; p++) {
+        const pageBtn = document.createElement('button');
+        const isActive = p === data.page;
+        pageBtn.className = `w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center ${isActive ? 'bg-primary text-white shadow-sm' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'}`;
+        pageBtn.textContent = p;
+        pageBtn.onclick = () => goToPage(p);
+        buttons.appendChild(pageBtn);
+      }
+
+      // Nút Next
+      const nextBtn = document.createElement('button');
+      nextBtn.disabled = !data.hasNextPage;
+      nextBtn.className = `px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 border transition ${data.hasNextPage ? 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200' : 'bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed'}`;
+      nextBtn.innerHTML = `Sau <span class="material-symbols-outlined text-[16px]">chevron_right</span>`;
+      nextBtn.onclick = () => { if (data.hasNextPage) goToPage(data.page + 1); };
+      buttons.appendChild(nextBtn);
+    }
+
+    function goToPage(page) {
+      currentPage = page;
+      loadOrders();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function changePageSize(size) {
+      currentPageSize = parseInt(size, 10);
+      currentPage = 1;
+      loadOrders();
+    }
+
+    function setStatusFilter(status) {
+      currentStatusFilter = status;
+      currentPage = 1;
+
+      // Update tab active styles
+      document.querySelectorAll('.status-tab').forEach(tab => {
+        if (tab.getAttribute('data-status') === status) {
+          tab.className = "status-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap bg-primary text-white shadow-sm";
+        } else {
+          tab.className = "status-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200/70";
+        }
+      });
+
+      loadOrders();
+    }
+
+    function handleSearch(val) {
+      searchQuery = val.trim();
+      let filtered = allOrdersCache;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        filtered = filtered.filter(o => 
+          (o.id && o.id.toLowerCase().includes(q)) ||
+          (o.eventTitle && o.eventTitle.toLowerCase().includes(q)) ||
+          (o.seatNames && o.seatNames.some(s => s.toLowerCase().includes(q)))
+        );
+      }
+      renderOrderCards(filtered);
+    }
+
+    // Modal hiển thị vé & QR code đã ký số
+    async function openTicketsModal(orderId) {
+      const modal = document.getElementById('ticketModal');
+      const modalBody = document.getElementById('ticketModalBody');
+      const token = localStorage.getItem('access_token');
+
+      modal.classList.remove('hidden');
+      modalBody.innerHTML = `
+        <div class="py-12 flex flex-col items-center justify-center">
+          <div class="w-10 h-10 border-4 border-indigo-200 border-t-primary rounded-full animate-spin mb-3"></div>
+          <p class="text-sm font-semibold text-slate-500">Đang tải mã vé và chữ ký điện tử...</p>
+        </div>
+      `;
+
+      try {
+        const res = await fetch(`/api/v1/orders/${orderId}/tickets`, {
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success || !data.data || data.data.length === 0) {
+          modalBody.innerHTML = `
+            <div class="py-8 text-center">
+              <span class="material-symbols-outlined text-[48px] text-slate-300 mb-2">confirmation_number</span>
+              <p class="text-sm font-bold text-slate-700">Chưa có vé điện tử cho đơn hàng này.</p>
+              <p class="text-xs text-slate-400 mt-1">Vé chỉ khả dụng sau khi đơn hàng được thanh toán thành công.</p>
+            </div>
+          `;
+          return;
+        }
+
+        const tickets = data.data;
+        modalBody.innerHTML = '';
+
+        tickets.forEach((ticket, idx) => {
+          const qrContainerId = `qr_canvas_${idx}`;
+          const ticketCard = document.createElement('div');
+          ticketCard.className = "bg-slate-50 rounded-2xl border border-slate-200 p-5 flex flex-col md:flex-row items-center gap-6";
+
+          ticketCard.innerHTML = `
+            <!-- QR Canvas Area -->
+            <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm shrink-0 flex flex-col items-center">
+              <div id="${qrContainerId}" class="w-36 h-36 flex items-center justify-center"></div>
+              <span class="text-[10px] font-mono text-slate-400 mt-2 font-bold uppercase tracking-wider">Quét tại cửa soát vé</span>
+            </div>
+
+            <!-- Ticket Info Area -->
+            <div class="flex-1 w-full space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-primary bg-indigo-50 px-2.5 py-1 rounded-md">Vé #${idx + 1}</span>
+                <span class="text-xs font-mono font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                  ${escapeHtml(ticket.ticketCode)}
+                </span>
+              </div>
+
+              <h4 class="text-base font-bold text-slate-900">${escapeHtml(ticket.eventTitle || 'Sự kiện')}</h4>
+
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="bg-white p-2 rounded-xl border border-slate-100">
+                  <span class="text-slate-400 block text-[10px]">Vị trí ghế:</span>
+                  <span class="font-bold text-slate-800">${escapeHtml(ticket.seatRow ? `${ticket.seatRow}${ticket.seatNumber}` : 'Chưa định vị')}</span>
+                </div>
+                <div class="bg-white p-2 rounded-xl border border-slate-100">
+                  <span class="text-slate-400 block text-[10px]">Hạng vé:</span>
+                  <span class="font-bold text-slate-800">${escapeHtml(ticket.categoryName || 'Tiêu chuẩn')}</span>
+                </div>
+                <div class="bg-white p-2 rounded-xl border border-slate-100">
+                  <span class="text-slate-400 block text-[10px]">Thời gian:</span>
+                  <span class="font-bold text-slate-800">${formatDateTime(ticket.showtimeStartTime)}</span>
+                </div>
+                <div class="bg-white p-2 rounded-xl border border-slate-100">
+                  <span class="text-slate-400 block text-[10px]">Giá vé:</span>
+                  <span class="font-bold text-slate-800">${formatCurrency(ticket.price)}</span>
+                </div>
+              </div>
+
+              <div class="pt-1 flex items-center gap-1.5 text-[11px] text-emerald-700 font-semibold">
+                <span class="material-symbols-outlined text-[15px] text-emerald-600">verified</span>
+                <span>Mã QR đã ký số mật mã ECDSA (Chống làm giả)</span>
+              </div>
+            </div>
+          `;
+
+          modalBody.appendChild(ticketCard);
+
+          // Sinh QR code bằng QRCode.js
+          setTimeout(() => {
+            const qrElem = document.getElementById(qrContainerId);
+            if (qrElem) {
+              qrElem.innerHTML = '';
+              const payload = ticket.qrPayload || ticket.ticketCode;
+              new QRCode(qrElem, {
+                text: payload,
+                width: 130,
+                height: 130,
+                colorDark: "#131b2e",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.M
+              });
+            }
+          }, 50);
+        });
+
+      } catch (err) {
+        console.error("Lỗi tải vé:", err);
+        modalBody.innerHTML = `
+          <div class="py-8 text-center text-rose-500">
+            <span class="material-symbols-outlined text-[48px] mb-2">error</span>
+            <p class="text-sm font-bold">Không thể tải thông tin vé điện tử.</p>
+          </div>
+        `;
+      }
+    }
+
+    function closeTicketModal() {
+      document.getElementById('ticketModal').classList.add('hidden');
+    }
+
+    // Helper functions
+    function getStatusDisplay(status) {
+      switch (status) {
+        case 'Paid':
+          return { text: 'Đã thanh toán', icon: 'check_circle', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        case 'Pending':
+          return { text: 'Chờ thanh toán', icon: 'pending', badgeClass: 'bg-amber-50 text-amber-700 border-amber-200' };
+        case 'Expired':
+          return { text: 'Đã hết hạn', icon: 'timer_off', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200' };
+        case 'Cancelled':
+          return { text: 'Đã huỷ', icon: 'cancel', badgeClass: 'bg-rose-50 text-rose-700 border-rose-200' };
+        default:
+          return { text: status || 'Không rõ', icon: 'help', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200' };
+      }
+    }
+
+    function formatCurrency(amount) {
+      if (amount === null || amount === undefined) return '0 ₫';
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    }
+
+    function formatDateTime(isoString) {
+      if (!isoString) return '--/--/----';
+      const d = new Date(isoString);
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} - ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    }
+
+    function formatTime(isoString) {
+      if (!isoString) return '--:--';
+      const d = new Date(isoString);
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('Đã sao chép mã đơn vào bộ nhớ tạm!');
+      }).catch(() => {
+        showToast('Không thể sao chép tự động.', true);
+      });
+    }
+
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast');
+      const toastIcon = document.getElementById('toastIcon');
+      const toastMessage = document.getElementById('toastMessage');
+
+      toastMessage.textContent = message;
+      if (isError) {
+        toastIcon.textContent = 'error';
+        toastIcon.className = "material-symbols-outlined text-[20px] text-rose-400";
+      } else {
+        toastIcon.textContent = 'check_circle';
+        toastIcon.className = "material-symbols-outlined text-[20px] text-emerald-400";
+      }
+
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
