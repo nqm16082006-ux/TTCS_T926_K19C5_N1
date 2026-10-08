@@ -84,12 +84,23 @@ namespace EventTicketBooking.Api.Services.Implementations
             if (showtime.Status != ShowtimeStatus.OnSale)
                 return HoldSeatsResult.InvalidResult("Suất diễn chưa mở bán hoặc đã đóng bán.");
 
+            // 3. S-42.2 Validation Guard: Kiểm tra giới hạn số lượng vé tối đa mỗi người dùng
+            int currentTickets = await GetUserTicketCountForShowtimeAsync(showtimeId, userId, cancellationToken);
+            int requestedSeatsCount = seatIds?.Count ?? 0;
+            int maxTickets = 4;
+
+            if (currentTickets + requestedSeatsCount > maxTickets)
+            {
+                return HoldSeatsResult.InvalidResult(
+                    $"Bạn đã vượt quá số lượng vé tối đa được phép mua cho suất chiếu này (Tối đa {maxTickets} vé).");
+            }
+
             var seats = await _context.Seats
                 .AsNoTracking()
-                .Where(s => seatIds.Contains(s.Id))
+                .Where(s => seatIds!.Contains(s.Id))
                 .ToListAsync(cancellationToken);
 
-            if (seats.Count != seatIds.Count)
+            if (seats.Count != seatIds!.Count)
             {
                 return HoldSeatsResult.InvalidResult("Một hoặc nhiều ghế không tồn tại.");
             }
@@ -452,6 +463,36 @@ namespace EventTicketBooking.Api.Services.Implementations
             {
                 _logger.LogError(ex, "Lỗi khi thực thi hoán tác xóa có điều kiện Redis keys cho User {UserId}.", userId);
             }
+        }
+        /// <summary>
+        /// Đếm tổng số vé của người dùng cho một suất chiếu (Bao gồm các ghế đang ACTIVE HOLD + Các ghế đã MUA/ĐẶT THÀNH CÔNG).
+        /// </summary>
+        public async Task<int> GetUserTicketCountForShowtimeAsync(
+            Guid showtimeId,
+            Guid userId,
+            CancellationToken cancellationToken = default)
+        {
+            var now = DateTime.UtcNow;
+
+            // 1. Đếm số lượng ghế đang được người dùng giữ chỗ (ACTIVE hold)
+            var activeHoldsCount = await (from sh in _context.SeatHold
+                                          join s in _context.Seats on sh.SeatId equals s.Id
+                                          where s.ShowtimeId == showtimeId &&
+                                                sh.UserId == userId &&
+                                                sh.Status == "ACTIVE" &&
+                                                sh.ExpiresAt > now
+                                          select sh.Id).CountAsync(cancellationToken);
+
+            // 2. Đếm số lượng vé/ghế đã đặt thành công (trong các Order không bị CANCELLED/EXPIRED)
+            var purchasedTicketsCount = await (from o in _context.Orders
+                                               join oi in _context.OrderItems on o.Id equals oi.OrderId
+                                               where o.ShowtimeId == showtimeId &&
+                                                     o.UserId == userId &&
+                                                     o.Status != OrderStatus.Cancelled &&
+                                                     o.Status != OrderStatus.Expired
+                                               select oi.Id).CountAsync(cancellationToken);
+
+            return activeHoldsCount + purchasedTicketsCount;
         }
     }
 }
