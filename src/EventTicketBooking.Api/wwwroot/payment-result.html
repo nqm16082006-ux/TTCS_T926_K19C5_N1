@@ -110,7 +110,11 @@
         </div>
 
         <div class="flex flex-col sm:flex-row gap-3 w-full">
-          <a class="flex-1 h-12 rounded-xl bg-primary text-white font-bold flex items-center justify-center gap-2 shadow-md hover:bg-on-primary-fixed-variant transition" href="./public-events.html">
+          <a id="btnViewTickets" class="flex-1 h-12 rounded-xl bg-primary text-white font-bold flex items-center justify-center gap-2 shadow-md hover:bg-on-primary-fixed-variant transition" href="./order-success.html">
+            <span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+            <span>Xem vé điện tử (E-Tickets)</span>
+          </a>
+          <a class="flex-1 h-12 rounded-xl bg-surface-container-low text-on-surface font-semibold flex items-center justify-center hover:bg-surface-container transition" href="./public-events.html">
             <span class="material-symbols-outlined text-[20px]">home</span>
             <span>Khám phá thêm sự kiện</span>
           </a>
@@ -188,6 +192,8 @@
           successPanel.classList.toggle('hidden', actualStatus !== 'Paid');
           failedPanel.classList.toggle('hidden', actualStatus === 'Paid');
           document.getElementById('resOrderId').textContent = `#ORD-${orderId.substring(0, 8).toUpperCase()}`;
+          const btnView = document.getElementById('btnViewTickets');
+          if (btnView && orderId) btnView.href = `./order-success.html?orderId=${encodeURIComponent(orderId)}`;
           if (actualStatus !== 'Paid') failedPanel.querySelector('p').textContent =
             actualStatus === 'Pending' ? 'Đơn hàng đang chờ xác nhận thanh toán. Bạn có thể kiểm tra lại.' :
             'Đơn hàng chưa được thanh toán thành công. Vui lòng kiểm tra trạng thái đơn hàng trước khi đặt lại.';

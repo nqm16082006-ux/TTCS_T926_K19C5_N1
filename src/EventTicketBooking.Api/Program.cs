@@ -135,6 +135,11 @@ else if (paymentProvider.Equals("PayOS", StringComparison.OrdinalIgnoreCase))
 else
     throw new InvalidOperationException("Unsupported payment provider.");
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IPaymentService, EventTicketBooking.Api.Services.Implementations.PaymentService>();
+
+// Đăng ký cấu hình và dịch vụ ký số mã QR vé điện tử (Story S-26)
+builder.Services.Configure<EventTicketBooking.Api.Options.TicketQrOptions>(builder.Configuration.GetSection(EventTicketBooking.Api.Options.TicketQrOptions.SectionName));
+builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IQrSignatureService, EventTicketBooking.Api.Services.Implementations.QrSignatureService>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITicketService, EventTicketBooking.Api.Services.Implementations.TicketService>();
 builder.Services.AddHttpClient();
 
 

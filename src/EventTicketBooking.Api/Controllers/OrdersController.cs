@@ -21,11 +21,16 @@ namespace EventTicketBooking.Api.Controllers
     {
         private readonly AppDbContext _context;
         private readonly ILogger<OrdersController> _logger;
+        private readonly EventTicketBooking.Api.Services.Interfaces.ITicketService _ticketService;
 
-        public OrdersController(AppDbContext context, ILogger<OrdersController> logger)
+        public OrdersController(
+            AppDbContext context,
+            ILogger<OrdersController> logger,
+            EventTicketBooking.Api.Services.Interfaces.ITicketService? ticketService = null)
         {
             _context = context;
             _logger = logger;
+            _ticketService = ticketService ?? new EventTicketBooking.Api.Services.Implementations.TicketService();
         }
 
         /// <summary>
@@ -138,6 +143,21 @@ namespace EventTicketBooking.Api.Controllers
                         hold.Status = "CONVERTED";
                         hold.Seat.Status = "SOLD";
                     }
+
+                    // Story S-25: Sinh vé điện tử cho đơn hàng 0 VNĐ khi tự chuyển Paid
+                    foreach (var item in order.OrderItems)
+                    {
+                        var ticket = new Ticket
+                        {
+                            Id = Guid.NewGuid(),
+                            OrderItemId = item.Id,
+                            TicketCode = _ticketService.GenerateTicketCode(),
+                            CreatedAt = DateTimeOffset.UtcNow,
+                            OrderItem = item
+                        };
+                        _context.Tickets.Add(ticket);
+                        item.Ticket = ticket;
+                    }
                 }
 
                 _context.Orders.Add(order);
@@ -228,6 +248,72 @@ namespace EventTicketBooking.Api.Controllers
             Response.Headers["Pragma"] = "no-cache";
 
             return Ok(ApiResponse<OrderStatusResponseDto>.SuccessResult(new OrderStatusResponseDto { Status = order.Status.ToString() }, "Lấy trạng thái thành công."));
+        }
+
+        /// <summary>
+        /// S-25: API lấy danh sách vé điện tử của đơn hàng (Read-Only).
+        /// GET /api/v1/orders/{orderId}/tickets
+        /// </summary>
+        [HttpGet("{orderId:guid}/tickets")]
+        [RequireRole]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        [ProducesResponseType(typeof(ApiResponse<List<TicketDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetOrderTickets(Guid orderId)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+
+            var order = await _context.Orders
+                .AsNoTracking()
+                .Include(o => o.Showtime)
+                    .ThenInclude(st => st.Event)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Seat)
+                        .ThenInclude(s => s.SeatCategory)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Ticket)
+                .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
+
+            var isAdmin = User.IsInRole("Admin") || User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && c.Value == "Admin");
+            if (!isAdmin && order.UserId != userId)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền truy cập vé của đơn hàng này."));
+
+            // AC3: Giả sử đơn chưa trả, khi mở trang vé bằng đường dẫn, thì không có vé nào.
+            if (order.Status != OrderStatus.Paid)
+            {
+                return Ok(ApiResponse<List<TicketDto>>.SuccessResult(new List<TicketDto>(), "Đơn hàng chưa thanh toán. Không có vé nào."));
+            }
+
+            // S-25 & S-26: Đơn đã Paid -> Trả về danh sách vé kèm mã QR có chữ ký số (ECDSA P-256)
+            var showtimeId = order.ShowtimeId;
+            var tickets = order.OrderItems
+                .Where(oi => oi.Ticket != null)
+                .Select(oi => new TicketDto
+                {
+                    Id = oi.Ticket!.Id,
+                    OrderItemId = oi.Id,
+                    TicketCode = oi.Ticket.TicketCode,
+                    QrPayload = _ticketService.GenerateQrPayload(oi.Ticket.TicketCode, showtimeId),
+                    EventTitle = order.Showtime?.Event?.Title,
+                    EventLocation = order.Showtime?.Event?.Location,
+                    ShowtimeStartTime = order.Showtime?.StartTime,
+                    ShowtimeEndTime = order.Showtime?.EndTime,
+                    CategoryName = oi.Seat?.SeatCategory?.Name,
+                    SeatRow = oi.Seat?.Row,
+                    SeatNumber = oi.Seat?.SeatNumber ?? 0,
+                    Price = oi.Price,
+                    CreatedAt = oi.Ticket.CreatedAt
+                })
+                .ToList();
+
+            return Ok(ApiResponse<List<TicketDto>>.SuccessResult(tickets, "Lấy danh sách vé thành công."));
         }
 
         private OrderDto MapToDto(Order order)
