@@ -31,6 +31,11 @@ namespace EventTicketBooking.Api.Controllers
             _qrSignatureService = qrSignatureService ?? new QrSignatureService();
         }
 
+        public TicketCheckInController(AppDbContext context, IQrSignatureService? qrSignatureService = null)
+            : this(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<TicketCheckInController>.Instance, qrSignatureService)
+        {
+        }
+
         // 1. Lấy suất diễn hôm nay (S-29)
         [HttpGet("today-shows")]
         public async Task<IActionResult> GetTodayShows()
@@ -75,6 +80,7 @@ namespace EventTicketBooking.Api.Controllers
         /// Chỉ trả về dữ liệu tối thiểu (TicketCode, IsCheckedIn), tuyệt đối không trả PII.
         /// </summary>
         [HttpGet("showtimes/{showtimeId}/offline-tickets")]
+        [HttpGet("offline-tickets/{showtimeId}")]
         public async Task<IActionResult> GetOfflineTickets(Guid showtimeId, [FromQuery] DateTimeOffset? since = null)
         {
             var showtimeExists = await _context.Showtimes.AnyAsync(s => s.Id == showtimeId);

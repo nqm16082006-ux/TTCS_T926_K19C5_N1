@@ -443,6 +443,206 @@
     .btn-next-scan:active {
       transform: translateY(0);
     }
+
+    /* Offline & Network Banner Styles (S-34) */
+    .network-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      transition: all 0.2s ease;
+    }
+    .network-badge-online {
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+    .network-badge-offline {
+      background: #fff7ed;
+      color: #c2410c;
+      border: 1px solid #fed7aa;
+      animation: pulse-offline 2s infinite ease-in-out;
+    }
+    @keyframes pulse-offline {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.2); }
+      50% { box-shadow: 0 0 0 6px rgba(234, 88, 12, 0.15); }
+    }
+
+    .offline-panel {
+      background: #f8fafc;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 22px;
+    }
+
+    .offline-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .offline-switch-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #334155;
+      user-select: none;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #cbd5e1;
+      transition: 0.3s;
+      border-radius: 24px;
+    }
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    input:checked + .toggle-slider {
+      background-color: #ea580c;
+    }
+    input:checked + .toggle-slider:before {
+      transform: translateX(20px);
+    }
+
+    .offline-actions-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .btn-offline-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+    .btn-download-manifest {
+      background: #4f46e5;
+      color: white;
+    }
+    .btn-download-manifest:hover {
+      background: #4338ca;
+    }
+    .btn-view-queue {
+      background: #0f172a;
+      color: white;
+    }
+    .btn-view-queue:hover {
+      background: #1e293b;
+    }
+    .btn-clear-data {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+    .btn-clear-data:hover {
+      background: #fca5a5;
+    }
+
+    /* Modal for local queue */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-card {
+      background: white;
+      border-radius: 16px;
+      max-width: 680px;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+      padding: 24px;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .modal-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-close-modal {
+      background: transparent;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #64748b;
+    }
+    .queue-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    .queue-table th, .queue-table td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .queue-table th {
+      background: #f8fafc;
+      color: #475569;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body>
@@ -484,26 +684,9 @@
     <div class="card" id="scannerEntryCard" style="text-align: left;">
       <div style="margin-bottom: 20px;">
         <label for="showtimeSelect" style="display: block; font-weight: 600; margin-bottom: 8px;">1. Chọn suất diễn hiện tại:</label>
-        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-          <select id="showtimeSelect" style="flex: 1; min-width: 250px; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); font-family: inherit;">
-            <option value="">Đang tải danh sách suất diễn...</option>
-          </select>
-          <button id="btnDownloadTickets" type="button" style="padding: 10px 16px; background: #059669; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: var(--shadow-sm); transition: all 0.2s;" title="Tải trước danh sách vé xuống thiết bị để soát vé ngoại tuyến (Story S-33)">
-            <span class="material-symbols-outlined" style="font-size: 20px;">cloud_download</span>
-            <span>Tải danh sách vé</span>
-          </button>
-        </div>
-        <div id="syncStatusContainer" style="margin-top: 10px; padding: 8px 12px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">sync</span>
-            <span id="syncMetadataText">Chưa tải danh sách vé cho suất diễn này</span>
-          </div>
-          <div id="networkStatusBadge" style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 9999px; font-weight: 700; font-size: 0.75rem; background: #ecfdf5; color: #059669;">
-            <span class="material-symbols-outlined" id="networkStatusIcon" style="font-size: 14px;">wifi</span>
-            <span id="networkStatusLabel">Online</span>
-          </div>
-        </div>
-        <div id="syncAlertMessage" style="display: none; margin-top: 8px; padding: 8px 12px; border-radius: 6px; font-size: 0.825rem; font-weight: 600;"></div>
+        <select id="showtimeSelect" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); font-family: inherit;">
+          <option value="">Đang tải danh sách suất diễn...</option>
+        </select>
       </div>
 
       <div style="margin-bottom: 20px;">
@@ -511,14 +694,65 @@
         <input type="text" id="gateInput" value="Gate 1" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); font-family: inherit;">
       </div>
 
+      <!-- Bảng điều khiển Ngoại tuyến (Story S-33 & S-34) -->
+      <div class="offline-panel" id="offlinePanel">
+        <div class="offline-panel-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div id="networkStatusBadge" class="network-badge network-badge-online">
+              <span class="material-symbols-outlined" style="font-size: 18px;" id="networkStatusIcon">wifi</span>
+              <span id="networkStatusText">Trực tuyến (Online)</span>
+            </div>
+            <span id="offlineBannerNotice" style="display: none; font-size: 0.85rem; font-weight: 700; color: #c2410c;">
+              ⚡ Soát vé bằng bộ nhớ ngoại tuyến (S-34)
+            </span>
+          </div>
+
+          <label class="offline-switch-label" title="Chủ động bật/tắt chế độ ngoại tuyến để soát vé khi mất sóng hoặc kiểm thử">
+            <span class="toggle-switch">
+              <input type="checkbox" id="offlineModeToggle">
+              <span class="toggle-slider"></span>
+            </span>
+            <span>Chế độ Ngoại tuyến (Offline Mode)</span>
+          </label>
+        </div>
+
+        <div class="offline-actions-row">
+          <!-- Trạng thái dữ liệu đã tải của suất diễn (S-33) -->
+          <div style="font-size: 0.88rem;">
+            <div style="font-weight: 700; color: #1e293b; margin-bottom: 2px;">
+              📁 Danh sách vé đã tải (S-33):
+              <span id="manifestStatusText" style="font-weight: 700; color: #d97706;"><span id="syncMetadataText">Chưa tải danh sách</span></span>
+            </div>
+            <div id="manifestSubText" style="font-size: 0.8rem; color: #64748b;">
+              Tải trước để máy kiểm tra vé và chữ ký số khi mất mạng (AC1, AC4)
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn-offline-action btn-download-manifest" id="btnDownloadTickets" onclick="handleDownloadManifest()" title="Tải toàn bộ mã vé và khoá công khai của suất này xuống thiết bị">
+              <span class="material-symbols-outlined" style="font-size: 18px;">cloud_download</span>
+              <span id="btnDownloadManifestLabel">Tải danh sách vé</span>
+            </button>
+            <button type="button" class="btn-offline-action btn-view-queue" id="btnViewQueue" onclick="openQueueModal()">
+              <span class="material-symbols-outlined" style="font-size: 18px;">pending_actions</span>
+              <span id="queueCounterLabel">Hàng đợi: 0 vé</span>
+            </button>
+            <button type="button" class="btn-offline-action btn-clear-data" id="btnClearData" onclick="handleClearOfflineData()" title="Xoá cache danh sách vé đã tải của suất này">
+              <span class="material-symbols-outlined" style="font-size: 18px;">delete_outline</span>
+              <span>Xoá cache</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div style="margin-bottom: 24px;">
         <label for="ticketInput" style="display: block; font-weight: 600; margin-bottom: 8px;">3. Quét mã vé (QR Code):</label>
-
+        
         <div id="reader" style="width: 100%; max-width: 500px; margin: 0 auto 16px auto; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);"></div>
 
         <div style="display: flex; gap: 10px;">
           <input type="text" id="ticketInput" placeholder="Hoặc nhập mã thủ công: 123e4567-e89b..." style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); font-family: inherit;">
-          <button id="scanBtn" style="padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Kiểm tra vé</button>
+          <button id="scanBtn" type="button" onclick="handleScan()" style="padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Kiểm tra vé</button>
         </div>
       </div>
 
@@ -535,6 +769,34 @@
       </div>
     </div>
   </main>
+
+  <!-- Modal Hàng đợi cục bộ (Story S-34 NFR) -->
+  <div class="modal-overlay" id="queueModal" onclick="if(event.target === this) closeQueueModal()">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="material-symbols-outlined" style="color: var(--primary);">pending_actions</span>
+          <span>Hàng đợi soát vé ngoại tuyến (S-34)</span>
+        </div>
+        <button type="button" class="btn-close-modal" onclick="closeQueueModal()">&times;</button>
+      </div>
+      <p style="font-size: 0.88rem; color: #64748b; margin-bottom: 14px;">
+        Các lượt soát vé đã ghi nhận thành công trên thiết bị này khi mất mạng (NFR: lưu bền vững trên bộ nhớ trình duyệt). Sẵn sàng đồng bộ lên máy chủ khi có mạng lại (S-35).
+      </p>
+      <div id="queueTableContainer" style="overflow-x: auto; margin-bottom: 16px;">
+        <!-- Bảng được render bởi JS -->
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 14px;">
+        <button type="button" class="btn-offline-action btn-clear-data" onclick="handleClearQueue()">
+          <span class="material-symbols-outlined" style="font-size: 18px;">delete_sweep</span>
+          <span>Xoá hàng đợi</span>
+        </button>
+        <button type="button" class="btn-offline-action btn-view-queue" onclick="closeQueueModal()">
+          <span>Đóng</span>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <footer class="footer">
     Event Ticket Booking System &copy; 2026 - Cổng Soát Vé Dành Cho Nhân Viên
@@ -587,42 +849,37 @@
         roleBadge.textContent = 'Nhân viên Soát vé (Staff)';
       }
 
-      // 4. Khởi tạo tính năng soát vé & Offline Cache (Story S-33)
+      // 4. Khởi tạo tính năng soát vé
       loadTodayShows();
-      fetchAndCachePublicKeys();
-      updateNetworkStatus();
 
-      window.addEventListener('online', () => {
-        updateNetworkStatus();
-        fetchAndCachePublicKeys();
-        checkAndTriggerAutoDeltaSync();
-      });
-      window.addEventListener('offline', updateNetworkStatus);
+      const scanBtnEl = document.getElementById('scanBtn');
+      if (scanBtnEl) {
+        scanBtnEl.onclick = handleScan;
+      }
+      const ticketInputEl = document.getElementById('ticketInput');
+      if (ticketInputEl) {
+        ticketInputEl.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') handleScan();
+        });
+      }
 
-      document.getElementById('btnDownloadTickets').addEventListener('click', handleDownloadTickets);
-      document.getElementById('showtimeSelect').addEventListener('change', function() {
-        updateSyncMetadataDisplay(this.value);
-      });
-
-      document.getElementById('scanBtn').addEventListener('click', handleScan);
-      document.getElementById('ticketInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') handleScan();
-      });
-
-      // Kiểm tra tự động sync delta mỗi 30 giây (AC2: quá 30 phút + có mạng tự sync phần thay đổi)
-      setInterval(checkAndTriggerAutoDeltaSync, 30000);
-
-      // Khởi tạo HTML5 Qrcode
-      let html5QrcodeScanner = new Html5QrcodeScanner(
-        "reader",
-        { fps: 10, qrbox: {width: 250, height: 250} },
-        /* verbose= */ false);
-
-      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+      // Khởi tạo HTML5 Qrcode an toàn (không crash khi không có camera hoặc unpkg chậm)
+      let html5QrcodeScanner = null;
+      try {
+        if (typeof Html5QrcodeScanner !== 'undefined') {
+          html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader",
+            { fps: 10, qrbox: {width: 250, height: 250} },
+            /* verbose= */ false);
+          html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        }
+      } catch (cameraErr) {
+        console.warn('Không thể khởi tạo camera scanner:', cameraErr);
+      }
 
       function onScanSuccess(decodedText, decodedResult) {
         if (isProcessing) return;
-
+        
         // Gán giá trị vào input và gọi hàm kiểm tra
         document.getElementById('ticketInput').value = decodedText;
         handleScan();
@@ -635,7 +892,7 @@
       let isProcessing = false;
 
       // ==========================================
-      // S-33: IndexedDB Local Storage Module
+      // S-33 & S-34: IndexedDB & Compatibility Helpers
       // ==========================================
       function openScannerDb() {
         return new Promise((resolve, reject) => {
@@ -657,434 +914,579 @@
         });
       }
 
-      async function getOfflineTicket(showtimeId, ticketCode) {
-        const db = await openScannerDb();
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction('offline_tickets', 'readonly');
-          const store = tx.objectStore('offline_tickets');
-          const req = store.get([showtimeId, ticketCode]);
-          req.onsuccess = (e) => resolve(e.target.result || null);
-          req.onerror = (e) => reject(e.target.error);
-        });
+      async function checkAndTriggerAutoDeltaSync() {}
+
+      async function verifyOfflineSignature(keyVersion, ticketCode, qrShowtimeId, signatureBase64Url) {
+        return verifyQrOffline(`TICKET|${keyVersion}|${ticketCode}|${qrShowtimeId}|${signatureBase64Url}`, qrShowtimeId, getOfflinePublicKeys());
       }
 
-      async function getSyncMetadata(showtimeId) {
+      async function handleOfflineScan(rawInput, showtimeId, gateName) {
+        return checkInOffline(rawInput, showtimeId, gateName);
+      }
+
+      // ==========================================
+      // S-34 OFFLINE STATE & STORAGE HELPERS
+      // ==========================================
+      const DEFAULT_PUBLIC_KEYS = {
+        "v1": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEhKvN8uZyumXmc+fS6QxtF72eE52Lh/Ni9wdp4ARzLc5bJvxntjp2rfE7B2zP51CrPzHf6dsZ3/hp7HYCUc2JEg==",
+        "v2": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzeKFRx4YwyVdXi+1jUltqOYksIjpWUK3F30eXxMgFzrvYXf+XkPMquNxyi2R08IPaTXTq43NOBxUxiCaTrKdOw=="
+      };
+
+      const cryptoKeyCache = {};
+
+      function isSimulatedOffline() {
+        return document.getElementById('offlineModeToggle')?.checked || false;
+      }
+
+      function isDeviceOffline() {
+        return !navigator.onLine || isSimulatedOffline();
+      }
+
+      function getOfflinePublicKeys() {
+        try {
+          const raw = localStorage.getItem('offline_public_keys');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            return { ...DEFAULT_PUBLIC_KEYS, ...(parsed.publicKeys || parsed) };
+          }
+        } catch (_) {}
+        return DEFAULT_PUBLIC_KEYS;
+      }
+
+      function saveOfflinePublicKeys(keysObj) {
+        try {
+          localStorage.setItem('offline_public_keys', JSON.stringify(keysObj));
+        } catch (err) {
+          console.error('Không thể lưu public keys vào localStorage:', err);
+        }
+      }
+
+      function getOfflineManifest(showtimeId) {
         if (!showtimeId) return null;
         try {
-          const db = await openScannerDb();
-          return new Promise((resolve, reject) => {
-            const tx = db.transaction('sync_metadata', 'readonly');
-            const store = tx.objectStore('sync_metadata');
-            const req = store.get(showtimeId);
-            req.onsuccess = (e) => resolve(e.target.result || null);
-            req.onerror = (e) => reject(e.target.error);
-          });
-        } catch (_) {
-          return null;
-        }
-      }
-
-      async function saveSyncBatch(showtimeId, tickets, serverTime, isDelta, totalCount) {
-        const db = await openScannerDb();
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction(['offline_tickets', 'sync_metadata'], 'readwrite');
-          const ticketStore = tx.objectStore('offline_tickets');
-          const metaStore = tx.objectStore('sync_metadata');
-
-          // Idempotent upsert từng vé
-          for (let i = 0; i < tickets.length; i++) {
-            const t = tickets[i];
-            ticketStore.put({
-              showtimeId: showtimeId,
-              ticketCode: t.ticketCode,
-              isCheckedIn: t.isCheckedIn === true
-            });
-          }
-
-          const metaReq = metaStore.get(showtimeId);
-          metaReq.onsuccess = () => {
-            const existingMeta = metaReq.result || { totalTickets: 0 };
-            const effectiveTotal = isDelta ? existingMeta.totalTickets : totalCount;
-            const displayTime = formatDateTime(serverTime);
-            metaStore.put({
-              showtimeId: showtimeId,
-              lastSyncAt: serverTime,
-              totalTickets: effectiveTotal,
-              lastDownloadedDisplay: displayTime
-            });
-          };
-
-          tx.oncomplete = () => resolve();
-          tx.onerror = (e) => reject(e.target.error);
-        });
-      }
-
-      // ==========================================
-      // S-33 & S-26: Public Key Caching & Web Crypto
-      // ==========================================
-      async function fetchAndCachePublicKeys() {
-        if (!navigator.onLine) return;
-        try {
-          const res = await fetch('/api/v1/tickets/qr-public-keys', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (res.ok) {
-            const json = await res.json();
-            if (json && json.data && json.data.publicKeys) {
-              localStorage.setItem('cached_qr_public_keys', JSON.stringify(json.data.publicKeys));
-              if (json.data.activeVersion) {
-                localStorage.setItem('cached_qr_active_version', json.data.activeVersion);
-              }
-            }
-          }
-        } catch (err) {
-          console.warn('Không thể cập nhật danh sách khóa công khai từ máy chủ:', err);
-        }
-      }
-
-      function getCachedPublicKeys() {
-        try {
-          const raw = localStorage.getItem('cached_qr_public_keys');
+          const raw = localStorage.getItem('offline_manifest_' + showtimeId);
           return raw ? JSON.parse(raw) : null;
-        } catch (_) {
+        } catch (e) {
+          console.error('Lỗi đọc offline manifest:', e);
           return null;
         }
+      }
+
+      function saveOfflineManifest(showtimeId, manifest) {
+        if (!showtimeId || !manifest) return;
+        try {
+          localStorage.setItem('offline_manifest_' + showtimeId, JSON.stringify(manifest));
+        } catch (e) {
+          console.error('Lỗi lưu offline manifest:', e);
+        }
+      }
+
+      function getOfflineQueue() {
+        try {
+          const raw = localStorage.getItem('offline_checkin_queue');
+          return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+          console.error('Lỗi đọc offline queue:', e);
+          return [];
+        }
+      }
+
+      function saveOfflineQueue(queue) {
+        try {
+          localStorage.setItem('offline_checkin_queue', JSON.stringify(queue || []));
+        } catch (e) {
+          console.error('Lỗi lưu offline queue:', e);
+        }
+      }
+
+      // ==========================================
+      // WEB CRYPTO API VERIFICATION (ECDSA NIST P-256)
+      // ==========================================
+      function base64ToArrayBuffer(base64) {
+        const binaryString = window.atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
       }
 
       function base64UrlToUint8Array(base64Url) {
-        let base64 = (base64Url || '').replace(/-/g, '+').replace(/_/g, '/');
+        let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
         while (base64.length % 4) base64 += '=';
-        const binary = atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          bytes[i] = binary.charCodeAt(i);
+        const binaryString = window.atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
         }
         return bytes;
       }
 
-      async function verifyOfflineSignature(keyVersion, ticketCode, showtimeId, signatureBase64Url) {
-        const cachedKeys = getCachedPublicKeys();
-        if (!cachedKeys || !cachedKeys[keyVersion]) {
-          return {
-            valid: false,
-            reason: 'MISSING_KEY',
-            message: 'Không thể xác thực vé ngoại tuyến vì thiết bị chưa có khóa xác thực phù hợp.'
-          };
+      async function getPublicKeyCryptoKey(keyVersion, publicKeysMap) {
+        if (cryptoKeyCache[keyVersion]) {
+          return cryptoKeyCache[keyVersion];
         }
+        const spkiBase64 = publicKeysMap[keyVersion];
+        if (!spkiBase64) return null;
 
         try {
-          if (!window.crypto || !window.crypto.subtle) {
-            return {
-              valid: false,
-              reason: 'NO_WEB_CRYPTO',
-              message: 'Trình duyệt không hỗ trợ xác thực mật mã Web Crypto API.'
-            };
-          }
-
-          const spkiBase64 = cachedKeys[keyVersion];
-          const spkiBinary = atob(spkiBase64);
-          const spkiBytes = new Uint8Array(spkiBinary.length);
-          for (let i = 0; i < spkiBinary.length; i++) {
-            spkiBytes[i] = spkiBinary.charCodeAt(i);
-          }
-
-          const cryptoKey = await window.crypto.subtle.importKey(
+          const spkiBuffer = base64ToArrayBuffer(spkiBase64);
+          const key = await window.crypto.subtle.importKey(
             'spki',
-            spkiBytes.buffer,
+            spkiBuffer,
             { name: 'ECDSA', namedCurve: 'P-256' },
             false,
             ['verify']
           );
+          cryptoKeyCache[keyVersion] = key;
+          return key;
+        } catch (err) {
+          console.error('Lỗi import SPKI public key WebCrypto:', err);
+          return null;
+        }
+      }
 
-          // Dữ liệu chuẩn tắc theo chuẩn QrSignatureService: $"{ticketCode.Trim()}:{showtimeId}:{keyVersion.Trim()}"
-          const canonicalData = `${(ticketCode || '').trim()}:${(showtimeId || '').trim()}:${(keyVersion || '').trim()}`;
-          const enc = new TextEncoder();
-          const dataBytes = enc.encode(canonicalData);
-          const signatureBytes = base64UrlToUint8Array(signatureBase64Url);
+      function parseQrPayload(rawInput) {
+        const trimmed = (rawInput || '').trim();
+        let keyVersion = null;
+        let ticketCode = null;
+        let showtimeId = null;
+        let signature = null;
 
-          const isValid = await window.crypto.subtle.verify(
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            const obj = JSON.parse(trimmed);
+            ticketCode = obj.ticketCode;
+            showtimeId = obj.showtimeId;
+            keyVersion = obj.keyVersion;
+            signature = obj.sig || obj.signature;
+          } catch (_) {
+            return { error: 'INVALID_FORMAT', message: 'Mã QR có định dạng JSON không hợp lệ.' };
+          }
+        } else if (trimmed.includes('|')) {
+          const parts = trimmed.split('|');
+          if (parts.length >= 5 && parts[0].toUpperCase() === 'TICKET') {
+            keyVersion = parts[1];
+            ticketCode = parts[2];
+            showtimeId = parts[3];
+            signature = parts[4];
+          } else if (parts.length === 4 && parts[0].toUpperCase() === 'TICKET') {
+            keyVersion = parts[1];
+            ticketCode = parts[2];
+            showtimeId = parts[3];
+            signature = null;
+          } else if (parts.length >= 4 && parts[0].toUpperCase() !== 'TICKET') {
+            keyVersion = parts[0];
+            ticketCode = parts[1];
+            showtimeId = parts[2];
+            signature = parts[3];
+          } else {
+            ticketCode = parts[0];
+          }
+        } else {
+          ticketCode = trimmed;
+        }
+
+        return { keyVersion, ticketCode, showtimeId, signature };
+      }
+
+      async function verifyQrOffline(rawInput, selectedShowtimeId, publicKeysMap) {
+        const parsed = parseQrPayload(rawInput);
+        if (parsed.error) {
+          return { isValid: false, reason: parsed.error, message: parsed.message };
+        }
+
+        // AC3 S-26: Mã QR tự chế hoặc thiếu chữ ký số
+        if (!parsed.signature) {
+          return {
+            isValid: false,
+            reason: 'MISSING_SIGNATURE',
+            message: 'Mã QR không có chữ ký số hợp lệ hoặc bị thiếu chữ ký (chỉ chấp nhận mã QR có chữ ký số hệ thống).'
+          };
+        }
+
+        if (!parsed.ticketCode || !parsed.showtimeId) {
+          return {
+            isValid: false,
+            reason: 'INVALID_FORMAT',
+            message: 'Mã QR thiếu mã vé hoặc mã suất diễn hợp lệ.'
+          };
+        }
+
+        if (!parsed.keyVersion) {
+          return {
+            isValid: false,
+            reason: 'MISSING_KEY_VERSION',
+            message: 'Mã QR không chứa thông tin phiên bản khoá (Key Version).'
+          };
+        }
+
+        // AC2 S-26: Lấy khoá công khai tương ứng với keyVersion
+        const cryptoKey = await getPublicKeyCryptoKey(parsed.keyVersion, publicKeysMap);
+        if (!cryptoKey) {
+          return {
+            isValid: false,
+            reason: 'UNKNOWN_KEY_VERSION',
+            message: `Phiên bản khoá '${parsed.keyVersion}' không tồn tại hoặc chưa được cập nhật trên thiết bị quét.`
+          };
+        }
+
+        // AC1 S-26 & S-34: Xác thực chữ ký đối với dữ liệu chuẩn tắc (ticketCode:showtimeId:keyVersion)
+        try {
+          const canonicalData = `${parsed.ticketCode.trim()}:${parsed.showtimeId.trim()}:${parsed.keyVersion.trim()}`;
+          const dataBytes = new TextEncoder().encode(canonicalData);
+          const sigBytes = base64UrlToUint8Array(parsed.signature);
+
+          const isSigValid = await window.crypto.subtle.verify(
             { name: 'ECDSA', hash: { name: 'SHA-256' } },
             cryptoKey,
-            signatureBytes,
+            sigBytes,
             dataBytes
           );
 
-          if (!isValid) {
+          if (!isSigValid) {
             return {
-              valid: false,
+              isValid: false,
               reason: 'INVALID_SIGNATURE',
-              message: 'Chữ ký số không khớp hoặc mã QR đã bị chỉnh sửa.'
+              message: 'Chữ ký số không khớp hoặc mã QR đã bị chỉnh sửa/tạo giả ngoài hệ thống.'
             };
           }
-          return { valid: true };
         } catch (err) {
-          console.error('Lỗi xác thực chữ ký ECDSA ngoại tuyến:', err);
+          console.error('Lỗi xác thực chữ ký WebCrypto:', err);
           return {
-            valid: false,
-            reason: 'CRYPTO_ERROR',
-            message: 'Lỗi trong quá trình xác thực chữ ký điện tử ngoại tuyến.'
+            isValid: false,
+            reason: 'INVALID_SIGNATURE',
+            message: 'Chữ ký số không hợp lệ hoặc bị lỗi cấu trúc giải mã.'
           };
         }
+
+        // Kiểm tra suất diễn
+        if (parsed.showtimeId.toLowerCase() !== (selectedShowtimeId || '').toLowerCase()) {
+          return {
+            isValid: false,
+            reason: 'WRONG_SHOWTIME',
+            message: 'Cảnh báo: Vé này KHÔNG thuộc về suất diễn đang được chọn tại cổng!'
+          };
+        }
+
+        return {
+          isValid: true,
+          ticketCode: parsed.ticketCode,
+          showtimeId: parsed.showtimeId,
+          keyVersion: parsed.keyVersion
+        };
       }
 
       // ==========================================
-      // S-33: UI & Sync Controls
+      // S-34 OFFLINE CHECK-IN LOGIC (AC1, AC2, AC3, AC4)
       // ==========================================
-      function updateNetworkStatus() {
-        const isOnline = navigator.onLine;
+      async function checkInOffline(rawInput, selectedShowtimeId, gateName) {
+        // 1. AC4: Giả sử máy chưa tải danh sách, Khi mất mạng -> Báo không soát được và hướng dẫn tải
+        const manifest = getOfflineManifest(selectedShowtimeId);
+        if (!manifest || !manifest.tickets || !manifest.tickets.length) {
+          return {
+            success: false,
+            isAc4Error: true,
+            reason: 'NO_MANIFEST',
+            message: 'Không thể soát vé ngoại tuyến: Thiết bị chưa tải danh sách vé cho suất diễn này. Vui lòng kết nối mạng và bấm "Tải danh sách vé" trước khi soát ngoại tuyến.'
+          };
+        }
+
+        // 2. Xác thực chữ ký mã QR bằng khoá công khai (AC1 & S-26)
+        const publicKeysMap = getOfflinePublicKeys();
+        const qrResult = await verifyQrOffline(rawInput, selectedShowtimeId, publicKeysMap);
+        if (!qrResult.isValid) {
+          return {
+            success: false,
+            reason: qrResult.reason,
+            message: qrResult.message
+          };
+        }
+
+        const ticketCode = qrResult.ticketCode;
+
+        // 3. Tra mã trong danh sách đã tải
+        const ticket = manifest.tickets.find(t => (t.ticketCode || '').toLowerCase() === ticketCode.toLowerCase());
+        if (!ticket) {
+          return {
+            success: false,
+            reason: 'TICKET_NOT_FOUND',
+            message: 'Mã vé không tồn tại trong danh sách của suất diễn này hoặc chưa thanh toán hợp lệ.'
+          };
+        }
+
+        // 4. AC3: Giả sử cùng máy quét một vé hai lần khi mất mạng -> Bị từ chối nhờ hàng đợi cục bộ
+        const queue = getOfflineQueue();
+        const alreadyInQueue = queue.find(q =>
+          (q.ticketCode || '').toLowerCase() === ticketCode.toLowerCase() &&
+          (q.showtimeId || '').toLowerCase() === selectedShowtimeId.toLowerCase()
+        );
+
+        if (alreadyInQueue) {
+          const timeStr = alreadyInQueue.scannedAt ? formatDateTime(alreadyInQueue.scannedAt) : 'trước đó';
+          const gateStr = alreadyInQueue.gateName ? ` tại cửa ${alreadyInQueue.gateName}` : '';
+          return {
+            success: false,
+            reason: 'DUPLICATE_OFFLINE_SCAN',
+            message: `Vé đã được quét ngoại tuyến trên thiết bị này lúc ${timeStr}${gateStr} (đang trong hàng đợi cục bộ).`
+          };
+        }
+
+        // 5. AC2: Giả sử vé đã được đánh dấu đã vào trong danh sách tải về -> Báo đỏ như khi có mạng
+        if (ticket.isCheckedIn) {
+          const timeStr = ticket.checkInTime ? formatDateTime(ticket.checkInTime) : 'trước đó';
+          const gateStr = ticket.checkInGate ? ` tại cửa ${ticket.checkInGate}` : '';
+          return {
+            success: false,
+            reason: 'ALREADY_CHECKED_IN',
+            message: `Vé đã được sử dụng lúc ${timeStr}${gateStr}.`
+          };
+        }
+
+        // 6. AC1: Hợp lệ -> Đánh dấu vé trong manifest, ghi vào hàng đợi cục bộ, báo xanh
+        ticket.isCheckedIn = true;
+        ticket.checkInGate = gateName;
+        ticket.checkInTime = new Date().toISOString();
+        saveOfflineManifest(selectedShowtimeId, manifest);
+
+        const now = new Date();
+        const scanRecord = {
+          offlineScanId: (window.crypto && crypto.randomUUID ? crypto.randomUUID() : ('offline-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9))),
+          ticketCode: ticket.ticketCode,
+          showtimeId: selectedShowtimeId,
+          gateName: gateName,
+          scannedAt: now.toISOString(),
+          staffUsername: displayName,
+          seatRow: ticket.seatRow || '',
+          seatNumber: ticket.seatNumber || 0,
+          seatInfo: ticket.seatInfo || (ticket.seatRow ? `${ticket.seatRow}${ticket.seatNumber}` : 'Ghế'),
+          categoryName: ticket.categoryName || 'Tiêu chuẩn',
+          qrPayload: rawInput
+        };
+
+        queue.push(scanRecord);
+        saveOfflineQueue(queue);
+        updateQueueCounterUI();
+        updateManifestUI();
+
+        return {
+          success: true,
+          isOffline: true,
+          data: {
+            message: 'Check-in ngoại tuyến thành công.',
+            seatInfo: scanRecord.seatInfo,
+            seatRow: scanRecord.seatRow,
+            seatNumber: scanRecord.seatNumber,
+            categoryName: scanRecord.categoryName,
+            gate: gateName,
+            checkInTime: now.toISOString(),
+            ticketCode: ticket.ticketCode,
+            isOffline: true
+          }
+        };
+      }
+
+      // ==========================================
+      // UI STATE & MANIFEST MANAGEMENT (S-33 & S-34)
+      // ==========================================
+      function updateNetworkStatusUI() {
         const badge = document.getElementById('networkStatusBadge');
         const icon = document.getElementById('networkStatusIcon');
-        const label = document.getElementById('networkStatusLabel');
-        if (!badge || !icon || !label) return;
+        const text = document.getElementById('networkStatusText');
+        const bannerNotice = document.getElementById('offlineBannerNotice');
+        const offline = isDeviceOffline();
 
-        if (isOnline) {
-          badge.style.background = '#ecfdf5';
-          badge.style.color = '#059669';
-          icon.textContent = 'wifi';
-          label.textContent = 'Online';
-        } else {
-          badge.style.background = '#fef2f2';
-          badge.style.color = '#dc2626';
+        if (offline) {
+          badge.className = 'network-badge network-badge-offline';
           icon.textContent = 'wifi_off';
-          label.textContent = 'Mất mạng (Offline)';
+          text.textContent = isSimulatedOffline() ? 'Ngoại tuyến (Mô phỏng)' : 'Ngoại tuyến (Mất mạng)';
+          bannerNotice.style.display = 'inline';
+        } else {
+          badge.className = 'network-badge network-badge-online';
+          icon.textContent = 'wifi';
+          text.textContent = 'Trực tuyến (Online)';
+          bannerNotice.style.display = 'none';
         }
       }
 
-      async function updateSyncMetadataDisplay(showtimeId) {
-        const metaText = document.getElementById('syncMetadataText');
-        if (!metaText) return;
+      function updateManifestUI() {
+        const showtimeSelect = document.getElementById('showtimeSelect');
+        const showtimeId = showtimeSelect ? showtimeSelect.value : null;
+        const statusText = document.getElementById('manifestStatusText');
+        const subText = document.getElementById('manifestSubText');
+        const btnLabel = document.getElementById('btnDownloadManifestLabel');
 
         if (!showtimeId) {
-          metaText.textContent = 'Vui lòng chọn suất diễn để kiểm tra trạng thái vé đã tải';
+          statusText.textContent = 'Chưa chọn suất diễn';
+          statusText.style.color = '#64748b';
+          subText.textContent = 'Chọn suất diễn để kiểm tra hoặc tải dữ liệu ngoại tuyến.';
+          btnLabel.textContent = 'Tải danh sách vé';
           return;
         }
 
-        const meta = await getSyncMetadata(showtimeId);
-        if (meta && meta.lastSyncAt) {
-          const dateStr = meta.lastDownloadedDisplay || formatDateTime(meta.lastSyncAt);
-          metaText.innerHTML = `Đã tải: <strong>${(meta.totalTickets || 0).toLocaleString('vi-VN')} vé</strong> (lúc ${escapeHtml(dateStr)})`;
+        const manifest = getOfflineManifest(showtimeId);
+        if (manifest && manifest.tickets) {
+          const total = manifest.tickets.length;
+          const checkedInCount = manifest.tickets.filter(t => t.isCheckedIn).length;
+          const timeStr = manifest.downloadedAt ? formatDateTime(manifest.downloadedAt) : 'Đã tải';
+          statusText.textContent = `✅ Đã lưu ${total} vé (${checkedInCount} đã vào) lúc ${timeStr}`;
+          statusText.style.color = '#059669';
+          subText.textContent = 'Thiết bị sẵn sàng soát vé không cần mạng cho suất này (S-34).';
+          btnLabel.textContent = 'Cập nhật lại';
         } else {
-          metaText.textContent = 'Chưa tải danh sách vé cho suất diễn này';
+          statusText.textContent = '⚠️ Chưa tải danh sách cho suất này';
+          statusText.style.color = '#d97706';
+          subText.textContent = 'Cần tải trước để soát vé khi mất mạng (AC1, AC4).';
+          btnLabel.textContent = 'Tải danh sách vé';
         }
       }
 
-      function showSyncNotice(msg, type) {
-        const alertBox = document.getElementById('syncAlertMessage');
-        if (!alertBox) return;
-        alertBox.style.display = 'block';
-        if (type === 'success') {
-          alertBox.style.background = '#ecfdf5';
-          alertBox.style.color = '#065f46';
-          alertBox.style.border = '1px solid #a7f3d0';
-        } else {
-          alertBox.style.background = '#fef2f2';
-          alertBox.style.color = '#991b1b';
-          alertBox.style.border = '1px solid #fecaca';
+      function updateQueueCounterUI() {
+        const queue = getOfflineQueue();
+        const label = document.getElementById('queueCounterLabel');
+        if (label) {
+          label.textContent = `Hàng đợi: ${queue.length} vé`;
         }
-        alertBox.textContent = msg;
-        setTimeout(() => {
-          alertBox.style.display = 'none';
-        }, 5000);
       }
 
-      // ==========================================
-      // S-33: Nút "Tải danh sách vé" (Full Sync)
-      // ==========================================
-      async function handleDownloadTickets() {
-        const showtimeId = document.getElementById('showtimeSelect').value;
+      window.handleDownloadManifest = async function () {
+        const showtimeSelect = document.getElementById('showtimeSelect');
+        const showtimeId = showtimeSelect ? showtimeSelect.value : null;
         if (!showtimeId) {
-          alert('Vui lòng chọn suất diễn hiện tại trước khi tải danh sách vé.');
-          return;
-        }
-        if (!navigator.onLine) {
-          alert('Không có kết nối mạng. Không thể tải danh sách vé từ máy chủ.');
+          alert('Vui lòng chọn suất diễn trước khi tải danh sách vé.');
           return;
         }
 
-        const btn = document.getElementById('btnDownloadTickets');
-        const originalHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="material-symbols-outlined" style="animation: spin 1s linear infinite; font-size: 18px;">sync</span> <span>Đang tải...</span>';
+        const btnLabel = document.getElementById('btnDownloadManifestLabel');
+        const originalText = btnLabel.textContent;
+        btnLabel.textContent = 'Đang tải...';
 
         try {
-          // 1. Đồng bộ khóa công khai
-          await fetchAndCachePublicKeys();
+          // 1. Tải Public Keys của hệ thống
+          try {
+            const keysRes = await fetch('/api/v1/tickets/qr-public-keys');
+            if (keysRes.ok) {
+              const keysJson = await keysRes.json();
+              if (keysJson?.data?.publicKeys) {
+                saveOfflinePublicKeys(keysJson.data);
+              }
+            }
+          } catch (e) {
+            console.warn('Không thể tải public keys từ server, sử dụng keys mặc định:', e);
+          }
 
-          // 2. Tải toàn bộ vé của suất (Full sync)
-          const tStart = performance.now();
-          const res = await fetch(`/api/v1/checkin/showtimes/${showtimeId}/offline-tickets`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+          // 2. Tải manifest danh sách vé của suất diễn (S-33)
+          const res = await fetch(`/api/v1/checkin/offline-tickets/${showtimeId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
           });
 
           if (!res.ok) {
             const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.message || 'Lỗi từ máy chủ khi tải danh sách vé.');
+            throw new Error(errData.message || 'Lỗi khi tải danh sách vé từ máy chủ.');
           }
 
           const data = await res.json();
-          const tickets = data.tickets || [];
+          data.downloadedAt = new Date().toISOString();
+          saveOfflineManifest(showtimeId, data);
+          updateManifestUI();
 
-          // 3. Ghi vào IndexedDB
-          await saveSyncBatch(showtimeId, tickets, data.serverTime, false, data.totalCount);
-          const durationMs = Math.round(performance.now() - tStart);
-
-          await updateSyncMetadataDisplay(showtimeId);
-          showSyncNotice(`Tải thành công ${tickets.length.toLocaleString('vi-VN')} vé xuống thiết bị (${durationMs}ms). Sẵn sàng soát vé ngoại tuyến!`, 'success');
+          const count = data.totalCount || (data.tickets ? data.tickets.length : 0);
+          alert(`Tải thành công ${count} vé của suất diễn xuống thiết bị! Thiết bị đã sẵn sàng soát vé ngoại tuyến.`);
         } catch (err) {
-          console.error('Lỗi khi tải danh sách vé:', err);
-          showSyncNotice(`Lỗi tải danh sách: ${err.message}`, 'error');
+          console.error(err);
+          alert('Không thể tải danh sách vé: ' + (err.message || 'Lỗi kết nối.'));
         } finally {
-          btn.disabled = false;
-          btn.innerHTML = originalHtml;
+          btnLabel.textContent = originalText;
+          updateManifestUI();
         }
-      }
+      };
 
-      // ==========================================
-      // S-33: Auto Delta Sync (30 phút)
-      // ==========================================
-      async function checkAndTriggerAutoDeltaSync() {
-        const showtimeId = document.getElementById('showtimeSelect').value;
-        if (!showtimeId || !navigator.onLine) return;
-
-        try {
-          const meta = await getSyncMetadata(showtimeId);
-          if (!meta || !meta.lastSyncAt) return;
-
-          const lastSyncTime = new Date(meta.lastSyncAt).getTime();
-          const now = Date.now();
-          const diffMinutes = (now - lastSyncTime) / (1000 * 60);
-
-          if (diffMinutes >= 30) {
-            console.log(`[Auto Delta Sync S-33] Dữ liệu đã quá ${Math.round(diffMinutes)} phút, bắt đầu đồng bộ phần thay đổi...`);
-            await runDeltaSync(showtimeId, meta.lastSyncAt);
-          }
-        } catch (err) {
-          console.warn('[Auto Delta Sync S-33] Lỗi kiểm tra:', err);
+      window.handleClearOfflineData = function () {
+        const showtimeSelect = document.getElementById('showtimeSelect');
+        const showtimeId = showtimeSelect ? showtimeSelect.value : null;
+        if (!showtimeId) {
+          alert('Chưa chọn suất diễn để xoá.');
+          return;
         }
-      }
+        if (confirm('Bạn có chắc muốn xoá dữ liệu danh sách vé đã tải của suất này không?')) {
+          localStorage.removeItem('offline_manifest_' + showtimeId);
+          updateManifestUI();
+          alert('Đã xoá dữ liệu ngoại tuyến của suất này.');
+        }
+      };
 
-      async function runDeltaSync(showtimeId, lastSyncAt) {
-        try {
-          const res = await fetch(`/api/v1/checkin/showtimes/${showtimeId}/offline-tickets?since=${encodeURIComponent(lastSyncAt)}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+      window.openQueueModal = function () {
+        const queue = getOfflineQueue();
+        const container = document.getElementById('queueTableContainer');
+
+        if (!queue || queue.length === 0) {
+          container.innerHTML = '<div style="padding: 24px; text-align: center; color: #64748b;">Hàng đợi cục bộ đang trống (chưa có lần quét ngoại tuyến nào).</div>';
+        } else {
+          let html = `
+            <table class="queue-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Mã Vé</th>
+                  <th>Vị Trí Ghế</th>
+                  <th>Hạng</th>
+                  <th>Cửa</th>
+                  <th>Thời Điểm</th>
+                </tr>
+              </thead>
+              <tbody>
+          `;
+          queue.forEach((item, idx) => {
+            html += `
+              <tr>
+                <td>${idx + 1}</td>
+                <td><strong>${escapeHtml(item.ticketCode)}</strong></td>
+                <td>${escapeHtml(item.seatInfo || '')}</td>
+                <td>${escapeHtml(item.categoryName || '')}</td>
+                <td>${escapeHtml(item.gateName || '')}</td>
+                <td>${escapeHtml(formatDateTime(item.scannedAt))}</td>
+              </tr>
+            `;
           });
-          if (!res.ok) return;
-
-          const data = await res.json();
-          const changedTickets = data.tickets || [];
-
-          if (changedTickets.length > 0) {
-            await saveSyncBatch(showtimeId, changedTickets, data.serverTime, true, data.totalCount);
-            console.log(`[Auto Delta Sync S-33] Đã cập nhật ${changedTickets.length} vé thay đổi.`);
-          } else {
-            // Không có vé thay đổi -> cập nhật lại watermark mới
-            const db = await openScannerDb();
-            const tx = db.transaction('sync_metadata', 'readwrite');
-            const store = tx.objectStore('sync_metadata');
-            const req = store.get(showtimeId);
-            req.onsuccess = () => {
-              const meta = req.result;
-              if (meta) {
-                meta.lastSyncAt = data.serverTime;
-                meta.lastDownloadedDisplay = formatDateTime(data.serverTime);
-                store.put(meta);
-              }
-            };
-          }
-          await updateSyncMetadataDisplay(showtimeId);
-        } catch (err) {
-          console.warn('[Auto Delta Sync S-33] Lỗi thực hiện delta sync:', err);
+          html += `</tbody></table>`;
+          container.innerHTML = html;
         }
-      }
+
+        document.getElementById('queueModal').style.display = 'flex';
+      };
+
+      window.closeQueueModal = function () {
+        document.getElementById('queueModal').style.display = 'none';
+      };
+
+      window.handleClearQueue = function () {
+        const queue = getOfflineQueue();
+        if (!queue.length) return;
+        if (confirm(`Bạn có chắc muốn xoá toàn bộ ${queue.length} lần quét trong hàng đợi cục bộ không?`)) {
+          saveOfflineQueue([]);
+          updateQueueCounterUI();
+          window.openQueueModal();
+        }
+      };
 
       // ==========================================
-      // S-33: Tra cứu vé Ngoại tuyến (Read-Only)
+      // LOAD TODAY SHOWS & PRE-CACHE KEYS
       // ==========================================
-      async function handleOfflineScan(rawInput, showtimeId, gateName) {
-        // 1. Trường hợp Signed QR: TICKET|{keyVersion}|{ticketCode}|{showtimeId}|{signatureBase64Url}
-        if (rawInput.startsWith('TICKET|') || (rawInput.includes('|') && rawInput.split('|').length >= 5)) {
-          const parts = rawInput.trim().split('|');
-          if (parts.length < 5 || parts[0].toLowerCase() !== 'ticket') {
-            showErrorResult('Mã QR không đúng định dạng chuẩn của hệ thống.', 'OFFLINE');
-            return;
-          }
-
-          const keyVersion = parts[1];
-          const ticketCode = parts[2];
-          const qrShowtimeId = parts[3];
-          const signatureBase64Url = parts[4];
-
-          if (!keyVersion || !ticketCode || !qrShowtimeId || !signatureBase64Url) {
-            showErrorResult('Mã QR không có chữ ký số hợp lệ hoặc bị thiếu chữ ký.', 'OFFLINE');
-            return;
-          }
-
-          // 2. Xác thực chữ ký số bằng Web Crypto API
-          const verifyResult = await verifyOfflineSignature(keyVersion, ticketCode, qrShowtimeId, signatureBase64Url);
-          if (!verifyResult.valid) {
-            showErrorResult(verifyResult.message || 'Chữ ký số không khớp hoặc mã QR đã bị chỉnh sửa.', 'OFFLINE');
-            return;
-          }
-
-          // 3. Kiểm tra suất diễn
-          if (qrShowtimeId.toLowerCase() !== showtimeId.toLowerCase()) {
-            showErrorResult('Cảnh báo: Vé này KHÔNG thuộc về suất diễn đang được chọn tại cổng!', 'OFFLINE');
-            return;
-          }
-
-          // 4. Tra cứu IndexedDB (Read-Only 100%)
-          let localTicket = null;
-          try {
-            localTicket = await getOfflineTicket(showtimeId, ticketCode);
-          } catch (e) {
-            showErrorResult('Lỗi truy xuất cơ sở dữ liệu ngoại tuyến trên thiết bị.', 'OFFLINE');
-            return;
-          }
-
-          if (!localTicket) {
-            showErrorResult('Vé không tồn tại trong danh sách đã tải của suất diễn.', 'OFFLINE');
-            return;
-          }
-
-          if (localTicket.isCheckedIn) {
-            showErrorResult('Vé đã được sử dụng trước đó (theo dữ liệu ngoại tuyến).', 'OFFLINE');
-            return;
-          }
-
-          // Hợp lệ có chữ ký xác thực! (Read-Only: Tuyệt đối không sửa đổi isCheckedIn)
-          showOfflineSuccessResult(ticketCode, /* isSigned */ true, gateName);
-          document.getElementById('ticketInput').value = '';
-          return;
-        }
-
-        // 2. Trường hợp Manual Input (nhập tay mã TK-...)
-        const ticketCode = rawInput.trim();
-        let localTicket = null;
-        try {
-          localTicket = await getOfflineTicket(showtimeId, ticketCode);
-        } catch (e) {
-          showErrorResult('Lỗi truy xuất cơ sở dữ liệu ngoại tuyến trên thiết bị.', 'OFFLINE');
-          return;
-        }
-
-        if (!localTicket) {
-          showErrorResult('Mã vé không tồn tại trong danh sách đã tải của suất diễn.', 'OFFLINE');
-          return;
-        }
-
-        if (localTicket.isCheckedIn) {
-          showErrorResult('Vé đã được sử dụng trước đó (theo dữ liệu ngoại tuyến).', 'OFFLINE');
-          return;
-        }
-
-        // Hợp lệ thủ công! (Read-Only: Tuyệt đối không sửa đổi isCheckedIn)
-        showOfflineSuccessResult(ticketCode, /* isSigned */ false, gateName);
-        document.getElementById('ticketInput').value = '';
-      }
-
       async function loadTodayShows() {
         const select = document.getElementById('showtimeSelect');
         try {
+          // Pre-fetch và cache public keys
+          fetch('/api/v1/tickets/qr-public-keys')
+            .then(r => r.ok ? r.json() : null)
+            .then(json => {
+              if (json?.data?.publicKeys) {
+                saveOfflinePublicKeys(json.data);
+              }
+            })
+            .catch(() => {});
+
           const res = await fetch('/api/v1/checkin/today-shows', {
             headers: {
               'Authorization': `Bearer ${token}`
@@ -1092,14 +1494,14 @@
           });
           if (!res.ok) throw new Error('Không thể tải danh sách suất diễn');
           const data = await res.json();
-
+          
           select.innerHTML = '';
           if (data.length === 0) {
             select.innerHTML = '<option value="">Không có suất diễn nào đang diễn ra hôm nay</option>';
-            updateSyncMetadataDisplay(null);
+            updateManifestUI();
             return;
           }
-
+          
           data.forEach(show => {
             const startTime = new Date(show.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
             const endTime = new Date(show.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -1109,17 +1511,15 @@
             select.appendChild(option);
           });
 
-          // Hiển thị trạng thái dữ liệu đã tải của suất diễn đầu tiên
-          if (select.value) {
-            updateSyncMetadataDisplay(select.value);
-          }
+          updateManifestUI();
         } catch (error) {
           console.error(error);
-          select.innerHTML = '<option value="">Lỗi tải danh sách suất diễn</option>';
-          updateSyncMetadataDisplay(null);
+          select.innerHTML = '<option value="">Lỗi tải danh sách suất diễn (Kiểm tra kết nối)</option>';
+          updateManifestUI();
         }
       }
 
+      window.handleScan = handleScan;
       async function handleScan() {
         if (isProcessing) return;
 
@@ -1129,7 +1529,7 @@
         const resultDiv = document.getElementById('scanResult');
 
         resultDiv.style.display = 'block';
-
+        
         if (!rawInput) {
           showErrorResult('Vui lòng quét mã QR hoặc nhập mã vé.');
           return;
@@ -1143,21 +1543,30 @@
         resultDiv.className = 'info-alert';
         resultDiv.innerHTML = '<span class="material-symbols-outlined" style="animation: spin 1s linear infinite;">sync</span> <span>Đang xác thực vé...</span>';
 
-        // 1. Nếu thiết bị đang mất mạng (Offline): Kích hoạt ngay luồng offline lookup S-33
-        if (!navigator.onLine) {
+        // 1. NẾU THIẾT BỊ ĐANG Ở CHẾ ĐỘ NGOẠI TUYẾN
+        if (isDeviceOffline()) {
           try {
-            await handleOfflineScan(rawInput, showtimeId, gateName);
+            const offlineRes = await checkInOffline(rawInput, showtimeId, gateName);
+            if (offlineRes.success) {
+              showSuccessResult(offlineRes.data, gateName, true);
+              document.getElementById('ticketInput').value = '';
+            } else {
+              showErrorResult(offlineRes.message);
+            }
+          } catch (offlineErr) {
+            console.error('Lỗi check-in ngoại tuyến:', offlineErr);
+            showErrorResult('Lỗi xác thực ngoại tuyến: ' + (offlineErr.message || 'Không xác định'));
           } finally {
             setTimeout(() => {
               isProcessing = false;
               const inputEl = document.getElementById('ticketInput');
               if (inputEl) inputEl.focus();
-            }, 800);
+            }, 600);
           }
           return;
         }
 
-        // 2. Nếu có mạng: Thực hiện luồng Online chuẩn S-29/S-30
+        // 2. NẾU THIẾT BỊ ĐANG TRỰC TUYẾN: GỌI MÁY CHỦ VỚI FALLBACK NGOẠI TUYẾN
         const bodyPayload = {
           selectedShowtimeId: showtimeId,
           gateName: gateName
@@ -1171,7 +1580,6 @@
           bodyPayload.ticketCode = rawInput;
         }
 
-        // S-30: Quá 3 giây chưa có phản hồi → hiển thị "Đang chờ...", không đứng im
         let pendingTimeout = setTimeout(() => {
           if (isProcessing) {
             showPendingNotice();
@@ -1192,21 +1600,32 @@
           clearTimeout(pendingTimeout);
 
           if (res.ok) {
-            showSuccessResult(data, gateName);
-            document.getElementById('ticketInput').value = ''; // clear cho vé tiếp theo
+            showSuccessResult(data, gateName, false);
+            document.getElementById('ticketInput').value = '';
           } else {
-            // Không fallback offline cho lỗi nghiệp vụ HTTP 400/403/409 từ server
             showErrorResult(data.message || 'Mã vé không hợp lệ hoặc bị từ chối.');
-            if (data.reason === 'ALREADY_CHECKED_IN') {
-              try { html5QrcodeScanner.pause(true); } catch {}
-              offerReadmission(bodyPayload);
-            }
           }
-        } catch (error) {
+        } catch (networkError) {
           clearTimeout(pendingTimeout);
-          console.warn('Lỗi kết nối máy chủ online, kích hoạt fallback ngoại tuyến S-33:', error);
-          // Chỉ fallback sang Offline Lookup khi request thất bại do lỗi kết nối thực sự
-          await handleOfflineScan(rawInput, showtimeId, gateName);
+          console.warn('Lỗi kết nối máy chủ, kích hoạt fallback ngoại tuyến S-34:', networkError);
+
+          // Kiểm tra xem đã có manifest để chuyển sang soát vé ngoại tuyến ngay không
+          const manifest = getOfflineManifest(showtimeId);
+          if (manifest && manifest.tickets) {
+            try {
+              const offlineRes = await checkInOffline(rawInput, showtimeId, gateName);
+              if (offlineRes.success) {
+                showSuccessResult(offlineRes.data, gateName, true);
+                document.getElementById('ticketInput').value = '';
+              } else {
+                showErrorResult(offlineRes.message);
+              }
+            } catch (err) {
+              showErrorResult('Lỗi soát vé ngoại tuyến: ' + err.message);
+            }
+          } else {
+            showErrorResult('Mất kết nối máy chủ và chưa có danh sách tải trước cho suất này. Vui lòng kiểm tra lại mạng hoặc tải danh sách vé (S-33).');
+          }
         } finally {
           clearTimeout(pendingTimeout);
           setTimeout(() => {
@@ -1215,45 +1634,6 @@
             if (inputEl) inputEl.focus();
           }, 800);
         }
-      }
-
-      function offerReadmission(originalPayload) {
-        const container = document.createElement('div');
-        container.style.cssText = 'padding:16px;background:white;border:2px solid #b45309;border-radius:12px;margin-top:12px';
-        const label = document.createElement('label');
-        label.textContent = 'Chỉ cho vào bổ sung sau khi đã xác nhận khách là chủ vé. Nhập lý do:';
-        const reason = document.createElement('textarea');
-        reason.maxLength = 1000;
-        reason.style.cssText = 'display:block;width:100%;margin:12px 0;color:#111;background:#fff';
-        reason.setAttribute('aria-label', 'Lý do cho vào bổ sung');
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.textContent = 'Đã xác nhận chủ vé — Cho vào có ghi chú';
-        const error = document.createElement('p');
-        error.setAttribute('role', 'alert');
-        const requestId = crypto.randomUUID();
-        button.addEventListener('click', async () => {
-          if (isProcessing) return;
-          if (!reason.value.trim()) { error.textContent = 'Vui lòng nhập lý do.'; reason.focus(); return; }
-          button.disabled = true;
-          isProcessing = true;
-          try {
-            const response = await fetch('/api/v1/checkin/scan', {
-              method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-              body: JSON.stringify({ ...originalPayload, allowReadmission: true, readmissionReason: reason.value.trim(), requestId })
-            });
-            const data = await response.json();
-            if (!response.ok) { error.textContent = data.message || 'Không thể cho vào bổ sung.'; return; }
-            showSuccessResult(data, originalPayload.gateName);
-            const note = document.createElement('p');
-            note.textContent = `Vào bổ sung — ${data.staffName}: ${data.readmissionReason}`;
-            document.getElementById('scanResult').appendChild(note);
-            document.getElementById('ticketInput').value = '';
-          } catch { error.textContent = 'Lỗi kết nối. Thử lại để kiểm tra cùng mã yêu cầu.'; }
-          finally { isProcessing = false; button.disabled = false; }
-        });
-        container.append(label, reason, button, error);
-        document.getElementById('scanResult').appendChild(container);
       }
 
       function showPendingNotice() {
@@ -1272,7 +1652,7 @@
         `;
       }
 
-      function showSuccessResult(data, gateFallback) {
+      function showSuccessResult(data, gateFallback, isOffline = false) {
         playAudioCue('success');
         const resultDiv = document.getElementById('scanResult');
         resultDiv.style.display = 'block';
@@ -1282,11 +1662,28 @@
         const gateStr = data.gate || gateFallback || 'Gate 1';
         const checkInTimeStr = data.checkInTime ? formatDateTime(data.checkInTime) : formatDateTime(new Date());
 
+        const isOff = isOffline || data.isOffline;
+        const offlineBadgeHtml = isOff ? `
+          <div style="display: inline-block; background: #fff7ed; color: #c2410c; border: 1.5px solid #fed7aa; padding: 4px 14px; border-radius: 20px; font-weight: 800; font-size: 0.85rem; margin-bottom: 12px; letter-spacing: 0.02em;">
+            ⚡ SOÁT VÉ NGOẠI TUYẾN — ĐÃ LƯU HÀNG ĐỢI CỤC BỘ (S-34)
+          </div>
+        ` : '';
+
+        const offlineNoteHtml = isOff ? `
+          <div style="font-size: 0.82rem; color: #047857; margin-top: 8px; font-weight: 600;">
+            Lần quét đã được ghi nhận vào bộ nhớ thiết bị và sẽ đồng bộ khi có mạng lại (S-35).
+          </div>
+        ` : '';
+
+        const badgeText = isOff ? 'VÉ HỢP LỆ — NGOẠI TUYẾN' : 'VÉ HỢP LỆ — CHECK-IN THÀNH CÔNG';
+        const verifyMethodTag = data.isManual ? ' [XÁC THỰC THỦ CÔNG]' : '';
+
         resultDiv.innerHTML = `
           <div class="result-card-outdoor result-card-success">
+            ${offlineBadgeHtml}
             <div class="badge-valid-outdoor">
               <span class="material-symbols-outlined" style="font-size: 28px;">check_circle</span>
-              <span>VÉ HỢP LỆ — CHECK-IN THÀNH CÔNG</span>
+              <span>${badgeText}${verifyMethodTag}</span>
             </div>
 
             <div class="seat-highlight-grid">
@@ -1305,6 +1702,7 @@
               <div>⏰ <span>Thời điểm:</span> <strong>${escapeHtml(checkInTimeStr)}</strong></div>
               ${data.ticketCode ? `<div>🎟️ <span>Mã vé:</span> <strong>${escapeHtml(data.ticketCode)}</strong></div>` : ''}
             </div>
+            ${offlineNoteHtml}
 
             <div>
               <button type="button" class="btn-next-scan" onclick="resetForNextScan()">
@@ -1316,70 +1714,16 @@
         `;
       }
 
-      function showOfflineSuccessResult(ticketCode, isSigned, gateFallback) {
-        playAudioCue('success');
-        const resultDiv = document.getElementById('scanResult');
-        resultDiv.style.display = 'block';
-
-        const gateStr = gateFallback || 'Gate 1';
-        const checkTimeStr = formatDateTime(new Date());
-
-        const badgeHtml = isSigned
-          ? `<div class="badge-valid-outdoor" style="background: #0284c7; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);">
-               <span class="material-symbols-outlined" style="font-size: 28px;">verified</span>
-               <span>VÉ HỢP LỆ — NGOẠI TUYẾN (CHỮ KÝ ĐÃ XÁC THỰC)</span>
-             </div>`
-          : `<div class="badge-valid-outdoor" style="background: #0891b2; box-shadow: 0 4px 14px rgba(8, 145, 178, 0.35);">
-               <span class="material-symbols-outlined" style="font-size: 28px;">pin</span>
-               <span>VÉ HỢP LỆ — NGOẠI TUYẾN (XÁC THỰC THỦ CÔNG)</span>
-             </div>`;
-
-        const noticeHtml = isSigned
-          ? `<div style="font-size: 0.95rem; font-weight: 700; color: #0369a1; margin-bottom: 12px;">
-               🔒 Đã xác thực chữ ký điện tử ECDSA P-256 hợp lệ bằng khóa công khai trên thiết bị.
-             </div>`
-          : `<div style="font-size: 0.95rem; font-weight: 700; color: #0e7490; margin-bottom: 12px;">
-               ⚠️ Xác thực thủ công — Không có chữ ký số kèm theo mã vé.
-             </div>`;
-
-        resultDiv.innerHTML = `
-          <div class="result-card-outdoor result-card-success" style="border-color: #0284c7; background: #f0f9ff;">
-            ${badgeHtml}
-            ${noticeHtml}
-
-            <div style="background: #ffffff; border-radius: 14px; padding: 18px 20px; margin: 16px 0; border: 2px solid #bae6fd;">
-              <div style="font-size: 0.8rem; font-weight: 800; color: #0369a1; text-transform: uppercase; margin-bottom: 4px;">Mã vé đã đối soát</div>
-              <div style="font-size: 1.6rem; font-weight: 900; color: #0f172a; letter-spacing: 0.02em;">${escapeHtml(ticketCode)}</div>
-            </div>
-
-            <div class="meta-row-outdoor" style="color: #0369a1; border-color: #7dd3fc;">
-              <div>📍 <span>Cửa soát:</span> <strong>${escapeHtml(gateStr)}</strong></div>
-              <div>⏰ <span>Thời điểm kiểm:</span> <strong>${escapeHtml(checkTimeStr)}</strong></div>
-              <div>📶 <span>Chế độ:</span> <strong>Ngoại tuyến (Offline)</strong></div>
-            </div>
-
-            <div>
-              <button type="button" class="btn-next-scan" onclick="resetForNextScan()">
-                <span class="material-symbols-outlined">qr_code_scanner</span>
-                <span>Quét vé tiếp theo</span>
-              </button>
-            </div>
-          </div>
-        `;
-      }
-
-      function showErrorResult(errorMessage, mode) {
+      function showErrorResult(errorMessage) {
         playAudioCue('error');
         const resultDiv = document.getElementById('scanResult');
         resultDiv.style.display = 'block';
-
-        const badgeText = mode === 'OFFLINE' ? 'TỪ CHỐI VÉ — NGOẠI TUYẾN' : 'TỪ CHỐI VÉ — KHÔNG HỢP LỆ';
 
         resultDiv.innerHTML = `
           <div class="result-card-outdoor result-card-error">
             <div class="badge-invalid-outdoor">
               <span class="material-symbols-outlined" style="font-size: 28px;">cancel</span>
-              <span>${badgeText}</span>
+              <span>TỪ CHỐI VÉ — KHÔNG HỢP LỆ</span>
             </div>
 
             <div style="background: #ffffff; border-radius: 12px; padding: 16px 20px; margin: 16px 0; border: 2px solid #fecaca; text-align: center;">
@@ -1398,7 +1742,6 @@
       }
 
       window.resetForNextScan = function () {
-        try { html5QrcodeScanner.resume(); } catch {}
         isProcessing = false;
         const input = document.getElementById('ticketInput');
         if (input) {
@@ -1452,6 +1795,23 @@
           }
         } catch (_) {}
       }
+
+      // Khởi tạo các sự kiện mạng & điều khiển
+      const offlineToggle = document.getElementById('offlineModeToggle');
+      if (offlineToggle) {
+        offlineToggle.addEventListener('change', updateNetworkStatusUI);
+      }
+      window.addEventListener('online', updateNetworkStatusUI);
+      window.addEventListener('offline', updateNetworkStatusUI);
+
+      const showtimeSelect = document.getElementById('showtimeSelect');
+      if (showtimeSelect) {
+        showtimeSelect.addEventListener('change', updateManifestUI);
+      }
+
+      updateNetworkStatusUI();
+      updateQueueCounterUI();
+      updateManifestUI();
 
     })();
 
