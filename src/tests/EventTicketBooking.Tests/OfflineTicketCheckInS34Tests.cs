@@ -49,7 +49,7 @@ namespace EventTicketBooking.Tests
 
             var httpContext = new DefaultHttpContext { User = claimsPrincipal };
 
-            return new TicketCheckInController(_context, _qrService)
+            return new TicketCheckInController(_context, Microsoft.Extensions.Logging.Abstractions.NullLogger<TicketCheckInController>.Instance, _qrService)
             {
                 ControllerContext = new ControllerContext
                 {
