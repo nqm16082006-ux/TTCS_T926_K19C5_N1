@@ -15,10 +15,15 @@ public class TicketReadmissionS31Tests
 {
     private static TicketCheckInController Controller(AppDbContext db, Guid staffId, string role = "Staff") => new(db)
     {
-        ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext {
-            User = new ClaimsPrincipal(new ClaimsIdentity(new[] {
+        ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[] {
                 new Claim(ClaimTypes.NameIdentifier, staffId.ToString()), new Claim(ClaimTypes.Role, role)
-            }, "test")) } }
+            }, "test"))
+            }
+        }
     };
 
     private static async Task<(OrderItem Ticket, User Staff)> Seed(AppDbContext db, bool checkedIn)
@@ -29,8 +34,15 @@ public class TicketReadmissionS31Tests
         var category = new SeatCategory { Showtime = show, Name = "VIP", Price = 100 };
         var seat = new Seat { Showtime = show, SeatCategory = category, Row = "A", SeatNumber = 1 };
         var order = new Order { User = staff, Showtime = show, Status = OrderStatus.Paid, ExpiresAt = DateTimeOffset.UtcNow.AddHours(1) };
-        var ticket = new OrderItem { Order = order, Seat = seat, Price = 100, IsCheckedIn = checkedIn,
-            CheckInGate = checkedIn ? "A" : null, CheckInTime = checkedIn ? DateTimeOffset.UtcNow.AddMinutes(-5) : null };
+        var ticket = new OrderItem
+        {
+            Order = order,
+            Seat = seat,
+            Price = 100,
+            IsCheckedIn = checkedIn,
+            CheckInGate = checkedIn ? "A" : null,
+            CheckInTime = checkedIn ? DateTimeOffset.UtcNow.AddMinutes(-5) : null
+        };
         db.Add(ticket);
         await db.SaveChangesAsync();
         return (ticket, staff);
@@ -75,9 +87,15 @@ public class TicketReadmissionS31Tests
         var (ticket, staff) = await Seed(db, checkedIn);
         ticket.Order.Status = status;
         await db.SaveChangesAsync();
-        var result = await Controller(db, staff.Id, role).ScanTicket(new TicketScanRequestDto {
-            TicketId = ticket.Id, SelectedShowtimeId = ticket.Order.ShowtimeId, GateName = "B", AllowReadmission = true,
-            ReadmissionReason = "Confirmed", RequestId = Guid.NewGuid() });
+        var result = await Controller(db, staff.Id, role).ScanTicket(new TicketScanRequestDto
+        {
+            TicketId = ticket.Id,
+            SelectedShowtimeId = ticket.Order.ShowtimeId,
+            GateName = "B",
+            AllowReadmission = true,
+            ReadmissionReason = "Confirmed",
+            RequestId = Guid.NewGuid()
+        });
         Assert.False(result is OkObjectResult);
         Assert.Empty(await db.TicketReadmissions.ToListAsync());
     }
@@ -85,8 +103,10 @@ public class TicketReadmissionS31Tests
     [PostgresS31Fact]
     public async Task PostgreSql_ConcurrentScans_AllowExactlyOne_AndKeepOriginalGate()
     {
-        var builder = new NpgsqlConnectionStringBuilder(Environment.GetEnvironmentVariable("S31_POSTGRES_CONNECTION")) {
-            Database = "s31_test_" + Guid.NewGuid().ToString("N") };
+        var builder = new NpgsqlConnectionStringBuilder(Environment.GetEnvironmentVariable("S31_POSTGRES_CONNECTION"))
+        {
+            Database = "s31_test_" + Guid.NewGuid().ToString("N")
+        };
         var barrier = new SimultaneousScanInterceptor();
         var options = new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(builder.ConnectionString).AddInterceptors(barrier).Options;
         await using var db = new AppDbContext(options);
@@ -97,8 +117,12 @@ public class TicketReadmissionS31Tests
             async Task<IActionResult> Scan(string gate)
             {
                 await using var separate = new AppDbContext(options);
-                return await Controller(separate, staff.Id).ScanTicket(new TicketScanRequestDto {
-                    TicketId = ticket.Id, SelectedShowtimeId = ticket.Order.ShowtimeId, GateName = gate });
+                return await Controller(separate, staff.Id).ScanTicket(new TicketScanRequestDto
+                {
+                    TicketId = ticket.Id,
+                    SelectedShowtimeId = ticket.Order.ShowtimeId,
+                    GateName = gate
+                });
             }
             var results = await Task.WhenAll(Scan("A"), Scan("B"));
             Assert.Single(results.OfType<OkObjectResult>());
@@ -109,8 +133,15 @@ public class TicketReadmissionS31Tests
             Assert.True(ticket.IsCheckedIn);
             Assert.Equal(ticket.CheckInGate, rejectedJson.GetProperty("PreviousGate").GetString());
             Assert.Equal(ticket.CheckInTime, rejectedJson.GetProperty("PreviousCheckInTime").GetDateTimeOffset());
-            var payload = new TicketScanRequestDto { TicketId = ticket.Id, SelectedShowtimeId = ticket.Order.ShowtimeId,
-                GateName = "C", AllowReadmission = true, RequestId = Guid.NewGuid(), ReadmissionReason = "Confirmed owner" };
+            var payload = new TicketScanRequestDto
+            {
+                TicketId = ticket.Id,
+                SelectedShowtimeId = ticket.Order.ShowtimeId,
+                GateName = "C",
+                AllowReadmission = true,
+                RequestId = Guid.NewGuid(),
+                ReadmissionReason = "Confirmed owner"
+            };
             async Task<IActionResult> Readmit()
             {
                 await using var separate = new AppDbContext(options);

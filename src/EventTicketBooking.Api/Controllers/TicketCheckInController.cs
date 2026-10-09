@@ -202,18 +202,29 @@ namespace EventTicketBooking.Api.Controllers
                     return Conflict(new { Message = "Yêu cầu cho vào này đã được ghi nhận.", Reason = "READMISSION_ALREADY_RECORDED" });
                 var admission = new TicketReadmission
                 {
-                    Id = request.RequestId.Value, OrderItemId = ticket.Id, StaffUserId = actorId,
-                    StaffName = staff.FullName ?? staff.Username, Gate = request.GateName,
-                    Reason = request.ReadmissionReason.Trim(), AdmittedAt = DateTimeOffset.UtcNow
+                    Id = request.RequestId.Value,
+                    OrderItemId = ticket.Id,
+                    StaffUserId = actorId,
+                    StaffName = staff.FullName ?? staff.Username,
+                    Gate = request.GateName,
+                    Reason = request.ReadmissionReason.Trim(),
+                    AdmittedAt = DateTimeOffset.UtcNow
                 };
                 _context.TicketReadmissions.Add(admission);
                 try { await _context.SaveChangesAsync(); }
                 catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23505" })
                 { return Conflict(new { Message = "Yêu cầu cho vào này đã được ghi nhận.", Reason = "READMISSION_ALREADY_RECORDED" }); }
-                return Ok(new { Message = "Đã cho vào bổ sung có ghi chú.", Gate = admission.Gate,
-                    CheckInTime = admission.AdmittedAt, StaffName = admission.StaffName,
-                    ReadmissionReason = admission.Reason, SeatInfo = $"{ticket.Seat.Row}{ticket.Seat.SeatNumber}",
-                    CategoryName = ticket.Seat.SeatCategory?.Name ?? "Tiêu chuẩn", IsReadmission = true });
+                return Ok(new
+                {
+                    Message = "Đã cho vào bổ sung có ghi chú.",
+                    Gate = admission.Gate,
+                    CheckInTime = admission.AdmittedAt,
+                    StaffName = admission.StaffName,
+                    ReadmissionReason = admission.Reason,
+                    SeatInfo = $"{ticket.Seat.Row}{ticket.Seat.SeatNumber}",
+                    CategoryName = ticket.Seat.SeatCategory?.Name ?? "Tiêu chuẩn",
+                    IsReadmission = true
+                });
             }
             if (ticket.IsCheckedIn) return AlreadyCheckedIn(ticket);
             // 6. Cập nhật chống Race Condition bằng ExecuteUpdateAsync (Atomic update)
@@ -283,9 +294,14 @@ namespace EventTicketBooking.Api.Controllers
         {
             var zone = TimeZoneInfo.FindSystemTimeZoneById(OperatingSystem.IsWindows() ? "SE Asia Standard Time" : "Asia/Ho_Chi_Minh");
             var time = ticket.CheckInTime.HasValue ? TimeZoneInfo.ConvertTime(ticket.CheckInTime.Value, zone).ToString("HH:mm dd/MM/yyyy") : "không rõ";
-            return BadRequest(new { Message = $"Vé đã được sử dụng lúc {time} tại cửa {ticket.CheckInGate}.",
-                Reason = "ALREADY_CHECKED_IN", OrderItemId = ticket.Id,
-                PreviousCheckInTime = ticket.CheckInTime, PreviousGate = ticket.CheckInGate });
+            return BadRequest(new
+            {
+                Message = $"Vé đã được sử dụng lúc {time} tại cửa {ticket.CheckInGate}.",
+                Reason = "ALREADY_CHECKED_IN",
+                OrderItemId = ticket.Id,
+                PreviousCheckInTime = ticket.CheckInTime,
+                PreviousGate = ticket.CheckInGate
+            });
         }
     }
 
