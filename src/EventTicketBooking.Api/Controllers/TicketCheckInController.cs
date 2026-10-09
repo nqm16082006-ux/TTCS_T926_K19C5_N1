@@ -183,13 +183,50 @@ namespace EventTicketBooking.Api.Controllers
                 });
             }
 
-            // 5. Đã soát chưa? (Kiểm tra đọc lần 1 để báo lỗi rõ ràng)
-            if (ticket.IsCheckedIn)
-            {
-                var localCheckInTime = ticket.CheckInTime?.ToLocalTime().ToString("HH:mm dd/MM/yyyy") ?? "không rõ";
-                return BadRequest(new { Message = $"Vé đã được sử dụng lúc {localCheckInTime} tại cửa {ticket.CheckInGate}." });
-            }
+            if (string.IsNullOrWhiteSpace(request.GateName) || request.GateName.Trim().Length > 100)
+                return BadRequest(new { Message = "Tên cửa phải có từ 1 đến 100 ký tự." });
+            request.GateName = request.GateName.Trim();
 
+            if (request.AllowReadmission)
+            {
+                if (!ticket.IsCheckedIn)
+                    return BadRequest(new { Message = "Vé chưa vào cửa. Vui lòng quét vé bình thường." });
+                if (string.IsNullOrWhiteSpace(request.ReadmissionReason) || request.ReadmissionReason.Trim().Length > 1000 || request.RequestId == null || request.RequestId == Guid.Empty)
+                    return BadRequest(new { Message = "Cần lý do (tối đa 1000 ký tự) và mã yêu cầu cho lần vào bổ sung." });
+                var actor = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                    ?? User.FindFirst("id")?.Value ?? User.FindFirst("sub")?.Value;
+                if (!Guid.TryParse(actor, out var actorId)) return Unauthorized();
+                var staff = await _context.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == actorId && x.IsActive);
+                if (staff == null) return Unauthorized();
+                if (await _context.TicketReadmissions.AnyAsync(x => x.Id == request.RequestId))
+                    return Conflict(new { Message = "Yêu cầu cho vào này đã được ghi nhận.", Reason = "READMISSION_ALREADY_RECORDED" });
+                var admission = new TicketReadmission
+                {
+                    Id = request.RequestId.Value,
+                    OrderItemId = ticket.Id,
+                    StaffUserId = actorId,
+                    StaffName = staff.FullName ?? staff.Username,
+                    Gate = request.GateName,
+                    Reason = request.ReadmissionReason.Trim(),
+                    AdmittedAt = DateTimeOffset.UtcNow
+                };
+                _context.TicketReadmissions.Add(admission);
+                try { await _context.SaveChangesAsync(); }
+                catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23505" })
+                { return Conflict(new { Message = "Yêu cầu cho vào này đã được ghi nhận.", Reason = "READMISSION_ALREADY_RECORDED" }); }
+                return Ok(new
+                {
+                    Message = "Đã cho vào bổ sung có ghi chú.",
+                    Gate = admission.Gate,
+                    CheckInTime = admission.AdmittedAt,
+                    StaffName = admission.StaffName,
+                    ReadmissionReason = admission.Reason,
+                    SeatInfo = $"{ticket.Seat.Row}{ticket.Seat.SeatNumber}",
+                    CategoryName = ticket.Seat.SeatCategory?.Name ?? "Tiêu chuẩn",
+                    IsReadmission = true
+                });
+            }
+            if (ticket.IsCheckedIn) return AlreadyCheckedIn(ticket);
             // 6. Cập nhật chống Race Condition bằng ExecuteUpdateAsync (Atomic update)
             var now = DateTimeOffset.UtcNow;
             int rowsAffected;
@@ -214,7 +251,8 @@ namespace EventTicketBooking.Api.Controllers
             if (rowsAffected == 0)
             {
                 // Có transaction khác vừa cập nhật thành công ngay sau lần đọc trên
-                return BadRequest(new { Message = "Vé vừa được quét tại một thiết bị khác ngay tức thì." });
+                await _context.Entry(ticket).ReloadAsync();
+                return AlreadyCheckedIn(ticket);
             }
 
             // 7. Vé hợp lệ (S-30): Báo vé hợp lệ, hiển thị hạng vé + số ghế, lượt soát và thời điểm
@@ -252,10 +290,26 @@ namespace EventTicketBooking.Api.Controllers
                 TicketCode = resultTicketCode
             });
         }
+        private IActionResult AlreadyCheckedIn(OrderItem ticket)
+        {
+            var zone = TimeZoneInfo.FindSystemTimeZoneById(OperatingSystem.IsWindows() ? "SE Asia Standard Time" : "Asia/Ho_Chi_Minh");
+            var time = ticket.CheckInTime.HasValue ? TimeZoneInfo.ConvertTime(ticket.CheckInTime.Value, zone).ToString("HH:mm dd/MM/yyyy") : "không rõ";
+            return BadRequest(new
+            {
+                Message = $"Vé đã được sử dụng lúc {time} tại cửa {ticket.CheckInGate}.",
+                Reason = "ALREADY_CHECKED_IN",
+                OrderItemId = ticket.Id,
+                PreviousCheckInTime = ticket.CheckInTime,
+                PreviousGate = ticket.CheckInGate
+            });
+        }
     }
 
     public class TicketScanRequestDto
     {
+        public bool AllowReadmission { get; set; }
+        public string? ReadmissionReason { get; set; }
+        public Guid? RequestId { get; set; }
         public Guid? TicketId { get; set; }
         public string? QrPayload { get; set; }
         public string? TicketCode { get; set; }

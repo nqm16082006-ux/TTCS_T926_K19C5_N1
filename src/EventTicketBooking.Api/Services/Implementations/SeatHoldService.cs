@@ -360,7 +360,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             if (pendingExpirations.Any(expiry => expiry > DateTimeOffset.UtcNow))
                 return HoldSeatsResult.ConflictResult("Ghế thuộc đơn hàng đang chờ thanh toán.", new List<Guid> { seatId });
 
-            _context.SeatHold.Remove(hold);
+            hold.Status = "RELEASED";
             await _context.SaveChangesAsync(cancellationToken);
 
             if (_redis != null && _redis.IsConnected)

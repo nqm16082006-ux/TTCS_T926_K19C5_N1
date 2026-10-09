@@ -496,7 +496,7 @@
 
       <div style="margin-bottom: 24px;">
         <label for="ticketInput" style="display: block; font-weight: 600; margin-bottom: 8px;">3. Quét mã vé (QR Code):</label>
-        
+
         <div id="reader" style="width: 100%; max-width: 500px; margin: 0 auto 16px auto; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);"></div>
 
         <div style="display: flex; gap: 10px;">
@@ -588,7 +588,7 @@
 
       function onScanSuccess(decodedText, decodedResult) {
         if (isProcessing) return;
-        
+
         // Gán giá trị vào input và gọi hàm kiểm tra
         document.getElementById('ticketInput').value = decodedText;
         handleScan();
@@ -610,13 +610,13 @@
           });
           if (!res.ok) throw new Error('Không thể tải danh sách suất diễn');
           const data = await res.json();
-          
+
           select.innerHTML = '';
           if (data.length === 0) {
             select.innerHTML = '<option value="">Không có suất diễn nào đang diễn ra hôm nay</option>';
             return;
           }
-          
+
           data.forEach(show => {
             const startTime = new Date(show.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
             const endTime = new Date(show.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -640,7 +640,7 @@
         const resultDiv = document.getElementById('scanResult');
 
         resultDiv.style.display = 'block';
-        
+
         if (!rawInput) {
           showErrorResult('Vui lòng quét mã QR hoặc nhập mã vé.');
           return;
@@ -693,6 +693,10 @@
             document.getElementById('ticketInput').value = ''; // clear cho vé tiếp theo
           } else {
             showErrorResult(data.message || 'Mã vé không hợp lệ hoặc bị từ chối.');
+            if (data.reason === 'ALREADY_CHECKED_IN') {
+              try { html5QrcodeScanner.pause(true); } catch {}
+              offerReadmission(bodyPayload);
+            }
           }
         } catch (error) {
           clearTimeout(pendingTimeout);
@@ -707,6 +711,45 @@
             if (inputEl) inputEl.focus();
           }, 800);
         }
+      }
+
+      function offerReadmission(originalPayload) {
+        const container = document.createElement('div');
+        container.style.cssText = 'padding:16px;background:white;border:2px solid #b45309;border-radius:12px;margin-top:12px';
+        const label = document.createElement('label');
+        label.textContent = 'Chỉ cho vào bổ sung sau khi đã xác nhận khách là chủ vé. Nhập lý do:';
+        const reason = document.createElement('textarea');
+        reason.maxLength = 1000;
+        reason.style.cssText = 'display:block;width:100%;margin:12px 0;color:#111;background:#fff';
+        reason.setAttribute('aria-label', 'Lý do cho vào bổ sung');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = 'Đã xác nhận chủ vé — Cho vào có ghi chú';
+        const error = document.createElement('p');
+        error.setAttribute('role', 'alert');
+        const requestId = crypto.randomUUID();
+        button.addEventListener('click', async () => {
+          if (isProcessing) return;
+          if (!reason.value.trim()) { error.textContent = 'Vui lòng nhập lý do.'; reason.focus(); return; }
+          button.disabled = true;
+          isProcessing = true;
+          try {
+            const response = await fetch('/api/v1/checkin/scan', {
+              method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ ...originalPayload, allowReadmission: true, readmissionReason: reason.value.trim(), requestId })
+            });
+            const data = await response.json();
+            if (!response.ok) { error.textContent = data.message || 'Không thể cho vào bổ sung.'; return; }
+            showSuccessResult(data, originalPayload.gateName);
+            const note = document.createElement('p');
+            note.textContent = `Vào bổ sung — ${data.staffName}: ${data.readmissionReason}`;
+            document.getElementById('scanResult').appendChild(note);
+            document.getElementById('ticketInput').value = '';
+          } catch { error.textContent = 'Lỗi kết nối. Thử lại để kiểm tra cùng mã yêu cầu.'; }
+          finally { isProcessing = false; button.disabled = false; }
+        });
+        container.append(label, reason, button, error);
+        document.getElementById('scanResult').appendChild(container);
       }
 
       function showPendingNotice() {
@@ -797,6 +840,7 @@
       }
 
       window.resetForNextScan = function () {
+        try { html5QrcodeScanner.resume(); } catch {}
         isProcessing = false;
         const input = document.getElementById('ticketInput');
         if (input) {

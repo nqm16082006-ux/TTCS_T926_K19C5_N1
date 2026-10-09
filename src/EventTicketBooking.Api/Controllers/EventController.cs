@@ -1118,6 +1118,122 @@ namespace EventTicketBooking.Api.Controllers
                 );
         }
 
+        /// <summary>
+        /// Báo cáo tỉ lệ bỏ giỏ và thời gian giữ chỗ thực tế (S-63).
+        /// GET /api/events/{eventId}/showtimes/{showtimeId}/hold-stats
+        /// </summary>
+        [HttpGet("{eventId:guid}/showtimes/{showtimeId:guid}/hold-stats")]
+        [RequireRole("Organizer", "Admin")]
+        [ProducesResponseType(typeof(ApiResponse<SeatHoldReportDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetHoldStats(Guid eventId, Guid showtimeId)
+        {
+            var currentUserId = GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return StatusCode(StatusCodes.Status401Unauthorized, ApiResponse<object>.FailureResult("Vui lòng đăng nhập để thực hiện thao tác này."));
+            }
+
+            var ev = await _context.Events
+                .AsNoTracking()
+                .Include(e => e.Showtimes)
+                .FirstOrDefaultAsync(e => e.Id == eventId);
+
+            if (ev == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
+            }
+
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền xem báo cáo của sự kiện này."));
+            }
+
+            var showtime = ev.Showtimes.FirstOrDefault(s => s.Id == showtimeId);
+            if (showtime == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Suất diễn không tồn tại."));
+            }
+
+            var holdStatsQuery = await _context.SeatHold
+                .AsNoTracking()
+                .Where(h => h.Seat.ShowtimeId == showtimeId)
+                .GroupBy(h => h.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            int activeCount = holdStatsQuery.FirstOrDefault(x => x.Status == "ACTIVE")?.Count ?? 0;
+            int convertedCount = holdStatsQuery.FirstOrDefault(x => x.Status == "CONVERTED")?.Count ?? 0;
+            int expiredCount = holdStatsQuery.FirstOrDefault(x => x.Status == "EXPIRED")?.Count ?? 0;
+            int releasedCount = holdStatsQuery.FirstOrDefault(x => x.Status == "RELEASED")?.Count ?? 0;
+
+            int totalHoldCount = activeCount + convertedCount + expiredCount + releasedCount;
+            int unsuccessfulHoldCount = expiredCount + releasedCount;
+            int resolvedHoldCount = convertedCount + expiredCount + releasedCount;
+
+            double conversionRate = resolvedHoldCount > 0 ? Math.Round((double)convertedCount / resolvedHoldCount * 100, 2) : 0;
+
+            var convertedHoldsData = await (from h in _context.SeatHold
+                                            join oi in _context.OrderItems on h.SeatId equals oi.SeatId
+                                            join o in _context.Orders on oi.OrderId equals o.Id
+                                            join pt in _context.PaymentTransactions on o.Id equals pt.OrderId
+                                            where h.Seat.ShowtimeId == showtimeId
+                                                  && h.Status == "CONVERTED"
+                                                  && h.UserId == o.UserId
+                                                  && o.Status == OrderStatus.Paid
+                                                  && pt.Status == "PAID"
+                                                  && pt.UpdatedAt.UtcDateTime >= h.HeldAt
+                                            select new
+                                            {
+                                                HoldId = h.Id,
+                                                HeldAt = h.HeldAt,
+                                                PaidAt = pt.UpdatedAt.UtcDateTime
+                                            }).AsNoTracking().ToListAsync();
+
+            var durations = convertedHoldsData
+                .GroupBy(x => x.HoldId)
+                .Select(g =>
+                {
+                    var earliestPaidAt = g.Min(x => x.PaidAt);
+                    return (earliestPaidAt - g.First().HeldAt).TotalSeconds;
+                })
+                .Where(seconds => seconds >= 0)
+                .OrderBy(s => s)
+                .ToList();
+
+            double? avgDuration = null;
+            double? p90Duration = null;
+
+            if (durations.Count > 0)
+            {
+                avgDuration = Math.Round(durations.Average(), 2);
+
+                int p90Index = (int)Math.Ceiling(0.90 * durations.Count) - 1;
+                p90Index = Math.Max(0, Math.Min(durations.Count - 1, p90Index));
+                p90Duration = Math.Round(durations[p90Index], 2);
+            }
+
+            var report = new SeatHoldReportDto
+            {
+                ShowtimeId = showtimeId,
+                EventTitle = ev.Title,
+                StartTime = showtime.StartTime,
+                TotalHoldCount = totalHoldCount,
+                ConvertedHoldCount = convertedCount,
+                ExpiredHoldCount = expiredCount,
+                ReleasedHoldCount = releasedCount,
+                UnsuccessfulHoldCount = unsuccessfulHoldCount,
+                ConversionRate = conversionRate,
+                AveragePaymentDurationSeconds = avgDuration,
+                P90PaymentDurationSeconds = p90Duration
+            };
+
+            return Ok(ApiResponse<SeatHoldReportDto>.SuccessResult(report, "Lấy báo cáo giữ chỗ thành công."));
+        }
+
         #endregion
     }
 }
