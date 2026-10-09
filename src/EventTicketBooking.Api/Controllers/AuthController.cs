@@ -24,6 +24,7 @@ namespace EventTicketBooking.Api.Controllers
     /// </summary>
     [ApiController]
     [Route("api/auth")]
+    [Route("api/v1/auth")]
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
@@ -87,6 +88,17 @@ namespace EventTicketBooking.Api.Controllers
                 });
             }
 
+            if (result.RequiresTermsAcceptance)
+            {
+                return StatusCode(StatusCodes.Status428PreconditionRequired, new
+                {
+                    statusCode = StatusCodes.Status428PreconditionRequired,
+                    requiresTermsAcceptance = true,
+                    termsVersion = result.RequiredTermsVersion,
+                    message = result.Message
+                });
+            }
+
             return StatusCode(StatusCodes.Status401Unauthorized, new
             {
                 statusCode = StatusCodes.Status401Unauthorized,
@@ -105,6 +117,11 @@ namespace EventTicketBooking.Api.Controllers
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
+            }
+
+            if (!request.AcceptTerms)
+            {
+                return BadRequest(new { message = "Bạn cần đồng ý với Điều khoản dịch vụ để đăng ký." });
             }
 
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
@@ -151,6 +168,8 @@ namespace EventTicketBooking.Api.Controllers
                 existingUser.PasswordHash = hashedPassword;
                 existingUser.VerificationCode = otpCode;
                 existingUser.VerificationCodeExpiresAt = expiresAt;
+                EventTicketBooking.Api.Services.TermsPolicy.AcceptCurrent(existingUser);
+                existingUser.MarketingEmailOptIn = true;
                 existingUser.UpdatedAt = DateTime.UtcNow;
                 targetUser = existingUser;
             }
@@ -177,6 +196,9 @@ namespace EventTicketBooking.Api.Controllers
                     IsActive = false,
                     VerificationCode = otpCode,
                     VerificationCodeExpiresAt = expiresAt,
+                    TermsVersion = EventTicketBooking.Api.Services.TermsPolicy.CurrentVersion,
+                    TermsAcceptedAt = DateTime.UtcNow,
+                    MarketingEmailOptIn = true,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
@@ -192,18 +214,24 @@ namespace EventTicketBooking.Api.Controllers
 
             await _context.SaveChangesAsync();
 
-            // Gửi email chứa mã OTP 6 số qua EmailService
-            _ = Task.Run(async () =>
+            try
             {
-                try
+                await _emailService.SendOtpEmailAsync(
+                    targetUser.Email,
+                    targetUser.FullName ?? targetUser.Username,
+                    otpCode);
+            }
+            catch (EventTicketBooking.Api.Services.EmailDeliveryException ex)
+            {
+                _logger.LogError(ex, "Could not deliver registration OTP to {Email}", targetUser.Email);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new
                 {
-                    await _emailService.SendOtpEmailAsync(targetUser.Email, targetUser.FullName ?? targetUser.Username, otpCode);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Lỗi nền khi gửi OTP cho {Email}", targetUser.Email);
-                }
-            });
+                    success = false,
+                    requiresOtp = false,
+                    email = targetUser.Email,
+                    message = "Không thể gửi mã xác thực qua email lúc này. Tài khoản đã được lưu; vui lòng thử gửi lại mã sau."
+                });
+            }
 
             return Ok(new
             {
@@ -257,6 +285,17 @@ namespace EventTicketBooking.Api.Controllers
             user.VerificationCodeExpiresAt = null;
             user.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+
+            if (!EventTicketBooking.Api.Services.TermsPolicy.IsCurrent(user))
+            {
+                return StatusCode(StatusCodes.Status428PreconditionRequired, new
+                {
+                    statusCode = StatusCodes.Status428PreconditionRequired,
+                    requiresTermsAcceptance = true,
+                    termsVersion = EventTicketBooking.Api.Services.TermsPolicy.CurrentVersion,
+                    message = "Tài khoản đã được kích hoạt. Vui lòng đăng nhập và chấp nhận Điều khoản dịch vụ hiện hành để tiếp tục."
+                });
+            }
 
             // Gửi email xác nhận đăng ký thành công cho người dùng qua Email & Mật khẩu
             _ = Task.Run(async () =>
@@ -339,18 +378,22 @@ namespace EventTicketBooking.Api.Controllers
             user.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            // Gửi email mới
-            _ = Task.Run(async () =>
+            try
             {
-                try
+                await _emailService.SendOtpEmailAsync(
+                    user.Email,
+                    user.FullName ?? user.Username,
+                    newOtp);
+            }
+            catch (EventTicketBooking.Api.Services.EmailDeliveryException ex)
+            {
+                _logger.LogError(ex, "Could not resend OTP to {Email}", user.Email);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new
                 {
-                    await _emailService.SendOtpEmailAsync(user.Email, user.FullName ?? user.Username, newOtp);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Lỗi gửi lại OTP cho {Email}", user.Email);
-                }
-            });
+                    success = false,
+                    message = "Không thể gửi mã xác thực qua email lúc này. Vui lòng thử lại sau."
+                });
+            }
 
             return Ok(new { success = true, message = "Đã gửi lại mã xác thực mới vào email của bạn. Vui lòng kiểm tra hộp thư." });
         }
@@ -365,6 +408,10 @@ namespace EventTicketBooking.Api.Controllers
             if (string.IsNullOrWhiteSpace(request?.Credential))
             {
                 return BadRequest(new { message = "Mã xác thực Google không hợp lệ hoặc bị thiếu." });
+            }
+            if (string.Equals(request.Mode, "register", StringComparison.OrdinalIgnoreCase) && !request.AcceptTerms)
+            {
+                return BadRequest(new { message = "Bạn cần đồng ý với Điều khoản dịch vụ để đăng ký." });
             }
 
             try
@@ -403,6 +450,17 @@ namespace EventTicketBooking.Api.Controllers
 
                 if (user == null)
                 {
+                    if (!request.AcceptTerms && !request.AcceptCurrentTerms)
+                    {
+                        return StatusCode(StatusCodes.Status428PreconditionRequired, new
+                        {
+                            statusCode = StatusCodes.Status428PreconditionRequired,
+                            requiresTermsAcceptance = true,
+                            termsVersion = EventTicketBooking.Api.Services.TermsPolicy.CurrentVersion,
+                            message = $"Bạn cần chấp nhận Điều khoản dịch vụ phiên bản {EventTicketBooking.Api.Services.TermsPolicy.CurrentVersion} trước khi tiếp tục."
+                        });
+                    }
+
                     var customerRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Customer");
                     if (customerRole == null)
                     {
@@ -439,6 +497,9 @@ namespace EventTicketBooking.Api.Controllers
                         IsActive = false, // Bắt buộc phải bấm nút xác nhận trong email gửi về
                         VerificationCode = verificationToken,
                         VerificationCodeExpiresAt = DateTime.UtcNow.AddHours(24),
+                        TermsVersion = EventTicketBooking.Api.Services.TermsPolicy.CurrentVersion,
+                        TermsAcceptedAt = DateTime.UtcNow,
+                        MarketingEmailOptIn = true,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
                     };
@@ -495,6 +556,12 @@ namespace EventTicketBooking.Api.Controllers
                     // Bắt buộc gửi email chứa nút bấm xác nhận và yêu cầu người dùng bấm nút
                     if (!user.IsActive)
                     {
+                        if (request.AcceptTerms)
+                        {
+                            EventTicketBooking.Api.Services.TermsPolicy.AcceptCurrent(user);
+                            user.MarketingEmailOptIn = true;
+                        }
+
                         user.IsActive = false;
                         string verificationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
                         user.VerificationCode = verificationToken;
@@ -538,6 +605,23 @@ namespace EventTicketBooking.Api.Controllers
                         user.FullName = payload.Name;
                         await _context.SaveChangesAsync();
                     }
+                }
+
+                if (!EventTicketBooking.Api.Services.TermsPolicy.IsCurrent(user))
+                {
+                    if (!request.AcceptCurrentTerms && !request.AcceptTerms)
+                    {
+                        return StatusCode(StatusCodes.Status428PreconditionRequired, new
+                        {
+                            statusCode = StatusCodes.Status428PreconditionRequired,
+                            requiresTermsAcceptance = true,
+                            termsVersion = EventTicketBooking.Api.Services.TermsPolicy.CurrentVersion,
+                            message = $"Bạn cần chấp nhận Điều khoản dịch vụ phiên bản {EventTicketBooking.Api.Services.TermsPolicy.CurrentVersion} trước khi đăng nhập."
+                        });
+                    }
+
+                    EventTicketBooking.Api.Services.TermsPolicy.AcceptCurrent(user);
+                    await _context.SaveChangesAsync();
                 }
 
                 // Nếu tài khoản ĐÃ được kích hoạt thành công trước đó (đã bấm nút xác nhận trong mail)
@@ -639,6 +723,17 @@ namespace EventTicketBooking.Api.Controllers
             user.VerificationCodeExpiresAt = null;
             user.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+
+            if (!EventTicketBooking.Api.Services.TermsPolicy.IsCurrent(user))
+            {
+                return StatusCode(StatusCodes.Status428PreconditionRequired, new
+                {
+                    statusCode = StatusCodes.Status428PreconditionRequired,
+                    requiresTermsAcceptance = true,
+                    termsVersion = EventTicketBooking.Api.Services.TermsPolicy.CurrentVersion,
+                    message = "Tài khoản đã được kích hoạt. Vui lòng đăng nhập và chấp nhận Điều khoản dịch vụ hiện hành để tiếp tục."
+                });
+            }
 
             var newAccessToken = _tokenService.GenerateAccessToken(user, roles);
 

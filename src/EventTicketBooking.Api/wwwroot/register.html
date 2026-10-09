@@ -246,7 +246,7 @@
 
                 <!-- Terms Checkbox -->
                 <div class="p-3 rounded-xl bg-surface-container-low flex items-start gap-2.5">
-                  <input class="mt-0.5 w-4 h-4 rounded text-primary focus:ring-primary accent-primary" id="termsConsent" name="termsConsent" required type="checkbox" checked>
+                  <input class="mt-0.5 w-4 h-4 rounded text-primary focus:ring-primary accent-primary" id="termsConsent" name="termsConsent" required type="checkbox">
                   <label class="text-[11px] text-on-surface-variant leading-snug cursor-pointer select-none" for="termsConsent">
                     Tôi đồng ý với <a class="text-primary font-bold hover:underline" href="#">Điều khoản dịch vụ</a> và chính sách gửi mã xác thực của EventPulse.
                   </label>
@@ -579,6 +579,10 @@
         showAlert('Không nhận được thông tin xác thực từ Google.');
         return;
       }
+      if (!document.getElementById('termsConsent').checked) {
+        showAlert('Bạn cần đồng ý với Điều khoản dịch vụ để đăng ký.');
+        return;
+      }
 
       pendingGoogleCredential = response.credential;
       const payload = parseJwt(response.credential);
@@ -622,7 +626,7 @@
         const res = await fetch('/api/auth/google', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ credential: pendingGoogleCredential, mode: 'register' })
+          body: JSON.stringify({ credential: pendingGoogleCredential, mode: 'register', acceptTerms: true })
         });
 
         const data = await res.json().catch(() => ({}));
@@ -701,8 +705,14 @@
       const email = document.getElementById('email').value.trim();
       const pwd = document.getElementById('password').value;
       const confirmPwd = document.getElementById('confirmPassword').value;
+      const acceptTerms = document.getElementById('termsConsent').checked;
 
       hideAlert();
+
+      if (!acceptTerms) {
+        showAlert('Bạn cần đồng ý với Điều khoản dịch vụ để đăng ký.');
+        return;
+      }
 
       if (pwd !== confirmPwd) {
         showAlert('Mật khẩu và xác nhận mật khẩu chưa trùng khớp.');
@@ -720,7 +730,7 @@
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fullName, email, password: pwd })
+          body: JSON.stringify({ fullName, email, password: pwd, acceptTerms })
         });
 
         const data = await res.json().catch(() => ({}));

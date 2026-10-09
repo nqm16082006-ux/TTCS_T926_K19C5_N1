@@ -560,6 +560,16 @@ namespace EventTicketBooking.Api.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<DateTime?>("TermsAcceptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TermsVersion")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("MarketingEmailOptIn")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("VerificationCode")
                         .HasColumnType("text");
 

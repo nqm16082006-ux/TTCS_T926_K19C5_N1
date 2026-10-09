@@ -19,8 +19,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Đảm bảo Configuration đọc các biến môi trường
 builder.Configuration.AddEnvironmentVariables();
-if (int.TryParse(builder.Configuration["PORT"], out var listenPort) && listenPort is > 0 and <= 65535)
-    builder.WebHost.UseUrls($"http://0.0.0.0:{listenPort}");
+var listenPort = int.TryParse(builder.Configuration["PORT"], out var configuredPort) &&
+                 configuredPort is > 0 and <= 65535
+    ? configuredPort
+    : 5012;
+builder.WebHost.UseUrls($"http://0.0.0.0:{listenPort}");
 
 var publicUrl = builder.Configuration["App:PublicBaseUrl"] ?? builder.Configuration["RENDER_EXTERNAL_URL"];
 if (!string.IsNullOrWhiteSpace(publicUrl))

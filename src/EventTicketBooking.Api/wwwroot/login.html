@@ -300,13 +300,22 @@
       document.getElementById('successMessage').textContent = 'Vui lòng chờ trong giây lát...';
 
       try {
-        const res = await fetch('/api/auth/google', {
+        let res = await fetch('/api/auth/google', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ credential: response.credential, mode: 'login' })
         });
 
-        const data = await res.json().catch(() => ({}));
+        let data = await res.json().catch(() => ({}));
+        if (res.status === 428 && data.requiresTermsAcceptance &&
+            window.confirm(`Bạn cần chấp nhận Điều khoản dịch vụ phiên bản ${data.termsVersion} để tiếp tục. Bạn có đồng ý không?`)) {
+          res = await fetch('/api/auth/google', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ credential: response.credential, mode: 'login', acceptCurrentTerms: true })
+          });
+          data = await res.json().catch(() => ({}));
+        }
 
         if (res.ok && data.requiresEmailConfirmation) {
           successAlert.classList.add('hidden');
@@ -423,7 +432,7 @@
       btnIcon.classList.add('animate-spin');
 
       try {
-        const response = await fetch('/api/auth/login', {
+        let response = await fetch('/api/auth/login', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -434,7 +443,17 @@
           })
         });
 
-        const data = await response.json().catch(() => ({}));
+        let data = await response.json().catch(() => ({}));
+
+        if (response.status === 428 && data.requiresTermsAcceptance &&
+            window.confirm(`Bạn cần chấp nhận Điều khoản dịch vụ phiên bản ${data.termsVersion} để tiếp tục. Bạn có đồng ý không?`)) {
+          response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: emailVal, password: passwordVal, acceptCurrentTerms: true })
+          });
+          data = await response.json().catch(() => ({}));
+        }
 
         if (response.ok && data.accessToken) {
           // Lưu token và thông tin user

@@ -1,43 +1,34 @@
 using System;
 using System.Threading.Tasks;
+using EventTicketBooking.Api.Services;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
 using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace EventTicketBooking.Api.Services.Implementations;
 
 /// <summary>
 /// Triển khai dịch vụ gửi email sử dụng MailKit qua SMTP.
-/// Cấu hình SMTP lấy từ appsettings.json (mục "EmailSettings").
+/// SMTP settings are read from SmtpSettings, with EmailSettings retained for compatibility.
 /// </summary>
 public class EmailService : IEmailService
 {
     private readonly IConfiguration _configuration;
     private readonly ILogger<EmailService> _logger;
-    private readonly IWebHostEnvironment _env;
 
-    public EmailService(IConfiguration configuration, ILogger<EmailService> logger, IWebHostEnvironment env)
+    public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
     {
         _configuration = configuration;
         _logger = logger;
-        _env = env;
     }
 
     /// <inheritdoc/>
     public async Task SendConfirmationEmailAsync(string toEmail, string toName, string confirmationLink)
     {
-        var settings = _configuration.GetSection("EmailSettings");
-
-        var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(
-            settings["SenderName"] ?? "EventPulse Ticketing",
-            settings["SenderEmail"] ?? "noreply@eventticket.com"
-        ));
-        message.To.Add(new MailboxAddress(toName, toEmail));
+        var message = CreateMessage(toEmail, toName);
         message.Subject = "✅ Xác nhận địa chỉ email của bạn - EventPulse";
 
         message.Body = new TextPart("html")
@@ -45,41 +36,39 @@ public class EmailService : IEmailService
             Text = BuildEmailBody(System.Net.WebUtility.HtmlEncode(toName), System.Net.WebUtility.HtmlEncode(confirmationLink))
         };
 
-        await SendEmailInternalAsync(message, toEmail, $"Link: {confirmationLink}");
+        await SendEmailInternalAsync(message, toEmail);
     }
 
     /// <inheritdoc/>
     public async Task SendOtpEmailAsync(string toEmail, string toName, string otpCode)
     {
-        var settings = _configuration.GetSection("EmailSettings");
-
-        var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(
-            settings["SenderName"] ?? "EventPulse Ticketing",
-            settings["SenderEmail"] ?? "noreply@eventticket.com"
-        ));
-        message.To.Add(new MailboxAddress(toName, toEmail));
-        message.Subject = $"Mã xác nhận EventPulse của bạn: {otpCode}";
-
-        message.Body = new TextPart("html")
+        try
         {
-            Text = BuildOtpEmailBody(System.Net.WebUtility.HtmlEncode(toName), otpCode)
-        };
+            var message = CreateMessage(toEmail, toName);
+            message.Subject = $"Mã xác nhận EventPulse của bạn: {otpCode}";
 
-        await SendEmailInternalAsync(message, toEmail, $"Mã OTP: {otpCode}");
+            message.Body = new TextPart("html")
+            {
+                Text = BuildOtpEmailBody(System.Net.WebUtility.HtmlEncode(toName), otpCode)
+            };
+
+            await SendEmailInternalAsync(message, toEmail);
+        }
+        catch (EmailDeliveryException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to prepare or send registration OTP to {Email}", toEmail);
+            throw new EmailDeliveryException("Failed to send the registration OTP email.", ex);
+        }
     }
 
     /// <inheritdoc/>
     public async Task SendWelcomeEmailAsync(string toEmail, string toName, string registrationMethod)
     {
-        var settings = _configuration.GetSection("EmailSettings");
-
-        var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(
-            settings["SenderName"] ?? "EventPulse Ticketing",
-            settings["SenderEmail"] ?? "noreply@eventticket.com"
-        ));
-        message.To.Add(new MailboxAddress(toName, toEmail));
+        var message = CreateMessage(toEmail, toName);
         message.Subject = "🎉 Đăng ký thành công - Chào mừng bạn đến với EventPulse!";
 
         message.Body = new TextPart("html")
@@ -87,20 +76,13 @@ public class EmailService : IEmailService
             Text = BuildWelcomeEmailBody(System.Net.WebUtility.HtmlEncode(toName), System.Net.WebUtility.HtmlEncode(toEmail), System.Net.WebUtility.HtmlEncode(registrationMethod))
         };
 
-        await SendEmailInternalAsync(message, toEmail, $"Chào mừng thành viên mới ({registrationMethod})");
+        await SendEmailInternalAsync(message, toEmail);
     }
 
     /// <inheritdoc/>
     public async Task SendTicketEmailAsync(string toEmail, string toName, string eventTitle, string location, string showtime, System.Collections.Generic.IEnumerable<string> seatNames, byte[] qrCodeBytes)
     {
-        var settings = _configuration.GetSection("EmailSettings");
-
-        var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(
-            settings["SenderName"] ?? "EventPulse Ticketing",
-            settings["SenderEmail"] ?? "noreply@eventticket.com"
-        ));
-        message.To.Add(new MailboxAddress(toName, toEmail));
+        var message = CreateMessage(toEmail, toName);
         message.Subject = $"🎫 Vé điện tử của bạn: {eventTitle}";
 
         var builder = new BodyBuilder();
@@ -121,47 +103,80 @@ public class EmailService : IEmailService
 
         message.Body = builder.ToMessageBody();
 
-        await SendEmailInternalAsync(message, toEmail, $"Vé sự kiện: {eventTitle}");
+        await SendEmailInternalAsync(message, toEmail);
     }
 
-    private async Task SendEmailInternalAsync(MimeMessage message, string toEmail, string logDetail)
+    private MimeMessage CreateMessage(string toEmail, string toName)
     {
-        var settings = _configuration.GetSection("EmailSettings");
-        var user = settings["SmtpUser"] ?? "";
-        var pass = settings["SmtpPass"] ?? "";
-
-        // Nếu chưa cấu hình mật khẩu SMTP thì ghi log mô phỏng (cho môi trường test)
-        if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(pass))
+        var senderEmail = GetSetting("SenderEmail", "FromEmail", "Username", "User", "SmtpUser");
+        if (string.IsNullOrWhiteSpace(senderEmail))
         {
-            if (_env.IsDevelopment())
+            throw new InvalidOperationException("SMTP sender email must be configured.");
+        }
+
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(
+            GetSetting("SenderName", "FromName") ?? "EventPulse Ticketing",
+            senderEmail));
+        message.To.Add(new MailboxAddress(toName, toEmail));
+        return message;
+    }
+
+    private string? GetSetting(params string[] keys)
+    {
+        foreach (var section in new[] { "SmtpSettings", "EmailSettings" })
+        {
+            foreach (var key in keys)
             {
-                _logger.LogInformation("[SIMULATED] Email tới {Email}", toEmail);
-                return;
+                var value = _configuration[$"{section}:{key}"];
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
             }
-            throw new InvalidOperationException("SMTP credentials must be configured.");
+        }
+
+        return null;
+    }
+
+    private async Task SendEmailInternalAsync(MimeMessage message, string toEmail)
+    {
+        var user = GetSetting("Username", "User", "SmtpUser");
+        var pass = GetSetting("Password", "SmtpPass");
+        var host = GetSetting("Server", "Host", "SmtpHost") ?? "smtp.gmail.com";
+        var senderEmail = GetSetting("SenderEmail", "FromEmail") ?? user;
+
+        if (string.IsNullOrWhiteSpace(user) ||
+            string.IsNullOrWhiteSpace(pass) ||
+            string.IsNullOrWhiteSpace(senderEmail))
+        {
+            throw new InvalidOperationException(
+                "SMTP user and password must be configured.");
         }
 
         try
         {
-            var host = settings["SmtpHost"] ?? "smtp.gmail.com";
-            var port = int.Parse(settings["SmtpPort"] ?? "587");
+            var configuredPort = GetSetting("Port", "SmtpPort") ?? "587";
+            if (!int.TryParse(configuredPort, out var port) || port is < 1 or > 65535)
+            {
+                throw new InvalidOperationException("SMTP port must be a valid TCP port.");
+            }
 
             using var client = new SmtpClient();
-            client.CheckCertificateRevocation = false;
-            client.ServerCertificateValidationCallback = (s, c, h, e) => true;
-
-            await client.ConnectAsync(host, port, SecureSocketOptions.StartTls);
+            var socketOptions = port == 465
+                ? SecureSocketOptions.SslOnConnect
+                : SecureSocketOptions.StartTls;
+            await client.ConnectAsync(host, port, socketOptions);
             await client.AuthenticateAsync(user, pass);
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
 
-            _logger.LogInformation("📧 Đã gửi email thành công đến {Email}", toEmail);
+            _logger.LogInformation("Email sent successfully to {Email}", toEmail);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ Lỗi khi gửi email qua SMTP đến {Email}: {Message}", toEmail, ex.Message);
-            // Vẫn log chi tiết để nhà phát triển có thể kiểm tra nếu SMTP gặp sự cố mạng
-            throw;
+            _logger.LogError(ex, "Failed to send email through SMTP to {Email}", toEmail);
+            throw new EmailDeliveryException("Failed to send email through SMTP.", ex);
         }
     }
 
