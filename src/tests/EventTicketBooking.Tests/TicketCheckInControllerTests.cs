@@ -11,6 +11,9 @@ using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Xunit;
 
 namespace EventTicketBooking.Tests
@@ -20,6 +23,7 @@ namespace EventTicketBooking.Tests
         private readonly AppDbContext _context;
         private TicketCheckInController _controller;
         private readonly Guid _userId = Guid.NewGuid();
+        private readonly Mock<ILogger<TicketCheckInController>> _mockLogger;
 
         public TicketCheckInControllerTests()
         {
@@ -28,6 +32,7 @@ namespace EventTicketBooking.Tests
                 .Options;
 
             _context = new AppDbContext(options);
+            _mockLogger = new Mock<ILogger<TicketCheckInController>>();
 
             // Default controller context as Staff
             _controller = CreateControllerWithRole("Staff");
@@ -45,7 +50,7 @@ namespace EventTicketBooking.Tests
 
             var httpContext = new DefaultHttpContext { User = claimsPrincipal };
 
-            return new TicketCheckInController(_context, qrSignatureService)
+            return new TicketCheckInController(_context, _mockLogger.Object, qrSignatureService)
             {
                 ControllerContext = new ControllerContext
                 {
@@ -154,7 +159,7 @@ namespace EventTicketBooking.Tests
         }
 
         [Fact]
-        public async Task ScanTicket_ReturnsNotFound_WhenTicketDoesNotExist()
+        public async Task ScanTicket_ReturnsBadRequest_WhenTicketDoesNotExist()
         {
             // Arrange
             var request = new TicketScanRequestDto { TicketId = Guid.NewGuid(), SelectedShowtimeId = Guid.NewGuid(), GateName = "Gate A" };
@@ -163,17 +168,28 @@ namespace EventTicketBooking.Tests
             var result = await _controller.ScanTicket(request);
 
             // Assert
-            Assert.IsType<NotFoundObjectResult>(result);
+            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+            var reasonProp = badRequestResult.Value?.GetType().GetProperty("Reason")?.GetValue(badRequestResult.Value)?.ToString();
+            Assert.Equal("UNKNOWN_TICKET", reasonProp);
+
+            // Verify log masking
+            _mockLogger.Verify(x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("UNKNOWN_TICKET") && !v.ToString()!.Contains(request.TicketId.ToString()!)),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Once);
         }
 
         [Fact]
-        public async Task ScanTicket_ReturnsBadRequest_WhenOrderIsNotPaid()
+        public async Task ScanTicket_ReturnsBadRequest_WhenOrderIsCancelled()
         {
             // Arrange
             var orderId = Guid.NewGuid();
             var showtimeId = Guid.NewGuid();
             var seatId = Guid.NewGuid();
-            var order = new Order { Id = orderId, ShowtimeId = showtimeId, Status = OrderStatus.Pending }; // CHƯA THANH TOÁN
+            var cancelDate = DateTimeOffset.UtcNow;
+            var order = new Order { Id = orderId, ShowtimeId = showtimeId, Status = OrderStatus.Cancelled, UpdatedAt = cancelDate };
             var seat = new Seat { Id = seatId, ShowtimeId = showtimeId, Row = "A", SeatNumber = 1, SeatCategoryId = Guid.NewGuid() };
             var ticket = new OrderItem { Id = Guid.NewGuid(), OrderId = orderId, Order = order, SeatId = seatId, Seat = seat, Price = 100 };
 
@@ -189,8 +205,10 @@ namespace EventTicketBooking.Tests
 
             // Assert
             var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+            var reasonProp = badRequestResult.Value?.GetType().GetProperty("Reason")?.GetValue(badRequestResult.Value)?.ToString();
             var message = badRequestResult.Value?.GetType().GetProperty("Message")?.GetValue(badRequestResult.Value)?.ToString();
-            Assert.Contains("chưa thanh toán thành công", message);
+            Assert.Equal("TICKET_CANCELLED", reasonProp);
+            Assert.Contains($"Vé đã huỷ ngày {cancelDate.ToString("dd/MM/yyyy")}", message);
         }
 
         [Fact]
@@ -219,7 +237,9 @@ namespace EventTicketBooking.Tests
             // Assert
             var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
             var message = badRequestResult.Value?.GetType().GetProperty("Message")?.GetValue(badRequestResult.Value)?.ToString();
-            Assert.Contains("KHÔNG thuộc về suất diễn đang được chọn", message);
+            var reasonProp = badRequestResult.Value?.GetType().GetProperty("Reason")?.GetValue(badRequestResult.Value)?.ToString();
+            Assert.Equal("WRONG_SHOWTIME", reasonProp);
+            Assert.Contains("Vé thuộc suất diễn khác", message);
         }
 
         [Fact]
@@ -455,7 +475,7 @@ namespace EventTicketBooking.Tests
             var messageProp = badRequestResult.Value?.GetType().GetProperty("Message")?.GetValue(badRequestResult.Value)?.ToString();
 
             Assert.Equal("WRONG_SHOWTIME", reasonProp);
-            Assert.Contains("KHÔNG thuộc về suất diễn đang được chọn", messageProp);
+            Assert.Contains("Vé thuộc suất diễn khác", messageProp);
         }
 
         [Fact]

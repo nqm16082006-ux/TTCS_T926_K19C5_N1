@@ -11,6 +11,7 @@ using EventTicketBooking.Api.Middlewares;
 using EventTicketBooking.Api.Services.Interfaces;
 using EventTicketBooking.Api.Services.Implementations;
 using EventTicketBooking.Api.DTOs;
+using Microsoft.Extensions.Logging;
 
 namespace EventTicketBooking.Api.Controllers
 {
@@ -21,10 +22,12 @@ namespace EventTicketBooking.Api.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IQrSignatureService _qrSignatureService;
+        private readonly ILogger<TicketCheckInController> _logger;
 
-        public TicketCheckInController(AppDbContext context, IQrSignatureService? qrSignatureService = null)
+        public TicketCheckInController(AppDbContext context, ILogger<TicketCheckInController> logger, IQrSignatureService? qrSignatureService = null)
         {
             _context = context;
+            _logger = logger;
             _qrSignatureService = qrSignatureService ?? new QrSignatureService();
         }
 
@@ -160,9 +163,17 @@ namespace EventTicketBooking.Api.Controllers
                 // Kiểm tra vé thuộc đúng suất diễn đang được chọn theo S-29 & S-30
                 if (qrShowtimeId.HasValue && qrShowtimeId.Value != request.SelectedShowtimeId)
                 {
+                    var showtimeInfo = await _context.Showtimes.Include(s => s.Event).FirstOrDefaultAsync(s => s.Id == qrShowtimeId.Value);
+                    var message = showtimeInfo != null
+                        ? $"Vé thuộc suất diễn {showtimeInfo.Event.Title} lúc {showtimeInfo.StartTime:HH:mm dd/MM/yyyy}"
+                        : "Vé thuộc suất diễn khác";
+
+                    _logger.LogWarning("Từ chối check-in: {ReasonCode}. Mã QR: {TicketCode}, Cổng: {GateName}, Suất diễn chọn: {SelectedShowtimeId}, Suất diễn thực tế: {TicketShowtimeId}",
+                        "WRONG_SHOWTIME", MaskIdentifier(verifiedTicketCode ?? request.QrPayload), request.GateName, request.SelectedShowtimeId, qrShowtimeId);
+
                     return BadRequest(new
                     {
-                        Message = "Cảnh báo: Vé này KHÔNG thuộc về suất diễn đang được chọn tại cổng!",
+                        Message = message,
                         Reason = "WRONG_SHOWTIME",
                         TicketShowtimeId = qrShowtimeId,
                         SelectedShowtimeId = request.SelectedShowtimeId
@@ -219,21 +230,45 @@ namespace EventTicketBooking.Api.Controllers
 
             if (ticket == null)
             {
-                return NotFound(new { Message = "Mã vé không tồn tại hoặc không hợp lệ." });
+                _logger.LogWarning("Từ chối check-in: {ReasonCode}. Mã tìm kiếm: {CodeSearch}, Cổng: {GateName}, Suất diễn chọn: {SelectedShowtimeId}",
+                    "UNKNOWN_TICKET", MaskIdentifier(codeToSearch ?? request.TicketId?.ToString()), request.GateName, request.SelectedShowtimeId);
+
+                return BadRequest(new { Message = "Không phải vé của hệ thống", Reason = "UNKNOWN_TICKET" });
             }
 
             // 3. Vé đã thanh toán chưa? (Dựa theo OrderStatus.Paid)
             if (ticket.Order.Status != OrderStatus.Paid)
             {
+                if (ticket.Order.Status == OrderStatus.Cancelled)
+                {
+                    var cancelDate = ticket.Order.UpdatedAt.ToString("dd/MM/yyyy");
+                    _logger.LogWarning("Từ chối check-in: {ReasonCode}. Mã vé: {TicketCode}, Cổng: {GateName}, Suất diễn chọn: {SelectedShowtimeId}, Trạng thái đơn: {OrderStatus}",
+                        "TICKET_CANCELLED", MaskIdentifier(codeToSearch ?? request.TicketId?.ToString()), request.GateName, request.SelectedShowtimeId, ticket.Order.Status);
+
+                    return BadRequest(new
+                    {
+                        Message = $"Vé đã huỷ ngày {cancelDate}",
+                        Reason = "TICKET_CANCELLED"
+                    });
+                }
+
                 return BadRequest(new { Message = $"Cảnh báo: Vé này thuộc đơn hàng đang ở trạng thái {ticket.Order.Status}, chưa thanh toán thành công!" });
             }
 
             // 4. Đúng suất không? (Kiểm tra Order.ShowtimeId)
             if (ticket.Order.ShowtimeId != request.SelectedShowtimeId)
             {
+                var showtimeInfo = await _context.Showtimes.Include(s => s.Event).FirstOrDefaultAsync(s => s.Id == ticket.Order.ShowtimeId);
+                var message = showtimeInfo != null
+                    ? $"Vé thuộc suất diễn {showtimeInfo.Event.Title} lúc {showtimeInfo.StartTime:HH:mm dd/MM/yyyy}"
+                    : "Vé thuộc suất diễn khác";
+
+                _logger.LogWarning("Từ chối check-in: {ReasonCode}. Mã vé: {TicketCode}, Cổng: {GateName}, Suất diễn chọn: {SelectedShowtimeId}, Suất diễn thực tế: {TicketShowtimeId}",
+                    "WRONG_SHOWTIME", MaskIdentifier(codeToSearch ?? request.TicketId?.ToString()), request.GateName, request.SelectedShowtimeId, ticket.Order.ShowtimeId);
+
                 return BadRequest(new
                 {
-                    Message = "Cảnh báo: Vé này KHÔNG thuộc về suất diễn đang được chọn tại cổng!",
+                    Message = message,
                     Reason = "WRONG_SHOWTIME",
                     TicketShowtimeId = ticket.Order.ShowtimeId,
                     SelectedShowtimeId = request.SelectedShowtimeId
@@ -359,6 +394,13 @@ namespace EventTicketBooking.Api.Controllers
                 PreviousCheckInTime = ticket.CheckInTime,
                 PreviousGate = ticket.CheckInGate
             });
+        }
+
+        private string MaskIdentifier(string? identifier)
+        {
+            if (string.IsNullOrWhiteSpace(identifier)) return "UNKNOWN";
+            if (identifier.Length <= 8) return new string('*', identifier.Length);
+            return identifier.Substring(0, 4) + "****" + identifier.Substring(identifier.Length - 4);
         }
     }
 
