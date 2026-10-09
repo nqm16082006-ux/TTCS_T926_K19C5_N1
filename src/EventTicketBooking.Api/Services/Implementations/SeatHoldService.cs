@@ -7,6 +7,8 @@ using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Services.Interfaces;
+using EventTicketBooking.Api.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -24,16 +26,19 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly AppDbContext _context;
         private readonly IConnectionMultiplexer? _redis;
         private readonly ILogger<SeatHoldService> _logger;
+        private readonly IHubContext<SeatStatusHub>? _hubContext;
 
         public const int DefaultHoldTtlSeconds = 600; // 10 phút
 
         public SeatHoldService(
             AppDbContext context,
             ILogger<SeatHoldService> logger,
+            IHubContext<SeatStatusHub>? hubContext = null,
             IConnectionMultiplexer? redis = null)
         {
             _context = context;
             _logger = logger;
+            _hubContext = hubContext;
             _redis = redis;
         }
 
@@ -304,6 +309,15 @@ namespace EventTicketBooking.Api.Services.Implementations
                 ActiveHoldCount = alreadyHeldSeatIdsByThisUser.Count + newlyRequestedCount
             };
 
+            if (_hubContext != null && _hubContext.Clients != null)
+            {
+                var groupClient = _hubContext.Clients.Group(showtimeId.ToString());
+                if (groupClient != null)
+                {
+                    await groupClient.SendAsync("SeatHeld", new { ShowtimeId = showtimeId, SeatIds = seatIds, ExpiresAt = expiresAt });
+                }
+            }
+
             return HoldSeatsResult.SuccessResult(responseData, "Giữ chỗ ghế thành công.");
         }
 
@@ -353,6 +367,15 @@ namespace EventTicketBooking.Api.Services.Implementations
             {
                 var redisKey = (RedisKey)$"seat_hold:{showtime.EventId}:{seatId}";
                 await ReleaseRedisHoldConditionalAsync(new[] { redisKey }, userId);
+            }
+
+            if (_hubContext != null && _hubContext.Clients != null)
+            {
+                var groupClient = _hubContext.Clients.Group(showtimeId.ToString());
+                if (groupClient != null)
+                {
+                    await groupClient.SendAsync("SeatReleased", new { ShowtimeId = showtimeId, SeatIds = new List<Guid> { seatId } });
+                }
             }
 
             return HoldSeatsResult.SuccessResult(null!, "Huỷ giữ ghế thành công.");

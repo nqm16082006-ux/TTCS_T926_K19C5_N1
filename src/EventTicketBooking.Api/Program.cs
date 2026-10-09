@@ -176,6 +176,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -241,5 +242,6 @@ if (!string.IsNullOrWhiteSpace(uploadsPath))
 app.UseAuthorization();
 app.UseMiddleware<EventTicketBooking.Api.Middlewares.RoleAuthorizationMiddleware>();
 app.MapControllers();
+app.MapHub<EventTicketBooking.Api.Hubs.SeatStatusHub>("/hubs/seat-status");
 
 app.Run();

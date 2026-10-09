@@ -1,4 +1,5 @@
 using System;
+using Microsoft.AspNetCore.SignalR;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,19 +24,25 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly ILogger<PaymentService> _logger;
         private readonly EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue _ticketEmailQueue;
         private readonly ITicketService _ticketService;
+        private readonly StackExchange.Redis.IConnectionMultiplexer? _redis;
+        private readonly Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>? _hubContext;
 
         public PaymentService(
             AppDbContext context,
             IPaymentGateway paymentGateway,
             ILogger<PaymentService> logger,
             EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue ticketEmailQueue,
-            ITicketService? ticketService = null)
+            ITicketService? ticketService = null,
+            StackExchange.Redis.IConnectionMultiplexer? redis = null,
+            Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>? hubContext = null)
         {
             _context = context;
             _paymentGateway = paymentGateway;
             _logger = logger;
             _ticketEmailQueue = ticketEmailQueue;
             _ticketService = ticketService ?? new TicketService();
+            _redis = redis;
+            _hubContext = hubContext;
         }
 
         public async Task<PaymentCreationResult> CreatePaymentForOrderAsync(Guid orderId, Guid userId, CancellationToken cancellationToken = default)
@@ -343,7 +350,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                     );
                 }
 
-                // 4.2. Xử lý trường hợp thanh toán bị hủy từ cổng (Cancelled)
+                // 4.2. Xử lý trường hợp thanh toán bị hủy (Cancelled) - hủy order và nhả ghế
                 if (result.Status == PaymentStatus.Cancelled)
                 {
                     order.Status = OrderStatus.Cancelled;
@@ -357,18 +364,69 @@ namespace EventTicketBooking.Api.Services.Implementations
                         cancelledTx.UpdatedAt = DateTimeOffset.UtcNow;
                     }
 
+                    // Release seats immediately
+                    var releaseSeatIds = order.OrderItems.Select(oi => oi.SeatId).Distinct().ToList();
+
+                    var holdsToCancel = await _context.SeatHold
+                        .Where(h => releaseSeatIds.Contains(h.SeatId) && h.UserId == order.UserId && h.Status == "ACTIVE")
+                        .ToListAsync(cancellationToken);
+                    foreach (var hold in holdsToCancel) hold.Status = "CANCELLED";
+
+                    var seatsToRelease = await _context.Seats
+                        .Where(s => releaseSeatIds.Contains(s.Id) && s.Status == "HELD")
+                        .ToListAsync(cancellationToken);
+                    foreach (var s in seatsToRelease) s.Status = "AVAILABLE";
+
                     await _context.SaveChangesAsync(cancellationToken);
+
+                    // Clear redis if available
+                    if (_redis != null)
+                    {
+                        var redisDb = _redis.GetDatabase();
+                        var redisKeys = releaseSeatIds.Select(sid => (StackExchange.Redis.RedisKey)$"seat_hold:{sid}").ToArray();
+                        if (redisKeys.Length > 0)
+                        {
+                            await redisDb.KeyDeleteAsync(redisKeys);
+                        }
+                    }
+
                     if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
-                    _logger.LogInformation("Đơn hàng {OrderId} thanh toán bị hủy (Status: {Status}).", order.Id, result.Status);
-                    return PaymentExecutionResult.CreateFailure($"Thanh toán không thành công ({result.Status}).", order.Id, result.OrderCode, order.Status.ToString());
+
+                    // SignalR broadcast
+                    if (_hubContext != null && _hubContext.Clients != null)
+                    {
+                        var grouped = seatsToRelease.GroupBy(s => s.ShowtimeId);
+                        foreach (var g in grouped)
+                        {
+                            var client = _hubContext.Clients.Group(g.Key.ToString());
+                            if (client != null)
+                            {
+                                await client.SendAsync("SeatReleased", new { ShowtimeId = g.Key, SeatIds = g.Select(x => x.Id).ToList() }, cancellationToken);
+                            }
+                        }
+                    }
+
+                    _logger.LogInformation("Đơn hàng {OrderId} bị hủy (Cancelled). Đã nhả ghế.", order.Id);
+                    return PaymentExecutionResult.CreateFailure("Thanh toán đã bị hủy.", order.Id, result.OrderCode, order.Status.ToString());
                 }
 
-                // 4.3. Xử lý trường hợp thanh toán thất bại từ cổng (Failed)
+                // 4.3. Xử lý trường hợp thanh toán thất bại (Failed) - giữ nguyên Pending để user thử lại
                 if (result.Status == PaymentStatus.Failed)
                 {
-                    _logger.LogInformation("Đơn hàng {OrderId} thanh toán thất bại (Status: {Status}). Giữ nguyên trạng thái đơn hàng.", order.Id, result.Status);
+                    // Giữ order ở Pending để user có thể thử lại thanh toán
+                    var failedTx = await _context.PaymentTransactions
+                        .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
+                    if (failedTx != null)
+                    {
+                        failedTx.Status = "PENDING";
+                        failedTx.UpdatedAt = DateTimeOffset.UtcNow;
+                    }
+
+                    await _context.SaveChangesAsync(cancellationToken);
                     if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
-                    return PaymentExecutionResult.CreateFailure($"Thanh toán không thành công ({result.Status}).", order.Id, result.OrderCode, order.Status.ToString());
+
+                    _logger.LogInformation("Đơn hàng {OrderId} thanh toán thất bại (Failed). Giữ nguyên Pending để thử lại.", order.Id);
+                    return PaymentExecutionResult.CreateFailure("Thanh toán thất bại. Vui lòng thử lại.", order.Id, result.OrderCode, OrderStatus.Pending.ToString());
                 }
 
                 // 4.4. Các trạng thái không phải Success
