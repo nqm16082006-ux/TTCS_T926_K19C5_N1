@@ -29,11 +29,21 @@ namespace EventTicketBooking.Api.Data
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<UserRole> UserRoles { get; set; } = null!;
         public DbSet<AuditLog> AuditLogs { get; set; } = null!;
+        public DbSet<TicketReadmission> TicketReadmissions { get; set; } = null!;
         public DbSet<EmailFailureLog> EmailFailureLogs { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<TicketReadmission>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.StaffName).HasMaxLength(200).IsRequired();
+                entity.Property(x => x.Reason).HasMaxLength(1000).IsRequired();
+                entity.Property(x => x.Gate).HasMaxLength(100).IsRequired();
+                entity.HasOne(x => x.OrderItem).WithMany().HasForeignKey(x => x.OrderItemId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<User>().WithMany().HasForeignKey(x => x.StaffUserId).OnDelete(DeleteBehavior.Restrict);
+            });
 
             if (Database.IsNpgsql())
             {
