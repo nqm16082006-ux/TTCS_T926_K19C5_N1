@@ -13,5 +13,7 @@ namespace EventTicketBooking.Api.DTOs
 
         [Required(ErrorMessage = "Mật khẩu không được để trống.")]
         public string Password { get; set; } = string.Empty;
+
+        public bool AcceptCurrentTerms { get; set; }
     }
 }

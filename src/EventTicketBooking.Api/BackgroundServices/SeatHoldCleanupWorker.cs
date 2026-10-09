@@ -6,20 +6,24 @@ using EventTicketBooking.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.SignalR;
+using EventTicketBooking.Api.Hubs;
 namespace EventTicketBooking.Api.BackgroundServices;
 
 public class SeatHoldCleanupWorker : BackgroundService
 {
     private readonly ILogger<SeatHoldCleanupWorker> _logger;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IHubContext<SeatStatusHub>? _hubContext;
 
     public SeatHoldCleanupWorker(
         ILogger<SeatHoldCleanupWorker> logger,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        IHubContext<SeatStatusHub>? hubContext = null)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
+        _hubContext = hubContext;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -53,10 +57,12 @@ public class SeatHoldCleanupWorker : BackgroundService
             var now = DateTime.UtcNow;
 
             // 1. Lấy danh sách SeatId thuộc các lượt giữ chỗ quá hạn
-            var expiredSeatIds = await dbContext.SeatHold
+            var expiredSeatsInfo = await dbContext.SeatHold
                 .Where(sh => sh.Status == "ACTIVE" && sh.ExpiresAt <= now)
-                .Select(sh => sh.SeatId)
+                .Select(sh => new { sh.SeatId, sh.Seat.ShowtimeId })
                 .ToListAsync(stoppingToken);
+
+            var expiredSeatIds = expiredSeatsInfo.Select(x => x.SeatId).ToList();
 
             if (expiredSeatIds.Any())
             {
@@ -71,6 +77,19 @@ public class SeatHoldCleanupWorker : BackgroundService
                     .ExecuteUpdateAsync(s => s.SetProperty(seat => seat.Status, "AVAILABLE"), stoppingToken);
 
                 await transaction.CommitAsync(stoppingToken);
+
+                if (_hubContext != null && _hubContext.Clients != null)
+                {
+                    var grouped = expiredSeatsInfo.GroupBy(x => x.ShowtimeId);
+                    foreach (var group in grouped)
+                    {
+                        var groupClient = _hubContext.Clients.Group(group.Key.ToString());
+                        if (groupClient != null)
+                        {
+                            await groupClient.SendAsync("SeatReleased", new { ShowtimeId = group.Key, SeatIds = group.Select(x => x.SeatId).ToList() }, stoppingToken);
+                        }
+                    }
+                }
 
                 _logger.LogInformation("Đã nhả thành công {Count} ghế quá hạn giữ chỗ.", expiredSeatIds.Count);
             }

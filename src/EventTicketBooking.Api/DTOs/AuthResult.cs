@@ -7,6 +7,8 @@ namespace EventTicketBooking.Api.DTOs
     {
         public bool Success { get; set; }
         public bool IsLocked { get; set; }
+        public bool RequiresTermsAcceptance { get; set; }
+        public string? RequiredTermsVersion { get; set; }
         public int StatusCode { get; set; }
         public string Message { get; set; } = string.Empty;
         public LoginResponseDto? Data { get; set; }
@@ -34,6 +36,16 @@ namespace EventTicketBooking.Api.DTOs
             IsLocked = true,
             StatusCode = 423, // 423 Locked
             Message = message
+        };
+
+        public static AuthResult TermsAcceptanceRequired(string version) => new()
+        {
+            Success = false,
+            IsLocked = false,
+            RequiresTermsAcceptance = true,
+            RequiredTermsVersion = version,
+            StatusCode = 428,
+            Message = $"Bạn cần chấp nhận Điều khoản dịch vụ phiên bản {version} trước khi đăng nhập."
         };
     }
 }

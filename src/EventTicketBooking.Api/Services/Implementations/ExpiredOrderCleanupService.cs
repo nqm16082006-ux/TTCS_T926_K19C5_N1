@@ -8,6 +8,8 @@ using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.SignalR;
+using EventTicketBooking.Api.Hubs;
 
 namespace EventTicketBooking.Api.Services.Implementations
 {
@@ -19,13 +21,16 @@ namespace EventTicketBooking.Api.Services.Implementations
     {
         private readonly AppDbContext _dbContext;
         private readonly ILogger<ExpiredOrderCleanupService> _logger;
+        private readonly IHubContext<SeatStatusHub>? _hubContext;
 
         public ExpiredOrderCleanupService(
             AppDbContext dbContext,
-            ILogger<ExpiredOrderCleanupService> logger)
+            ILogger<ExpiredOrderCleanupService> logger,
+            IHubContext<SeatStatusHub>? hubContext = null)
         {
             _dbContext = dbContext;
             _logger = logger;
+            _hubContext = hubContext;
         }
 
         public async Task<int> CleanupExpiredOrdersAsync(DateTimeOffset? fakeNow = null, CancellationToken cancellationToken = default)
@@ -117,9 +122,25 @@ namespace EventTicketBooking.Api.Services.Implementations
                     {
                         seat.Status = "AVAILABLE";
                     }
-                }
+                    await _dbContext.SaveChangesAsync(cancellationToken);
 
-                await _dbContext.SaveChangesAsync(cancellationToken);
+                    if (_hubContext != null && _hubContext.Clients != null)
+                    {
+                        var grouped = heldSeats.GroupBy(s => s.ShowtimeId);
+                        foreach (var group in grouped)
+                        {
+                            var groupClient = _hubContext.Clients.Group(group.Key.ToString());
+                            if (groupClient != null)
+                            {
+                                await groupClient.SendAsync("SeatReleased", new { ShowtimeId = group.Key, SeatIds = group.Select(s => s.Id).ToList() }, cancellationToken);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+                }
 
                 if (transaction != null)
                 {

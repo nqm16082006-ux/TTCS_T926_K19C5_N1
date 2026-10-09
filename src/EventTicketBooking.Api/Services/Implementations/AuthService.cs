@@ -187,6 +187,17 @@ namespace EventTicketBooking.Api.Services.Implementations
                 return AuthResult.Locked("Tài khoản của bạn chưa được kích hoạt. Vui lòng hoàn tất xác thực email để đăng nhập.");
             }
 
+            if (!TermsPolicy.IsCurrent(user))
+            {
+                if (!request.AcceptCurrentTerms)
+                {
+                    return AuthResult.TermsAcceptanceRequired(TermsPolicy.CurrentVersion);
+                }
+
+                TermsPolicy.AcceptCurrent(user);
+                await _dbContext.SaveChangesAsync();
+            }
+
             // Lấy Role
             var roles = user.UserRoles
                 .Where(ur => ur.Role != null)

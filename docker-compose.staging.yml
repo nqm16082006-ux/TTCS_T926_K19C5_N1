@@ -42,8 +42,9 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Staging
+      ASPNETCORE_URLS: http://+:5012
       JWT_KEY: ${JWT_KEY:-}
-      PORT: 5000
+      PORT: 5012
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-event_ticket_db}
@@ -53,10 +54,16 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       ConnectionStrings__Redis: "redis:6379"
+      SmtpSettings__Server: ${SmtpSettings__Server:-smtp.gmail.com}
+      SmtpSettings__Port: ${SmtpSettings__Port:-587}
+      SmtpSettings__SenderName: ${SmtpSettings__SenderName:-EventPulse Ticketing}
+      SmtpSettings__SenderEmail: ${SmtpSettings__SenderEmail:-}
+      SmtpSettings__Username: ${SmtpSettings__Username:-}
+      SmtpSettings__Password: ${SmtpSettings__Password:-}
     ports:
-      - "5000:5000"
+      - "5012:5012"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5012/api/health"]
       interval: 10s
       timeout: 5s
       retries: 3
