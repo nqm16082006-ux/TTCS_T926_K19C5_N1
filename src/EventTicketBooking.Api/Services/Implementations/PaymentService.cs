@@ -350,18 +350,17 @@ namespace EventTicketBooking.Api.Services.Implementations
                     );
                 }
 
-                // 4.2. Xử lý trường hợp thanh toán bị hủy từ cổng (Cancelled) hoặc thất bại (Failed)
-                if (result.Status == PaymentStatus.Cancelled || result.Status == PaymentStatus.Failed)
+                // 4.2. Xử lý trường hợp thanh toán bị hủy (Cancelled) - hủy order và nhả ghế
+                if (result.Status == PaymentStatus.Cancelled)
                 {
                     order.Status = OrderStatus.Cancelled;
                     order.UpdatedAt = DateTimeOffset.UtcNow;
 
-                    var txStatus = result.Status == PaymentStatus.Cancelled ? "CANCELLED" : "FAILED";
                     var cancelledTx = await _context.PaymentTransactions
                         .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
                     if (cancelledTx != null)
                     {
-                        cancelledTx.Status = txStatus;
+                        cancelledTx.Status = "CANCELLED";
                         cancelledTx.UpdatedAt = DateTimeOffset.UtcNow;
                     }
 
@@ -407,8 +406,27 @@ namespace EventTicketBooking.Api.Services.Implementations
                         }
                     }
 
-                    _logger.LogInformation("Đơn hàng {OrderId} thanh toán bị hủy/thất bại (Status: {Status}). Đã nhả ghế.", order.Id, result.Status);
-                    return PaymentExecutionResult.CreateFailure($"Thanh toán không thành công ({result.Status}).", order.Id, result.OrderCode, order.Status.ToString());
+                    _logger.LogInformation("Đơn hàng {OrderId} bị hủy (Cancelled). Đã nhả ghế.", order.Id);
+                    return PaymentExecutionResult.CreateFailure("Thanh toán đã bị hủy.", order.Id, result.OrderCode, order.Status.ToString());
+                }
+
+                // 4.3. Xử lý trường hợp thanh toán thất bại (Failed) - giữ nguyên Pending để user thử lại
+                if (result.Status == PaymentStatus.Failed)
+                {
+                    // Giữ order ở Pending để user có thể thử lại thanh toán
+                    var failedTx = await _context.PaymentTransactions
+                        .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
+                    if (failedTx != null)
+                    {
+                        failedTx.Status = "PENDING";
+                        failedTx.UpdatedAt = DateTimeOffset.UtcNow;
+                    }
+
+                    await _context.SaveChangesAsync(cancellationToken);
+                    if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
+
+                    _logger.LogInformation("Đơn hàng {OrderId} thanh toán thất bại (Failed). Giữ nguyên Pending để thử lại.", order.Id);
+                    return PaymentExecutionResult.CreateFailure("Thanh toán thất bại. Vui lòng thử lại.", order.Id, result.OrderCode, OrderStatus.Pending.ToString());
                 }
 
                 // 4.4. Các trạng thái không phải Success
