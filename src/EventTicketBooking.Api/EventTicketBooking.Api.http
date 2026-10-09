@@ -1,6 +1,67 @@
 @EventTicketBooking.Api_HostAddress = http://localhost:5012
 
-GET {{EventTicketBooking.Api_HostAddress}}/weatherforecast/
+### 1. Test Đăng nhập thành công (AC1 & AC4)
+POST {{EventTicketBooking.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@gmail.com",
+  "password": "123456"
+}
+
+### 2. Test Mật khẩu sai (AC2)
+POST {{EventTicketBooking.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@gmail.com",
+  "password": "sai_password"
+}
+
+### 3. Test Tài khoản không tồn tại (AC3)
+POST {{EventTicketBooking.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "nosuchuser@gmail.com",
+  "password": "123456"
+}
+
+### =========================================================================
+### TASK TTKN-127 (S-60): XUẤT SƠ ĐỒ GHẾ ĐÃ BÁN RA FILE PDF (1 TRANG HOÀN CHỈNH)
+### =========================================================================
+
+### 4. Lấy dữ liệu sơ đồ ghế dạng JSON (Thống kê, Tỷ lệ lấp đầy & Ma trận hàng ghế)
+GET {{EventTicketBooking.Api_HostAddress}}/api/seats/map-data
 Accept: application/json
 
-###
+### 5. Xuất sơ đồ ghế ra file PDF 1 trang mặc định (Hoặc theo EventId)
+GET {{EventTicketBooking.Api_HostAddress}}/api/seats/export-pdf
+Accept: application/pdf
+
+### 6. Xuất sơ đồ ghế ra file PDF 1 trang từ dữ liệu tùy biến (Custom Seats & Colors)
+POST {{EventTicketBooking.Api_HostAddress}}/api/seats/export-pdf
+Content-Type: application/json
+Accept: application/pdf
+
+{
+  "eventTitle": "CONCERT TRONG MƠ 2026 - GIAO HƯỞNG MÙA THU",
+  "location": "Nhà Hát Lớn Hà Nội - Số 1 Tràng Tiền",
+  "eventDate": "2026-11-20T20:00:00Z",
+  "hallName": "Khán Phòng Thính Phòng VIP",
+  "seats": [
+    { "row": "A", "number": 1, "seatCode": "VIP-A1", "status": "Sold", "seatType": "VIP", "price": 2000000 },
+    { "row": "A", "number": 2, "seatCode": "VIP-A2", "status": "Sold", "seatType": "VIP", "price": 2000000 },
+    { "row": "A", "number": 3, "seatCode": "VIP-A3", "status": "Reserved", "seatType": "VIP", "price": 2000000 },
+    { "row": "A", "number": 4, "seatCode": "VIP-A4", "status": "Available", "seatType": "VIP", "price": 2000000 },
+    { "row": "B", "number": 1, "seatCode": "B1", "status": "Sold", "seatType": "Standard", "price": 1000000 },
+    { "row": "B", "number": 2, "seatCode": "B2", "status": "Sold", "seatType": "Standard", "price": 1000000 },
+    { "row": "B", "number": 3, "seatCode": "B3", "status": "Available", "seatType": "Standard", "price": 1000000 },
+    { "row": "B", "number": 4, "seatCode": "B4", "status": "Reserved", "seatType": "Standard", "price": 1000000 },
+    { "row": "C", "number": 1, "seatCode": "C1", "status": "Available", "seatType": "Economy", "price": 500000 },
+    { "row": "C", "number": 2, "seatCode": "C2", "status": "Available", "seatType": "Economy", "price": 500000 },
+    { "row": "C", "number": 3, "seatCode": "C3", "status": "Sold", "seatType": "Economy", "price": 500000 },
+    { "row": "C", "number": 4, "seatCode": "C4", "status": "Available", "seatType": "Economy", "price": 500000 }
+  ]
+}
+

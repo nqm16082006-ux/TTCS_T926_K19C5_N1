@@ -1,3 +1,4 @@
+using EventTicketBooking.Api.Services;
 using EventTicketBooking.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using DotNetEnv;
@@ -48,10 +49,17 @@ builder.Services.AddStackExchangeRedisCache(options =>
     options.InstanceName = "EventTicket_";
 });
 
+// Configure QuestPDF License (Community) & Font handling
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+QuestPDF.Settings.UseSystemFonts = true;
+QuestPDF.Settings.ThrowOnMissingFontFamilies = false;
+
 // Add Controllers & Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ISeatMapPdfService, SeatMapPdfService>();
 
 var app = builder.Build();
 
