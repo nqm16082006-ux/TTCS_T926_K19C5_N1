@@ -10,6 +10,7 @@ using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.Middlewares;
 using EventTicketBooking.Api.Models;
+using EventTicketBooking.Api.Services;
 using EventTicketBooking.Api.Services.Implementations;
 using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Builder;
@@ -109,6 +110,8 @@ public class StaffScannerS28Tests : IDisposable
             Email = email,
             PasswordHash = _passwordHasher.Hash(password),
             IsActive = isActive,
+            TermsVersion = TermsPolicy.CurrentVersion,
+            TermsAcceptedAt = DateTime.UtcNow,
             FullName = $"Test {roleName}",
             CreatedAt = DateTime.UtcNow
         };

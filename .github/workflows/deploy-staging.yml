@@ -119,9 +119,10 @@ jobs:
           docker run -d \
             --name $TEMP_CONTAINER \
             --restart always \
-            -p 5000:5000 \
+            -p 5012:5012 \
             --network $NETWORK_NAME \
             -e ASPNETCORE_ENVIRONMENT=Staging \
+            -e PORT=5012 \
             -e JWT_KEY \
             -e Database__AutoMigrate=true \
             -e PAYMENT_PROVIDER=Mock \
@@ -136,7 +137,7 @@ jobs:
 
           for i in {1..12}
           do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/api/health || true)
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5012/api/health || true)
             echo "Health check attempt $i : $STATUS"
 
             if [ "$STATUS" = "200" ]; then

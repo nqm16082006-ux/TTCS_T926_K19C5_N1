@@ -119,11 +119,6 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(ModelState);
             }
 
-            if (!request.AcceptTerms)
-            {
-                return BadRequest(new { message = "Bạn cần đồng ý với Điều khoản dịch vụ để đăng ký." });
-            }
-
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
             // Kiểm tra user đã tồn tại
@@ -138,6 +133,11 @@ namespace EventTicketBooking.Api.Controllers
 
             if (existingUser != null && string.IsNullOrEmpty(existingUser.VerificationCode))
                 return StatusCode(StatusCodes.Status423Locked, new { message = "Tài khoản đã bị khóa bởi Quản trị viên." });
+
+            if (!request.AcceptTerms)
+            {
+                return BadRequest(new { message = "Bạn cần đồng ý với Điều khoản dịch vụ để đăng ký." });
+            }
 
             // Lấy Role "Customer" từ Database
             var customerRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Customer");
