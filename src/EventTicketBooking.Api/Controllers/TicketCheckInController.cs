@@ -72,6 +72,7 @@ namespace EventTicketBooking.Api.Controllers
         /// Chỉ trả về dữ liệu tối thiểu (TicketCode, IsCheckedIn), tuyệt đối không trả PII.
         /// </summary>
         [HttpGet("showtimes/{showtimeId}/offline-tickets")]
+        [HttpGet("offline-tickets/{showtimeId}")]
         public async Task<IActionResult> GetOfflineTickets(Guid showtimeId, [FromQuery] DateTimeOffset? since = null)
         {
             var showtimeExists = await _context.Showtimes.AnyAsync(s => s.Id == showtimeId);
