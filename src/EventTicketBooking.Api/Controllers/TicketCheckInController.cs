@@ -10,6 +10,7 @@ using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Middlewares;
 using EventTicketBooking.Api.Services.Interfaces;
 using EventTicketBooking.Api.Services.Implementations;
+using EventTicketBooking.Api.DTOs;
 
 namespace EventTicketBooking.Api.Controllers
 {
@@ -63,6 +64,61 @@ namespace EventTicketBooking.Api.Controllers
                 .ToListAsync();
 
             return Ok(shows);
+        }
+
+        /// <summary>
+        /// Story S-33: Tải trước danh sách vé của suất diễn xuống máy quét phục vụ soát vé ngoại tuyến.
+        /// Hỗ trợ Full sync (since == null) và Delta sync (since != null) với cơ chế race mitigation lùi 15s.
+        /// Chỉ trả về dữ liệu tối thiểu (TicketCode, IsCheckedIn), tuyệt đối không trả PII.
+        /// </summary>
+        [HttpGet("showtimes/{showtimeId}/offline-tickets")]
+        public async Task<IActionResult> GetOfflineTickets(Guid showtimeId, [FromQuery] DateTimeOffset? since = null)
+        {
+            var showtimeExists = await _context.Showtimes.AnyAsync(s => s.Id == showtimeId);
+            if (!showtimeExists)
+            {
+                return NotFound(new { Message = "Suất diễn không tồn tại." });
+            }
+
+            var nowUtc = DateTimeOffset.UtcNow;
+            var query = _context.Tickets
+                .AsNoTracking()
+                .Where(t => t.OrderItem.Order.ShowtimeId == showtimeId);
+
+            bool isDelta = since.HasValue;
+            if (since.HasValue)
+            {
+                var threshold = since.Value.AddSeconds(-15);
+                query = query.Where(t => t.CreatedAt > threshold
+                                      || (t.OrderItem.CheckInTime != null && t.OrderItem.CheckInTime > threshold));
+            }
+
+            var rawTickets = await query
+                .Select(t => new
+                {
+                    TicketCode = t.TicketCode,
+                    IsCheckedIn = t.OrderItem.IsCheckedIn,
+                    OrderStatus = t.OrderItem.Order.Status
+                })
+                .ToListAsync();
+
+            var tickets = rawTickets
+                .Where(t => t.OrderStatus == OrderStatus.Paid)
+                .Select(t => new OfflineTicketItemDto
+                {
+                    TicketCode = t.TicketCode,
+                    IsCheckedIn = t.IsCheckedIn
+                })
+                .ToList();
+
+            return Ok(new OfflineTicketSyncResponseDto
+            {
+                ShowtimeId = showtimeId,
+                ServerTime = nowUtc,
+                IsDelta = isDelta,
+                TotalCount = tickets.Count,
+                Tickets = tickets
+            });
         }
 
         // 2. Soát vé (Scan) - Story S-29 & S-30
