@@ -15,6 +15,7 @@ using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace EventTicketBooking.Tests
@@ -47,8 +48,9 @@ namespace EventTicketBooking.Tests
             var claimsPrincipal = new ClaimsPrincipal(identity);
 
             var httpContext = new DefaultHttpContext { User = claimsPrincipal };
+            var logger = NullLogger<TicketCheckInController>.Instance;
 
-            return new TicketCheckInController(_context)
+            return new TicketCheckInController(_context, logger)
             {
                 ControllerContext = new ControllerContext
                 {

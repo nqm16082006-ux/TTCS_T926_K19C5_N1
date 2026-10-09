@@ -13,7 +13,7 @@ namespace EventTicketBooking.Tests;
 
 public class TicketReadmissionS31Tests
 {
-    private static TicketCheckInController Controller(AppDbContext db, Guid staffId, string role = "Staff") => new(db)
+    private static TicketCheckInController Controller(AppDbContext db, Guid staffId, string role = "Staff") => new(db, Microsoft.Extensions.Logging.Abstractions.NullLogger<TicketCheckInController>.Instance)
     {
         ControllerContext = new ControllerContext
         {
