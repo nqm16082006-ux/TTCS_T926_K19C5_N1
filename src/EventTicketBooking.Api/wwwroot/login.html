@@ -360,6 +360,9 @@
         } else if (roles.includes('staff')) {
           // Nhân viên soát vé chỉ thấy màn hình quét vé (S-28 AC)
           window.location.href = './staff-scanner.html';
+        } else if (roles.includes('auditor')) {
+          // Kế toán chuyển tới Cổng kế toán & đối soát
+          window.location.href = './auditor.html';
         } else if (roles.includes('organizer')) {
           if (returnUrl && safeReturn) {
             window.location.href = safeReturn;
