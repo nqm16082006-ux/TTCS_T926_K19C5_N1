@@ -193,6 +193,12 @@ builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.Seat
 
 var app = builder.Build();
 
+var configuredTermsVersion = builder.Configuration["TermsPolicy:CurrentVersion"];
+if (!string.IsNullOrWhiteSpace(configuredTermsVersion))
+{
+    EventTicketBooking.Api.Services.TermsPolicy.CurrentVersion = configuredTermsVersion;
+}
+
 if (builder.Configuration.GetValue<bool>("Database:AutoMigrate"))
     await DatabaseInitializer.InitializeAsync(app.Services, builder.Configuration);
 
