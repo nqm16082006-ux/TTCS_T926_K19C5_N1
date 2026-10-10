@@ -40,5 +40,10 @@ public interface IEmailService
         string showtime,
         System.Collections.Generic.IEnumerable<string> seatNames,
         byte[] qrCodeBytes);
+
+    /// <summary>
+    /// Gửi email tiếp thị / quảng bá sự kiện (chỉ gửi khi người dùng cho phép nhận).
+    /// </summary>
+    Task<bool> SendMarketingEmailAsync(string toEmail, string toName, string subject, string content);
 }
 

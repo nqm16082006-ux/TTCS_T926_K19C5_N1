@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html class="h-full" lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Cài đặt riêng tư &amp; Điều khoản - EventPulse</title>
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#3525cd",
+            "primary-container": "#4f46e5",
+            "surface-container-low": "#f2f3ff",
+            "on-surface": "#131b2e",
+            "on-surface-variant": "#464555",
+            "outline": "#777587"
+          },
+          fontFamily: {
+            "body": ["Plus Jakarta Sans", "sans-serif"],
+            "mono": ["JetBrains Mono", "monospace"]
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-[#f8f9fc] font-body text-slate-800 antialiased min-h-screen flex flex-col justify-between">
+
+  <!-- Top Navigation Header -->
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
+    <div class="h-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-6">
+        <a class="flex items-center gap-2.5 group" href="./public-events.html">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-primary text-white flex items-center justify-center shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+            <span class="material-symbols-outlined text-[22px]">confirmation_number</span>
+          </div>
+          <span class="text-xl tracking-tight font-extrabold bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent">EventPulse</span>
+        </a>
+        <nav class="hidden md:flex items-center gap-1">
+          <a class="px-3.5 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:text-primary hover:bg-slate-50 transition" href="./public-events.html">Khám phá sự kiện</a>
+          <a class="px-3.5 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:text-primary hover:bg-slate-50 transition" href="./my-orders.html">Đơn hàng của tôi</a>
+          <a class="px-3.5 py-2 rounded-lg text-sm font-bold text-primary bg-indigo-50 transition flex items-center gap-1.5" href="./privacy-settings.html">
+            <span class="material-symbols-outlined text-[18px]">verified_user</span>
+            <span>Cài đặt riêng tư</span>
+          </a>
+        </nav>
+      </div>
+
+      <!-- User Nav Info -->
+      <div class="flex items-center gap-3" id="navAuthContainer">
+        <div class="w-8 h-8 rounded-full bg-slate-200 animate-pulse"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
+    
+    <!-- Breadcrumb & Header -->
+    <div class="mb-8">
+      <div class="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-2">
+        <a href="./public-events.html" class="hover:text-primary transition flex items-center gap-1">
+          <span class="material-symbols-outlined text-[14px]">home</span>
+          Trang chủ
+        </a>
+        <span>/</span>
+        <span class="text-slate-600">Cài đặt riêng tư &amp; Điều khoản</span>
+      </div>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+            <span>Quản lý Điều khoản &amp; Quyền riêng tư</span>
+            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700">S-54</span>
+          </h1>
+          <p class="text-sm text-slate-500 mt-1">Minh bạch thông tin chấp thuận chính sách, phiên bản điều khoản và quyền thu hồi nhận email tiếp thị (Nghị định 13/2023/NĐ-CP).</p>
+        </div>
+        <button onclick="loadTermsStatus(true)" class="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl border border-slate-200 shadow-sm transition active:scale-95 self-start">
+          <span class="material-symbols-outlined text-[18px]" id="refreshSpinner">refresh</span>
+          <span>Làm mới</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Alert Banner (Toast / Feedback) -->
+    <div id="statusAlert" class="hidden mb-6 p-4 rounded-2xl flex items-start gap-3 border transition-all">
+      <span class="material-symbols-outlined text-[22px] shrink-0" id="statusAlertIcon">info</span>
+      <div class="flex-1 text-xs">
+        <h4 class="font-bold text-sm mb-0.5" id="statusAlertTitle">Thông báo</h4>
+        <p id="statusAlertMsg" class="leading-relaxed"></p>
+      </div>
+      <button onclick="hideAlert()" class="text-slate-400 hover:text-slate-700 p-1">
+        <span class="material-symbols-outlined text-[16px]">close</span>
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      
+      <!-- Left Column: Status & Consent Actions (2 cols) -->
+      <div class="md:col-span-2 space-y-6">
+
+        <!-- Card 1: Consent Summary & Version Info -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-indigo-50 text-primary flex items-center justify-center font-bold">
+                <span class="material-symbols-outlined text-[22px]">policy</span>
+              </div>
+              <div>
+                <h3 class="text-base font-bold text-slate-900">Phiên bản Điều khoản &amp; Chính sách</h3>
+                <p class="text-xs text-slate-500">Thông tin lưu trữ phiên bản và thời điểm đồng ý</p>
+              </div>
+            </div>
+            <span id="termsBadgeStatus" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600">Đang tải...</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5 text-xs">
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+              <span class="text-slate-400 block text-[11px] mb-1">Phiên bản bạn đã đồng ý:</span>
+              <span class="text-base font-extrabold text-slate-900 font-mono" id="userTermsVersion">--</span>
+            </div>
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+              <span class="text-slate-400 block text-[11px] mb-1">Phiên bản hiện hành của hệ thống:</span>
+              <span class="text-base font-extrabold text-primary font-mono" id="systemTermsVersion">--</span>
+            </div>
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-100 sm:col-span-2">
+              <span class="text-slate-400 block text-[11px] mb-1">Thời điểm bạn đã đồng ý (Timestamp):</span>
+              <span class="text-xs font-semibold text-slate-800" id="userTermsAcceptedAt">--</span>
+            </div>
+          </div>
+
+          <!-- Re-accept prompt if version is outdated -->
+          <div id="outdatedNotice" class="hidden mt-4 p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[20px] text-amber-600">warning</span>
+                <span>Hệ thống đã có bản chính sách mới. Bạn cần cập nhật để tiếp tục sử dụng đầy đủ quyền lợi.</span>
+              </div>
+              <button onclick="acceptUpdatedTerms()" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm transition">
+                Đồng ý phiên bản mới ngay
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Marketing Email Consent & Revocation (Core S-54 AC) -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                <span class="material-symbols-outlined text-[22px]">unsubscribe</span>
+              </div>
+              <div>
+                <h3 class="text-base font-bold text-slate-900">Quyền thu hồi nhận Email tiếp thị</h3>
+                <p class="text-xs text-slate-500">Chủ động thu hồi hoặc kích hoạt nhận email quảng cáo &amp; khuyến mãi</p>
+              </div>
+            </div>
+            <span id="marketingStatusBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600">Đang kiểm tra...</span>
+          </div>
+
+          <div class="mt-5 space-y-4 text-xs text-slate-600 leading-relaxed">
+            <p>
+              Theo quy định bảo vệ dữ liệu cá nhân (Nghị định 13/2023/NĐ-CP), bạn có quyền <strong>rút lại sự đồng ý</strong> cho phép gửi thông tin quảng cáo, tiếp thị bất cứ thời điểm nào.
+            </p>
+            
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span class="font-bold text-slate-800 block mb-0.5">Trạng thái nhận email tiếp thị hiện tại:</span>
+                <span class="text-xs text-slate-500" id="marketingStatusDesc">--</span>
+              </div>
+              <div id="marketingActionContainer">
+                <button id="btnToggleMarketing" class="px-4 py-2.5 rounded-xl font-bold text-xs transition shadow-sm inline-flex items-center gap-1.5">
+                  <span class="material-symbols-outlined text-[16px]">hourglass_empty</span>
+                  <span>Đang tải...</span>
+                </button>
+              </div>
+            </div>
+            
+            <p class="text-[11px] text-slate-400 italic">
+              * Lưu ý: Thu hồi email tiếp thị không ảnh hưởng đến các email giao dịch bắt buộc như vé điện tử đã mua hoặc mã OTP bảo mật.
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 3: Interactive Marketing Email Suppression Test Tool (AC4 Verification) -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                <span class="material-symbols-outlined text-[22px]">mark_email_read</span>
+              </div>
+              <div>
+                <h3 class="text-base font-bold text-slate-900">Kiểm tra thực tế: Không nhận email tiếp thị khi đã thu hồi</h3>
+                <p class="text-xs text-slate-500">Thử nghiệm gửi email tiếp thị để kiểm chứng hệ thống chặn gửi</p>
+              </div>
+            </div>
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Demo S-54</span>
+          </div>
+
+          <div class="mt-5 space-y-4 text-xs">
+            <p class="text-slate-600">
+              Nhấn nút bên dưới để yêu cầu máy chủ gửi thử nghiệm một email tiếp thị về hộp thư của bạn. 
+              Nếu bạn <strong>đã thu hồi quyền</strong>, máy chủ sẽ <span class="text-rose-600 font-bold">từ chối gửi (HTTP 403 Forbidden)</span>. 
+              Nếu bạn <strong>đang đồng ý</strong>, máy chủ sẽ cho phép gửi thành công.
+            </p>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <button onclick="testSendMarketingEmail()" id="btnTestSendMarketing" class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition active:scale-95 flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">forward_to_inbox</span>
+                <span>Thử gửi email tiếp thị ngay</span>
+              </button>
+            </div>
+
+            <!-- Test Result Box -->
+            <div id="testResultBox" class="hidden p-4 rounded-xl border text-xs transition">
+              <div class="flex items-start gap-2.5">
+                <span class="material-symbols-outlined text-[20px] shrink-0" id="testResultIcon">info</span>
+                <div>
+                  <span class="font-bold block" id="testResultTitle">Kết quả thử nghiệm:</span>
+                  <p class="mt-0.5 leading-relaxed" id="testResultMsg"></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Policy Full Text & Admin Demo Controls (1 col) -->
+      <div class="space-y-6">
+
+        <!-- Policy Viewer Card -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2 mb-3">
+            <span class="material-symbols-outlined text-[20px] text-primary">description</span>
+            <span>Nội dung chính sách</span>
+          </h3>
+          <p class="text-xs text-slate-500 mb-4">Các điều khoản ràng buộc pháp lý và cam kết dữ liệu của EventPulse.</p>
+
+          <div class="space-y-3">
+            <details class="group bg-slate-50 rounded-xl border border-slate-100 p-3.5 text-xs text-slate-700 open:bg-white open:border-slate-200 transition">
+              <summary class="font-bold text-slate-900 cursor-pointer list-none flex items-center justify-between">
+                <span>1. Điều khoản dịch vụ</span>
+                <span class="material-symbols-outlined text-[18px] text-slate-400 group-open:rotate-180 transition-transform">expand_more</span>
+              </summary>
+              <div class="mt-2 text-slate-600 leading-relaxed text-[11px] pt-2 border-t border-slate-100">
+                Áp dụng cho mọi tài khoản tham gia mua vé, giữ chỗ và tham dự sự kiện. Tuân thủ việc thanh toán hợp lệ và quy định kiểm soát vé tại cửa.
+              </div>
+            </details>
+
+            <details class="group bg-slate-50 rounded-xl border border-slate-100 p-3.5 text-xs text-slate-700 open:bg-white open:border-slate-200 transition">
+              <summary class="font-bold text-slate-900 cursor-pointer list-none flex items-center justify-between">
+                <span>2. Chính sách bảo vệ dữ liệu</span>
+                <span class="material-symbols-outlined text-[18px] text-slate-400 group-open:rotate-180 transition-transform">expand_more</span>
+              </summary>
+              <div class="mt-2 text-slate-600 leading-relaxed text-[11px] pt-2 border-t border-slate-100">
+                Thông tin cá nhân chỉ được sử dụng cho việc xác thực tài khoản và phát hành vé điện tử có chữ ký số. Người dùng có toàn quyền xem và thu hồi sự đồng ý.
+              </div>
+            </details>
+
+            <details class="group bg-slate-50 rounded-xl border border-slate-100 p-3.5 text-xs text-slate-700 open:bg-white open:border-slate-200 transition">
+              <summary class="font-bold text-slate-900 cursor-pointer list-none flex items-center justify-between">
+                <span>3. Quản lý email tiếp thị</span>
+                <span class="material-symbols-outlined text-[18px] text-slate-400 group-open:rotate-180 transition-transform">expand_more</span>
+              </summary>
+              <div class="mt-2 text-slate-600 leading-relaxed text-[11px] pt-2 border-t border-slate-100">
+                Chỉ gửi email quảng bá/ưu đãi khi có sự đồng ý của khách hàng. Khi thu hồi, việc gửi email tiếp thị chấm dứt ngay lập tức.
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <!-- Admin / Demo Version Changer Card (AC3 Verification) -->
+        <div class="bg-gradient-to-br from-indigo-50/60 to-purple-50/60 rounded-2xl border border-indigo-100 p-6 shadow-xs">
+          <div class="flex items-center gap-2.5 mb-2">
+            <span class="material-symbols-outlined text-[20px] text-indigo-600">tune</span>
+            <h3 class="text-sm font-bold text-slate-900">Công cụ Demo S-54 (Đổi Version)</h3>
+          </div>
+          <p class="text-xs text-slate-500 mb-4">Mô phỏng trường hợp hệ thống nâng cấp phiên bản chính sách (ví dụ: v1.1) để kiểm thử AC3: lần đăng nhập sau phải đồng ý lại.</p>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 mb-1" for="newPolicyInput">Phiên bản chính sách mới:</label>
+              <input id="newPolicyInput" type="text" placeholder="ví dụ: v1.1 hoặc v2.0" class="w-full h-9 px-3 rounded-xl bg-white border border-slate-200 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+            </div>
+            <button onclick="changeSystemPolicyVersion()" id="btnChangePolicy" class="w-full h-9 rounded-xl bg-primary hover:bg-primary-container text-white font-bold text-xs shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px]">upgrade</span>
+              <span>Đổi phiên bản hệ thống</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 mt-12 py-6 text-center text-xs text-slate-400">
+    <p>&copy; 2026 EventPulse System. S-54: Người dùng đồng ý điều khoản và chính sách riêng tư, thu hồi được.</p>
+  </footer>
+
+  <!-- Scripts -->
+  <script>
+    let currentTermsData = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initAuthNav();
+      loadTermsStatus();
+    });
+
+    function initAuthNav() {
+      const token = localStorage.getItem('access_token');
+      const navContainer = document.getElementById('navAuthContainer');
+      if (!token) {
+        window.location.href = './login.html';
+        return;
+      }
+
+      try {
+        const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
+        const displayName = userInfo.fullName || userInfo.username || 'Tài khoản';
+        const avatarLetter = (displayName[0] || 'U').toUpperCase();
+
+        navContainer.innerHTML = `
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-primary/10 text-primary font-extrabold flex items-center justify-center text-xs border border-primary/20">
+              ${avatarLetter}
+            </div>
+            <div class="hidden sm:block text-left">
+              <div class="text-xs font-bold text-slate-800 leading-none">${displayName}</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">${userInfo.email || ''}</div>
+            </div>
+            <button onclick="handleLogout()" title="Đăng xuất" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition ml-1">
+              <span class="material-symbols-outlined text-[18px]">logout</span>
+            </button>
+          </div>
+        `;
+      } catch {
+        localStorage.clear();
+        window.location.href = './login.html';
+      }
+    }
+
+    function handleLogout() {
+      localStorage.clear();
+      window.location.href = './login.html';
+    }
+
+    // Tải trạng thái điều khoản & sự đồng ý tiếp thị
+    async function loadTermsStatus(isRefresh = false) {
+      const token = localStorage.getItem('access_token');
+      const spinner = document.getElementById('refreshSpinner');
+      if (isRefresh && spinner) spinner.classList.add('animate-spin');
+
+      try {
+        const res = await fetch('/api/v1/user/terms/status', {
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (res.status === 401) {
+          handleLogout();
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error('Không thể tải thông tin điều khoản.');
+        }
+
+        currentTermsData = await res.json();
+        renderTermsStatus(currentTermsData);
+
+      } catch (err) {
+        console.error('Lỗi loadTermsStatus:', err);
+        showAlert('Lỗi', 'Không thể kết nối máy chủ để lấy thông tin điều khoản.', true);
+      } finally {
+        if (spinner) spinner.classList.remove('animate-spin');
+      }
+    }
+
+    function renderTermsStatus(data) {
+      document.getElementById('userTermsVersion').textContent = data.termsVersion || 'Chưa xác định';
+      document.getElementById('systemTermsVersion').textContent = data.currentPolicyVersion || 'v1.0';
+      document.getElementById('userTermsAcceptedAt').textContent = data.termsAcceptedAt 
+        ? formatDateTime(data.termsAcceptedAt) 
+        : 'Chưa có thông tin';
+
+      const termsBadge = document.getElementById('termsBadgeStatus');
+      const outdatedNotice = document.getElementById('outdatedNotice');
+
+      if (data.isTermsCurrent) {
+        termsBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1";
+        termsBadge.innerHTML = `<span class="material-symbols-outlined text-[14px]">check_circle</span><span>Đã cập nhật mới nhất</span>`;
+        outdatedNotice.classList.add('hidden');
+      } else {
+        termsBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1";
+        termsBadge.innerHTML = `<span class="material-symbols-outlined text-[14px]">warning</span><span>Cần cập nhật (${data.currentPolicyVersion})</span>`;
+        outdatedNotice.classList.remove('hidden');
+      }
+
+      // Render Marketing Email Status
+      const mBadge = document.getElementById('marketingStatusBadge');
+      const mDesc = document.getElementById('marketingStatusDesc');
+      const btnToggle = document.getElementById('btnToggleMarketing');
+
+      if (data.marketingEmailOptIn) {
+        mBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1";
+        mBadge.innerHTML = `<span class="material-symbols-outlined text-[14px]">mark_email_read</span><span>Đang nhận email tiếp thị</span>`;
+        mDesc.innerHTML = `<span class="text-emerald-700 font-semibold">BẬT:</span> Bạn đang đồng ý nhận các chương trình ưu đãi, thông tin vé sớm từ EventPulse.`;
+
+        btnToggle.className = "px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 transition shadow-sm inline-flex items-center gap-1.5 active:scale-95";
+        btnToggle.innerHTML = `<span class="material-symbols-outlined text-[16px]">cancel</span><span>Thu hồi quyền nhận email tiếp thị</span>`;
+        btnToggle.onclick = revokeMarketingConsent;
+      } else {
+        mBadge.className = "px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1";
+        mBadge.innerHTML = `<span class="material-symbols-outlined text-[14px]">unsubscribe</span><span>Đã thu hồi quyền</span>`;
+        mDesc.innerHTML = `<span class="text-slate-700 font-semibold">TẮT:</span> Bạn đã thu hồi quyền nhận email tiếp thị. Hệ thống cam kết không gửi email quảng cáo/tiếp thị đến bạn.`;
+
+        btnToggle.className = "px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-container text-white font-bold text-xs transition shadow-sm inline-flex items-center gap-1.5 active:scale-95";
+        btnToggle.innerHTML = `<span class="material-symbols-outlined text-[16px]">add_task</span><span>Đăng ký nhận lại email tiếp thị</span>`;
+        btnToggle.onclick = optInMarketingConsent;
+      }
+    }
+
+    // Thu hồi quyền nhận email tiếp thị (AC4)
+    async function revokeMarketingConsent() {
+      if (!confirm('Bạn có chắc chắn muốn thu hồi quyền nhận email tiếp thị? Sau khi thu hồi, bạn sẽ không nhận bất kỳ email quảng cáo/ưu đãi nào từ EventPulse.')) {
+        return;
+      }
+
+      const token = localStorage.getItem('access_token');
+      try {
+        const res = await fetch('/api/v1/user/terms/revoke-marketing', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showAlert('Thành công', data.message || 'Đã thu hồi quyền nhận email tiếp thị thành công.', false);
+          loadTermsStatus();
+        } else {
+          showAlert('Lỗi', data.message || 'Không thể thu hồi quyền tiếp thị.', true);
+        }
+      } catch (err) {
+        showAlert('Lỗi', 'Không thể kết nối máy chủ.', true);
+      }
+    }
+
+    // Đăng ký nhận lại email tiếp thị
+    async function optInMarketingConsent() {
+      const token = localStorage.getItem('access_token');
+      try {
+        const res = await fetch('/api/v1/user/terms/opt-in-marketing', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showAlert('Thành công', data.message || 'Đã đăng ký nhận lại email tiếp thị thành công.', false);
+          loadTermsStatus();
+        } else {
+          showAlert('Lỗi', data.message || 'Không thể đăng ký nhận tiếp thị.', true);
+        }
+      } catch (err) {
+        showAlert('Lỗi', 'Không thể kết nối máy chủ.', true);
+      }
+    }
+
+    // Đồng ý điều khoản phiên bản mới
+    async function acceptUpdatedTerms() {
+      const token = localStorage.getItem('access_token');
+      try {
+        const res = await fetch('/api/v1/user/terms/accept', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showAlert('Thành công', data.message || 'Đã đồng ý điều khoản mới thành công!', false);
+          loadTermsStatus();
+        } else {
+          showAlert('Lỗi', data.message || 'Không thể cập nhật điều khoản.', true);
+        }
+      } catch (err) {
+        showAlert('Lỗi', 'Không thể kết nối máy chủ.', true);
+      }
+    }
+
+    // Thử gửi email tiếp thị để kiểm chứng hệ thống chặn gửi (AC4)
+    async function testSendMarketingEmail() {
+      const token = localStorage.getItem('access_token');
+      const box = document.getElementById('testResultBox');
+      const title = document.getElementById('testResultTitle');
+      const msg = document.getElementById('testResultMsg');
+      const icon = document.getElementById('testResultIcon');
+      const btn = document.getElementById('btnTestSendMarketing');
+
+      btn.disabled = true;
+      btn.innerHTML = `<span class="material-symbols-outlined text-[18px] animate-spin">sync</span><span>Đang kiểm tra gửi...</span>`;
+
+      try {
+        const res = await fetch('/api/v1/user/terms/send-marketing-test', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            subject: '🎁 Ưu đãi độc quyền vé Concert cuối tuần từ EventPulse',
+            content: 'Giảm 20% cho đơn hàng tiếp theo khi đặt vé qua ứng dụng EventPulse trong tuần này.'
+          })
+        });
+
+        const data = await res.json();
+        box.classList.remove('hidden');
+
+        if (res.status === 403) {
+          // BỊ CHẶN VÌ ĐÃ THU HỒI QUYỀN (THÀNH CÔNG KIỂM CHỨNG AC4!)
+          box.className = "p-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-900";
+          icon.textContent = "block";
+          icon.className = "material-symbols-outlined text-[20px] shrink-0 text-rose-600";
+          title.textContent = "⛔ Hệ thống đã chặn gửi email tiếp thị (HTTP 403 Forbidden)";
+          msg.textContent = `${data.message} • Tiêu chí 'khi thu hồi thì không nhận email tiếp thị nữa' hoạt động chính xác!`;
+        } else if (res.ok && data.sent) {
+          // ĐƯỢC PHÉP GỬI VÌ ĐANG OPT-IN
+          box.className = "p-4 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900";
+          icon.textContent = "check_circle";
+          icon.className = "material-symbols-outlined text-[20px] shrink-0 text-emerald-600";
+          title.textContent = "✅ Gửi email tiếp thị thành công (HTTP 200 OK)";
+          msg.textContent = `${data.message} • Người dùng đang ở trạng thái đồng ý nhận tiếp thị.`;
+        } else {
+          box.className = "p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-800";
+          icon.textContent = "info";
+          icon.className = "material-symbols-outlined text-[20px] shrink-0 text-slate-600";
+          title.textContent = "Thông tin phản hồi:";
+          msg.textContent = data.message || 'Không có thêm thông tin.';
+        }
+      } catch (err) {
+        box.classList.remove('hidden');
+        box.className = "p-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-900";
+        icon.textContent = "error";
+        title.textContent = "Lỗi kết nối";
+        msg.textContent = "Không thể gửi yêu cầu đến máy chủ.";
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">forward_to_inbox</span><span>Thử gửi email tiếp thị ngay</span>`;
+      }
+    }
+
+    // Admin/Demo: Đổi phiên bản chính sách hệ thống (AC3)
+    async function changeSystemPolicyVersion() {
+      const input = document.getElementById('newPolicyInput');
+      const newVersion = input.value.trim();
+      if (!newVersion) {
+        alert('Vui lòng nhập phiên bản mới (ví dụ: v1.1)');
+        return;
+      }
+
+      const token = localStorage.getItem('access_token');
+      try {
+        const res = await fetch('/api/v1/user/terms/admin/change-policy-version', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ newVersion })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showAlert('Đã đổi phiên bản hệ thống', `${data.message} Bây giờ khi đăng nhập lại, hệ thống sẽ yêu cầu người dùng đồng ý lại phiên bản ${newVersion}!`, false);
+          input.value = '';
+          loadTermsStatus();
+        } else {
+          showAlert('Lỗi', data.message || 'Không thể đổi phiên bản hệ thống.', true);
+        }
+      } catch (err) {
+        showAlert('Lỗi', 'Không thể kết nối máy chủ.', true);
+      }
+    }
+
+    function showAlert(title, msg, isError = false) {
+      const alertBox = document.getElementById('statusAlert');
+      const alertTitle = document.getElementById('statusAlertTitle');
+      const alertMsg = document.getElementById('statusAlertMsg');
+      const alertIcon = document.getElementById('statusAlertIcon');
+
+      alertTitle.textContent = title;
+      alertMsg.textContent = msg;
+
+      if (isError) {
+        alertBox.className = "mb-6 p-4 rounded-2xl flex items-start gap-3 border border-rose-200 bg-rose-50 text-rose-900 transition-all";
+        alertIcon.className = "material-symbols-outlined text-[22px] shrink-0 text-rose-600";
+        alertIcon.textContent = "error";
+      } else {
+        alertBox.className = "mb-6 p-4 rounded-2xl flex items-start gap-3 border border-emerald-200 bg-emerald-50 text-emerald-900 transition-all";
+        alertIcon.className = "material-symbols-outlined text-[22px] shrink-0 text-emerald-600";
+        alertIcon.textContent = "check_circle";
+      }
+
+      alertBox.classList.remove('hidden');
+    }
+
+    function hideAlert() {
+      document.getElementById('statusAlert').classList.add('hidden');
+    }
+
+    function formatDateTime(isoString) {
+      if (!isoString) return '--/--/----';
+      const d = new Date(isoString);
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')} ngày ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} (UTC+7)`;
+    }
+  </script>
+</body>
+</html>

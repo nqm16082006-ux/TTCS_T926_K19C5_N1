@@ -307,14 +307,16 @@
         });
 
         let data = await res.json().catch(() => ({}));
-        if (res.status === 428 && data.requiresTermsAcceptance &&
-            window.confirm(`Bạn cần chấp nhận Điều khoản dịch vụ phiên bản ${data.termsVersion} để tiếp tục. Bạn có đồng ý không?`)) {
-          res = await fetch('/api/auth/google', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ credential: response.credential, mode: 'login', acceptCurrentTerms: true })
-          });
-          data = await res.json().catch(() => ({}));
+        if (res.status === 428 && data.requiresTermsAcceptance) {
+          const accepted = await promptTermsAcceptanceModal(data.termsVersion);
+          if (accepted) {
+            res = await fetch('/api/auth/google', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ credential: response.credential, mode: 'login', acceptCurrentTerms: true })
+            });
+            data = await res.json().catch(() => ({}));
+          }
         }
 
         if (res.ok && data.requiresEmailConfirmation) {
@@ -448,14 +450,16 @@
 
         let data = await response.json().catch(() => ({}));
 
-        if (response.status === 428 && data.requiresTermsAcceptance &&
-            window.confirm(`Bạn cần chấp nhận Điều khoản dịch vụ phiên bản ${data.termsVersion} để tiếp tục. Bạn có đồng ý không?`)) {
-          response = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: emailVal, password: passwordVal, acceptCurrentTerms: true })
-          });
-          data = await response.json().catch(() => ({}));
+        if (response.status === 428 && data.requiresTermsAcceptance) {
+          const accepted = await promptTermsAcceptanceModal(data.termsVersion);
+          if (accepted) {
+            response = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: emailVal, password: passwordVal, acceptCurrentTerms: true })
+            });
+            data = await response.json().catch(() => ({}));
+          }
         }
 
         if (response.ok && data.accessToken) {
@@ -496,6 +500,82 @@
         btnIcon.textContent = 'arrow_forward';
       }
     }
+
+    // --- TERMS UPDATE PROMPT MODAL (S-54) ---
+    let termsModalResolver = null;
+    function promptTermsAcceptanceModal(version) {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('termsUpdateModal');
+        if (!modal) {
+          resolve(window.confirm(`Bạn cần chấp nhận Điều khoản dịch vụ và Chính sách riêng tư phiên bản ${version} để tiếp tục. Bạn có đồng ý không?`));
+          return;
+        }
+        document.getElementById('termsModalVersionBadge').textContent = version || 'v1.0';
+        termsModalResolver = resolve;
+        modal.classList.remove('hidden');
+      });
+    }
+
+    function onConfirmTermsModal() {
+      const modal = document.getElementById('termsUpdateModal');
+      if (modal) modal.classList.add('hidden');
+      if (termsModalResolver) {
+        termsModalResolver(true);
+        termsModalResolver = null;
+      }
+    }
+
+    function onCancelTermsModal() {
+      const modal = document.getElementById('termsUpdateModal');
+      if (modal) modal.classList.add('hidden');
+      if (termsModalResolver) {
+        termsModalResolver(false);
+        termsModalResolver = null;
+      }
+      // Re-enable login button
+      submitBtn.disabled = false;
+      btnText.textContent = 'Đăng nhập';
+      btnIcon.classList.remove('animate-spin');
+      btnIcon.textContent = 'arrow_forward';
+      errorAlert.classList.remove('hidden');
+      document.getElementById('errorTitle').textContent = 'Chưa đồng ý điều khoản';
+      errorMessage.textContent = 'Bạn cần đồng ý với phiên bản điều khoản mới nhất để tiếp tục sử dụng hệ thống.';
+    }
   </script>
+
+  <!-- Modal Terms Re-Acceptance (S-54 AC3) -->
+  <div id="termsUpdateModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="relative bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex items-center gap-3 pb-3 border-b border-slate-100">
+        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-[24px]">verified_user</span>
+        </div>
+        <div>
+          <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <span>Cập nhật Điều khoản dịch vụ</span>
+            <span id="termsModalVersionBadge" class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">v1.1</span>
+          </h3>
+          <p class="text-xs text-slate-500">EventPulse đã cập nhật Chính sách riêng tư &amp; Điều khoản mới</p>
+        </div>
+      </div>
+
+      <div class="my-4 p-4 bg-slate-50 rounded-xl text-xs text-slate-600 space-y-2.5 border border-slate-200 leading-relaxed">
+        <p class="font-medium text-slate-800">Để tiếp tục đăng nhập, bạn cần xem lại và đồng ý với phiên bản chính sách mới:</p>
+        <ul class="list-disc pl-4 space-y-1 text-slate-600 text-[11px]">
+          <li>Bảo vệ dữ liệu cá nhân theo Nghị định 13/2023/NĐ-CP.</li>
+          <li>Quyền thu hồi nhận email tiếp thị bất cứ lúc nào trong mục <em>Cài đặt riêng tư</em>.</li>
+          <li>Quy trình mã hóa chữ ký số vé điện tử ECDSA nâng cao.</li>
+        </ul>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+        <button onclick="onCancelTermsModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition">Từ chối</button>
+        <button onclick="onConfirmTermsModal()" class="px-5 py-2 rounded-xl bg-primary hover:bg-primary-container text-white text-xs font-bold transition shadow-sm flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-[16px]">check</span>
+          <span>Tôi đồng ý &amp; Đăng nhập</span>
+        </button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
