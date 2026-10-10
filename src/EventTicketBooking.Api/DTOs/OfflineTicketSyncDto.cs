@@ -24,4 +24,57 @@ namespace EventTicketBooking.Api.DTOs
         public string TicketCode { get; set; } = string.Empty;
         public bool IsCheckedIn { get; set; }
     }
+
+    /// <summary>
+    /// DTO yêu cầu đồng bộ lô các lượt soát vé ngoại tuyến (Story S-35).
+    /// </summary>
+    public class OfflineSyncBatchRequestDto
+    {
+        public List<OfflineScanBatchItemDto> Items { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Mỗi phần tử lượt quét ngoại tuyến được đẩy lên từ thiết bị.
+    /// qrPayload là bắt buộc để server xác thực lại chữ ký số (S-26/S-35).
+    /// </summary>
+    public class OfflineScanBatchItemDto
+    {
+        public string OfflineScanId { get; set; } = string.Empty;
+        public string TicketCode { get; set; } = string.Empty;
+        public Guid ShowtimeId { get; set; }
+        public string GateName { get; set; } = string.Empty;
+        public DateTimeOffset ScannedAt { get; set; }
+        public string QrPayload { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// DTO phản hồi kết quả đồng bộ theo lô (Story S-35).
+    /// </summary>
+    public class OfflineSyncBatchResponseDto
+    {
+        public int TotalSubmitted { get; set; }
+        public int SyncedCount { get; set; }
+        public int DuplicateCount { get; set; }
+        public int ConflictCount { get; set; }
+        public int RejectedCount { get; set; }
+        public List<OfflineSyncItemResultDto> Results { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Kết quả xử lý cho từng lần quét ngoại tuyến trong lô.
+    /// </summary>
+    public class OfflineSyncItemResultDto
+    {
+        public string OfflineScanId { get; set; } = string.Empty;
+        public string TicketCode { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty; // "synced", "duplicate", "conflict", "rejected"
+        public string? Reason { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public bool IsAckTerminal { get; set; }
+
+        public string? SeatInfo { get; set; }
+        public string? CategoryName { get; set; }
+        public string? Gate { get; set; }
+        public DateTimeOffset? CheckInTime { get; set; }
+    }
 }
