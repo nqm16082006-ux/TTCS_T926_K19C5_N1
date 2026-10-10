@@ -248,7 +248,7 @@
                 <div class="p-3 rounded-xl bg-surface-container-low flex items-start gap-2.5">
                   <input class="mt-0.5 w-4 h-4 rounded text-primary focus:ring-primary accent-primary" id="termsConsent" name="termsConsent" required type="checkbox">
                   <label class="text-[11px] text-on-surface-variant leading-snug cursor-pointer select-none" for="termsConsent">
-                    Tôi đồng ý với <a class="text-primary font-bold hover:underline" href="#">Điều khoản dịch vụ</a> và chính sách gửi mã xác thực của EventPulse.
+                    Tôi đồng ý với <a class="text-primary font-bold hover:underline" href="javascript:void(0)" onclick="openTermsModal('terms')">Điều khoản dịch vụ</a> và <a class="text-primary font-bold hover:underline" href="javascript:void(0)" onclick="openTermsModal('privacy')">Chính sách riêng tư</a> của EventPulse.
                   </label>
                 </div>
 
@@ -580,7 +580,7 @@
         return;
       }
       if (!document.getElementById('termsConsent').checked) {
-        showAlert('Bạn cần đồng ý với Điều khoản dịch vụ để đăng ký.');
+        showAlert('Bạn cần đồng ý với Điều khoản dịch vụ và Chính sách riêng tư để đăng ký.');
         return;
       }
 
@@ -710,7 +710,7 @@
       hideAlert();
 
       if (!acceptTerms) {
-        showAlert('Bạn cần đồng ý với Điều khoản dịch vụ để đăng ký.');
+        showAlert('Bạn cần đồng ý với Điều khoản dịch vụ và Chính sách riêng tư để đăng ký.');
         return;
       }
 
@@ -1091,6 +1091,103 @@
         hideAlert();
       }
     }
+
+    // --- TERMS & PRIVACY MODAL (S-54) ---
+    async function openTermsModal(initialTab = 'terms') {
+      const modal = document.getElementById('termsModal');
+      modal.classList.remove('hidden');
+      switchTermsTab(initialTab);
+
+      try {
+        const res = await fetch('/api/v1/user/terms/policy');
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('modalPolicyVersion').textContent = data.version || 'v1.0';
+          document.getElementById('modalPolicyDate').textContent = data.effectiveDate || '09/10/2026';
+          if (data.termsContent) {
+            document.getElementById('modalTermsContent').innerHTML = data.termsContent.replace(/\n/g, '<br><br>');
+          }
+          if (data.privacyContent) {
+            document.getElementById('modalPrivacyContent').innerHTML = data.privacyContent.replace(/\n/g, '<br><br>');
+          }
+        }
+      } catch (err) {
+        console.error('Không thể tải chi tiết điều khoản:', err);
+      }
+    }
+
+    function closeTermsModal() {
+      document.getElementById('termsModal').classList.add('hidden');
+    }
+
+    function acceptAndCloseTermsModal() {
+      document.getElementById('termsConsent').checked = true;
+      closeTermsModal();
+      hideAlert();
+    }
+
+    function switchTermsTab(tab) {
+      const termsTab = document.getElementById('tabTermsBtn');
+      const privacyTab = document.getElementById('tabPrivacyBtn');
+      const termsBody = document.getElementById('modalTermsContent');
+      const privacyBody = document.getElementById('modalPrivacyContent');
+
+      if (tab === 'terms') {
+        termsTab.className = "px-4 py-2 border-b-2 border-primary font-bold text-primary text-xs transition";
+        privacyTab.className = "px-4 py-2 border-b-2 border-transparent font-medium text-slate-500 hover:text-slate-800 text-xs transition";
+        termsBody.classList.remove('hidden');
+        privacyBody.classList.add('hidden');
+      } else {
+        privacyTab.className = "px-4 py-2 border-b-2 border-primary font-bold text-primary text-xs transition";
+        termsTab.className = "px-4 py-2 border-b-2 border-transparent font-medium text-slate-500 hover:text-slate-800 text-xs transition";
+        privacyBody.classList.remove('hidden');
+        termsBody.classList.add('hidden');
+      }
+    }
   </script>
+
+  <!-- Modal Terms & Privacy (S-54) -->
+  <div id="termsModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="relative bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div>
+          <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <span>Điều khoản dịch vụ &amp; Chính sách riêng tư</span>
+            <span id="modalPolicyVersion" class="px-2 py-0.5 rounded-full bg-indigo-50 text-primary text-[11px] font-bold">v1.0</span>
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Ngày hiệu lực: <span id="modalPolicyDate">09/10/2026</span> • Tuân thủ Nghị định 13/2023/NĐ-CP</p>
+        </div>
+        <button onclick="closeTermsModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <div class="flex gap-2 border-b border-slate-200 mt-3">
+        <button id="tabTermsBtn" onclick="switchTermsTab('terms')" class="px-4 py-2 border-b-2 border-primary font-bold text-primary text-xs transition">1. Điều khoản dịch vụ</button>
+        <button id="tabPrivacyBtn" onclick="switchTermsTab('privacy')" class="px-4 py-2 border-b-2 border-transparent font-medium text-slate-500 hover:text-slate-800 text-xs transition">2. Chính sách riêng tư &amp; Tiếp thị</button>
+      </div>
+
+      <div class="max-h-80 overflow-y-auto p-4 my-3 bg-slate-50 rounded-xl text-xs text-slate-700 leading-relaxed border border-slate-200">
+        <div id="modalTermsContent">
+          <strong>1. Chấp thuận điều khoản:</strong> Bằng việc tạo tài khoản, bạn đồng ý tuân thủ toàn bộ các quy định đặt vé, thanh toán và bảo mật của EventPulse.<br><br>
+          <strong>2. Tài khoản và Bảo mật:</strong> Người dùng có trách nhiệm tự bảo mật mã xác thực OTP gửi về hòm thư điện tử.<br><br>
+          <strong>3. Thay đổi chính sách:</strong> Khi hệ thống cập nhật phiên bản chính sách mới, người dùng sẽ được nhắc nhở xác nhận lại ở lần đăng nhập tiếp theo.
+        </div>
+        <div id="modalPrivacyContent" class="hidden">
+          <strong>1. Thu thập &amp; Xử lý dữ liệu:</strong> Dữ liệu người dùng (tên, email, số điện thoại) được sử dụng để phát hành vé điện tử và gửi thông báo hệ thống.<br><br>
+          <strong>2. Chữ ký số và Chống giả mạo:</strong> Mã QR vé điện tử được ký số bằng mật mã ECDSA nhằm đảm bảo an toàn tuyệt đối khi soát vé tại cổng.<br><br>
+          <strong>3. Quyền thu hồi nhận email tiếp thị (S-54):</strong> Người dùng có quyền thu hồi sự đồng ý nhận email tiếp thị bất cứ lúc nào trong mục <em>Cài đặt riêng tư</em>. Khi người dùng thu hồi, hệ thống cam kết chặn và không gửi email tiếp thị nữa.
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+        <span class="text-[11px] text-slate-500">Bấm "Đồng ý điều khoản" để tích chọn và tiếp tục.</span>
+        <div class="flex gap-2">
+          <button onclick="closeTermsModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition">Đóng</button>
+          <button onclick="acceptAndCloseTermsModal()" class="px-4 py-2 rounded-xl bg-primary hover:bg-primary-container text-white text-xs font-bold transition shadow-sm">Đồng ý điều khoản</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

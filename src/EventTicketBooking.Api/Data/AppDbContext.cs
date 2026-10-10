@@ -1,4 +1,4 @@
-using EventTicketBooking.Api.Models;
+﻿using EventTicketBooking.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace EventTicketBooking.Api.Data
@@ -32,6 +32,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<TicketReadmission> TicketReadmissions { get; set; } = null!;
         public DbSet<EmailFailureLog> EmailFailureLogs { get; set; } = null!;
         public DbSet<OrderAuditLog> OrderAuditLogs { get; set; } = null!;
+        public DbSet<OfflineCheckInRecord> OfflineCheckInRecords { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -384,6 +385,60 @@ namespace EventTicketBooking.Api.Data
                 entity.HasIndex(l => l.OrderId).HasDatabaseName("IX_order_audit_logs_OrderId");
                 entity.HasIndex(l => l.Timestamp).HasDatabaseName("IX_order_audit_logs_Timestamp");
                 entity.HasIndex(l => l.EntityType).HasDatabaseName("IX_order_audit_logs_EntityType");
+            });
+
+            // Cấu hình bảng OfflineCheckInRecords (Story S-35)
+            modelBuilder.Entity<OfflineCheckInRecord>(entity =>
+            {
+                entity.ToTable("OfflineCheckInRecords");
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.OfflineScanId)
+                      .IsRequired()
+                      .HasMaxLength(100);
+
+                entity.Property(x => x.TicketCode)
+                      .IsRequired()
+                      .HasMaxLength(64);
+
+                entity.Property(x => x.GateName)
+                      .IsRequired()
+                      .HasMaxLength(100);
+
+                entity.Property(x => x.Status)
+                      .IsRequired()
+                      .HasMaxLength(20);
+
+                entity.Property(x => x.ConflictReason)
+                      .HasMaxLength(100);
+
+                entity.Property(x => x.ExistingCheckInGate)
+                      .HasMaxLength(100);
+
+                entity.Property(x => x.ReceivedAtServer)
+                      .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasIndex(x => x.OfflineScanId)
+                      .IsUnique()
+                      .HasDatabaseName("UX_OfflineCheckInRecords_OfflineScanId");
+
+                entity.HasIndex(x => x.TicketCode);
+                entity.HasIndex(x => x.ShowtimeId);
+
+                entity.HasOne(x => x.OrderItem)
+                      .WithMany()
+                      .HasForeignKey(x => x.OrderItemId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(x => x.Showtime)
+                      .WithMany()
+                      .HasForeignKey(x => x.ShowtimeId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(x => x.SyncedByUser)
+                      .WithMany()
+                      .HasForeignKey(x => x.SyncedByUserId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
         }
 
