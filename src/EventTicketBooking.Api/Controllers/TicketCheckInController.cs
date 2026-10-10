@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Http;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.Models;
@@ -24,6 +25,7 @@ namespace EventTicketBooking.Api.Controllers
         private readonly IQrSignatureService _qrSignatureService;
         private readonly ILogger<TicketCheckInController> _logger;
 
+        [ActivatorUtilitiesConstructor]
         public TicketCheckInController(AppDbContext context, ILogger<TicketCheckInController> logger, IQrSignatureService? qrSignatureService = null)
         {
             _context = context;

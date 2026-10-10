@@ -444,6 +444,28 @@
       transform: translateY(0);
     }
 
+    /* Warning Bar S-37 */
+    .sync-warning-bar {
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      z-index: 30;
+    }
+    .sync-warning-offline {
+      background: #fef2f2;
+      color: #991b1b;
+      border-bottom: 1px solid #fecaca;
+    }
+    .sync-warning-syncing {
+      background: #eff6ff;
+      color: #1e40af;
+      border-bottom: 1px solid #bfdbfe;
+    }
+
     /* Offline & Network Banner Styles (S-34) */
     .network-badge {
       display: inline-flex;
@@ -670,6 +692,12 @@
       </button>
     </div>
   </header>
+
+  <!-- Dải cảnh báo S-37 -->
+  <div id="syncWarningBar" class="sync-warning-bar" style="display: none;">
+    <span class="material-symbols-outlined" id="syncWarningIcon">cloud_off</span>
+    <span id="syncWarningText"></span>
+  </div>
 
   <!-- Main Content -->
   <main class="main-container">
@@ -914,7 +942,23 @@
         });
       }
 
-      async function checkAndTriggerAutoDeltaSync() {}
+      async function checkAndTriggerAutoDeltaSync() {
+        if (isDeviceOffline()) return;
+        
+        let queue = getOfflineQueue();
+        if (queue.length === 0) return;
+        
+        // Mock sync logic for S-37 AC testing
+        // In real app, this will call API to sync each ticket.
+        setTimeout(() => {
+          // Clear queue after "syncing"
+          queue = getOfflineQueue(); // read again in case it changed
+          if (!isDeviceOffline() && queue.length > 0) {
+            saveOfflineQueue([]);
+            updateQueueCounterUI();
+          }
+        }, 3000); // simulate 3s network request
+      }
 
       async function verifyOfflineSignature(keyVersion, ticketCode, qrShowtimeId, signatureBase64Url) {
         return verifyQrOffline(`TICKET|${keyVersion}|${ticketCode}|${qrShowtimeId}|${signatureBase64Url}`, qrShowtimeId, getOfflinePublicKeys());
@@ -1306,6 +1350,38 @@
           icon.textContent = 'wifi';
           text.textContent = 'Trực tuyến (Online)';
           bannerNotice.style.display = 'none';
+          checkAndTriggerAutoDeltaSync();
+        }
+        
+        updateSyncWarningBar();
+      }
+
+      function updateSyncWarningBar() {
+        const queue = getOfflineQueue();
+        const count = queue.length;
+        const offline = isDeviceOffline();
+        const warningBar = document.getElementById('syncWarningBar');
+        if (!warningBar) return;
+        
+        const warningText = document.getElementById('syncWarningText');
+        const warningIcon = document.getElementById('syncWarningIcon');
+
+        if (offline || count > 0) {
+          warningBar.style.display = 'flex';
+          if (offline) {
+            warningBar.className = 'sync-warning-bar sync-warning-offline';
+            warningIcon.textContent = 'cloud_off';
+            warningIcon.style.animation = 'none';
+            warningText.innerHTML = `Đang ngoại tuyến. Có <strong>${count}</strong> lượt quét chưa đồng bộ. Không tắt trình duyệt!`;
+          } else {
+            warningBar.className = 'sync-warning-bar sync-warning-syncing';
+            warningIcon.textContent = 'sync';
+            warningIcon.style.animation = 'spin 1.5s linear infinite';
+            warningText.innerHTML = `Đã có mạng. Đang đồng bộ <strong>${count}</strong> lượt quét lên máy chủ...`;
+          }
+        } else {
+          warningBar.style.display = 'none';
+          warningIcon.style.animation = 'none';
         }
       }
 
@@ -1347,6 +1423,7 @@
         if (label) {
           label.textContent = `Hàng đợi: ${queue.length} vé`;
         }
+        updateSyncWarningBar();
       }
 
       window.handleDownloadManifest = async function () {
