@@ -40,6 +40,10 @@
           window.location.href = './staff-scanner.html';
           return;
         }
+        if (roles.includes('auditor') && !roles.includes('organizer') && !roles.includes('admin')) {
+          window.location.href = './auditor.html';
+          return;
+        }
 
         const canAccess = roles.includes('organizer') || roles.includes('admin');
         if (!canAccess) {
