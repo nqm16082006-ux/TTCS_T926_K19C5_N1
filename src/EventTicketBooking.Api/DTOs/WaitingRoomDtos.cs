@@ -32,7 +32,7 @@ namespace EventTicketBooking.Api.DTOs
     {
         public string QueueToken { get; set; } = string.Empty;
         public Guid ShowtimeId { get; set; }
-        
+
         /// <summary>
         /// Trạng thái: WAITING, ADMITTED, EXPIRED, CANCELLED
         /// </summary>
