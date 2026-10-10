@@ -606,6 +606,57 @@
       }
     }
 
+    let conflictShowtimeId = null;
+    let conflictPage = 1;
+    let conflictRequestVersion = 0;
+    const conflictPanel = document.createElement('dialog');
+    conflictPanel.className = 'p-6 rounded-xl bg-surface-container-lowest shadow-xl';
+    conflictPanel.style.cssText = 'width:min(1000px,94vw);max-height:85vh;overflow:auto;border:1px solid #ddd';
+    conflictPanel.setAttribute('aria-label', 'Chi tiết xung đột soát vé');
+    document.body.appendChild(conflictPanel);
+    conflictPanel.addEventListener('close', () => { conflictRequestVersion++; });
+    document.getElementById('ovShowtimeSalesBody').addEventListener('click', event => {
+      const button = event.target.closest('[data-conflict-showtime]');
+      if (button) { conflictShowtimeId = button.dataset.conflictShowtime; conflictPage = 1; void loadCheckInConflicts(); }
+    });
+    conflictPanel.addEventListener('click', event => {
+      const button = event.target.closest('[data-conflict-action]');
+      if (!button) return;
+      if (button.dataset.conflictAction === 'close') { conflictPanel.close(); return; }
+      if (button.dataset.conflictAction === 'previous') conflictPage--;
+      if (button.dataset.conflictAction === 'next') conflictPage++;
+      void loadCheckInConflicts();
+    });
+    async function loadCheckInConflicts() {
+      const version = ++conflictRequestVersion;
+      const title = 'Xung đột soát vé của suất diễn';
+      const controls = '<button data-conflict-action="refresh" class="underline mr-4">Cập nhật</button><button data-conflict-action="close" class="underline">Đóng</button>';
+      if (!conflictPanel.open) conflictPanel.showModal();
+      conflictPanel.innerHTML = `<h3 class="font-semibold">${title}</h3><p role="status">Đang tải...</p>${controls}`;
+      conflictPanel.scrollTop = 0;
+      try {
+        const response = await fetch(`${API_BASE}/api/events/showtimes/${encodeURIComponent(conflictShowtimeId)}/checkin-conflicts?page=${conflictPage}&pageSize=20`, {
+          cache: 'no-store', headers: { Authorization: 'Bearer ' + token }
+        });
+        if (response.status === 401) { window.location.href = './login.html'; return; }
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error('Không thể tải báo cáo xung đột.');
+        if (version !== conflictRequestVersion) return;
+        const data = result.data;
+        const formatTime = value => value ? new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }) : 'Chưa có dữ liệu';
+        const rows = data.items.map(item => `<tr><td class="p-3">${escapeHtml(item.ticketCode)}</td><td class="p-3">${escapeHtml(item.validGate || '')}<br>${escapeHtml(formatTime(item.validTime))}</td><td class="p-3 text-red-600">${escapeHtml(item.conflictGate)}<br>${escapeHtml(formatTime(item.conflictTime))}</td></tr>`).join('');
+        conflictPanel.innerHTML = `<h3 class="font-semibold">${title}</h3><p role="status">${data.totalTickets} vé / ${data.totalConflicts} lượt xung đột. Giờ Việt Nam.</p>
+          <p class="text-sm">Kết quả có thể cập nhật khi thiết bị khác đồng bộ lượt quét sớm hơn.</p>
+          <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr><th class="p-3">Mã vé</th><th class="p-3">Cửa / giờ hợp lệ</th><th class="p-3">Cửa / giờ xung đột</th></tr></thead><tbody>${rows || '<tr><td colspan="3" class="p-3">Không có lượt xung đột trên trang này.</td></tr>'}</tbody></table></div>
+          <p class="my-3">Trang ${data.page} / ${Math.max(1, Math.ceil(data.totalConflicts / data.pageSize))}</p>
+          <button data-conflict-action="previous" class="underline mr-4" ${data.page <= 1 ? 'disabled' : ''}>Trang trước</button>
+          <button data-conflict-action="next" class="underline mr-4" ${data.page * data.pageSize >= data.totalConflicts ? 'disabled' : ''}>Trang sau</button>${controls}`;
+      } catch (error) {
+        if (version !== conflictRequestVersion) return;
+        conflictPanel.innerHTML = `<h3 class="font-semibold">${title}</h3><p role="alert" class="text-red-600">Không thể tải báo cáo xung đột. Vui lòng thử lại.</p>${controls}`;
+      }
+    }
+
     async function loadShowtimeSales() {
       if (showtimeSalesRequestInFlight) {
         showtimeSalesRefreshPending = true;
@@ -693,6 +744,7 @@
             <td class="px-space-lg py-4">
               <div class="font-semibold">${escapeHtml(showtime.eventTitle)}</div>
               <div class="mt-1 text-sm text-on-surface-variant">${escapeHtml(startLabel)}</div>
+              <button type="button" class="mt-2 text-sm text-red-600 underline" data-conflict-showtime="${escapeHtml(showtime.showtimeId)}">Xung đột soát vé: ${Number(showtime.conflictTicketCount || 0)} vé — Xem chi tiết</button>
             </td>
             <td class="px-space-md py-4 text-right font-code-mono">${Number(showtime.ticketSoldCount || 0).toLocaleString('vi-VN')}</td>
             <td class="px-space-md py-4 text-right font-code-mono text-amber-700">${Number(showtime.heldSeatCount || 0).toLocaleString('vi-VN')}</td>

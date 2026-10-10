@@ -403,6 +403,7 @@ namespace EventTicketBooking.Api.Controllers
             var showtimesDto = ev.Showtimes.Select(s => new ShowtimeResponseDto
             {
                 Id = s.Id,
+                SeatingMapImageUrl = s.SeatingMapImageUrl,
                 EventId = s.EventId,
                 StartTime = s.StartTime,
                 EndTime = s.EndTime,
@@ -584,8 +585,59 @@ namespace EventTicketBooking.Api.Controllers
         }
 
         /// <summary>
-        /// Lấy số vé bán, ghế đang giữ, ghế còn và doanh thu theo hạng cho từng suất diễn.
-        /// GET /api/events/sales-by-showtime
+        /// S-36: Báo cáo các lượt quét xung đột của suất diễn, giới hạn theo chủ sự kiện.
+        /// </summary>
+        [HttpPut("{eventId:guid}/showtimes/{showtimeId:guid}/seating-map-image")]
+        public async Task<IActionResult> UpdateSeatingMapImage(Guid eventId, Guid showtimeId, [FromBody] SeatingMapImageDto dto)
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue) return Unauthorized();
+            var showtime = await _context.Showtimes.Include(s => s.Event)
+                .SingleOrDefaultAsync(s => s.Id == showtimeId && s.EventId == eventId);
+            if (showtime == null) return NotFound();
+            if (showtime.Event.OwnerId != userId.Value && !await IsCurrentUserAdminAsync(userId.Value))
+                return StatusCode(StatusCodes.Status403Forbidden);
+            var url = dto.ImageUrl?.Trim();
+            if (!string.IsNullOrEmpty(url) && (url.Length > 2048 ||
+                !(url.StartsWith("/uploads/events/", StringComparison.Ordinal) && !url.Contains('\\') && !url.Contains("..") && !url.Contains('?') && !url.Contains('#') ||
+                  Uri.TryCreate(url, UriKind.Absolute, out var uri) && (uri.Scheme == "http" || uri.Scheme == "https"))))
+                return BadRequest(ApiResponse<object>.FailureResult("Dùng đường link ảnh http/https hoặc ảnh đã tải lên, tối đa 2048 ký tự."));
+            showtime.SeatingMapImageUrl = string.IsNullOrEmpty(url) ? null : url;
+            await _context.SaveChangesAsync();
+            return Ok(ApiResponse<object>.SuccessResult(new { showtime.Id, showtime.SeatingMapImageUrl }, "Đã lưu ảnh sơ đồ khán phòng."));
+        }
+
+        [HttpGet("showtimes/{showtimeId:guid}/checkin-conflicts")]
+        public async Task<IActionResult> GetCheckInConflicts(Guid showtimeId, int page = 1, int pageSize = 20)
+        {
+            Response.Headers["Cache-Control"] = "no-store";
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue) return Unauthorized();
+            if (page < 1 || pageSize < 1 || pageSize > 100 || page > 1000000) return BadRequest();
+            var showtime = await _context.Showtimes.AsNoTracking().Include(s => s.Event)
+                .SingleOrDefaultAsync(s => s.Id == showtimeId);
+            if (showtime == null) return NotFound();
+            if (showtime.Event.OwnerId != userId.Value && !await IsCurrentUserAdminAsync(userId.Value))
+                return StatusCode(StatusCodes.Status403Forbidden);
+            var query = _context.OfflineCheckInRecords.AsNoTracking()
+                .Where(r => r.ShowtimeId == showtimeId && r.IsConflict);
+            var totalConflicts = await query.CountAsync();
+            var totalTickets = await query.Select(r => r.OrderItemId).Distinct().CountAsync();
+            var items = await query.OrderBy(r => r.Id)
+                .Skip((page - 1) * pageSize).Take(pageSize)
+                .Select(r => new
+                {
+                    r.TicketCode,
+                    ConflictGate = r.GateName,
+                    ConflictTime = r.ScannedAtDevice,
+                    ValidGate = r.ExistingCheckInGate,
+                    ValidTime = r.ExistingCheckInTime
+                }).ToListAsync();
+            return Ok(ApiResponse<object>.SuccessResult(new { showtimeId, page, pageSize, totalConflicts, totalTickets, items }));
+        }
+
+        /// <summary>
+        /// Lấy số vé bán, ghế đang giữ, ghế còn, vé xung đột và doanh thu theo hạng cho từng suất diễn.
         /// </summary>
         [HttpGet("sales-by-showtime")]
         [ProducesResponseType(typeof(ApiResponse<ShowtimeSalesReportDto>), StatusCodes.Status200OK)]
@@ -616,6 +668,11 @@ namespace EventTicketBooking.Api.Controllers
                 .OrderBy(showtime => showtime.StartTime)
                 .ToListAsync();
             var showtimeIds = showtimes.Select(showtime => showtime.Id).ToList();
+            var conflictCounts = await _context.OfflineCheckInRecords.AsNoTracking()
+                .Where(r => showtimeIds.Contains(r.ShowtimeId) && r.IsConflict)
+                .GroupBy(r => r.ShowtimeId)
+                .Select(g => new { ShowtimeId = g.Key, Count = g.Select(r => r.OrderItemId).Distinct().Count() })
+                .ToDictionaryAsync(g => g.ShowtimeId, g => g.Count);
             var now = DateTime.UtcNow;
 
             var seatCounts = await _context.Seats
@@ -703,6 +760,7 @@ namespace EventTicketBooking.Api.Controllers
 
                 return new ShowtimeSalesDto
                 {
+                    ConflictTicketCount = conflictCounts.GetValueOrDefault(showtime.Id),
                     ShowtimeId = showtime.Id,
                     EventTitle = showtime.Event.Title,
                     StartTime = showtime.StartTime,
@@ -1097,6 +1155,7 @@ namespace EventTicketBooking.Api.Controllers
                 Showtimes = ev.Showtimes?.Select(s => new ShowtimeResponseDto
                 {
                     Id = s.Id,
+                    SeatingMapImageUrl = s.SeatingMapImageUrl,
                     EventId = s.EventId,
                     StartTime = s.StartTime,
                     EndTime = s.EndTime,

@@ -8,6 +8,7 @@ public class ShowtimeSalesReportDto
 
 public class ShowtimeSalesDto
 {
+    public int ConflictTicketCount { get; set; }
     public Guid ShowtimeId { get; set; }
     public string EventTitle { get; set; } = string.Empty;
     public DateTime StartTime { get; set; }

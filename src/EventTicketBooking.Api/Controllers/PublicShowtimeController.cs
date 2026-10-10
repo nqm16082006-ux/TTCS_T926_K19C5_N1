@@ -117,6 +117,7 @@ namespace EventTicketBooking.Api.Controllers
                 return new PublicShowtimeDto
                 {
                     Id = s.Id,
+                    SeatingMapImageUrl = s.SeatingMapImageUrl,
                     EventId = s.EventId,
                     EventTitle = s.Event?.Title ?? string.Empty,
                     EventDescription = s.Event?.Description,
@@ -201,11 +202,16 @@ namespace EventTicketBooking.Api.Controllers
             }
 
             var remainingSeats = await GetRemainingSeatsAsync(ev.Showtimes.ToList());
+            var eventShowtimeIds = ev.Showtimes.Select(s => s.Id).ToList();
+            var actualSeatCounts = await _context.Seats.AsNoTracking()
+                .Where(s => eventShowtimeIds.Contains(s.ShowtimeId)).GroupBy(s => s.ShowtimeId)
+                .Select(g => new { Id = g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Id, g => g.Count);
             var showtimesList = ev.Showtimes
                 .OrderBy(s => s.StartTime)
                 .Select(s => new PublicShowtimeDto
                 {
                     Id = s.Id,
+                    SeatingMapImageUrl = s.SeatingMapImageUrl,
                     EventId = s.EventId,
                     EventTitle = ev.Title,
                     EventDescription = ev.Description,
@@ -215,7 +221,7 @@ namespace EventTicketBooking.Api.Controllers
                     StartTime = s.StartTime,
                     EndTime = s.EndTime,
                     AvailableSeats = s.AvailableSeats,
-                    TotalSeats = ev.TotalSeats,
+                    TotalSeats = actualSeatCounts.GetValueOrDefault(s.Id, ev.TotalSeats),
                     RemainingTickets = remainingSeats[s.Id],
                     AvailableTickets = remainingSeats[s.Id],
                     RemainingSeats = remainingSeats[s.Id],
@@ -289,6 +295,7 @@ namespace EventTicketBooking.Api.Controllers
             var dto = new PublicShowtimeDto
             {
                 Id = showtime.Id,
+                SeatingMapImageUrl = showtime.SeatingMapImageUrl,
                 EventId = showtime.EventId,
                 EventTitle = showtime.Event?.Title ?? string.Empty,
                 EventDescription = showtime.Event?.Description,

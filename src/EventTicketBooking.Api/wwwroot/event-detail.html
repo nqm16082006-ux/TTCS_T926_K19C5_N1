@@ -1238,6 +1238,7 @@
                     Tải file sơ đồ (.JSON)
                   </button>
                 `}
+                <button type="button" onclick="openSeatingMapImageEditor(this)" data-showtime="${escapeHtml(s.id)}" data-image="${escapeHtml(s.seatingMapImageUrl || '')}" class="font-label-sm text-primary hover:underline mt-2">${s.seatingMapImageUrl ? 'Thay / xóa ảnh sơ đồ' : 'Tải ảnh / link sơ đồ khán phòng'}</button>
               </div>
             </td>
 
@@ -1959,5 +1960,6 @@
         .replace(/"/g, '&quot;');
     }
   </script>
+<script src="./seating-map-image.js"></script>
 </body>
 </html>
