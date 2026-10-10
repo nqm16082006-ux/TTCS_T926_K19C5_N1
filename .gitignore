@@ -67,3 +67,6 @@ audit-fix-frontend.cjs
 demo-*.jpg
 artifacts/
 .tmp/
+
+*.xlsx
+test_e2e*.ps1

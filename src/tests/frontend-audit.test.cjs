@@ -169,3 +169,15 @@ test('S-38 detail modal renders a large scannable QR and a download button only 
   // Tải QR chỉ cho vé hợp lệ.
   assert.ok(ticketsSource.includes("currentTicket.kind !== 'valid'"));
 });
+
+test('order-success page renders large scannable QR (140px+ card, 256px modal), ECDSA badge, scan label and PNG download', () => {
+  const orderSuccessSource = fs.readFileSync(path.join(root, 'order-success.html'), 'utf8');
+  assert.ok(/width:\s*144px/.test(orderSuccessSource), 'Card QR box must be ~144px');
+  assert.ok(/renderQrCode\(qrElement,\s*t\.qrPayload\s*\|\|\s*t\.ticketCode,\s*140\)/.test(orderSuccessSource), 'Card QR size 140px');
+  assert.ok(orderSuccessSource.includes('QUÉT TẠI CỬA SOÁT VÉ'), 'Scan label present');
+  assert.ok(orderSuccessSource.includes('ECDSA'), 'ECDSA verified badge present');
+  assert.ok(/width:\s*256px/.test(orderSuccessSource), 'Modal QR box size 256px');
+  assert.ok(orderSuccessSource.includes('Tải ảnh mã QR (PNG)'), 'Download button present');
+  assert.ok(orderSuccessSource.includes("canvas.toDataURL('image/png')"), 'Export PNG canvas');
+  assert.ok(orderSuccessSource.includes('openQrModal'), 'Click to zoom modal function');
+});

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html class="h-full" lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title id="pageTitle">Phòng Chờ Trực Tuyến - EventPulse</title>
+
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#3525cd",
+            "primary-container": "#4f46e5",
+            "surface": "#faf8ff",
+            "surface-container": "#eaedff",
+            "surface-container-high": "#e2e7ff",
+            "surface-container-low": "#f2f3ff",
+            "on-surface": "#131b2e",
+            "on-surface-variant": "#464555",
+            "outline": "#777587"
+          },
+          fontFamily: {
+            sans: ["Plus Jakarta Sans", "sans-serif"],
+            mono: ["JetBrains Mono", "monospace"]
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 25px rgba(79, 70, 229, 0.25); }
+      50% { box-shadow: 0 0 45px rgba(79, 70, 229, 0.45); }
+    }
+    .glow-card {
+      animation: pulse-glow 3s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-[#f8f9fe] font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary/20 selection:text-primary">
+
+  <!-- Header -->
+  <header class="bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-0 z-40">
+    <div class="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center shadow-md shadow-primary/20">
+          <span class="material-symbols-outlined text-[22px]">confirmation_number</span>
+        </div>
+        <div>
+          <span class="font-extrabold text-lg tracking-tight text-primary">EventPulse</span>
+          <span class="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">Phòng chờ thông minh</span>
+        </div>
+      </div>
+      <div id="liveIndicator" class="flex items-center gap-2 text-xs font-medium text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span>Đang kết nối</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-2xl w-full mx-auto px-4 py-8 flex flex-col justify-center">
+    
+    <!-- Event Summary Card -->
+    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+      <div class="flex items-start gap-4">
+        <div class="w-14 h-14 rounded-xl bg-indigo-50 text-primary flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-3xl">event_seat</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <h1 id="eventTitle" class="text-xl font-bold text-gray-900 truncate">Đang tải thông tin suất diễn...</h1>
+          <p id="showtimeInfo" class="text-sm text-gray-500 mt-1 flex items-center gap-2">
+            <span class="material-symbols-outlined text-sm">schedule</span>
+            <span id="showtimeTime">...</span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Queue Status Card (Primary Focus) -->
+    <div id="queueCard" class="bg-white rounded-3xl p-8 shadow-xl border border-indigo-50 glow-card text-center relative overflow-hidden">
+      <!-- Background decoration -->
+      <div class="absolute -right-16 -top-16 w-48 h-48 bg-primary/5 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute -left-16 -bottom-16 w-48 h-48 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none"></div>
+
+      <!-- Icon & Status Tag -->
+      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200/60 mb-6">
+        <span class="material-symbols-outlined text-sm animate-spin">hourglass_top</span>
+        <span id="statusBadge">ĐANG TRONG HÀNG ĐỢI</span>
+      </div>
+
+      <h2 class="text-gray-500 text-sm font-semibold uppercase tracking-wider mb-2">Vị trí của bạn trong hàng chờ</h2>
+      
+      <!-- Big Position Number -->
+      <div class="my-4">
+        <span id="positionNumber" class="text-6xl sm:text-7xl font-extrabold font-mono text-primary tracking-tight">--</span>
+      </div>
+
+      <!-- People Ahead and Estimated Time -->
+      <div class="grid grid-cols-2 gap-4 max-w-sm mx-auto my-6 p-4 rounded-2xl bg-gray-50 border border-gray-100">
+        <div>
+          <span class="text-xs text-gray-400 font-medium block">Người đứng trước</span>
+          <span id="peopleAhead" class="text-xl font-bold font-mono text-gray-800">--</span>
+        </div>
+        <div>
+          <span class="text-xs text-gray-400 font-medium block">Ước tính chờ</span>
+          <span id="estimatedWait" class="text-xl font-bold font-mono text-gray-800">--</span>
+        </div>
+      </div>
+
+      <!-- Animated Progress Bar -->
+      <div class="space-y-2 mb-6 text-left">
+        <div class="flex justify-between text-xs text-gray-500 font-medium">
+          <span>Tiến độ hàng chờ</span>
+          <span id="progressText">Đang chuẩn bị lượt...</span>
+        </div>
+        <div class="w-full h-3 bg-gray-100 rounded-full overflow-hidden p-0.5">
+          <div id="progressBar" class="h-full bg-gradient-to-r from-indigo-500 to-primary rounded-full transition-all duration-700 ease-out" style="width: 15%;"></div>
+        </div>
+      </div>
+
+      <!-- Instructions & Warning -->
+      <div class="p-4 rounded-xl bg-blue-50/60 border border-blue-100/80 text-xs text-blue-900 leading-relaxed text-left flex items-start gap-3">
+        <span class="material-symbols-outlined text-blue-600 text-lg shrink-0 mt-0.5">info</span>
+        <div>
+          <strong>Lưu ý:</strong> Vui lòng không đóng tab hoặc bấm F5 tải lại trang. Hệ thống sẽ tự động chuyển hướng bạn vào sơ đồ chọn ghế ngay khi đến lượt!
+        </div>
+      </div>
+
+      <!-- Leave Queue Button -->
+      <div class="mt-8 pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
+        <span id="lastUpdated">Vừa cập nhật xong</span>
+        <button id="btnLeaveQueue" onclick="leaveQueue()" class="text-rose-600 hover:text-rose-700 hover:underline font-semibold flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">logout</span>
+          Rời khỏi hàng chờ
+        </button>
+      </div>
+    </div>
+
+    <!-- Admitted Notification (Hidden by default) -->
+    <div id="admittedCard" class="hidden bg-emerald-600 text-white rounded-3xl p-8 shadow-2xl text-center transform scale-95 transition-all duration-300">
+      <div class="w-16 h-16 rounded-full bg-white text-emerald-600 mx-auto flex items-center justify-center shadow-lg mb-4">
+        <span class="material-symbols-outlined text-4xl">check_circle</span>
+      </div>
+      <h2 class="text-2xl font-extrabold mb-2">ĐÃ ĐẾN LƯỢT CỦA BẠN!</h2>
+      <p class="text-emerald-100 text-sm mb-6">
+        Vé thông hành đã được cấp với thời hạn <strong>10 phút</strong>. Đang tự động chuyển hướng vào phòng chọn ghế...
+      </p>
+      <div class="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin mx-auto"></div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="py-6 text-center text-xs text-gray-400">
+    Hệ thống phòng chờ công bằng EventPulse • Bảo vệ lượt mua vé & chống quá tải
+  </footer>
+
+  <script>
+    const API_BASE = window.location.origin;
+    const urlParams = new URLSearchParams(window.location.search);
+    const showtimeId = urlParams.get('showtimeId');
+    let queueToken = urlParams.get('token') || sessionStorage.getItem(`queue_token_${showtimeId}`);
+    let pollInterval = null;
+    let initialPosition = null;
+
+    if (!showtimeId) {
+      alert("Thiếu mã suất diễn. Đang chuyển về trang chủ sự kiện.");
+      window.location.href = './public-events.html';
+    }
+
+    async function loadShowtimeInfo() {
+      try {
+        const res = await fetch(`${API_BASE}/api/public/showtimes/${showtimeId}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data) {
+            const data = json.data;
+            document.getElementById('eventTitle').textContent = data.eventTitle || 'Sự kiện mở bán';
+            const start = data.startTime ? new Date(data.startTime).toLocaleString('vi-VN') : '';
+            document.getElementById('showtimeTime').textContent = start + (data.eventLocation ? ` • ${data.eventLocation}` : '');
+          }
+        }
+      } catch (e) {
+        console.warn("Không tải được chi tiết suất diễn:", e);
+      }
+    }
+
+    async function joinQueue() {
+      try {
+        const token = localStorage.getItem('access_token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/waiting-room/join`, {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify({ clientSessionId: getBrowserSessionId() })
+        });
+
+        const json = await res.json();
+        if (res.ok && json.success) {
+          handleStatusUpdate(json.data);
+        } else {
+          document.getElementById('statusBadge').textContent = 'LỖI HÀNG ĐỢI';
+          alert(json.message || 'Không thể gia nhập hàng chờ. Vui lòng thử lại.');
+        }
+      } catch (err) {
+        console.error("Lỗi khi tham gia hàng chờ:", err);
+      }
+    }
+
+    async function sendHeartbeat() {
+      if (!queueToken) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/waiting-room/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ queueToken: queueToken })
+        });
+
+        const json = await res.json();
+        if (res.ok && json.success) {
+          handleStatusUpdate(json.data);
+          updateLiveIndicator(true);
+        } else if (res.status === 404) {
+          // Phiên bị hủy hoặc hết hạn
+          stopPolling();
+          alert("Phiên xếp hàng của bạn đã hết hạn do mất kết nối quá lâu. Vui lòng xếp hàng lại.");
+          sessionStorage.removeItem(`queue_token_${showtimeId}`);
+          window.location.reload();
+        } else {
+          updateLiveIndicator(false);
+        }
+      } catch (e) {
+        console.warn("Lỗi gửi heartbeat:", e);
+        updateLiveIndicator(false);
+      }
+    }
+
+    function handleStatusUpdate(data) {
+      if (!data) return;
+
+      if (data.queueToken) {
+        queueToken = data.queueToken;
+        sessionStorage.setItem(`queue_token_${showtimeId}`, queueToken);
+      }
+
+      document.getElementById('lastUpdated').textContent = `Cập nhật: ${new Date().toLocaleTimeString('vi-VN')}`;
+
+      if (data.status === 'ADMITTED') {
+        // Đã đến lượt vào phòng chọn ghế!
+        stopPolling();
+        showAdmittedState(data.accessPassToken);
+        return;
+      }
+
+      // Đang trong hàng chờ
+      const pos = data.position || 1;
+      const ahead = data.peopleAhead !== undefined ? data.peopleAhead : Math.max(0, pos - 1);
+
+      document.getElementById('positionNumber').textContent = `#${pos}`;
+      document.getElementById('peopleAhead').textContent = ahead;
+
+      if (initialPosition === null || pos > initialPosition) {
+        initialPosition = pos;
+      }
+
+      // Tính toán tiến độ %
+      let pct = 15;
+      if (initialPosition > 1) {
+        const done = initialPosition - pos;
+        pct = Math.min(95, Math.max(15, Math.round((done / initialPosition) * 100)));
+      }
+      document.getElementById('progressBar').style.width = `${pct}%`;
+      document.getElementById('progressText').textContent = ahead === 0 ? "Bạn là người tiếp theo!" : `Còn ${ahead} người phía trước`;
+
+      // Thời gian chờ ước tính
+      const estSec = data.estimatedWaitSeconds || Math.max(10, pos * 20);
+      const estMin = Math.ceil(estSec / 60);
+      document.getElementById('estimatedWait').textContent = estSec < 60 ? `~${estSec}s` : `~${estMin} phút`;
+    }
+
+    let isRedirectingToSeatMap = false;
+
+    function showAdmittedState(passToken) {
+      isRedirectingToSeatMap = true;
+      document.getElementById('queueCard').classList.add('hidden');
+      const admittedCard = document.getElementById('admittedCard');
+      admittedCard.classList.remove('hidden');
+      setTimeout(() => {
+        admittedCard.classList.remove('scale-95');
+        admittedCard.classList.add('scale-100');
+      }, 50);
+
+      if (passToken) {
+        sessionStorage.setItem(`access_pass_${showtimeId}`, passToken);
+        localStorage.setItem(`access_pass_${showtimeId}`, passToken);
+      }
+
+      // Tự động chuyển hướng sang trang chọn ghế
+      setTimeout(() => {
+        const passParam = passToken ? `&passToken=${encodeURIComponent(passToken)}` : '';
+        window.location.href = `./seat-map.html?showtimeId=${showtimeId}${passParam}`;
+      }, 1500);
+    }
+
+    async function leaveQueue() {
+      if (!confirm("Bạn có chắc chắn muốn rời khỏi hàng chờ? Vị trí hiện tại của bạn sẽ bị mất.")) {
+        return;
+      }
+
+      notifyExit();
+      window.location.href = './public-events.html';
+    }
+
+    function updateLiveIndicator(isOnline) {
+      const el = document.getElementById('liveIndicator');
+      if (isOnline) {
+        el.className = "flex items-center gap-2 text-xs font-medium text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100";
+        el.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span>Đang đồng bộ trực tiếp</span>';
+      } else {
+        el.className = "flex items-center gap-2 text-xs font-medium text-amber-700 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-100";
+        el.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span><span>Đang kết nối lại...</span>';
+      }
+    }
+
+    function getBrowserSessionId() {
+      let id = sessionStorage.getItem('eventpulse_tab_session');
+      if (!id) {
+        id = 'tab_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+        sessionStorage.setItem('eventpulse_tab_session', id);
+      }
+      return id;
+    }
+
+    function startPolling() {
+      stopPolling();
+      pollInterval = setInterval(sendHeartbeat, 2500);
+    }
+
+    function stopPolling() {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    }
+
+    function notifyExit() {
+      if (isRedirectingToSeatMap) return;
+      stopPolling();
+      const currentQueueToken = queueToken || sessionStorage.getItem(`queue_token_${showtimeId}`);
+      const currentPassToken = sessionStorage.getItem(`access_pass_${showtimeId}`);
+
+      if (showtimeId) {
+        if (currentQueueToken) {
+          const leaveUrl = `${API_BASE}/api/showtimes/${showtimeId}/waiting-room/leave?queueToken=${encodeURIComponent(currentQueueToken)}`;
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon(leaveUrl);
+          } else {
+            fetch(leaveUrl, { method: 'POST', keepalive: true }).catch(() => {});
+          }
+        }
+        if (currentPassToken) {
+          const relUrl = `${API_BASE}/api/showtimes/${showtimeId}/waiting-room/release?passToken=${encodeURIComponent(currentPassToken)}`;
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon(relUrl);
+          } else {
+            fetch(relUrl, { method: 'POST', keepalive: true }).catch(() => {});
+          }
+        }
+      }
+      sessionStorage.removeItem(`queue_token_${showtimeId}`);
+      sessionStorage.removeItem(`access_pass_${showtimeId}`);
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await loadShowtimeInfo();
+      await joinQueue();
+      startPolling();
+    });
+
+    window.addEventListener('beforeunload', notifyExit);
+    window.addEventListener('pagehide', notifyExit);
+  </script>
+</body>
+</html>

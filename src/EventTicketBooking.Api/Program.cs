@@ -194,6 +194,11 @@ builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.Tick
 //T-27 Job nền quét và nhả ghế quá hạn, chạy lặp lại được
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.SeatHoldCleanupWorker>();
 
+// S-40: Dịch vụ hàng đợi phòng chờ khi lượng truy cập vượt ngưỡng
+builder.Services.Configure<EventTicketBooking.Api.Options.WaitingRoomOptions>(builder.Configuration.GetSection(EventTicketBooking.Api.Options.WaitingRoomOptions.SectionName));
+builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IWaitingRoomService, EventTicketBooking.Api.Services.Implementations.WaitingRoomService>();
+builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.WaitingRoomCleanupWorker>();
+
 var app = builder.Build();
 
 var configuredTermsVersion = builder.Configuration["TermsPolicy:CurrentVersion"];
