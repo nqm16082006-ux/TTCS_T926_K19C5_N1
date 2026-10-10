@@ -1403,14 +1403,20 @@
 
       try {
         const seatIdsToHold = Array.from(selectedSeatIds);
+        const passToken = new URLSearchParams(window.location.search).get('passToken') || sessionStorage.getItem(`access_pass_${showtimeId}`);
+
+        const holdHeaders = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        };
+        if (passToken) {
+          holdHeaders['X-Access-Pass'] = passToken;
+        }
 
         const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/seats/hold`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ seatIds: seatIdsToHold })
+          headers: holdHeaders,
+          body: JSON.stringify({ seatIds: seatIdsToHold, passToken: passToken || undefined })
         });
 
         const httpDateHeader = res.headers.get('Date');
@@ -1451,6 +1457,12 @@
           // Tự động chuyển tiếp sang khởi tạo đơn hàng & thanh toán
           await createOrderAndProceed();
 
+        } else if (res.status === 429) {
+          // S-40: Lượng truy cập vượt ngưỡng -> Điều hướng sang Phòng chờ
+          const waitingUrl = (json && json.data && json.data.waitingRoomUrl) ? json.data.waitingRoomUrl : `./waiting-room.html?showtimeId=${showtimeId}`;
+          alert((json && json.message) || "Lượng truy cập đang vượt ngưỡng. Hệ thống đang chuyển bạn vào phòng chờ để xếp hàng.");
+          window.location.href = waitingUrl;
+          return;
         } else if (res.status === 401) {
           localStorage.removeItem('access_token');
           localStorage.removeItem('user_info');
@@ -1842,6 +1854,12 @@
         return;
       }
 
+      // S-40: Tự động kiểm tra quyền truy cập phòng chờ
+      const hasAccess = await ensureWaitingRoomAccess();
+      if (!hasAccess) {
+        return; // Đã chuyển hướng sang waiting-room.html
+      }
+
       renderAuthNav();
       await loadEventInfo();
       await loadSeats();
@@ -1850,12 +1868,130 @@
       await initSignalR();
     }
 
+    // Mỗi tab trình duyệt có một định danh phiên riêng biệt được đồng bộ từ phòng chờ
+    function getTabSessionId() {
+      let id = sessionStorage.getItem('eventpulse_tab_session');
+      if (!id) {
+        id = 'tab_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+        sessionStorage.setItem('eventpulse_tab_session', id);
+      }
+      return id;
+    }
+    const currentTabId = getTabSessionId();
+    let activePingTimer = null;
+
+    function startActivePing(token) {
+      if (activePingTimer) clearInterval(activePingTimer);
+      if (!token || !showtimeId) return;
+
+      activePingTimer = setInterval(async () => {
+        try {
+          await fetch(`${API_BASE}/api/showtimes/${showtimeId}/waiting-room/active-ping?passToken=${encodeURIComponent(token)}&clientSessionId=${encodeURIComponent(currentTabId)}`, {
+            method: 'POST'
+          });
+        } catch {}
+      }, 10000);
+    }
+
+    async function ensureWaitingRoomAccess() {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        let passToken = urlParams.get('passToken') ||
+                        sessionStorage.getItem(`access_pass_${showtimeId}`) ||
+                        localStorage.getItem(`access_pass_${showtimeId}`);
+
+        // Xóa passToken khỏi URL hiển thị trên thanh địa chỉ để chống copy pass sang tab khác
+        if (urlParams.has('passToken')) {
+          urlParams.delete('passToken');
+          const cleanSearch = urlParams.toString();
+          const cleanUrl = window.location.pathname + (cleanSearch ? '?' + cleanSearch : '');
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+
+        const token = getValidToken();
+
+        // 1. Nếu có passToken, kiểm tra tính hợp lệ và quyền sở hữu của tab / tài khoản này
+        if (passToken) {
+          try {
+            const valHeaders = {};
+            if (token) valHeaders['Authorization'] = `Bearer ${token}`;
+
+            const valRes = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/waiting-room/validate?passToken=${encodeURIComponent(passToken)}&clientSessionId=${encodeURIComponent(currentTabId)}`, {
+              headers: valHeaders
+            });
+            if (valRes.ok) {
+              const valJson = await valRes.json();
+              if (valJson.data && valJson.data.isValid) {
+                sessionStorage.setItem(`access_pass_${showtimeId}`, passToken);
+                localStorage.setItem(`access_pass_${showtimeId}`, passToken);
+                startActivePing(passToken);
+                return true;
+              }
+            }
+          } catch {}
+          sessionStorage.removeItem(`access_pass_${showtimeId}`);
+          localStorage.removeItem(`access_pass_${showtimeId}`);
+        }
+
+        // 2. Không có passToken hợp lệ -> Gọi JoinQueue kèm token xác thực người dùng
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/waiting-room/join`, {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify({ clientSessionId: currentTabId })
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data) {
+            if (json.data.status === 'ADMITTED') {
+              // Dưới ngưỡng hoặc cùng tài khoản đã có quyền vào: Được cấp lượt vào thẳng!
+              if (json.data.accessPassToken) {
+                sessionStorage.setItem(`access_pass_${showtimeId}`, json.data.accessPassToken);
+                localStorage.setItem(`access_pass_${showtimeId}`, json.data.accessPassToken);
+                startActivePing(json.data.accessPassToken);
+              }
+              return true;
+            } else if (json.data.status === 'WAITING') {
+              // VƯỢT NGƯỠNG: Tự động điều hướng ngay lập tức sang phòng chờ!
+              const queueToken = json.data.queueToken;
+              const redirectUrl = `./waiting-room.html?showtimeId=${showtimeId}${queueToken ? `&token=${encodeURIComponent(queueToken)}` : ''}`;
+              window.location.replace(redirectUrl);
+              return false;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Lỗi kiểm tra phòng chờ:", err);
+      }
+      return true;
+    }
+
     document.addEventListener('DOMContentLoaded', initPage);
 
-    // Dọn dẹp timer khi thoát trang
-    window.addEventListener('beforeunload', () => {
+    // Dọn dẹp timer & giải phóng vé thông hành khi thoát trang
+    function releasePassOnExit() {
       stopHoldCountdown();
-    });
+      if (activePingTimer) {
+        clearInterval(activePingTimer);
+        activePingTimer = null;
+      }
+      const pass = sessionStorage.getItem(`access_pass_${showtimeId}`);
+      if (pass && showtimeId) {
+        const relUrl = `${API_BASE}/api/showtimes/${showtimeId}/waiting-room/release?passToken=${encodeURIComponent(pass)}`;
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(relUrl);
+        } else {
+          fetch(relUrl, { method: 'POST', keepalive: true }).catch(() => {});
+        }
+        sessionStorage.removeItem(`access_pass_${showtimeId}`);
+      }
+    }
+
+    window.addEventListener('beforeunload', releasePassOnExit);
+    window.addEventListener('pagehide', releasePassOnExit);
   </script>
 </body>
 </html>

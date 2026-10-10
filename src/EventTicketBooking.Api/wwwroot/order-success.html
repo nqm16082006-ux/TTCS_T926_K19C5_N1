@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
   <script src="./qrcode.min.js"></script>
   <style>
     :root {
@@ -42,7 +43,7 @@
     }
 
     .success-container {
-      max-width: 680px;
+      max-width: 720px;
       width: 100%;
     }
 
@@ -254,51 +255,160 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding-top: 18px;
-      border-top: 1px solid var(--border-color);
-      gap: 16px;
+      padding-top: 20px;
+      border-top: 1px dashed var(--border-color);
+      gap: 20px;
     }
 
     .qr-info {
       display: flex;
       flex-direction: column;
       flex: 1;
+      min-width: 0;
+    }
+
+    .qr-code-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
     }
 
     .qr-code-display {
       font-family: 'Space Mono', monospace;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 700;
       color: var(--primary);
       letter-spacing: 0.5px;
-      margin-top: 4px;
       word-break: break-all;
     }
 
+    .btn-copy-code {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 4px 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #475569;
+      transition: all 0.15s ease;
+    }
+
+    .btn-copy-code:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .qr-badge-verified {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #047857;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      padding: 4px 10px;
+      border-radius: 8px;
+      margin-top: 8px;
+      width: fit-content;
+    }
+
     .qr-note {
-      font-size: 11px;
+      font-size: 12px;
       color: var(--text-muted);
-      margin-top: 4px;
-      line-height: 1.4;
+      margin-top: 6px;
+      line-height: 1.45;
+    }
+
+    .btn-zoom-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-light);
+      border: 1px solid #c7d2fe;
+      padding: 6px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      margin-top: 10px;
+      width: fit-content;
+      transition: all 0.15s ease;
+    }
+
+    .btn-zoom-action:hover {
+      background: #e0e7ff;
+      border-color: #a5b4fc;
+      transform: translateY(-1px);
+    }
+
+    /* QR Card Box (phóng to to đẹp khớp my-tickets & my-orders) */
+    .qr-card-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      border: 2px solid #e2e8f0;
+      border-radius: 18px;
+      padding: 12px;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .qr-card-wrap:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(79, 70, 229, 0.15);
     }
 
     .qr-box {
-      width: 96px;
-      height: 96px;
-      min-width: 96px;
+      width: 144px;
+      height: 144px;
+      min-width: 144px;
+      min-height: 144px;
       background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 10px;
-      padding: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
+      position: relative;
     }
 
     .qr-box canvas, .qr-box img {
       width: 100% !important;
       height: 100% !important;
       display: block;
+      border-radius: 4px;
+    }
+
+    .qr-scan-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #64748b;
+      margin-top: 8px;
+    }
+
+    .qr-zoom-hint {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--primary);
+      margin-top: 3px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
     }
 
     /* Empty state */
@@ -334,13 +444,15 @@
     /* Actions */
     .actions-wrap {
       display: flex;
+      flex-wrap: wrap;
       gap: 12px;
       margin-top: 28px;
     }
 
     .btn-action {
       flex: 1;
-      padding: 14px;
+      min-width: 160px;
+      padding: 13px 18px;
       border-radius: 12px;
       font-size: 14px;
       font-weight: 700;
@@ -362,6 +474,7 @@
 
     .btn-print:hover {
       background: #f1f5f9;
+      border-color: #cbd5e1;
     }
 
     .btn-home {
@@ -376,19 +489,275 @@
       box-shadow: 0 6px 18px rgba(79, 70, 229, 0.4);
     }
 
+    /* QR Zoom Modal */
+    .qr-modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+      animation: fadeIn 0.15s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .qr-modal-card {
+      background: #ffffff;
+      border-radius: 24px;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+      animation: scaleUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes scaleUp {
+      from { transform: scale(0.94); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .qr-modal-header {
+      padding: 20px 24px 16px 24px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .qr-modal-title-group {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .modal-badge {
+      display: inline-flex;
+      align-items: center;
+      background: var(--primary-light);
+      color: var(--primary);
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .qr-modal-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text-heading);
+      line-height: 1.3;
+    }
+
+    .qr-modal-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .btn-modal-close {
+      background: #f1f5f9;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      font-size: 16px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.15s ease;
+    }
+
+    .btn-modal-close:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .qr-modal-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .modal-qr-frame {
+      background: #ffffff;
+      padding: 16px;
+      border-radius: 20px;
+      border: 2px solid #e2e8f0;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+      display: inline-block;
+    }
+
+    .modal-qr-box {
+      width: 256px;
+      height: 256px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-qr-box canvas, .modal-qr-box img {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+
+    .modal-code-tag {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: #475569;
+      margin-top: 14px;
+      letter-spacing: 0.8px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 5px 14px;
+      border-radius: 8px;
+    }
+
+    .modal-instruction {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 12px;
+      line-height: 1.4;
+      max-width: 320px;
+    }
+
+    .qr-modal-footer {
+      padding: 16px 24px;
+      background: #f8fafc;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn-modal-download {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--primary) 0%, #4338ca 100%);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+      transition: all 0.15s ease;
+    }
+
+    .btn-modal-download:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
+    }
+
+    .btn-modal-dismiss {
+      padding: 12px 18px;
+      border-radius: 12px;
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      color: var(--text-heading);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-modal-dismiss:hover {
+      background: #f1f5f9;
+    }
+
+    /* Toast */
+    .toast-popup {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1e293b;
+      color: #ffffff;
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      z-index: 2000;
+      animation: slideInUp 0.2s ease-out;
+    }
+
+    @keyframes slideInUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    @media (max-width: 600px) {
+      .qr-section {
+        flex-direction: column-reverse;
+        align-items: center;
+        text-align: center;
+        gap: 16px;
+      }
+      .qr-info {
+        align-items: center;
+      }
+      .qr-code-row {
+        justify-content: center;
+      }
+      .details-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      .ticket-top {
+        padding: 20px 20px;
+      }
+      .ticket-body {
+        padding: 20px;
+      }
+      .modal-qr-box {
+        width: 220px;
+        height: 220px;
+      }
+    }
+
     @media print {
       body {
         background: #ffffff;
         padding: 0;
       }
-      .actions-wrap, .success-header {
+      .actions-wrap, .success-header, .qr-modal-backdrop, .btn-zoom-action, .qr-zoom-hint, .btn-copy-code {
         display: none !important;
       }
       .ticket-card {
         box-shadow: none;
-        border: 1px solid #000;
+        border: 2px solid #000;
         page-break-after: always;
         margin-bottom: 20px;
+      }
+      .qr-card-wrap {
+        box-shadow: none;
+        border: 2px solid #000;
       }
     }
   </style>
@@ -423,13 +792,59 @@
 
     <!-- Action Buttons -->
     <div class="actions-wrap" id="actionsBar" style="display: none;">
+      <a href="./my-tickets.html" class="btn-action btn-home">
+        <span>🎟️</span> Xem Vé Của Tôi
+      </a>
+      <a href="./my-orders.html" class="btn-action btn-print">
+        <span>📋</span> Xem Đơn Của Tôi
+      </a>
       <button class="btn-action btn-print" onclick="window.print()">
-        <span>🖨️</span> In tất cả vé / Lưu PDF
+        <span>🖨️</span> In Tất Cả Vé / PDF
       </button>
-      <a href="./public-events.html" class="btn-action btn-home">
-        <span>🎪</span> Khám phá thêm sự kiện
+      <a href="./public-events.html" class="btn-action btn-print">
+        <span>🎪</span> Sự Kiện Khác
       </a>
     </div>
+  </div>
+
+  <!-- QR Fullscreen / Zoom Modal (khớp với Vé Của Tôi) -->
+  <div id="qrModal" class="qr-modal-backdrop" style="display: none;" onclick="closeQrModal(event)">
+    <div class="qr-modal-card" onclick="event.stopPropagation()">
+      <div class="qr-modal-header">
+        <div class="qr-modal-title-group">
+          <span class="modal-badge">🎫 Vé Điện Tử</span>
+          <h3 class="qr-modal-title" id="modalEventTitle">Tên Sự Kiện</h3>
+          <p class="qr-modal-sub" id="modalTicketMeta">Ghế A7 • VIP • 18:00 26/10/2026</p>
+        </div>
+        <button type="button" class="btn-modal-close" onclick="closeQrModal()" title="Đóng">✕</button>
+      </div>
+      <div class="qr-modal-body">
+        <div class="modal-qr-frame">
+          <div id="modalQrBox" class="modal-qr-box"></div>
+        </div>
+        <div class="modal-code-tag" id="modalTicketCode">TK-XXXX-XXXX</div>
+        <div class="qr-badge-verified" style="margin-top: 10px;">
+          <span class="material-symbols-outlined" style="font-size: 16px; color: #059669;">verified</span>
+          <span>Mã QR đã ký số mật mã ECDSA (Chống làm giả)</span>
+        </div>
+        <p class="modal-instruction">
+          Tăng độ sáng màn hình điện thoại để máy quét tại cửa soát vé nhận diện mã tức thì.
+        </p>
+      </div>
+      <div class="qr-modal-footer">
+        <button type="button" class="btn-modal-download" onclick="downloadModalQr()">
+          <span class="material-symbols-outlined" style="font-size: 18px;">download</span>
+          Tải ảnh mã QR (PNG)
+        </button>
+        <button type="button" class="btn-modal-dismiss" onclick="closeQrModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastPopup" class="toast-popup" style="display: none;">
+    <span class="material-symbols-outlined" id="toastIcon" style="font-size: 20px; color: #10b981;">check_circle</span>
+    <span id="toastMsg">Thông báo</span>
   </div>
 
   <script>
@@ -437,6 +852,10 @@
     const params = new URLSearchParams(window.location.search);
     const orderId = params.get('orderId') || '';
     const token = localStorage.getItem('access_token');
+
+    let currentTicketsCache = [];
+    let currentModalIndex = null;
+    let toastTimeout = null;
 
     async function loadTickets() {
       const loadingState = document.getElementById('loadingState');
@@ -474,6 +893,7 @@
 
         const ticketsJson = await ticketsRes.json();
         const tickets = ticketsJson.data || [];
+        currentTicketsCache = tickets;
 
         // AC3: Nếu đơn chưa trả (Pending/Cancelled/Expired) hoặc vé rỗng -> Không có vé nào
         if (!tickets || tickets.length === 0) {
@@ -563,22 +983,48 @@
                 <span class="status-paid-pill">● HỢP LỆ (PAID)</span>
               </div>
 
+              <!-- QR Code Section: Phóng to to rõ, khớp với Vé của tôi & Đơn của tôi -->
               <div class="qr-section">
                 <div class="qr-info">
                   <span class="detail-label">Mã vé điện tử (Ticket Code)</span>
-                  <div class="qr-code-display">${escapeHtml(t.ticketCode)}</div>
-                  <div class="qr-note">🔒 Mã QR có chữ ký số chống giả mạo. Xuất trình mã này hoặc quét QR tại cửa soát vé.</div>
+                  <div class="qr-code-row">
+                    <div class="qr-code-display">${escapeHtml(t.ticketCode)}</div>
+                    <button type="button" class="btn-copy-code" onclick="copyTicketByIndex(${index})" title="Sao chép mã vé">
+                      <span class="material-symbols-outlined" style="font-size: 16px;">content_copy</span>
+                    </button>
+                  </div>
+                  <div class="qr-badge-verified">
+                    <span class="material-symbols-outlined" style="font-size: 16px; color: #059669;">verified</span>
+                    <span>Mã QR đã ký số mật mã ECDSA (Chống làm giả)</span>
+                  </div>
+                  <div class="qr-note">
+                    Xuất trình mã này hoặc quét QR trực tiếp trên màn hình/bản in tại cửa soát vé.
+                  </div>
+                  <button type="button" class="btn-zoom-action" onclick="openQrModal(${index})">
+                    <span class="material-symbols-outlined" style="font-size: 16px;">fullscreen</span>
+                    Phóng to mã QR & Tải ảnh
+                  </button>
                 </div>
-                <div class="qr-box" id="qrContainer_${index}"></div>
+
+                <div class="qr-card-wrap" onclick="openQrModal(${index})" title="Nhấn để phóng to mã QR">
+                  <div class="qr-box" id="qrContainer_${index}"></div>
+                  <span class="qr-scan-label">
+                    <span class="material-symbols-outlined" style="font-size: 13px;">qr_code_scanner</span>
+                    QUÉT TẠI CỬA SOÁT VÉ
+                  </span>
+                  <span class="qr-zoom-hint">
+                    <span class="material-symbols-outlined" style="font-size: 12px;">zoom_in</span> Chạm để phóng to
+                  </span>
+                </div>
               </div>
             </div>
           `;
 
           ticketsList.appendChild(card);
 
-          // Render mã QR (payload Story S-25 chính là TicketCode)
+          // Render mã QR cỡ lớn (140x140px, màu sắc #131b2e rõ nét dễ quét)
           const qrElement = document.getElementById(`qrContainer_${index}`);
-          renderQrCode(qrElement, t.qrPayload || t.ticketCode);
+          renderQrCode(qrElement, t.qrPayload || t.ticketCode, 140);
         });
 
       } catch (err) {
@@ -588,28 +1034,147 @@
       }
     }
 
-    function renderQrCode(container, text) {
+    function renderQrCode(container, text, size = 140) {
       if (!container || !text) return;
       container.innerHTML = '';
       if (typeof QRCode !== 'undefined') {
         new QRCode(container, {
           text: text,
-          width: 84,
-          height: 84,
-          colorDark: '#0f172a',
+          width: size,
+          height: size,
+          colorDark: '#131b2e',
           colorLight: '#ffffff',
           correctLevel: QRCode.CorrectLevel.M
         });
       } else {
-        // Fallback khi thư viện QR chưa tải được: hiển thị mã vé ký tự rõ ràng, không dùng SVG giả
         container.innerHTML = `
-          <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%; font-size:10px; font-weight:700; color:#334155; text-align:center; padding:6px; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc;">
-            <span style="font-size:18px; margin-bottom:2px;">🎟️</span>
-            <span style="font-family:'Space Mono',monospace; word-break:break-all; font-size:9px; line-height:1.2; color:#1e293b;">${escapeHtml(text)}</span>
+          <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%; font-size:10px; font-weight:700; color:#334155; text-align:center; padding:8px; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc;">
+            <span style="font-size:24px; margin-bottom:4px;">🎟️</span>
+            <span style="font-family:'Space Mono',monospace; word-break:break-all; font-size:10px; line-height:1.2; color:#1e293b;">${escapeHtml(text)}</span>
           </div>
         `;
       }
     }
+
+    function openQrModal(index) {
+      const t = currentTicketsCache[index];
+      if (!t) return;
+      currentModalIndex = index;
+
+      const modal = document.getElementById('qrModal');
+      const eventTitle = document.getElementById('modalEventTitle');
+      const ticketMeta = document.getElementById('modalTicketMeta');
+      const ticketCode = document.getElementById('modalTicketCode');
+      const qrBox = document.getElementById('modalQrBox');
+
+      eventTitle.textContent = t.eventTitle || 'Vé Điện Tử';
+      const startTimeStr = t.showtimeStartTime ? formatDateTime(t.showtimeStartTime) : '';
+      const seatTitle = t.seatName ? `Ghế ${t.seatName}` : `Ghế #${t.seatNumber}`;
+      const catTitle = t.categoryName || 'Tiêu chuẩn';
+      ticketMeta.textContent = `${seatTitle} • ${catTitle}${startTimeStr ? ' • ' + startTimeStr : ''}`;
+      ticketCode.textContent = t.ticketCode || '';
+
+      modal.style.display = 'flex';
+
+      setTimeout(() => {
+        renderQrCode(qrBox, t.qrPayload || t.ticketCode, 256);
+      }, 30);
+    }
+
+    function closeQrModal(e) {
+      if (e && e.target && e.target.id !== 'qrModal') {
+        return;
+      }
+      const modal = document.getElementById('qrModal');
+      if (modal) modal.style.display = 'none';
+      currentModalIndex = null;
+    }
+
+    function downloadModalQr() {
+      if (currentModalIndex === null || !currentTicketsCache[currentModalIndex]) {
+        showToast('Chưa chọn vé để tải.', true);
+        return;
+      }
+      const t = currentTicketsCache[currentModalIndex];
+      const qrBox = document.getElementById('modalQrBox');
+      const canvas = qrBox ? qrBox.querySelector('canvas') : null;
+      if (!canvas) {
+        showToast('Chưa thể tải ảnh QR. Vui lòng thử lại.', true);
+        return;
+      }
+      try {
+        const dataUrl = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        const safeCode = (t.ticketCode || 've').replace(/[^A-Za-z0-9\-]/g, '');
+        a.href = dataUrl;
+        a.download = `QR-${safeCode}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast('Đã tải ảnh mã QR thành công.');
+      } catch (err) {
+        showToast('Không thể tải ảnh QR: ' + err.message, true);
+      }
+    }
+
+    function copyTicketByIndex(index) {
+      const t = currentTicketsCache[index];
+      if (!t || !t.ticketCode) return;
+      copyTicketCode(t.ticketCode);
+    }
+
+    function copyTicketCode(code) {
+      if (!code) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(() => {
+          showToast('Đã sao chép mã vé: ' + code);
+        }).catch(() => {
+          fallbackCopyText(code);
+        });
+      } else {
+        fallbackCopyText(code);
+      }
+    }
+
+    function fallbackCopyText(text) {
+      try {
+        const input = document.createElement('input');
+        input.value = text;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        showToast('Đã sao chép mã vé: ' + text);
+      } catch (_) {
+        showToast('Mã vé: ' + text);
+      }
+    }
+
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toastPopup');
+      const toastIcon = document.getElementById('toastIcon');
+      const toastMsg = document.getElementById('toastMsg');
+      if (!toast) return;
+
+      toastMsg.textContent = message;
+      if (isError) {
+        toastIcon.textContent = 'error';
+        toastIcon.style.color = '#f43f5e';
+      } else {
+        toastIcon.textContent = 'check_circle';
+        toastIcon.style.color = '#10b981';
+      }
+
+      toast.style.display = 'flex';
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.style.display = 'none';
+      }, 3000);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeQrModal();
+    });
 
     function formatDateTime(isoString) {
       try {

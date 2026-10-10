@@ -23,20 +23,23 @@ namespace EventTicketBooking.Api.Controllers
     {
         private readonly SeatImportService _seatImportService;
         private readonly ISeatHoldService _seatHoldService;
+        private readonly IWaitingRoomService? _waitingRoomService;
         private readonly ILogger<ShowtimeSeatsController> _logger;
 
         public ShowtimeSeatsController(
             SeatImportService seatImportService,
             ISeatHoldService seatHoldService,
-            ILogger<ShowtimeSeatsController> logger)
+            ILogger<ShowtimeSeatsController> logger,
+            IWaitingRoomService? waitingRoomService = null)
         {
             _seatImportService = seatImportService;
             _seatHoldService = seatHoldService;
             _logger = logger;
+            _waitingRoomService = waitingRoomService;
         }
 
         /// <summary>
-        /// API Giữ ghế cho người dùng đăng nhập (Task T-23 / S-10).
+        /// API Giữ ghế cho người dùng đăng nhập (Task T-23 / S-10 / S-40).
         /// POST /api/showtimes/{showtimeId}/seats/hold
         /// </summary>
         [HttpPost("hold")]
@@ -49,6 +52,7 @@ namespace EventTicketBooking.Api.Controllers
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status429TooManyRequests)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> HoldSeats(
             Guid showtimeId,
@@ -59,6 +63,36 @@ namespace EventTicketBooking.Api.Controllers
             if (!userId.HasValue)
             {
                 return StatusCode(StatusCodes.Status401Unauthorized, ApiResponse<object>.FailureResult("Vui lòng đăng nhập để thực hiện giữ chỗ."));
+            }
+
+            // S-40: Kiểm tra phòng chờ nếu lưu lượng vượt ngưỡng
+            if (_waitingRoomService != null && await _waitingRoomService.IsWaitingRoomRequiredAsync(showtimeId))
+            {
+                string? passToken = request?.PassToken;
+                if (string.IsNullOrWhiteSpace(passToken))
+                {
+                    passToken = Request.Headers["X-Access-Pass"].ToString();
+                }
+                if (string.IsNullOrWhiteSpace(passToken) && Request.Query.ContainsKey("passToken"))
+                {
+                    passToken = Request.Query["passToken"].ToString();
+                }
+
+                bool isValidPass = !string.IsNullOrWhiteSpace(passToken) &&
+                                   await _waitingRoomService.ValidatePassTokenAsync(showtimeId, passToken);
+
+                if (!isValidPass)
+                {
+                    return StatusCode(StatusCodes.Status429TooManyRequests,
+                        ApiResponse<object>.FailureResult(
+                            "Lượng truy cập đang vượt ngưỡng. Vui lòng vào phòng chờ để nhận lượt chọn ghế.",
+                            new
+                            {
+                                WaitingRoomRequired = true,
+                                ShowtimeId = showtimeId,
+                                WaitingRoomUrl = $"/waiting-room.html?showtimeId={showtimeId}"
+                            }));
+                }
             }
 
             var result = await _seatHoldService.HoldSeatsAsync(
