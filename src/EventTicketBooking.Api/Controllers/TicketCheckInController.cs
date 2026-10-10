@@ -23,16 +23,22 @@ namespace EventTicketBooking.Api.Controllers
         private readonly AppDbContext _context;
         private readonly IQrSignatureService _qrSignatureService;
         private readonly ILogger<TicketCheckInController> _logger;
+        private readonly IOrderAuditService _orderAuditService;
 
-        public TicketCheckInController(AppDbContext context, ILogger<TicketCheckInController> logger, IQrSignatureService? qrSignatureService = null)
+        public TicketCheckInController(
+            AppDbContext context,
+            ILogger<TicketCheckInController> logger,
+            IQrSignatureService? qrSignatureService = null,
+            IOrderAuditService? orderAuditService = null)
         {
             _context = context;
             _logger = logger;
             _qrSignatureService = qrSignatureService ?? new QrSignatureService();
+            _orderAuditService = orderAuditService ?? new OrderAuditService(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
         }
 
         public TicketCheckInController(AppDbContext context, IQrSignatureService? qrSignatureService = null)
-            : this(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<TicketCheckInController>.Instance, qrSignatureService)
+            : this(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<TicketCheckInController>.Instance, qrSignatureService, null)
         {
         }
 
@@ -308,6 +314,20 @@ namespace EventTicketBooking.Api.Controllers
                     AdmittedAt = DateTimeOffset.UtcNow
                 };
                 _context.TicketReadmissions.Add(admission);
+
+                // Story S-49: Ghi nhận nhật ký vào lại bổ sung (Readmission)
+                _orderAuditService.Record(
+                    ticket.OrderId,
+                    "TICKET",
+                    ticket.Ticket?.TicketCode ?? ticket.Id.ToString(),
+                    "TICKET_READMISSION",
+                    "CHECKED_IN",
+                    "RE_ADMITTED",
+                    "STAFF",
+                    admission.StaffName,
+                    actorId,
+                    $"Cho vào bổ sung tại Cổng {admission.Gate}. Lý do: {admission.Reason}.");
+
                 try { await _context.SaveChangesAsync(); }
                 catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23505" })
                 { return Conflict(new { Message = "Yêu cầu cho vào này đã được ghi nhận.", Reason = "READMISSION_ALREADY_RECORDED" }); }
@@ -367,6 +387,24 @@ namespace EventTicketBooking.Api.Controllers
             var seatRow = ticket.Seat?.Row ?? "";
             var seatNumber = ticket.Seat?.SeatNumber ?? 0;
             var seatInfo = !string.IsNullOrEmpty(seatRow) ? $"{seatRow}{seatNumber}" : $"{seatNumber}";
+
+            // Story S-49: Ghi nhận nhật ký soát vé thành công
+            var staffNameClaim = User.Identity?.Name ?? User.FindFirst("name")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? "Nhân viên";
+            var actorClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("id")?.Value ?? User.FindFirst("sub")?.Value;
+            Guid.TryParse(actorClaim, out var staffUserId);
+            var isStaffAdmin = User.IsInRole("Admin") || User.HasClaim(c => (c.Type == "role" || c.Type == System.Security.Claims.ClaimTypes.Role) && c.Value == "Admin");
+
+            await _orderAuditService.RecordAndSaveAsync(
+                ticket.OrderId,
+                "TICKET",
+                ticket.Ticket?.TicketCode ?? ticket.Id.ToString(),
+                "TICKET_CHECKED_IN",
+                "NOT_CHECKED_IN",
+                "CHECKED_IN",
+                isStaffAdmin ? "ADMIN" : "STAFF",
+                staffNameClaim,
+                staffUserId != Guid.Empty ? staffUserId : null,
+                $"Soát vé tại Cổng {request.GateName}. Ghế: {seatInfo} ({seatCategoryName}).");
 
             var resultTicketCode = ticket.Ticket?.TicketCode ?? codeToSearch;
             if (string.IsNullOrWhiteSpace(resultTicketCode))

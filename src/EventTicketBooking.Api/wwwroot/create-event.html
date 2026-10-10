@@ -911,7 +911,7 @@
   <!-- SCRIPT LOGIC -->
   <script>
     const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:5012' : '';
-    let token = localStorage.getItem('access_token');
+    let token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
     let currentPosterUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuD5BeuDSNhed6YSukUGH4tRPe-CcJL2BEEqSGi2zphmeHuFOkA9hM5bBeH63-Us_Pf0DWJjisfton9WHqAbFBhkCE-cj9J9u8nIhsL8K8a_kU3dTUEkMEFyGNmiDbxL9kIgPnsSF8Mxgd4MgMNvu3Vh52Ba5C8bdJyg_SzQa4PjZYki1XqdLIQA2w7gs14DkCCRkiBgpQHapoqDtIf3UJcUsd2Qrr5aoSCvJzuNfqFfFWuMMZ2zNMb91w";
     let isSubmitting = false;
     let editEventId = null;
@@ -1397,9 +1397,9 @@
       const title = document.getElementById('eventName').value.trim();
       const category = document.getElementById('eventCategory').value;
       const shortDesc = document.getElementById('shortDesc').value.trim();
-      const detailedHtml = document.getElementById('detailedDesc').innerHTML.trim();
-      
-      const venueType = document.querySelector('input[name="venueType"]:checked').value;
+      const detailedHtml = (document.getElementById('detailedDesc')?.innerHTML || '').trim();
+      token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+      const venueType = document.querySelector('input[name="venueType"]:checked')?.value || 'offline';
       const venueName = document.getElementById('venueName').value.trim();
       const venueCity = document.getElementById('venueCity').value;
       const venueAddress = document.getElementById('venueAddress').value.trim();

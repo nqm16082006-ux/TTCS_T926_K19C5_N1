@@ -941,7 +941,7 @@
   <!-- JAVASCRIPT APPLICATION LOGIC -->
   <script>
     const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:5012' : '';
-    let token = localStorage.getItem('access_token');
+    let token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
     let userInfoRaw = localStorage.getItem('user_info');
     let currentEventId = null;
     let currentEvent = null;

@@ -88,7 +88,9 @@ namespace EventTicketBooking.Api.Controllers
         public async Task<IActionResult> CancelSeatHold(
             Guid showtimeId,
             Guid seatId,
-            CancellationToken cancellationToken)
+            [FromQuery] bool cancelOrder = false,
+            [FromQuery] bool force = false,
+            CancellationToken cancellationToken = default)
         {
             var userId = GetCurrentUserId();
             if (!userId.HasValue)
@@ -100,6 +102,7 @@ namespace EventTicketBooking.Api.Controllers
                 showtimeId,
                 seatId,
                 userId.Value,
+                cancelOrder || force,
                 cancellationToken);
 
             return result.Status switch
