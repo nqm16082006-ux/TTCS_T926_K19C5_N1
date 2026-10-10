@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nhật ký thao tác Đơn hàng & Vé - EventPulse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-800 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+          <i class="fa-solid fa-clock-rotate-left text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 leading-tight">Nhật ký thao tác & Lịch sử trạng thái</h1>
+          <p class="text-xs text-slate-500">Tra cứu toàn diện lịch sử thay đổi Đơn hàng, Vé và Giữ chỗ</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-4 text-sm font-semibold">
+        <a href="my-orders.html" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-slate-600 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition">
+          <i class="fa-solid fa-receipt"></i>
+          <span>Đơn hàng của tôi</span>
+        </a>
+        <a href="auditor.html" class="flex items-center gap-1.5 px-3 py-1.5 text-slate-600 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition">
+          <i class="fa-solid fa-chart-line"></i>
+          <span>Cổng Kế Toán</span>
+        </a>
+        <a href="public-events.html" class="px-3.5 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg transition">
+          Trang chủ
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+    
+    <!-- Search / Filter Card -->
+    <div class="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs mb-6">
+      <form id="searchForm" onsubmit="handleSearch(event)" class="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        <div class="flex-1 relative">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </div>
+          <input 
+            type="text" 
+            id="orderIdInput" 
+            placeholder="Nhập mã đơn hàng (GUID e.g. 3fa85f64-5717-4562-b3fc-2c963f66afa6)..."
+            class="w-full pl-10 pr-24 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
+            required
+          />
+          <button 
+            type="button" 
+            onclick="pasteFromClipboard()" 
+            title="Dán từ Clipboard"
+            class="absolute inset-y-1.5 right-1.5 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-2xs hover:bg-slate-50 transition"
+          >
+            <i class="fa-regular fa-clipboard mr-1"></i>Dán
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button 
+            type="submit" 
+            id="btnSubmitSearch"
+            class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-indigo-300 transition flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <i class="fa-solid fa-search"></i>
+            <span>Tra cứu</span>
+          </button>
+          
+          <button 
+            type="button" 
+            onclick="reloadLogs()" 
+            id="btnReload"
+            class="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm transition"
+            title="Tải lại dữ liệu"
+          >
+            <i class="fa-solid fa-rotate-right" id="reloadIcon"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Order Info Card (Loaded when order details found) -->
+    <div id="orderSummaryCard" class="hidden bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs mb-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-start sm:items-center gap-3">
+          <div class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-xl shrink-0">
+            <i class="fa-solid fa-file-invoice"></i>
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-xs uppercase font-bold text-slate-400">Đơn hàng</span>
+              <span id="summaryOrderId" class="font-mono text-sm font-bold text-slate-800"></span>
+              <span id="summaryStatusBadge" class="px-2.5 py-0.5 text-xs font-bold rounded-full"></span>
+            </div>
+            <p id="summaryDetails" class="text-xs text-slate-500 mt-1"></p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-slate-100">
+          <a 
+            id="linkViewOrderDetails" 
+            href="#" 
+            target="_blank"
+            class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5"
+          >
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            <span>Xem trang đơn hàng</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter & View Controls (Shown when data loaded) -->
+    <div id="filterControls" class="hidden bg-white border border-slate-200 rounded-2xl p-4 shadow-xs mb-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      <!-- Entity Type Pills -->
+      <div class="flex flex-wrap items-center gap-1.5" id="entityFilterTabs">
+        <span class="text-xs font-bold text-slate-400 mr-1.5">Thực thể:</span>
+        <button onclick="setEntityFilter('ALL')" data-filter="ALL" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-indigo-600 text-white">
+          Tất cả (<span id="countAll">0</span>)
+        </button>
+        <button onclick="setEntityFilter('ORDER')" data-filter="ORDER" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200">
+          <i class="fa-solid fa-receipt mr-1 text-slate-500"></i>Đơn hàng (<span id="countOrder">0</span>)
+        </button>
+        <button onclick="setEntityFilter('TICKET')" data-filter="TICKET" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200">
+          <i class="fa-solid fa-ticket mr-1 text-slate-500"></i>Vé (<span id="countTicket">0</span>)
+        </button>
+        <button onclick="setEntityFilter('SEAT_HOLD')" data-filter="SEAT_HOLD" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200">
+          <i class="fa-solid fa-couch mr-1 text-slate-500"></i>Giữ chỗ (<span id="countHold">0</span>)
+        </button>
+      </div>
+
+      <!-- Actor Type & View Toggle -->
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex items-center gap-1.5">
+          <span class="text-xs font-bold text-slate-400">Tác nhân:</span>
+          <select id="actorSelectFilter" onchange="applyFilters()" class="text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-hidden focus:ring-1 focus:ring-indigo-500">
+            <option value="ALL">Tất cả tác nhân</option>
+            <option value="USER">Người dùng (USER)</option>
+            <option value="STAFF">Nhân viên (STAFF)</option>
+            <option value="ADMIN">Quản trị viên (ADMIN)</option>
+            <option value="SYSTEM">Hệ thống (SYSTEM)</option>
+            <option value="BACKGROUND_JOB">Job chạy ngầm (BACKGROUND_JOB)</option>
+          </select>
+        </div>
+
+        <div class="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+          <button id="btnViewTimeline" onclick="switchView('timeline')" class="px-2.5 py-1 text-xs font-bold rounded-md transition bg-white text-indigo-700 shadow-2xs">
+            <i class="fa-solid fa-timeline mr-1"></i>Timeline
+          </button>
+          <button id="btnViewTable" onclick="switchView('table')" class="px-2.5 py-1 text-xs font-bold rounded-md transition text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-table-list mr-1"></i>Bảng
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty Initial Prompt -->
+    <div id="initialState" class="text-center py-16 bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+      <div class="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-2xl mx-auto mb-4">
+        <i class="fa-solid fa-magnifying-glass-arrow-right"></i>
+      </div>
+      <h3 class="text-lg font-bold text-slate-800 mb-1">Tra cứu nhật ký thao tác đơn hàng</h3>
+      <p class="text-sm text-slate-500 max-w-md mx-auto mb-5">
+        Nhập mã GUID của đơn hàng vào ô tìm kiếm ở trên để xem đầy đủ các mốc thay đổi trạng thái, tác nhân (người dùng, nhân viên, hệ thống hay background job).
+      </p>
+      <div class="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200">
+        <i class="fa-solid fa-shield-halved text-indigo-500"></i>
+        <span>Hỗ trợ kiểm toán viên, ban quản trị và khách hàng sở hữu đơn</span>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="hidden text-center py-16 bg-white border border-slate-200 rounded-2xl shadow-xs">
+      <div class="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-3"></div>
+      <p class="text-sm font-semibold text-slate-600">Đang tải nhật ký thao tác...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="hidden text-center py-12 bg-white border border-rose-200 rounded-2xl shadow-xs">
+      <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center text-2xl mx-auto mb-3">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-800 mb-1">Không thể tải nhật ký</h3>
+      <p id="errorMessage" class="text-sm text-slate-500 max-w-md mx-auto"></p>
+    </div>
+
+    <!-- No Logs Found -->
+    <div id="noLogsState" class="hidden text-center py-12 bg-white border border-slate-200 rounded-2xl shadow-xs">
+      <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center text-2xl mx-auto mb-3">
+        <i class="fa-solid fa-folder-open"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-800 mb-1">Chưa có bản ghi nhật ký phù hợp</h3>
+      <p class="text-sm text-slate-500 max-w-md mx-auto">Không tìm thấy thao tác nào với bộ lọc đã chọn.</p>
+    </div>
+
+    <!-- View: Timeline -->
+    <div id="timelineContainer" class="hidden space-y-6">
+      <div class="relative pl-6 sm:pl-8 border-l-2 border-indigo-100 ml-4 sm:ml-6 space-y-8" id="timelineList">
+        <!-- Rendered items go here -->
+      </div>
+    </div>
+
+    <!-- View: Table -->
+    <div id="tableContainer" class="hidden bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
+              <th class="py-3 px-4">Thời điểm</th>
+              <th class="py-3 px-4">Thực thể</th>
+              <th class="py-3 px-4">Hành động</th>
+              <th class="py-3 px-4">Thay đổi trạng thái</th>
+              <th class="py-3 px-4">Tác nhân</th>
+              <th class="py-3 px-4">Chi tiết / Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody" class="divide-y divide-slate-100 font-medium text-slate-700">
+            <!-- Table rows go here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-400 mt-auto">
+    <p>© 2026 EventPulse Ticket Booking System. Hệ thống nhật ký & lưu vết kiểm toán (Audit Trail).</p>
+  </footer>
+
+  <script>
+    let allLogs = [];
+    let currentEntityFilter = 'ALL';
+    let currentActorFilter = 'ALL';
+    let currentView = 'timeline';
+    let currentOrderId = '';
+
+    // Check query params on load
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const qOrderId = urlParams.get('orderId') || urlParams.get('orderCode');
+      if (qOrderId) {
+        document.getElementById('orderIdInput').value = qOrderId.trim();
+        loadLogsForOrder(qOrderId.trim());
+      }
+    });
+
+    async function pasteFromClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          document.getElementById('orderIdInput').value = text.trim();
+        }
+      } catch (err) {
+        console.warn('Clipboard read error:', err);
+      }
+    }
+
+    function handleSearch(e) {
+      e.preventDefault();
+      const orderId = document.getElementById('orderIdInput').value.trim();
+      if (!orderId) return;
+
+      // Update URL query without page reload
+      const url = new URL(window.location);
+      url.searchParams.set('orderId', orderId);
+      window.history.pushState({}, '', url);
+
+      loadLogsForOrder(orderId);
+    }
+
+    function reloadLogs() {
+      if (currentOrderId) {
+        loadLogsForOrder(currentOrderId);
+      } else {
+        const val = document.getElementById('orderIdInput').value.trim();
+        if (val) loadLogsForOrder(val);
+      }
+    }
+
+    async function loadLogsForOrder(orderId) {
+      currentOrderId = orderId;
+      showLoading();
+
+      const reloadIcon = document.getElementById('reloadIcon');
+      if (reloadIcon) reloadIcon.classList.add('fa-spin');
+
+      try {
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+        const headers = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        // Fetch Audit Logs from S-49 API
+        const response = await fetch(`/api/v1/orders/${encodeURIComponent(orderId)}/audit-logs`, {
+          headers: headers
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            window.location.href = `login.html?returnUrl=${encodeURIComponent(window.location.href)}`;
+            return;
+          }
+          throw new Error(result.message || `Lỗi tải nhật ký (Mã lỗi: ${response.status})`);
+        }
+
+        allLogs = result.data || [];
+
+        // Also fetch order summary info to display header
+        fetchOrderSummary(orderId, headers);
+
+        // Update counts
+        updateCounts();
+
+        // Apply filters & render
+        applyFilters();
+
+      } catch (err) {
+        console.error('Error loading audit logs:', err);
+        showError(err.message || 'Không thể kết nối đến máy chủ.');
+      } finally {
+        if (reloadIcon) reloadIcon.classList.remove('fa-spin');
+      }
+    }
+
+    async function fetchOrderSummary(orderId, headers) {
+      try {
+        const res = await fetch(`/api/v1/orders/${encodeURIComponent(orderId)}`, { headers });
+        if (res.ok) {
+          const resJson = await res.json();
+          const order = resJson.data;
+          renderOrderSummary(order);
+        }
+      } catch (e) {
+        console.warn('Could not fetch order summary:', e);
+      }
+    }
+
+    function renderOrderSummary(order) {
+      const summaryCard = document.getElementById('orderSummaryCard');
+      if (!order) {
+        summaryCard.classList.add('hidden');
+        return;
+      }
+
+      summaryCard.classList.remove('hidden');
+      document.getElementById('summaryOrderId').textContent = order.id;
+      
+      const badge = document.getElementById('summaryStatusBadge');
+      badge.textContent = order.status;
+      badge.className = `px-2.5 py-0.5 text-xs font-bold rounded-full ${getStatusBadgeClass(order.status)}`;
+
+      const formatVnd = (num) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num || 0);
+      const itemsCount = (order.items && order.items.length) || 0;
+      document.getElementById('summaryDetails').textContent = 
+        `Tổng tiền: ${formatVnd(order.totalAmount)} • Số lượng vé: ${itemsCount} vé • Tạo lúc: ${formatDateTime(order.createdAt)}`;
+
+      const link = document.getElementById('linkViewOrderDetails');
+      link.href = `order-details.html?orderId=${encodeURIComponent(order.id)}`;
+    }
+
+    function updateCounts() {
+      document.getElementById('countAll').textContent = allLogs.length;
+      document.getElementById('countOrder').textContent = allLogs.filter(l => l.entityType === 'ORDER').length;
+      document.getElementById('countTicket').textContent = allLogs.filter(l => l.entityType === 'TICKET').length;
+      document.getElementById('countHold').textContent = allLogs.filter(l => l.entityType === 'SEAT_HOLD').length;
+    }
+
+    function setEntityFilter(type) {
+      currentEntityFilter = type;
+      // Update UI active buttons
+      const buttons = document.querySelectorAll('#entityFilterTabs .filter-btn');
+      buttons.forEach(btn => {
+        if (btn.getAttribute('data-filter') === type) {
+          btn.className = 'filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-indigo-600 text-white';
+        } else {
+          btn.className = 'filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200';
+        }
+      });
+      applyFilters();
+    }
+
+    function applyFilters() {
+      currentActorFilter = document.getElementById('actorSelectFilter').value;
+
+      let filtered = [...allLogs];
+
+      if (currentEntityFilter !== 'ALL') {
+        filtered = filtered.filter(l => l.entityType === currentEntityFilter);
+      }
+
+      if (currentActorFilter !== 'ALL') {
+        filtered = filtered.filter(l => l.actorType === currentActorFilter);
+      }
+
+      renderLogs(filtered);
+    }
+
+    function switchView(view) {
+      currentView = view;
+      const btnTimeline = document.getElementById('btnViewTimeline');
+      const btnTable = document.getElementById('btnViewTable');
+
+      if (view === 'timeline') {
+        btnTimeline.className = 'px-2.5 py-1 text-xs font-bold rounded-md transition bg-white text-indigo-700 shadow-2xs';
+        btnTable.className = 'px-2.5 py-1 text-xs font-bold rounded-md transition text-slate-600 hover:text-slate-900';
+      } else {
+        btnTable.className = 'px-2.5 py-1 text-xs font-bold rounded-md transition bg-white text-indigo-700 shadow-2xs';
+        btnTimeline.className = 'px-2.5 py-1 text-xs font-bold rounded-md transition text-slate-600 hover:text-slate-900';
+      }
+
+      applyFilters();
+    }
+
+    function renderLogs(logs) {
+      hideAllStates();
+      document.getElementById('filterControls').classList.remove('hidden');
+
+      if (logs.length === 0) {
+        document.getElementById('noLogsState').classList.remove('hidden');
+        return;
+      }
+
+      if (currentView === 'timeline') {
+        document.getElementById('timelineContainer').classList.remove('hidden');
+        renderTimeline(logs);
+      } else {
+        document.getElementById('tableContainer').classList.remove('hidden');
+        renderTable(logs);
+      }
+    }
+
+    function renderTimeline(logs) {
+      const container = document.getElementById('timelineList');
+      container.innerHTML = '';
+
+      logs.forEach(log => {
+        const item = document.createElement('div');
+        item.className = 'relative group';
+
+        const actorConfig = getActorDisplay(log.actorType, log.actor);
+        const entityConfig = getEntityDisplay(log.entityType);
+        const iconConfig = getActionIcon(log.action, log.entityType);
+
+        item.innerHTML = `
+          <!-- Timeline Marker Node -->
+          <div class="absolute -left-[35px] sm:-left-[43px] top-1 w-8 h-8 rounded-full ${iconConfig.bg} border-2 border-white shadow-xs flex items-center justify-center text-xs ${iconConfig.textColor}">
+            <i class="${iconConfig.icon}"></i>
+          </div>
+
+          <!-- Content Card -->
+          <div class="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-sm transition-all">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3 mb-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <!-- Entity Badge -->
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold ${entityConfig.badge}">
+                  <i class="${entityConfig.icon}"></i>
+                  <span>${entityConfig.label}</span>
+                </span>
+
+                <!-- Action Name -->
+                <span class="text-sm font-bold text-slate-800">${escapeHtml(getActionTitle(log.action))}</span>
+
+                <!-- Entity ID snippet if any -->
+                ${log.entityId ? `<span class="font-mono text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100" title="${escapeHtml(log.entityId)}">ID: ${escapeHtml(log.entityId.substring(0, 8))}...</span>` : ''}
+              </div>
+
+              <!-- Timestamp -->
+              <div class="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                <i class="fa-regular fa-clock text-slate-400"></i>
+                <span title="${new Date(log.timestamp).toISOString()}">${formatDateTime(log.timestamp)}</span>
+              </div>
+            </div>
+
+            <!-- Status Transition Banner -->
+            ${log.oldStatus || log.newStatus ? `
+              <div class="flex items-center gap-2 text-xs font-semibold my-2.5 bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
+                <span class="text-slate-400">Trạng thái:</span>
+                <span class="px-2 py-0.5 rounded-md text-[11px] font-bold ${getStatusBadgeClass(log.oldStatus)}">
+                  ${escapeHtml(log.oldStatus || '(Không có)')}
+                </span>
+                <i class="fa-solid fa-arrow-right-long text-slate-400 text-xs"></i>
+                <span class="px-2 py-0.5 rounded-md text-[11px] font-bold ${getStatusBadgeClass(log.newStatus)}">
+                  ${escapeHtml(log.newStatus || '(Không có)')}
+                </span>
+              </div>
+            ` : ''}
+
+            <!-- Note / Description -->
+            ${log.note ? `
+              <p class="text-xs text-slate-600 mb-3 bg-amber-50/40 p-2.5 rounded-xl border border-amber-100/60 font-sans">
+                <i class="fa-regular fa-message text-amber-500 mr-1.5"></i>
+                <span>${escapeHtml(log.note)}</span>
+              </p>
+            ` : ''}
+
+            <!-- Footer: Actor Details -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="text-[11px] font-semibold text-slate-400">Tác nhân thực hiện:</span>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${actorConfig.badgeClass}">
+                  <i class="${actorConfig.icon}"></i>
+                  <span>${actorConfig.label}</span>
+                </span>
+                <span class="text-xs font-mono font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md truncate max-w-xs" title="${escapeHtml(log.actor || '')}">
+                  ${escapeHtml(log.actor || 'N/A')}
+                </span>
+              </div>
+            </div>
+          </div>
+        `;
+
+        container.appendChild(item);
+      });
+    }
+
+    function renderTable(logs) {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      logs.forEach(log => {
+        const actorConfig = getActorDisplay(log.actorType, log.actor);
+        const entityConfig = getEntityDisplay(log.entityType);
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50/80 transition';
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+            ${formatDateTime(log.timestamp)}
+          </td>
+          <td class="py-3 px-4 whitespace-nowrap">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold ${entityConfig.badge}">
+              <i class="${entityConfig.icon}"></i>
+              <span>${entityConfig.label}</span>
+            </span>
+            ${log.entityId ? `<span class="block font-mono text-[10px] text-slate-400 mt-0.5">${escapeHtml(log.entityId.substring(0, 8))}...</span>` : ''}
+          </td>
+          <td class="py-3 px-4 font-bold text-slate-800">
+            ${escapeHtml(getActionTitle(log.action))}
+            <span class="block font-mono text-[10px] text-slate-400 font-normal">${escapeHtml(log.action)}</span>
+          </td>
+          <td class="py-3 px-4 whitespace-nowrap">
+            <div class="flex items-center gap-1.5 text-[11px]">
+              <span class="px-1.5 py-0.5 rounded font-bold ${getStatusBadgeClass(log.oldStatus)}">${escapeHtml(log.oldStatus || '-')}</span>
+              <span class="text-slate-400">➔</span>
+              <span class="px-1.5 py-0.5 rounded font-bold ${getStatusBadgeClass(log.newStatus)}">${escapeHtml(log.newStatus || '-')}</span>
+            </div>
+          </td>
+          <td class="py-3 px-4 whitespace-nowrap">
+            <div class="flex items-center gap-1.5">
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${actorConfig.badgeClass}">
+                <i class="${actorConfig.icon}"></i>
+                <span>${actorConfig.label}</span>
+              </span>
+            </div>
+            <span class="block font-mono text-[10px] text-slate-500 mt-0.5 truncate max-w-[160px]" title="${escapeHtml(log.actor || '')}">
+              ${escapeHtml(log.actor || 'N/A')}
+            </span>
+          </td>
+          <td class="py-3 px-4 text-xs text-slate-600 max-w-sm">
+            ${escapeHtml(log.note || '-')}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function showLoading() {
+      hideAllStates();
+      document.getElementById('loadingState').classList.remove('hidden');
+    }
+
+    function showError(msg) {
+      hideAllStates();
+      document.getElementById('errorState').classList.remove('hidden');
+      document.getElementById('errorMessage').textContent = msg;
+    }
+
+    function hideAllStates() {
+      document.getElementById('initialState').classList.add('hidden');
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('errorState').classList.add('hidden');
+      document.getElementById('noLogsState').classList.add('hidden');
+      document.getElementById('timelineContainer').classList.add('hidden');
+      document.getElementById('tableContainer').classList.add('hidden');
+    }
+
+    // Helper functions
+    function formatDateTime(dtStr) {
+      if (!dtStr) return '-';
+      const d = new Date(dtStr);
+      if (isNaN(d.getTime())) return dtStr;
+      return d.toLocaleString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    }
+
+    function getActionTitle(action) {
+      switch (action) {
+        case 'ORDER_CREATED': return 'Tạo đơn hàng';
+        case 'SEAT_HOLD_ATTACHED': return 'Gắn giữ chỗ vào đơn hàng';
+        case 'ORDER_PAID': return 'Thanh toán thành công';
+        case 'SEAT_HOLD_CONVERTED': return 'Chuyển giữ chỗ thành vé chính thức';
+        case 'TICKET_ISSUED': return 'Phát hành vé điện tử';
+        case 'ORDER_CANCELLED': return 'Hủy đơn hàng';
+        case 'SEAT_HOLD_CANCELLED': return 'Hủy giữ chỗ theo đơn';
+        case 'ORDER_EXPIRED': return 'Đơn hàng hết hạn thanh toán';
+        case 'SEAT_HOLD_EXPIRED': return 'Hết hạn giữ chỗ';
+        case 'SEAT_HOLD_RELEASED': return 'Giải phóng giữ chỗ';
+        case 'ORDER_NEEDS_ATTENTION': return 'Đơn cần xử lý bất thường (Needs Attention)';
+        case 'TICKET_CHECKED_IN': return 'Soát vé vào cửa (Check-in)';
+        case 'TICKET_READMISSION': return 'Tái nhập cửa (Re-admission)';
+        default: return action;
+      }
+    }
+
+    function getEntityDisplay(type) {
+      switch (type) {
+        case 'ORDER':
+          return { label: 'Đơn hàng', icon: 'fa-solid fa-receipt', badge: 'bg-indigo-50 text-indigo-700 border border-indigo-200' };
+        case 'TICKET':
+          return { label: 'Vé điện tử', icon: 'fa-solid fa-ticket', badge: 'bg-emerald-50 text-emerald-700 border border-emerald-200' };
+        case 'SEAT_HOLD':
+          return { label: 'Giữ chỗ', icon: 'fa-solid fa-couch', badge: 'bg-amber-50 text-amber-700 border border-amber-200' };
+        default:
+          return { label: type || 'Thực thể', icon: 'fa-solid fa-cube', badge: 'bg-slate-50 text-slate-700 border border-slate-200' };
+      }
+    }
+
+    function getActorDisplay(actorType, actor) {
+      switch (actorType) {
+        case 'USER':
+          return { label: 'Người dùng', icon: 'fa-solid fa-user', badgeClass: 'bg-blue-50 text-blue-700 border border-blue-200' };
+        case 'STAFF':
+          return { label: 'Nhân viên soát vé', icon: 'fa-solid fa-id-badge', badgeClass: 'bg-teal-50 text-teal-700 border border-teal-200' };
+        case 'ADMIN':
+          return { label: 'Quản trị viên', icon: 'fa-solid fa-user-shield', badgeClass: 'bg-purple-50 text-purple-700 border border-purple-200' };
+        case 'SYSTEM':
+          return { label: 'Hệ thống tự động', icon: 'fa-solid fa-server', badgeClass: 'bg-cyan-50 text-cyan-700 border border-cyan-200' };
+        case 'BACKGROUND_JOB':
+          return { label: 'Job chạy ngầm', icon: 'fa-solid fa-robot', badgeClass: 'bg-rose-50 text-rose-700 border border-rose-200' };
+        default:
+          return { label: actorType || 'Khác', icon: 'fa-solid fa-circle-user', badgeClass: 'bg-slate-100 text-slate-600 border border-slate-200' };
+      }
+    }
+
+    function getActionIcon(action, entityType) {
+      if (action.includes('PAID') || action.includes('ISSUED')) {
+        return { icon: 'fa-solid fa-check', bg: 'bg-emerald-500', textColor: 'text-white' };
+      }
+      if (action.includes('EXPIRED') || action.includes('CANCELLED')) {
+        return { icon: 'fa-solid fa-clock-rotate-left', bg: 'bg-rose-500', textColor: 'text-white' };
+      }
+      if (action.includes('CHECKED_IN') || action.includes('READMISSION')) {
+        return { icon: 'fa-solid fa-qrcode', bg: 'bg-teal-500', textColor: 'text-white' };
+      }
+      if (action.includes('ATTENTION')) {
+        return { icon: 'fa-solid fa-triangle-exclamation', bg: 'bg-amber-500', textColor: 'text-white' };
+      }
+      if (action.includes('CREATED') || action.includes('ATTACHED')) {
+        return { icon: 'fa-solid fa-plus', bg: 'bg-indigo-500', textColor: 'text-white' };
+      }
+      return { icon: 'fa-solid fa-circle-info', bg: 'bg-slate-500', textColor: 'text-white' };
+    }
+
+    function getStatusBadgeClass(status) {
+      if (!status) return 'bg-slate-100 text-slate-500';
+      const s = status.toLowerCase();
+      if (s === 'paid' || s === 'completed' || s === 'used' || s === 'converted') {
+        return 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+      }
+      if (s === 'pending' || s === 'held' || s === 'valid') {
+        return 'bg-amber-100 text-amber-800 border border-amber-200';
+      }
+      if (s === 'expired' || s === 'cancelled' || s === 'released') {
+        return 'bg-rose-100 text-rose-800 border border-rose-200';
+      }
+      if (s === 'needsattention') {
+        return 'bg-purple-100 text-purple-800 border border-purple-200';
+      }
+      return 'bg-slate-100 text-slate-700 border border-slate-200';
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

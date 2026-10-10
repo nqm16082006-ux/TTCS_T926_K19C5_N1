@@ -532,30 +532,39 @@
     }
 
     /* Modal */
+    /* Modal */
     .modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(15, 23, 42, 0.5);
+      background: rgba(15, 23, 42, 0.55);
       backdrop-filter: blur(4px);
       display: none;
       align-items: center;
       justify-content: center;
       z-index: 1000;
-      padding: 20px;
+      padding: 16px;
+      overflow-y: auto;
     }
 
     .modal-box {
       background: var(--bg-surface);
-      border-radius: 20px;
-      max-width: 500px;
+      border-radius: 18px;
+      max-width: 520px;
       width: 100%;
-      padding: 28px;
+      padding: 22px 24px;
       box-shadow: var(--shadow-lg);
       position: relative;
       animation: modalSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      max-height: calc(100vh - 32px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-box.modal-lg {
+      max-width: 580px;
     }
 
     @keyframes modalSlide {
@@ -567,11 +576,12 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
+      margin-bottom: 8px;
+      flex-shrink: 0;
     }
 
     .modal-title {
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 800;
       color: var(--text-heading);
     }
@@ -583,18 +593,115 @@
       color: var(--text-muted);
       cursor: pointer;
       padding: 4px;
+      border-radius: 6px;
+      line-height: 1;
+      transition: background 0.15s ease;
+    }
+
+    .modal-close:hover {
+      background: #f1f5f9;
+      color: var(--text-heading);
+    }
+
+    .modal-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+      flex-shrink: 0;
+      line-height: 1.4;
+    }
+
+    .modal-form {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .modal-body {
+      overflow-y: auto;
+      flex: 1;
+      padding-right: 4px;
+    }
+
+    .modal-body::-webkit-scrollbar {
+      width: 6px;
+    }
+    .modal-body::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 4px;
+    }
+    .modal-body::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .modal-body::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    .form-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 14px;
+    }
+
+    @media (max-width: 520px) {
+      .form-grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-field-label {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text-heading);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 9px;
+      font-size: 13.5px;
+      font-family: inherit;
+      background: var(--bg-app);
+      color: var(--text-heading);
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .form-input:focus {
+      background: #ffffff;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+
+    .roles-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    @media (max-width: 480px) {
+      .roles-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     .role-option {
       display: flex;
       align-items: flex-start;
-      gap: 12px;
-      padding: 14px;
+      gap: 10px;
+      padding: 10px 12px;
       border: 1px solid var(--border-color);
-      border-radius: 12px;
-      margin-bottom: 12px;
+      border-radius: 10px;
       cursor: pointer;
       transition: all 0.2s ease;
+      background: #ffffff;
+      margin-bottom: 0;
     }
 
     .role-option:hover {
@@ -608,49 +715,62 @@
     }
 
     .role-option input[type="checkbox"] {
-      margin-top: 3px;
-      width: 18px;
-      height: 18px;
+      margin-top: 2px;
+      width: 16px;
+      height: 16px;
       accent-color: var(--primary);
+      flex-shrink: 0;
     }
 
     .role-option-info {
       display: flex;
       flex-direction: column;
+      min-width: 0;
     }
 
     .role-option-title {
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13px;
       color: var(--text-heading);
+      line-height: 1.2;
     }
 
     .role-option-desc {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-muted);
       margin-top: 2px;
+      line-height: 1.2;
     }
 
     .modal-actions {
       display: flex;
       justify-content: flex-end;
       gap: 10px;
-      margin-top: 24px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-color);
+      flex-shrink: 0;
     }
 
     .btn-modal-cancel {
-      padding: 10px 18px;
-      border-radius: 10px;
+      padding: 9px 16px;
+      border-radius: 9px;
       border: 1px solid var(--border-color);
       background: #ffffff;
       font-weight: 700;
       font-size: 13px;
       cursor: pointer;
+      color: var(--text-body);
+      transition: all 0.15s ease;
+    }
+
+    .btn-modal-cancel:hover {
+      background: #f1f5f9;
     }
 
     .btn-modal-save {
-      padding: 10px 22px;
-      border-radius: 10px;
+      padding: 9px 20px;
+      border-radius: 9px;
       border: none;
       background: linear-gradient(135deg, var(--primary) 0%, #4338ca 100%);
       color: #ffffff;
@@ -658,11 +778,18 @@
       font-size: 13px;
       cursor: pointer;
       box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+      transition: all 0.15s ease;
+    }
+
+    .btn-modal-save:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
     }
 
     .btn-modal-save:disabled {
       opacity: 0.6;
       cursor: not-allowed;
+      transform: none;
     }
 
     /* Alerts */
@@ -811,58 +938,60 @@
   </main>
 
   <!-- Modal Edit Roles -->
-  <div class="modal-overlay" id="roleModal">
+  <div class="modal-overlay" id="roleModal" onclick="if(event.target === this) closeRoleModal()">
     <div class="modal-box">
       <div class="modal-header">
         <h3 class="modal-title">🛡️ Phân quyền người dùng</h3>
         <button class="modal-close" onclick="closeRoleModal()">✕</button>
       </div>
-      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">
+      <p class="modal-desc">
         Đang chỉnh sửa quyền cho: <strong id="modalTargetUser" style="color: var(--text-heading);">user@example.com</strong>
       </p>
 
-      <form id="roleForm" onsubmit="handleSaveRoles(event)">
+      <form id="roleForm" class="modal-form" onsubmit="handleSaveRoles(event)">
         <input type="hidden" id="modalUserId">
 
-        <label class="role-option" id="optCustomer">
-          <input type="checkbox" name="roles" value="Customer" id="chkCustomer">
-          <div class="role-option-info">
-            <span class="role-option-title">Customer</span>
-            <span class="role-option-desc">Khách hàng tiêu chuẩn: đặt vé, giữ ghế và thanh toán.</span>
-          </div>
-        </label>
+        <div class="modal-body" style="display: flex; flex-direction: column; gap: 8px;">
+          <label class="role-option" id="optCustomer">
+            <input type="checkbox" name="roles" value="Customer" id="chkCustomer">
+            <div class="role-option-info">
+              <span class="role-option-title">Customer</span>
+              <span class="role-option-desc">Khách hàng tiêu chuẩn: đặt vé, giữ ghế và thanh toán.</span>
+            </div>
+          </label>
 
-        <label class="role-option" id="optStaff">
-          <input type="checkbox" name="roles" value="Staff" id="chkStaff">
-          <div class="role-option-info">
-            <span class="role-option-title">Staff</span>
-            <span class="role-option-desc">Nhân viên soát vé: vận hành sự kiện và kiểm tra vé.</span>
-          </div>
-        </label>
+          <label class="role-option" id="optStaff">
+            <input type="checkbox" name="roles" value="Staff" id="chkStaff">
+            <div class="role-option-info">
+              <span class="role-option-title">Staff</span>
+              <span class="role-option-desc">Nhân viên soát vé: vận hành sự kiện và kiểm tra vé.</span>
+            </div>
+          </label>
 
-        <label class="role-option" id="optAuditor">
-          <input type="checkbox" name="roles" value="Auditor" id="chkAuditor">
-          <div class="role-option-info">
-            <span class="role-option-title">Auditor</span>
-            <span class="role-option-desc">Kế toán / kiểm toán: theo dõi doanh thu và đối soát.</span>
-          </div>
-        </label>
+          <label class="role-option" id="optAuditor">
+            <input type="checkbox" name="roles" value="Auditor" id="chkAuditor">
+            <div class="role-option-info">
+              <span class="role-option-title">Auditor</span>
+              <span class="role-option-desc">Kế toán / kiểm toán: theo dõi doanh thu và đối soát.</span>
+            </div>
+          </label>
 
-        <label class="role-option" id="optOrganizer">
-          <input type="checkbox" name="roles" value="Organizer" id="chkOrganizer">
-          <div class="role-option-info">
-            <span class="role-option-title">Organizer</span>
-            <span class="role-option-desc">Ban tổ chức: tạo sự kiện, thiết lập sơ đồ ghế và mở bán suất diễn.</span>
-          </div>
-        </label>
+          <label class="role-option" id="optOrganizer">
+            <input type="checkbox" name="roles" value="Organizer" id="chkOrganizer">
+            <div class="role-option-info">
+              <span class="role-option-title">Organizer</span>
+              <span class="role-option-desc">Ban tổ chức: tạo sự kiện, thiết lập sơ đồ ghế và mở bán suất diễn.</span>
+            </div>
+          </label>
 
-        <label class="role-option" id="optAdmin">
-          <input type="checkbox" name="roles" value="Admin" id="chkAdmin">
-          <div class="role-option-info">
-            <span class="role-option-title">Admin</span>
-            <span class="role-option-desc">Quản trị viên tối cao: toàn quyền quản lý hệ thống, sự kiện và tài khoản.</span>
-          </div>
-        </label>
+          <label class="role-option" id="optAdmin">
+            <input type="checkbox" name="roles" value="Admin" id="chkAdmin">
+            <div class="role-option-info">
+              <span class="role-option-title">Admin</span>
+              <span class="role-option-desc">Quản trị viên tối cao: toàn quyền quản lý hệ thống, sự kiện và tài khoản.</span>
+            </div>
+          </label>
+        </div>
 
         <div class="modal-actions">
           <button type="button" class="btn-modal-cancel" onclick="closeRoleModal()">Hủy</button>
@@ -873,66 +1002,69 @@
   </div>
 
   <!-- Modal Tạo tài khoản nhân viên (S-28) -->
-  <div class="modal-overlay" id="createModal" style="display: none;">
-    <div class="modal-box">
+  <div class="modal-overlay" id="createModal" style="display: none;" onclick="if(event.target === this) closeCreateModal()">
+    <div class="modal-box modal-lg">
       <div class="modal-header">
         <h3 class="modal-title">＋ Tạo tài khoản nhân viên</h3>
         <button class="modal-close" onclick="closeCreateModal()">✕</button>
       </div>
-      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">
-        Tạo tài khoản cho nhân viên và gán vai trò ngay khi tạo. Mật khẩu được băm ở máy chủ.
+      <p class="modal-desc">
+        Tạo tài khoản cho nhân viên và phân quyền ngay khi tạo. Mật khẩu được mã hóa an toàn ở máy chủ.
       </p>
 
-      <form id="createUserForm" onsubmit="handleCreateUser(event)">
-        <div style="display: flex; flex-direction: column; gap: 12px;">
-          <label style="font-size: 13px; font-weight: 600;">Tên đăng nhập *
-            <input type="text" id="createUsername" required maxlength="50" placeholder="vd: nhanvien01"
-              style="margin-top: 5px; width: 100%; padding: 10px 12px; border: 1px solid var(--border-color, #d1d5db); border-radius: 10px; font-size: 14px;">
-          </label>
-          <label style="font-size: 13px; font-weight: 600;">Email *
-            <input type="email" id="createEmail" required maxlength="100" placeholder="vd: nhanvien01@eventticket.com"
-              style="margin-top: 5px; width: 100%; padding: 10px 12px; border: 1px solid var(--border-color, #d1d5db); border-radius: 10px; font-size: 14px;">
-          </label>
-          <label style="font-size: 13px; font-weight: 600;">Họ và tên
-            <input type="text" id="createFullName" maxlength="100" placeholder="Tên hiển thị"
-              style="margin-top: 5px; width: 100%; padding: 10px 12px; border: 1px solid var(--border-color, #d1d5db); border-radius: 10px; font-size: 14px;">
-          </label>
-          <label style="font-size: 13px; font-weight: 600;">Mật khẩu * <span style="font-weight: 400; color: var(--text-muted);">(tối thiểu 8 ký tự)</span>
-            <input type="password" id="createPassword" required minlength="8" autocomplete="new-password"
-              style="margin-top: 5px; width: 100%; padding: 10px 12px; border: 1px solid var(--border-color, #d1d5db); border-radius: 10px; font-size: 14px;">
-          </label>
+      <form id="createUserForm" class="modal-form" onsubmit="handleCreateUser(event)">
+        <div class="modal-body">
+          <div class="form-grid-2">
+            <label class="form-field-label">Tên đăng nhập *
+              <input type="text" id="createUsername" required maxlength="50" placeholder="vd: nhanvien01" class="form-input">
+            </label>
+            <label class="form-field-label">Họ và tên
+              <input type="text" id="createFullName" maxlength="100" placeholder="vd: Phạm Thị Nhung" class="form-input">
+            </label>
+          </div>
+
+          <div class="form-grid-2" style="margin-top: 10px;">
+            <label class="form-field-label">Email *
+              <input type="email" id="createEmail" required maxlength="100" placeholder="vd: nhanvien@gmail.com" class="form-input">
+            </label>
+            <label class="form-field-label">Mật khẩu *
+              <input type="password" id="createPassword" required minlength="8" autocomplete="new-password" placeholder="Tối thiểu 8 ký tự" class="form-input">
+            </label>
+          </div>
+
+          <p style="font-size: 12.5px; font-weight: 700; margin: 12px 0 8px; color: var(--text-heading);">Vai trò nhân viên *</p>
+
+          <div class="roles-grid">
+            <label class="role-option" id="optCreateStaff">
+              <input type="checkbox" name="createRoles" value="Staff" id="chkCreateStaff">
+              <div class="role-option-info">
+                <span class="role-option-title">Staff</span>
+                <span class="role-option-desc">Nhân viên soát vé.</span>
+              </div>
+            </label>
+            <label class="role-option" id="optCreateAuditor">
+              <input type="checkbox" name="createRoles" value="Auditor" id="chkCreateAuditor">
+              <div class="role-option-info">
+                <span class="role-option-title">Auditor</span>
+                <span class="role-option-desc">Kế toán.</span>
+              </div>
+            </label>
+            <label class="role-option" id="optCreateOrganizer">
+              <input type="checkbox" name="createRoles" value="Organizer" id="chkCreateOrganizer">
+              <div class="role-option-info">
+                <span class="role-option-title">Organizer</span>
+                <span class="role-option-desc">Ban tổ chức.</span>
+              </div>
+            </label>
+            <label class="role-option" id="optCreateAdmin">
+              <input type="checkbox" name="createRoles" value="Admin" id="chkCreateAdmin">
+              <div class="role-option-info">
+                <span class="role-option-title">Admin</span>
+                <span class="role-option-desc">Quản trị viên.</span>
+              </div>
+            </label>
+          </div>
         </div>
-
-        <p style="font-size: 13px; font-weight: 700; margin: 18px 0 10px;">Vai trò nhân viên *</p>
-
-        <label class="role-option" id="optCreateStaff">
-          <input type="checkbox" name="createRoles" value="Staff" id="chkCreateStaff">
-          <div class="role-option-info">
-            <span class="role-option-title">Staff</span>
-            <span class="role-option-desc">Nhân viên soát vé.</span>
-          </div>
-        </label>
-        <label class="role-option" id="optCreateAuditor">
-          <input type="checkbox" name="createRoles" value="Auditor" id="chkCreateAuditor">
-          <div class="role-option-info">
-            <span class="role-option-title">Auditor</span>
-            <span class="role-option-desc">Kế toán.</span>
-          </div>
-        </label>
-        <label class="role-option" id="optCreateOrganizer">
-          <input type="checkbox" name="createRoles" value="Organizer" id="chkCreateOrganizer">
-          <div class="role-option-info">
-            <span class="role-option-title">Organizer</span>
-            <span class="role-option-desc">Ban tổ chức.</span>
-          </div>
-        </label>
-        <label class="role-option" id="optCreateAdmin">
-          <input type="checkbox" name="createRoles" value="Admin" id="chkCreateAdmin">
-          <div class="role-option-info">
-            <span class="role-option-title">Admin</span>
-            <span class="role-option-desc">Quản trị viên.</span>
-          </div>
-        </label>
 
         <div class="modal-actions">
           <button type="button" class="btn-modal-cancel" onclick="closeCreateModal()">Hủy</button>
@@ -968,6 +1100,8 @@
             alert('Bạn không có quyền truy cập trang Quản trị Người dùng (Chỉ dành riêng cho Admin).');
             if (roles.includes('staff')) {
               window.location.href = './staff-scanner.html';
+            } else if (roles.includes('auditor')) {
+              window.location.href = './auditor.html';
             } else if (roles.includes('organizer')) {
               window.location.href = './events.html';
             } else {

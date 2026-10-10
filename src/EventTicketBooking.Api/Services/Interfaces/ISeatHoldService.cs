@@ -57,7 +57,7 @@ namespace EventTicketBooking.Api.Services.Interfaces
     public interface ISeatHoldService
     {
         Task<HoldSeatsResult> HoldSeatsAsync(Guid showtimeId, List<Guid> seatIds, Guid userId, CancellationToken cancellationToken = default);
-        Task<HoldSeatsResult> CancelSeatHoldAsync(Guid showtimeId, Guid seatId, Guid userId, CancellationToken cancellationToken = default);
+        Task<HoldSeatsResult> CancelSeatHoldAsync(Guid showtimeId, Guid seatId, Guid userId, bool cancelOrder = false, CancellationToken cancellationToken = default);
         Task<HoldSeatsResult> GetUserActiveHoldsAsync(Guid showtimeId, Guid userId, DateTime? nowOverride = null, CancellationToken cancellationToken = default);
         Task<int> GetUserTicketCountForShowtimeAsync(Guid showtimeId, Guid userId, CancellationToken cancellationToken = default);
     }

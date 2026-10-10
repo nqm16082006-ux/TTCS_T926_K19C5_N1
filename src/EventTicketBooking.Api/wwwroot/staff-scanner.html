@@ -814,11 +814,17 @@
       <div id="queueTableContainer" style="overflow-x: auto; margin-bottom: 16px;">
         <!-- Bảng được render bởi JS -->
       </div>
-      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 14px;">
-        <button type="button" class="btn-offline-action btn-clear-data" onclick="handleClearQueue()">
-          <span class="material-symbols-outlined" style="font-size: 18px;">delete_sweep</span>
-          <span>Xoá hàng đợi</span>
-        </button>
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 14px; gap: 8px; flex-wrap: wrap;">
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn-offline-action btn-download-manifest" id="btnSyncNow" onclick="syncOfflineQueue(true)">
+            <span class="material-symbols-outlined" style="font-size: 18px;">cloud_upload</span>
+            <span>Đồng bộ ngay</span>
+          </button>
+          <button type="button" class="btn-offline-action btn-clear-data" onclick="handleClearQueue()">
+            <span class="material-symbols-outlined" style="font-size: 18px;">delete_sweep</span>
+            <span>Xoá hàng đợi</span>
+          </button>
+        </div>
         <button type="button" class="btn-offline-action btn-view-queue" onclick="closeQueueModal()">
           <span>Đóng</span>
         </button>
@@ -1549,6 +1555,127 @@
       };
 
       // ==========================================
+      // S-35 CLIENT AUTO SYNC & QUEUE FLUSH LOGIC
+      // ==========================================
+      let isSyncInProgress = false;
+
+      async function syncOfflineQueue(isManual = false) {
+        if (isSyncInProgress) {
+          console.log('[S-35] Tiến trình đồng bộ đang chạy, bỏ qua gọi trùng lặp.');
+          return;
+        }
+
+        if (isDeviceOffline()) {
+          if (isManual) alert('Thiết bị đang ở chế độ ngoại tuyến hoặc mất mạng. Vui lòng kết nối mạng để đồng bộ.');
+          return;
+        }
+
+        const queue = getOfflineQueue();
+        if (!queue || queue.length === 0) {
+          if (isManual) alert('Hàng đợi cục bộ đang trống (không có lần quét nào cần đồng bộ).');
+          return;
+        }
+
+        isSyncInProgress = true;
+        const syncBtn = document.getElementById('btnSyncNow');
+        if (syncBtn) {
+          syncBtn.disabled = true;
+          syncBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px; animation: spin 1s linear infinite;">sync</span> <span>Đang đồng bộ...</span>';
+        }
+
+        try {
+          // Xử lý từng lô tối đa 40 vé theo AC1
+          const BATCH_SIZE = 40;
+          let currentQueue = getOfflineQueue();
+
+          while (currentQueue.length > 0 && !isDeviceOffline()) {
+            const batchItems = currentQueue.slice(0, BATCH_SIZE);
+            const batchScanIds = new Set(batchItems.map(item => item.offlineScanId));
+            const payloadItems = batchItems.map(item => ({
+              offlineScanId: item.offlineScanId,
+              ticketCode: item.ticketCode,
+              showtimeId: item.showtimeId,
+              gateName: item.gateName,
+              scannedAt: item.scannedAt,
+              qrPayload: item.qrPayload || ''
+            }));
+
+            const abortController = new AbortController();
+            const timeoutId = setTimeout(() => abortController.abort(), 15000);
+
+            let res;
+            try {
+              res = await fetch('/api/v1/checkin/offline-sync', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ items: payloadItems }),
+                signal: abortController.signal
+              });
+            } finally {
+              clearTimeout(timeoutId);
+            }
+
+            if (!res.ok) {
+              // HTTP 5xx, 429, timeout v.v.: Giữ nguyên queue, KHÔNG xóa item chưa ACK
+              console.warn('[S-35] Máy chủ phản hồi mã lỗi:', res.status);
+              if (isManual) alert(`Lỗi máy chủ (${res.status}) khi đồng bộ. Các vé chưa xác nhận được giữ nguyên trong hàng đợi để thử lại.`);
+              break;
+            }
+
+            const data = await res.json();
+            const results = data.results || [];
+
+            const VALID_ACK_STATUSES = new Set(['synced', 'duplicate', 'conflict', 'rejected']);
+
+            // Tập hợp các offlineScanId đã nhận ACK terminal hợp lệ VÀ thuộc đúng batch vừa gửi
+            const ackedIds = new Set(
+              results
+                .filter(r => r && r.isAckTerminal === true && VALID_ACK_STATUSES.has(r.status) && batchScanIds.has(r.offlineScanId))
+                .map(r => r.offlineScanId)
+            );
+
+            // Cập nhật lại queue: CHỈ xóa các item có trong ackedIds
+            const latestQueue = getOfflineQueue();
+            const remainingQueue = latestQueue.filter(item => !ackedIds.has(item.offlineScanId));
+            saveOfflineQueue(remainingQueue);
+            updateQueueCounterUI();
+            if (document.getElementById('queueModal') && document.getElementById('queueModal').style.display === 'flex') {
+              window.openQueueModal();
+            }
+
+            // Nếu không có item nào được ACK -> dừng lô để tránh loop vô hạn
+            if (ackedIds.size === 0) {
+              console.warn('[S-35] Không nhận được ACK terminal nào, dừng lô.');
+              break;
+            }
+
+            currentQueue = remainingQueue;
+          }
+
+          const finalQueue = getOfflineQueue();
+          if (finalQueue.length === 0 && isManual) {
+            alert('Đồng bộ thành công toàn bộ hàng đợi lên máy chủ!');
+          }
+        } catch (err) {
+          // Lỗi mạng fetch failed, timeout: Giữ nguyên queue
+          console.warn('[S-35] Lỗi kết nối mạng khi đồng bộ:', err);
+          if (isManual) alert('Mất kết nối mạng khi gửi dữ liệu. Hàng đợi được giữ nguyên an toàn để đồng bộ lại khi có mạng.');
+        } finally {
+          isSyncInProgress = false;
+          updateQueueCounterUI();
+          if (syncBtn) {
+            syncBtn.disabled = false;
+            syncBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px;">cloud_upload</span> <span>Đồng bộ ngay</span>';
+          }
+        }
+      }
+
+      window.syncOfflineQueue = syncOfflineQueue;
+
+      // ==========================================
       // LOAD TODAY SHOWS & PRE-CACHE KEYS
       // ==========================================
       async function loadTodayShows() {
@@ -1876,9 +2003,21 @@
       // Khởi tạo các sự kiện mạng & điều khiển
       const offlineToggle = document.getElementById('offlineModeToggle');
       if (offlineToggle) {
-        offlineToggle.addEventListener('change', updateNetworkStatusUI);
+        offlineToggle.addEventListener('change', () => {
+          updateNetworkStatusUI();
+          if (!isDeviceOffline()) {
+            syncOfflineQueue(false);
+          }
+        });
       }
-      window.addEventListener('online', updateNetworkStatusUI);
+
+      function handleOnlineReconnect() {
+        updateNetworkStatusUI();
+        // AC1: Khi có mạng lại, tự động đẩy hàng đợi ngoại tuyến lên máy chủ
+        syncOfflineQueue(false);
+      }
+
+      window.addEventListener('online', handleOnlineReconnect);
       window.addEventListener('offline', updateNetworkStatusUI);
 
       const showtimeSelect = document.getElementById('showtimeSelect');
@@ -1889,6 +2028,11 @@
       updateNetworkStatusUI();
       updateQueueCounterUI();
       updateManifestUI();
+
+      // Kiểm tra đồng bộ lúc tải trang nếu online và hàng đợi có sẵn vé
+      if (!isDeviceOffline() && getOfflineQueue().length > 0) {
+        syncOfflineQueue(false);
+      }
 
     })();
 

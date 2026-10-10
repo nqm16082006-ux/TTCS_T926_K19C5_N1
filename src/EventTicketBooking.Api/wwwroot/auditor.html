@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cổng Kế Toán & Đối Soát - Event Ticket Booking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-app: #f8fafc;
+      --bg-surface: #ffffff;
+      --border-color: #e2e8f0;
+      --border-focus: #0284c7;
+      --primary: #0284c7;
+      --primary-hover: #0369a1;
+      --primary-light: #e0f2fe;
+      --text-heading: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      --shadow-lg: 0 12px 28px -4px rgba(0, 0, 0, 0.08), 0 6px 12px -4px rgba(0, 0, 0, 0.03);
+      --success-bg: #ecfdf5;
+      --success-text: #059669;
+      --success-border: #a7f3d0;
+      --warning-bg: #fffbeb;
+      --warning-text: #d97706;
+      --warning-border: #fde68a;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-app);
+      color: var(--text-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Navbar */
+    .navbar {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 14px 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 19px;
+      font-weight: 800;
+      color: var(--text-heading);
+      text-decoration: none;
+      letter-spacing: -0.3px;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 20px;
+      box-shadow: 0 4px 10px rgba(2, 132, 199, 0.25);
+    }
+
+    .brand-badge {
+      background: #e0f2fe;
+      border: 1px solid #bae6fd;
+      color: #0369a1;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav-link {
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-body);
+      padding: 8px 14px;
+      border-radius: 10px;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-link:hover {
+      background: var(--bg-app);
+      color: var(--primary);
+    }
+
+    .nav-link.active {
+      background: var(--primary-light);
+      color: var(--primary);
+      border: 1px solid #bae6fd;
+    }
+
+    .user-menu {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-app);
+      padding: 6px 14px 6px 8px;
+      border-radius: 9999px;
+      border: 1px solid var(--border-color);
+    }
+
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0284c7, #026597);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .user-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-heading);
+    }
+
+    .btn-logout {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-logout:hover {
+      background: #fee2e2;
+      color: #dc2626;
+    }
+
+    /* Main Container */
+    .main-container {
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 32px 24px;
+      flex: 1;
+    }
+
+    /* Page Header */
+    .page-header {
+      margin-bottom: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .page-title {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--text-heading);
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .page-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .role-tag {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .stat-icon.emerald { background: #d1fae5; color: #047857; }
+    .stat-icon.sky { background: #e0f2fe; color: #0369a1; }
+    .stat-icon.amber { background: #fef3c7; color: #b45309; }
+    .stat-icon.indigo { background: #e0e7ff; color: #4338ca; }
+
+    .stat-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text-heading);
+      line-height: 1.1;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Blank / Placeholder Surface */
+    .placeholder-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 48px 32px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .placeholder-icon {
+      width: 80px;
+      height: 80px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 38px;
+      box-shadow: 0 8px 24px rgba(2, 132, 199, 0.15);
+    }
+
+    .placeholder-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text-heading);
+    }
+
+    .placeholder-desc {
+      font-size: 14.5px;
+      color: var(--text-muted);
+      max-width: 620px;
+      line-height: 1.6;
+    }
+
+    .permissions-box {
+      margin-top: 10px;
+      max-width: 580px;
+      width: 100%;
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 20px;
+      text-align: left;
+    }
+
+    .permissions-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-heading);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .permissions-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .permissions-list li {
+      font-size: 13px;
+      color: var(--text-body);
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .permissions-list li span.badge-ok {
+      color: #059669;
+      font-weight: 800;
+    }
+
+    .actions-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-action {
+      padding: 10px 20px;
+      font-size: 13.5px;
+      font-weight: 700;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      color: #ffffff;
+      border: none;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+    }
+
+    .btn-primary:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: #ffffff;
+      color: var(--text-body);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-outline:hover {
+      background: #f1f5f9;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <a href="./auditor.html" class="brand">
+      <div class="brand-icon">📑</div>
+      <span>EventPulse</span>
+      <span class="brand-badge">Auditor Portal</span>
+    </a>
+    <div class="nav-links">
+      <a href="./auditor.html" class="nav-link active">📊 Tổng quan kế toán</a>
+      <a href="./order-audit-logs.html" class="nav-link">⏱️ Nhật ký thao tác & lưu vết</a>
+      <a href="javascript:void(0)" class="nav-link" onclick="alert('Tính năng Báo cáo doanh thu đang được phát triển.')">📈 Báo cáo doanh thu</a>
+      <a href="javascript:void(0)" class="nav-link" onclick="alert('Tính năng Đối soát thanh toán đang được phát triển.')">💳 Đối soát thanh toán</a>
+    </div>
+    <div class="user-menu">
+      <div class="user-chip">
+        <div class="user-avatar" id="navAvatar">K</div>
+        <span class="user-name" id="navUsername">Kế toán viên</span>
+      </div>
+      <button class="btn-logout" onclick="logout()">Đăng xuất</button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-container">
+
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">📊 Cổng Kế Toán & Đối Soát Tài Chính</h1>
+        <p class="page-subtitle">Phân hệ dành riêng cho vai trò Kế toán (Auditor) để kiểm tra dòng tiền, đối soát giao dịch và xuất báo cáo tài chính.</p>
+      </div>
+      <div class="role-tag">
+        <span>🛡️</span>
+        <span id="roleBadgeText">Vai trò: Auditor (Kế toán)</span>
+      </div>
+    </div>
+
+    <!-- Summary Metrics Placeholder -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon emerald">💰</div>
+        <div class="stat-info">
+          <span class="stat-value">0 ₫</span>
+          <span class="stat-label">Doanh thu ghi nhận</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon sky">🧾</div>
+        <div class="stat-info">
+          <span class="stat-value">0</span>
+          <span class="stat-label">Đơn hàng thành công</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-info">
+          <span class="stat-value">0 ₫</span>
+          <span class="stat-label">Chờ đối soát PayOS</span>
+        </div>
+        <div class="stat-icon amber" style="margin-left: auto;">⏳</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-info">
+          <span class="stat-value">0</span>
+          <span class="stat-label">Vé đã xuất đối soát</span>
+        </div>
+        <div class="stat-icon indigo" style="margin-left: auto;">🎟️</div>
+      </div>
+    </div>
+
+    <!-- Empty / Placeholder State -->
+    <div class="placeholder-card">
+      <div class="placeholder-icon">📋</div>
+      <h2 class="placeholder-title">Phân hệ Kế Toán & Đối Soát Đang Sẵn Sàng</h2>
+      <p class="placeholder-desc">
+        Tài khoản của bạn đã được hệ thống xác thực thành công với vai trò <strong>Auditor (Kế toán)</strong>.
+        Màn hình này hiện đang đóng vai trò trang đích và sẵn sàng kết nối các module kế toán chi tiết khi được kích hoạt.
+      </p>
+
+      <div class="permissions-box">
+        <div class="permissions-title">
+          <span>🔒</span> Quyền hạn tài khoản của bạn trên hệ thống:
+        </div>
+        <ul class="permissions-list">
+          <li>
+            <span class="badge-ok">✓</span>
+            <span><strong>Theo dõi đối soát thanh toán:</strong> Giám sát các giao dịch phát sinh từ cổng PayOS/Mock.</span>
+          </li>
+          <li>
+            <span class="badge-ok">✓</span>
+            <span><strong>Báo cáo doanh thu sự kiện:</strong> Xem dữ liệu dòng tiền theo từng suất diễn và loại vé.</span>
+          </li>
+          <li>
+            <span class="badge-ok">✓</span>
+            <span><strong>Độc lập với vận hành soát vé:</strong> Không can thiệp vào nghiệp vụ quét vé tại cổng (Staff) hoặc mở bán (Organizer).</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="actions-row">
+        <a href="./order-audit-logs.html" class="btn-action btn-primary" style="text-decoration:none;">
+          ⏱️ Tra cứu nhật ký thao tác đơn & vé
+        </a>
+        <button class="btn-action btn-outline" onclick="window.location.reload()">
+          🔄 Làm mới dữ liệu
+        </button>
+        <button class="btn-action btn-outline" onclick="logout()">
+          🚪 Đăng xuất
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        window.location.href = './login.html?returnUrl=' + encodeURIComponent(window.location.pathname);
+        return;
+      }
+
+      const userInfoRaw = localStorage.getItem('user_info');
+      if (userInfoRaw) {
+        try {
+          const user = JSON.parse(userInfoRaw);
+          const name = user.fullName || user.username || user.email || 'Kế toán viên';
+          document.getElementById('navUsername').textContent = name;
+          document.getElementById('navAvatar').textContent = name.trim().charAt(0).toUpperCase();
+
+          const roles = (user.roles || []).map(r => (r || '').toLowerCase());
+          const isAuditor = roles.includes('auditor');
+          const isAdmin = roles.includes('admin');
+
+          if (!isAuditor && !isAdmin) {
+            alert('Bạn không có quyền truy cập khu vực Kế toán (Auditor).');
+            if (roles.includes('staff')) {
+              window.location.href = './staff-scanner.html';
+            } else if (roles.includes('organizer')) {
+              window.location.href = './events.html';
+            } else {
+              window.location.href = './public-events.html';
+            }
+            return;
+          }
+
+          if (isAdmin) {
+            document.getElementById('roleBadgeText').textContent = 'Vai trò: Admin & Auditor';
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    });
+
+    function logout() {
+      if (confirm('Bạn có chắc chắn muốn đăng xuất không?')) {
+        localStorage.clear();
+        window.location.href = './login.html';
+      }
+    }
+  </script>
+</body>
+</html>

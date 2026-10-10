@@ -136,7 +136,7 @@ namespace EventTicketBooking.Api.Controllers
 
             if (!request.AcceptTerms)
             {
-                return BadRequest(new { message = "Bạn cần đồng ý với Điều khoản dịch vụ để đăng ký." });
+                return BadRequest(new { message = "Bạn cần đồng ý với Điều khoản dịch vụ và Chính sách riêng tư để đăng ký." });
             }
 
             // Lấy Role "Customer" từ Database

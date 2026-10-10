@@ -24,6 +24,7 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly ILogger<PaymentService> _logger;
         private readonly EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue _ticketEmailQueue;
         private readonly ITicketService _ticketService;
+        private readonly IOrderAuditService _orderAuditService;
         private readonly StackExchange.Redis.IConnectionMultiplexer? _redis;
         private readonly Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>? _hubContext;
 
@@ -34,7 +35,8 @@ namespace EventTicketBooking.Api.Services.Implementations
             EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue ticketEmailQueue,
             ITicketService? ticketService = null,
             StackExchange.Redis.IConnectionMultiplexer? redis = null,
-            Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>? hubContext = null)
+            Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>? hubContext = null,
+            IOrderAuditService? orderAuditService = null)
         {
             _context = context;
             _paymentGateway = paymentGateway;
@@ -43,6 +45,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             _ticketService = ticketService ?? new TicketService();
             _redis = redis;
             _hubContext = hubContext;
+            _orderAuditService = orderAuditService ?? new OrderAuditService(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
         }
 
         public async Task<PaymentCreationResult> CreatePaymentForOrderAsync(Guid orderId, Guid userId, CancellationToken cancellationToken = default)
@@ -353,6 +356,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                 // 4.2. Xử lý trường hợp thanh toán bị hủy (Cancelled) - hủy order và nhả ghế
                 if (result.Status == PaymentStatus.Cancelled)
                 {
+                    var oldStatus = order.Status.ToString();
                     order.Status = OrderStatus.Cancelled;
                     order.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -376,6 +380,34 @@ namespace EventTicketBooking.Api.Services.Implementations
                         .Where(s => releaseSeatIds.Contains(s.Id) && s.Status == "HELD")
                         .ToListAsync(cancellationToken);
                     foreach (var s in seatsToRelease) s.Status = "AVAILABLE";
+
+                    // Story S-49: Ghi nhận nhật ký huỷ đơn hàng và giải phóng giữ chỗ
+                    _orderAuditService.Record(
+                        order.Id,
+                        "ORDER",
+                        order.Id.ToString(),
+                        "ORDER_CANCELLED",
+                        oldStatus,
+                        OrderStatus.Cancelled.ToString(),
+                        "SYSTEM",
+                        "system:PaymentWebhook",
+                        null,
+                        "Thanh toán bị huỷ bởi người dùng hoặc cổng thanh toán.");
+
+                    foreach (var hold in holdsToCancel)
+                    {
+                        _orderAuditService.Record(
+                            order.Id,
+                            "SEAT_HOLD",
+                            hold.SeatId.ToString(),
+                            "SEAT_HOLD_CANCELLED",
+                            "ACTIVE",
+                            "CANCELLED",
+                            "SYSTEM",
+                            "system:PaymentWebhook",
+                            null,
+                            "Giải phóng giữ chỗ do đơn hàng bị huỷ.");
+                    }
 
                     await _context.SaveChangesAsync(cancellationToken);
 
@@ -439,6 +471,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                 // 4.5. Re-check đơn hàng đã bị hết hạn hoặc bị hủy chưa (ExpiresAt <= UtcNow)
                 if (order.Status == OrderStatus.Expired || order.Status == OrderStatus.Cancelled || (order.Status == OrderStatus.Pending && order.ExpiresAt <= DateTimeOffset.UtcNow))
                 {
+                    var oldStatus = order.Status.ToString();
                     order.Status = OrderStatus.NeedsAttention;
                     order.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -461,6 +494,19 @@ namespace EventTicketBooking.Api.Services.Implementations
                     var expiredSeats = await _context.Seats.Where(s => expiredSeatIds.Contains(s.Id) && s.Status == "HELD")
                         .ToListAsync(cancellationToken);
                     foreach (var seat in expiredSeats) seat.Status = "AVAILABLE";
+
+                    // Story S-49: Ghi nhận nhật ký đơn hàng cần đối soát
+                    _orderAuditService.Record(
+                        order.Id,
+                        "ORDER",
+                        order.Id.ToString(),
+                        "ORDER_NEEDS_ATTENTION",
+                        oldStatus,
+                        OrderStatus.NeedsAttention.ToString(),
+                        "SYSTEM",
+                        "system:PaymentWebhook",
+                        null,
+                        "Thanh toán đến sau khi đơn hàng đã hết hạn hoặc bị huỷ. Cần nhân sự đối soát.");
 
                     await _context.SaveChangesAsync(cancellationToken);
                     if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
@@ -497,6 +543,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                 // Bước 5: Cập nhật trạng thái (Paid) và Commit Transaction
 
                 // A. Cập nhật Order -> Paid
+                var oldPaidStatus = order.Status.ToString();
                 order.Status = OrderStatus.Paid;
                 order.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -530,6 +577,18 @@ namespace EventTicketBooking.Api.Services.Implementations
                         successTx.Status = "NEEDS_ATTENTION";
                         successTx.UpdatedAt = DateTimeOffset.UtcNow;
                     }
+                    _orderAuditService.Record(
+                        order.Id,
+                        "ORDER",
+                        order.Id.ToString(),
+                        "ORDER_NEEDS_ATTENTION",
+                        oldPaidStatus,
+                        OrderStatus.NeedsAttention.ToString(),
+                        "SYSTEM",
+                        "system:PaymentWebhook",
+                        null,
+                        "Ghế không còn khả dụng khi xác nhận thanh toán. Chuyển sang NeedsAttention để hoàn tiền.");
+
                     await _context.SaveChangesAsync(cancellationToken);
                     if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
                     return PaymentExecutionResult.CreateFailure("Ghế không còn khả dụng. Giao dịch cần kiểm tra hoàn tiền.", order.Id, result.OrderCode);
@@ -548,6 +607,34 @@ namespace EventTicketBooking.Api.Services.Implementations
                 foreach (var hold in holds)
                 {
                     hold.Status = "CONVERTED";
+                }
+
+                // Story S-49: Ghi nhận nhật ký thanh toán thành công và chuyển đổi giữ chỗ
+                _orderAuditService.Record(
+                    order.Id,
+                    "ORDER",
+                    order.Id.ToString(),
+                    "ORDER_PAID",
+                    oldPaidStatus,
+                    OrderStatus.Paid.ToString(),
+                    "SYSTEM",
+                    "system:PaymentWebhook",
+                    null,
+                    $"Cổng thanh toán xác nhận giao dịch thành công. Mã GD: {result.TransactionId ?? successTx?.TransactionId ?? "N/A"}.");
+
+                foreach (var hold in holds)
+                {
+                    _orderAuditService.Record(
+                        order.Id,
+                        "SEAT_HOLD",
+                        hold.SeatId.ToString(),
+                        "SEAT_HOLD_CONVERTED",
+                        "ACTIVE",
+                        "CONVERTED",
+                        "SYSTEM",
+                        "system:PaymentWebhook",
+                        null,
+                        "Chuyển trạng thái giữ chỗ sang đã bán thành công (SOLD).");
                 }
 
                 // E. Sinh vé điện tử cho từng ghế trong đơn hàng (Story S-25)
@@ -570,6 +657,19 @@ namespace EventTicketBooking.Api.Services.Implementations
                         };
                         _context.Tickets.Add(ticket);
                         item.Ticket = ticket;
+
+                        // Story S-49: Ghi nhận nhật ký xuất vé
+                        _orderAuditService.Record(
+                            order.Id,
+                            "TICKET",
+                            ticket.TicketCode,
+                            "TICKET_ISSUED",
+                            "UNISSUED",
+                            "ISSUED",
+                            "SYSTEM",
+                            "system:TicketService",
+                            null,
+                            $"Phát hành vé điện tử mã {ticket.TicketCode}.");
                     }
                 }
 

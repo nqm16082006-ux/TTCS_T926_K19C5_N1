@@ -3,6 +3,7 @@ using System;
 using EventTicketBooking.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EventTicketBooking.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261010064324_AddOrderAuditLogs_S49")]
+    partial class AddOrderAuditLogs_S49
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -161,80 +164,6 @@ namespace EventTicketBooking.Api.Migrations
                     b.HasIndex("OwnerId");
 
                     b.ToTable("Events", (string)null);
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.OfflineCheckInRecord", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ConflictReason")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("ExistingCheckInGate")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTimeOffset?>("ExistingCheckInTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("GateName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<bool>("IsConflict")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("OfflineScanId")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<Guid>("OrderItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("ReceivedAtServer")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<DateTimeOffset>("ScannedAtDevice")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("ShowtimeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<Guid>("SyncedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("TicketCode")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OfflineScanId")
-                        .IsUnique()
-                        .HasDatabaseName("UX_OfflineCheckInRecords_OfflineScanId");
-
-                    b.HasIndex("OrderItemId");
-
-                    b.HasIndex("ShowtimeId");
-
-                    b.HasIndex("SyncedByUserId");
-
-                    b.HasIndex("TicketCode");
-
-                    b.ToTable("OfflineCheckInRecords", (string)null);
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.Order", b =>
@@ -797,33 +726,6 @@ namespace EventTicketBooking.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Owner");
-                });
-
-            modelBuilder.Entity("EventTicketBooking.Api.Models.OfflineCheckInRecord", b =>
-                {
-                    b.HasOne("EventTicketBooking.Api.Models.OrderItem", "OrderItem")
-                        .WithMany()
-                        .HasForeignKey("OrderItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("EventTicketBooking.Api.Models.Showtime", "Showtime")
-                        .WithMany()
-                        .HasForeignKey("ShowtimeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("EventTicketBooking.Api.Models.User", "SyncedByUser")
-                        .WithMany()
-                        .HasForeignKey("SyncedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("OrderItem");
-
-                    b.Navigation("Showtime");
-
-                    b.Navigation("SyncedByUser");
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.Order", b =>
