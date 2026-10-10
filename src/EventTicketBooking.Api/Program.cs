@@ -136,6 +136,9 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IEmailServ
 // Đăng ký dịch vụ Giữ ghế (T-23 / S-10)
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ISeatHoldService, EventTicketBooking.Api.Services.Implementations.SeatHoldService>();
 
+// Đăng ký dịch vụ Nhật ký thao tác đơn hàng và vé (Story S-49)
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IOrderAuditService, EventTicketBooking.Api.Services.Implementations.OrderAuditService>();
+
 // T-44 (S-19): Đọc cấu hình cổng thanh toán từ biến môi trường hoặc appsettings
 var paymentProvider = builder.Configuration["PaymentSettings:Provider"]
                      ?? builder.Configuration["PAYMENT_PROVIDER"]

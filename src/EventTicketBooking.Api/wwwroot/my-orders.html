@@ -264,7 +264,7 @@
     // Xác thực Nav Header
     function renderNavAuth() {
       const container = document.getElementById('navAuthContainer');
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
       const userStr = localStorage.getItem('user_info');
 
       if (!token || !userStr) {
@@ -317,7 +317,7 @@
 
     // Tải danh sách đơn hàng
     async function loadOrders(isRefresh = false) {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
       const loadingState = document.getElementById('loadingState');
       const emptyState = document.getElementById('emptyState');
       const unauthState = document.getElementById('unauthState');
@@ -448,6 +448,10 @@
               <span class="material-symbols-outlined text-[18px]">receipt</span>
               <span>Chi tiết</span>
             </a>
+            <a href="./order-audit-logs.html?orderId=${order.id}" title="Xem nhật ký thao tác & trạng thái" class="px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
+              <span class="material-symbols-outlined text-[18px]">history</span>
+              <span>Nhật ký</span>
+            </a>
           `;
         } else if (order.status === 'Pending') {
           actionButtonsHtml = `
@@ -459,12 +463,20 @@
               <span class="material-symbols-outlined text-[18px]">info</span>
               <span>Chi tiết</span>
             </a>
+            <a href="./order-audit-logs.html?orderId=${order.id}" title="Xem nhật ký thao tác & trạng thái" class="px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
+              <span class="material-symbols-outlined text-[18px]">history</span>
+              <span>Nhật ký</span>
+            </a>
           `;
         } else {
           actionButtonsHtml = `
             <a href="./order-details.html?orderId=${order.id}" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
               <span class="material-symbols-outlined text-[18px]">receipt_long</span>
               <span>Xem lại chi tiết</span>
+            </a>
+            <a href="./order-audit-logs.html?orderId=${order.id}" title="Xem nhật ký thao tác & trạng thái" class="px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
+              <span class="material-symbols-outlined text-[18px]">history</span>
+              <span>Nhật ký</span>
             </a>
           `;
         }
@@ -667,7 +679,7 @@
     async function openTicketsModal(orderId) {
       const modal = document.getElementById('ticketModal');
       const modalBody = document.getElementById('ticketModalBody');
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
 
       modal.classList.remove('hidden');
       modalBody.innerHTML = `

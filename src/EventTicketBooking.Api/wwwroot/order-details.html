@@ -82,6 +82,58 @@
           <i class="fa-solid fa-arrow-right"></i>
         </button>
       </div>
+
+      <!-- S-49: Audit Trail / Lịch sử thao tác & trạng thái -->
+      <div class="border-t border-slate-200 p-6 bg-white" id="auditSection">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-clock-rotate-left text-indigo-600"></i>
+              <span>Nhật ký thao tác & Lịch sử trạng thái</span>
+            </h3>
+            <p class="text-xs text-slate-500 mt-0.5">Mọi thay đổi trạng thái đơn, vé và giữ chỗ do người hay background job</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <a id="btnFullAuditLog" href="#" target="_blank" class="px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 text-xs font-bold rounded-lg transition flex items-center gap-1.5">
+              <i class="fa-solid fa-arrow-up-right-from-square text-[11px]"></i>
+              <span>Xem trang toàn màn hình</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Filter tabs -->
+        <div class="flex flex-wrap items-center gap-1.5 mb-4 border-b border-slate-100 pb-3" id="auditFilterTabs">
+          <button onclick="filterAuditLogs('ALL')" data-filter="ALL" class="audit-tab-btn px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-600 text-white transition">
+            Tất cả (<span id="auditCountAll">0</span>)
+          </button>
+          <button onclick="filterAuditLogs('ORDER')" data-filter="ORDER" class="audit-tab-btn px-2.5 py-1 text-xs font-bold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+            Đơn hàng (<span id="auditCountOrder">0</span>)
+          </button>
+          <button onclick="filterAuditLogs('TICKET')" data-filter="TICKET" class="audit-tab-btn px-2.5 py-1 text-xs font-bold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+            Vé (<span id="auditCountTicket">0</span>)
+          </button>
+          <button onclick="filterAuditLogs('SEAT_HOLD')" data-filter="SEAT_HOLD" class="audit-tab-btn px-2.5 py-1 text-xs font-bold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+            Giữ chỗ (<span id="auditCountHold">0</span>)
+          </button>
+        </div>
+
+        <!-- Audit Loading -->
+        <div id="auditLoading" class="py-6 text-center text-slate-400 text-xs">
+          <div class="w-6 h-6 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-2"></div>
+          Đang tải nhật ký...
+        </div>
+
+        <!-- Audit Empty -->
+        <div id="auditEmpty" class="hidden py-6 text-center text-slate-400 text-xs">
+          <i class="fa-solid fa-folder-open text-2xl mb-1 text-slate-300"></i>
+          <p>Chưa có bản ghi nhật ký phù hợp.</p>
+        </div>
+
+        <!-- Audit Timeline List -->
+        <div id="auditTimeline" class="hidden relative pl-6 border-l-2 border-slate-100 ml-3 space-y-4 pt-1">
+          <!-- Items injected here -->
+        </div>
+      </div>
     </div>
   </main>
 
@@ -121,7 +173,7 @@
 
     async function loadOrderDetails() {
       try {
-        const token = localStorage.getItem('accessToken');
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
         if (!token) {
           window.location.href = `login.html?returnUrl=${encodeURIComponent(window.location.href)}`;
           return;
@@ -172,7 +224,7 @@
         itemsList.appendChild(li);
       });
 
-      // T-55: Xử lý hiển thị nút Thanh toán lại & Timer
+      // T-55: Xử lý hiển thị nút Thanh toán / Thanh toán lại & Timer
       const btnRepay = document.getElementById('btnRepay');
       const timerWarning = document.getElementById('timerWarning');
       const processingWarning = document.getElementById('processingWarning');
@@ -182,10 +234,12 @@
       const isExpired = expiresAt <= now;
       const isPending = order.status === 'Pending';
 
-      // Ẩn/Hiện nút Thanh toán lại
-      // Điều kiện T-55: Pending AND chưa hết hạn AND có giao dịch Failed/Cancelled AND ko có giao dịch Pending
-      if (isPending && !isExpired && order.hasFailedPayment && !order.isPaymentProcessing) {
+      // Ẩn/Hiện nút Thanh toán
+      if (isPending && !isExpired && !order.isPaymentProcessing) {
         btnRepay.classList.remove('hidden');
+        const btnText = order.hasFailedPayment ? 'Thanh toán lại' : 'Thanh toán ngay';
+        const spanElem = btnRepay.querySelector('span');
+        if (spanElem) spanElem.textContent = btnText;
         btnRepay.onclick = () => handleRepayment(order.id, btnRepay);
       } else {
         btnRepay.classList.add('hidden');
@@ -203,6 +257,13 @@
         timerWarning.classList.add('hidden');
         if (countdownInterval) clearInterval(countdownInterval);
       }
+
+      // S-49: Load Audit Logs
+      const btnFullAuditLog = document.getElementById('btnFullAuditLog');
+      if (btnFullAuditLog) {
+        btnFullAuditLog.href = `order-audit-logs.html?orderId=${encodeURIComponent(order.id)}`;
+      }
+      loadAuditLogs(order.id);
     }
 
     function startTimer(expiresAt, timerWarning) {
@@ -234,16 +295,16 @@
     }
 
     async function handleRepayment(id, btnElement) {
+      const originalText = btnElement.querySelector('span')?.textContent || 'Thanh toán';
       try {
         // UI Feedback
-        const originalContent = btnElement.innerHTML;
         btnElement.disabled = true;
         btnElement.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Đang xử lý...`;
         btnElement.classList.replace('bg-indigo-600', 'bg-indigo-400');
         btnElement.classList.replace('hover:bg-indigo-700', 'hover:bg-indigo-400');
         btnElement.classList.add('cursor-not-allowed');
 
-        const token = localStorage.getItem('accessToken');
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
         const response = await fetch(`/api/v1/payments/orders/${id}`, {
           method: 'POST',
           headers: {
@@ -271,11 +332,203 @@
 
         // Restore button state
         btnElement.disabled = false;
-        btnElement.innerHTML = `<span>Thanh toán lại</span><i class="fa-solid fa-arrow-right"></i>`;
+        btnElement.innerHTML = `<span>${originalText}</span><i class="fa-solid fa-arrow-right"></i>`;
         btnElement.classList.replace('bg-indigo-400', 'bg-indigo-600');
         btnElement.classList.replace('hover:bg-indigo-400', 'hover:bg-indigo-700');
         btnElement.classList.remove('cursor-not-allowed');
       }
+    }
+
+    // S-49: Quản lý Nhật ký thao tác trên đơn hàng & vé
+    let orderAuditLogs = [];
+    let currentAuditFilter = 'ALL';
+
+    async function loadAuditLogs(orderId) {
+      const loading = document.getElementById('auditLoading');
+      const timeline = document.getElementById('auditTimeline');
+      const empty = document.getElementById('auditEmpty');
+
+      loading.classList.remove('hidden');
+      timeline.classList.add('hidden');
+      empty.classList.add('hidden');
+
+      try {
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+        const res = await fetch(`/api/v1/orders/${encodeURIComponent(orderId)}/audit-logs`, {
+          headers: headers
+        });
+
+        if (!res.ok) {
+          // If unauthorized or error, hide loading gracefully
+          loading.classList.add('hidden');
+          return;
+        }
+
+        const json = await res.json();
+        orderAuditLogs = json.data || [];
+
+        // Update counts
+        document.getElementById('auditCountAll').textContent = orderAuditLogs.length;
+        document.getElementById('auditCountOrder').textContent = orderAuditLogs.filter(l => l.entityType === 'ORDER').length;
+        document.getElementById('auditCountTicket').textContent = orderAuditLogs.filter(l => l.entityType === 'TICKET').length;
+        document.getElementById('auditCountHold').textContent = orderAuditLogs.filter(l => l.entityType === 'SEAT_HOLD').length;
+
+        loading.classList.add('hidden');
+        renderAuditList();
+
+      } catch (e) {
+        console.warn('Could not load order audit logs:', e);
+        loading.classList.add('hidden');
+      }
+    }
+
+    function filterAuditLogs(filterType) {
+      currentAuditFilter = filterType;
+      // Toggle button active styling
+      const buttons = document.querySelectorAll('#auditFilterTabs .audit-tab-btn');
+      buttons.forEach(btn => {
+        if (btn.getAttribute('data-filter') === filterType) {
+          btn.className = 'audit-tab-btn px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-600 text-white transition';
+        } else {
+          btn.className = 'audit-tab-btn px-2.5 py-1 text-xs font-bold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition';
+        }
+      });
+      renderAuditList();
+    }
+
+    function renderAuditList() {
+      const timeline = document.getElementById('auditTimeline');
+      const empty = document.getElementById('auditEmpty');
+      timeline.innerHTML = '';
+
+      let logs = [...orderAuditLogs];
+      if (currentAuditFilter !== 'ALL') {
+        logs = logs.filter(l => l.entityType === currentAuditFilter);
+      }
+
+      if (logs.length === 0) {
+        timeline.classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+      }
+
+      empty.classList.add('hidden');
+      timeline.classList.remove('hidden');
+
+      logs.forEach(log => {
+        const item = document.createElement('div');
+        item.className = 'relative group pb-1';
+
+        const actorConfig = getAuditActorConfig(log.actorType);
+        const entityBadge = getAuditEntityBadge(log.entityType);
+        const markerClass = getAuditMarker(log.action);
+
+        item.innerHTML = `
+          <!-- Timeline marker dot -->
+          <div class="absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full ${markerClass} border-2 border-white shadow-2xs"></div>
+
+          <div class="bg-slate-50/70 border border-slate-100 rounded-xl p-3 hover:bg-slate-50 transition">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${entityBadge}">
+                  ${log.entityType}
+                </span>
+                <span class="text-xs font-bold text-slate-800">${escapeHtml(getAuditActionLabel(log.action))}</span>
+              </div>
+              <span class="text-[11px] text-slate-400 font-medium">
+                ${formatAuditDateTime(log.timestamp)}
+              </span>
+            </div>
+
+            ${log.oldStatus || log.newStatus ? `
+              <div class="flex items-center gap-1.5 text-[11px] font-semibold my-1.5 text-slate-600">
+                <span class="px-1.5 py-0.2 rounded font-bold text-slate-700 bg-slate-200/60">${escapeHtml(log.oldStatus || '-')}</span>
+                <i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>
+                <span class="px-1.5 py-0.2 rounded font-bold text-slate-900 bg-indigo-100/70 text-indigo-800">${escapeHtml(log.newStatus || '-')}</span>
+              </div>
+            ` : ''}
+
+            ${log.note ? `<p class="text-[11px] text-slate-500 my-1">${escapeHtml(log.note)}</p>` : ''}
+
+            <div class="flex items-center gap-1.5 pt-1 text-[11px] text-slate-500">
+              <span class="font-medium text-slate-400">Tác nhân:</span>
+              <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold ${actorConfig.css}">
+                <i class="${actorConfig.icon}"></i>
+                <span>${actorConfig.label}</span>
+              </span>
+              <span class="font-mono text-[10px] text-slate-600 truncate max-w-[150px]" title="${escapeHtml(log.actor || '')}">
+                ${escapeHtml(log.actor || 'N/A')}
+              </span>
+            </div>
+          </div>
+        `;
+
+        timeline.appendChild(item);
+      });
+    }
+
+    function formatAuditDateTime(dt) {
+      if (!dt) return '';
+      const d = new Date(dt);
+      return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ' + d.toLocaleDateString('vi-VN');
+    }
+
+    function getAuditActionLabel(act) {
+      switch (act) {
+        case 'ORDER_CREATED': return 'Tạo đơn hàng';
+        case 'SEAT_HOLD_ATTACHED': return 'Gắn giữ chỗ vào đơn';
+        case 'ORDER_PAID': return 'Thanh toán đơn hàng';
+        case 'SEAT_HOLD_CONVERTED': return 'Chuyển giữ chỗ thành vé';
+        case 'TICKET_ISSUED': return 'Phát hành vé điện tử';
+        case 'ORDER_EXPIRED': return 'Đơn hàng hết hạn';
+        case 'SEAT_HOLD_EXPIRED': return 'Hết hạn giữ chỗ';
+        case 'ORDER_CANCELLED': return 'Hủy đơn hàng';
+        case 'SEAT_HOLD_CANCELLED': return 'Hủy giữ chỗ';
+        case 'SEAT_HOLD_RELEASED': return 'Giải phóng chỗ';
+        case 'ORDER_NEEDS_ATTENTION': return 'Bất thường thanh toán';
+        case 'TICKET_CHECKED_IN': return 'Soát vé vào cửa';
+        case 'TICKET_READMISSION': return 'Tái nhập cửa';
+        default: return act;
+      }
+    }
+
+    function getAuditEntityBadge(type) {
+      switch (type) {
+        case 'ORDER': return 'bg-indigo-100 text-indigo-700';
+        case 'TICKET': return 'bg-emerald-100 text-emerald-700';
+        case 'SEAT_HOLD': return 'bg-amber-100 text-amber-700';
+        default: return 'bg-slate-100 text-slate-700';
+      }
+    }
+
+    function getAuditActorConfig(type) {
+      switch (type) {
+        case 'USER': return { label: 'Người dùng', icon: 'fa-solid fa-user', css: 'bg-blue-50 text-blue-700' };
+        case 'STAFF': return { label: 'Nhân viên', icon: 'fa-solid fa-id-badge', css: 'bg-teal-50 text-teal-700' };
+        case 'ADMIN': return { label: 'Quản trị', icon: 'fa-solid fa-user-shield', css: 'bg-purple-50 text-purple-700' };
+        case 'SYSTEM': return { label: 'Hệ thống', icon: 'fa-solid fa-server', css: 'bg-cyan-50 text-cyan-700' };
+        case 'BACKGROUND_JOB': return { label: 'Job ngầm', icon: 'fa-solid fa-robot', css: 'bg-rose-50 text-rose-700' };
+        default: return { label: type, icon: 'fa-solid fa-circle-user', css: 'bg-slate-100 text-slate-700' };
+      }
+    }
+
+    function getAuditMarker(act) {
+      if (act.includes('PAID') || act.includes('ISSUED')) return 'bg-emerald-500';
+      if (act.includes('EXPIRED') || act.includes('CANCELLED')) return 'bg-rose-500';
+      if (act.includes('CHECKED_IN')) return 'bg-teal-500';
+      return 'bg-indigo-500';
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
     }
   </script>
 </body>
