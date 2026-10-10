@@ -1,4 +1,4 @@
-using EventTicketBooking.Api.Models;
+﻿using EventTicketBooking.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace EventTicketBooking.Api.Data
@@ -31,6 +31,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<AuditLog> AuditLogs { get; set; } = null!;
         public DbSet<TicketReadmission> TicketReadmissions { get; set; } = null!;
         public DbSet<EmailFailureLog> EmailFailureLogs { get; set; } = null!;
+        public DbSet<OrderAuditLog> OrderAuditLogs { get; set; } = null!;
         public DbSet<OfflineCheckInRecord> OfflineCheckInRecords { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -78,7 +79,9 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(s => s.AvailableSeats).IsRequired();
                 entity.Property(s => s.MaxTicketsPerUser).IsRequired().HasDefaultValue(10);
                 entity.Property(s => s.Status)
-                      .HasConversion<string>();
+                      .HasConversion(
+                          v => v.ToString(),
+                          v => ParseShowtimeStatus(v));
 
                 entity.HasOne(s => s.Event)
                     .WithMany(e => e.Showtimes)
@@ -238,7 +241,9 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(o => o.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                 entity.Property(o => o.Status)
-                      .HasConversion<string>();
+                      .HasConversion(
+                          v => v.ToString(),
+                          v => ParseOrderStatus(v));
 
                 entity.HasOne(o => o.User)
                       .WithMany()
@@ -357,6 +362,31 @@ namespace EventTicketBooking.Api.Data
                       .HasDatabaseName("IX_tickets_TicketCode_Unique");
             });
 
+            // Cấu hình bảng nhật ký thao tác đơn hàng và vé (Story S-49)
+            modelBuilder.Entity<OrderAuditLog>(entity =>
+            {
+                entity.ToTable("order_audit_logs");
+                entity.HasKey(l => l.Id);
+                entity.Property(l => l.EntityType).IsRequired().HasMaxLength(50);
+                entity.Property(l => l.EntityId).HasMaxLength(100);
+                entity.Property(l => l.Action).IsRequired().HasMaxLength(100);
+                entity.Property(l => l.OldStatus).HasMaxLength(50);
+                entity.Property(l => l.NewStatus).IsRequired().HasMaxLength(50);
+                entity.Property(l => l.ActorType).IsRequired().HasMaxLength(50);
+                entity.Property(l => l.Actor).IsRequired().HasMaxLength(150);
+                entity.Property(l => l.Timestamp).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(l => l.Note).HasMaxLength(1000);
+
+                entity.HasOne(l => l.Order)
+                      .WithMany()
+                      .HasForeignKey(l => l.OrderId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(l => l.OrderId).HasDatabaseName("IX_order_audit_logs_OrderId");
+                entity.HasIndex(l => l.Timestamp).HasDatabaseName("IX_order_audit_logs_Timestamp");
+                entity.HasIndex(l => l.EntityType).HasDatabaseName("IX_order_audit_logs_EntityType");
+            });
+
             // Cấu hình bảng OfflineCheckInRecords (Story S-35)
             modelBuilder.Entity<OfflineCheckInRecord>(entity =>
             {
@@ -410,6 +440,34 @@ namespace EventTicketBooking.Api.Data
                       .HasForeignKey(x => x.SyncedByUserId)
                       .OnDelete(DeleteBehavior.Restrict);
             });
+        }
+
+        public static ShowtimeStatus ParseShowtimeStatus(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return ShowtimeStatus.Draft;
+            var normalized = value.Trim().ToLowerInvariant().Replace("_", "");
+            return normalized switch
+            {
+                "onsale" => ShowtimeStatus.OnSale,
+                "closed" => ShowtimeStatus.Closed,
+                "draft" => ShowtimeStatus.Draft,
+                _ => Enum.TryParse<ShowtimeStatus>(value, true, out var result) ? result : ShowtimeStatus.Draft
+            };
+        }
+
+        public static OrderStatus ParseOrderStatus(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return OrderStatus.Pending;
+            var normalized = value.Trim().ToLowerInvariant().Replace("_", "");
+            return normalized switch
+            {
+                "pending" => OrderStatus.Pending,
+                "paid" => OrderStatus.Paid,
+                "cancelled" => OrderStatus.Cancelled,
+                "expired" => OrderStatus.Expired,
+                "needsattention" => OrderStatus.NeedsAttention,
+                _ => Enum.TryParse<OrderStatus>(value, true, out var result) ? result : OrderStatus.Pending
+            };
         }
     }
 }

@@ -328,6 +328,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             Guid showtimeId,
             Guid seatId,
             Guid userId,
+            bool cancelOrder = false,
             CancellationToken cancellationToken = default)
         {
             var now = DateTime.UtcNow;
@@ -357,10 +358,115 @@ namespace EventTicketBooking.Api.Services.Implementations
             var pendingExpirations = await _context.OrderItems
                 .Where(i => i.SeatId == seatId && i.Order.UserId == userId && i.Order.Status == OrderStatus.Pending)
                 .Select(i => i.Order.ExpiresAt).ToListAsync(cancellationToken);
-            if (pendingExpirations.Any(expiry => expiry > DateTimeOffset.UtcNow))
+            if (!cancelOrder && pendingExpirations.Any(expiry => expiry > DateTimeOffset.UtcNow))
+            {
                 return HoldSeatsResult.ConflictResult("Ghế thuộc đơn hàng đang chờ thanh toán.", new List<Guid> { seatId });
+            }
 
             hold.Status = "RELEASED";
+
+            // Cập nhật trạng thái ghế trong bảng Seats nếu là HELD
+            var seatEntity = await _context.Seats.FirstOrDefaultAsync(s => s.Id == seatId, cancellationToken);
+            if (seatEntity != null && seatEntity.Status == "HELD")
+            {
+                seatEntity.Status = "AVAILABLE";
+            }
+
+            // Xử lý các đơn hàng Pending có chứa ghế này của người dùng
+            var pendingOrderItems = await _context.OrderItems
+                .Include(i => i.Order)
+                    .ThenInclude(o => o.OrderItems)
+                .Include(i => i.Seat)
+                .Where(i => i.SeatId == seatId && i.Order.UserId == userId && i.Order.Status == OrderStatus.Pending)
+                .ToListAsync(cancellationToken);
+
+            Guid? relatedOrderId = null;
+            foreach (var item in pendingOrderItems)
+            {
+                var order = item.Order;
+                if (order == null) continue;
+                relatedOrderId = order.Id;
+
+                var seatLabel = item.Seat != null ? $"{item.Seat.Row}{item.Seat.SeatNumber}" : (seatEntity != null ? $"{seatEntity.Row}{seatEntity.SeatNumber}" : seatId.ToString());
+
+                // Nếu đơn hàng chỉ có 1 ghế này (hoặc tất cả ghế còn lại đều trùng seatId) -> Huỷ đơn hàng
+                if (order.OrderItems == null || order.OrderItems.Count <= 1 || order.OrderItems.All(oi => oi.SeatId == seatId))
+                {
+                    var oldStatus = order.Status.ToString();
+                    order.Status = OrderStatus.Cancelled;
+                    order.UpdatedAt = DateTimeOffset.UtcNow;
+
+                    _context.OrderAuditLogs.Add(new OrderAuditLog
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = order.Id,
+                        EntityType = "ORDER",
+                        EntityId = order.Id.ToString(),
+                        Action = "ORDER_CANCELLED",
+                        OldStatus = oldStatus,
+                        NewStatus = "Cancelled",
+                        ActorType = "USER",
+                        Actor = userId.ToString(),
+                        ActorUserId = userId,
+                        Timestamp = DateTimeOffset.UtcNow,
+                        Note = $"Người dùng huỷ chọn ghế {seatLabel}, đơn hàng tự động được huỷ."
+                    });
+                }
+                else
+                {
+                    // Đơn hàng gồm nhiều ghế: loại bỏ ghế này và tính lại tổng tiền
+                    order.OrderItems.Remove(item);
+                    _context.OrderItems.Remove(item);
+                    order.CalculateTotal();
+                    order.UpdatedAt = DateTimeOffset.UtcNow;
+
+                    _context.OrderAuditLogs.Add(new OrderAuditLog
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = order.Id,
+                        EntityType = "ORDER",
+                        EntityId = order.Id.ToString(),
+                        Action = "SEAT_REMOVED_FROM_ORDER",
+                        OldStatus = "Pending",
+                        NewStatus = "Pending",
+                        ActorType = "USER",
+                        Actor = userId.ToString(),
+                        ActorUserId = userId,
+                        Timestamp = DateTimeOffset.UtcNow,
+                        Note = $"Người dùng huỷ chọn ghế {seatLabel} khỏi đơn hàng. Tổng tiền cập nhật còn {order.TotalAmount:N0} đ."
+                    });
+                }
+            }
+
+            if (!relatedOrderId.HasValue)
+            {
+                relatedOrderId = await _context.OrderItems
+                    .Where(i => i.SeatId == seatId && i.Order.UserId == userId)
+                    .OrderByDescending(i => i.Order.CreatedAt)
+                    .Select(i => (Guid?)i.OrderId)
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
+
+            if (relatedOrderId.HasValue)
+            {
+                var seatLabel = seatEntity != null ? $"{seatEntity.Row}{seatEntity.SeatNumber}" : seatId.ToString();
+                _context.OrderAuditLogs.Add(new OrderAuditLog
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = relatedOrderId.Value,
+                    EntityType = "SEAT_HOLD",
+                    EntityId = seatId.ToString(),
+                    Action = "SEAT_HOLD_RELEASED",
+                    OldStatus = "ACTIVE",
+                    NewStatus = "RELEASED",
+                    ActorType = "USER",
+                    Actor = userId.ToString(),
+                    ActorUserId = userId,
+                    Timestamp = DateTimeOffset.UtcNow,
+                    Note = $"Người dùng chủ động huỷ giữ chỗ ghế {seatLabel} trên sơ đồ."
+                });
+            }
+
             await _context.SaveChangesAsync(cancellationToken);
 
             if (_redis != null && _redis.IsConnected)

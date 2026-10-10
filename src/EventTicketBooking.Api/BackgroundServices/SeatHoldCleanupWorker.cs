@@ -76,6 +76,34 @@ public class SeatHoldCleanupWorker : BackgroundService
                     .Where(s => expiredSeatIds.Contains(s.Id) && s.Status == "HELD")
                     .ExecuteUpdateAsync(s => s.SetProperty(seat => seat.Status, "AVAILABLE"), stoppingToken);
 
+                // Story S-49: Ghi nhận nhật ký giải phóng giữ chỗ cho các đơn hàng liên quan nếu có
+                var relatedOrderItems = await dbContext.OrderItems
+                    .Where(oi => expiredSeatIds.Contains(oi.SeatId))
+                    .Select(oi => new { oi.OrderId, oi.SeatId })
+                    .ToListAsync(stoppingToken);
+
+                if (relatedOrderItems.Any())
+                {
+                    foreach (var item in relatedOrderItems)
+                    {
+                        dbContext.OrderAuditLogs.Add(new Models.OrderAuditLog
+                        {
+                            Id = Guid.NewGuid(),
+                            OrderId = item.OrderId,
+                            EntityType = "SEAT_HOLD",
+                            EntityId = item.SeatId.ToString(),
+                            Action = "SEAT_HOLD_EXPIRED",
+                            OldStatus = "ACTIVE",
+                            NewStatus = "EXPIRED",
+                            ActorType = "BACKGROUND_JOB",
+                            Actor = "job:SeatHoldCleanupWorker",
+                            Timestamp = DateTimeOffset.UtcNow,
+                            Note = "Job nền quét và nhả ghế quá hạn thời gian giữ chỗ."
+                        });
+                    }
+                    await dbContext.SaveChangesAsync(stoppingToken);
+                }
+
                 await transaction.CommitAsync(stoppingToken);
 
                 if (_hubContext != null && _hubContext.Clients != null)

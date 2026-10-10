@@ -178,7 +178,7 @@
         const result = verified.data || verified.errors;
         if (!orderId && result?.orderId) orderId = result.orderId;
         if (!orderId) throw new Error(verified.message || 'Không thể xác minh thanh toán.');
-        const token = localStorage.getItem('access_token');
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || '';
         const headers = {};
         if (token) headers['Authorization'] = 'Bearer ' + token;
 
@@ -214,7 +214,7 @@
       }
       try {
         const res = await fetch(`/api/v1/payments/orders/${orderId}`, {
-          method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('access_token') || ''}` }
+          method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('access_token') || localStorage.getItem('accessToken') || ''}` }
         });
         const json = await res.json();
         if (!res.ok || !json.success || !json.data?.paymentUrl) throw new Error(json.message || 'Không thể tạo thanh toán.');

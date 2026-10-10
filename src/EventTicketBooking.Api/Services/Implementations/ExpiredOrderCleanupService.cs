@@ -22,15 +22,18 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly AppDbContext _dbContext;
         private readonly ILogger<ExpiredOrderCleanupService> _logger;
         private readonly IHubContext<SeatStatusHub>? _hubContext;
+        private readonly IOrderAuditService _orderAuditService;
 
         public ExpiredOrderCleanupService(
             AppDbContext dbContext,
             ILogger<ExpiredOrderCleanupService> logger,
-            IHubContext<SeatStatusHub>? hubContext = null)
+            IHubContext<SeatStatusHub>? hubContext = null,
+            IOrderAuditService? orderAuditService = null)
         {
             _dbContext = dbContext;
             _logger = logger;
             _hubContext = hubContext;
+            _orderAuditService = orderAuditService ?? new OrderAuditService(dbContext, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
         }
 
         public async Task<int> CleanupExpiredOrdersAsync(DateTimeOffset? fakeNow = null, CancellationToken cancellationToken = default)
@@ -89,9 +92,23 @@ namespace EventTicketBooking.Api.Services.Implementations
 
                 foreach (var order in expiredOrders)
                 {
+                    var oldStatus = order.Status.ToString();
                     order.Status = OrderStatus.Expired;
                     order.UpdatedAt = now;
                     cancelledCount++;
+
+                    // Story S-49: Ghi nhận nhật ký huỷ đơn hàng do quá hạn bởi Background Job
+                    _orderAuditService.Record(
+                        order.Id,
+                        "ORDER",
+                        order.Id.ToString(),
+                        "ORDER_EXPIRED",
+                        oldStatus,
+                        OrderStatus.Expired.ToString(),
+                        "BACKGROUND_JOB",
+                        "job:ExpiredOrderCleanupWorker",
+                        null,
+                        "Job nền quét và huỷ đơn hàng do quá hạn thời gian thanh toán.");
 
                     if (order.OrderItems != null && order.OrderItems.Any())
                     {
@@ -111,6 +128,23 @@ namespace EventTicketBooking.Api.Services.Implementations
                     foreach (var hold in activeHolds)
                     {
                         hold.Status = "EXPIRED";
+
+                        // Story S-49: Ghi nhận nhật ký giải phóng giữ chỗ cho từng đơn hàng tương ứng
+                        var relatedOrder = expiredOrders.FirstOrDefault(o => o.OrderItems.Any(oi => oi.SeatId == hold.SeatId));
+                        if (relatedOrder != null)
+                        {
+                            _orderAuditService.Record(
+                                relatedOrder.Id,
+                                "SEAT_HOLD",
+                                hold.SeatId.ToString(),
+                                "SEAT_HOLD_EXPIRED",
+                                "ACTIVE",
+                                "EXPIRED",
+                                "BACKGROUND_JOB",
+                                "job:ExpiredOrderCleanupWorker",
+                                null,
+                                "Job nền giải phóng giữ chỗ của đơn hàng đã hết hạn.");
+                        }
                     }
 
                     // 2. Chuyển trạng thái ghế từ HELD về AVAILABLE

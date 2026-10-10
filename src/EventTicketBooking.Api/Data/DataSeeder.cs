@@ -106,6 +106,94 @@ namespace EventTicketBooking.Api.Data
                         }
                     }
                     await conn.ReloadTypesAsync();
+
+                    try
+                    {
+                        using var opCmd = conn.CreateCommand();
+                        opCmd.CommandText = @"
+                            CREATE OR REPLACE FUNCTION order_status_eq_text(order_status, text) RETURNS boolean AS $$
+                                SELECT LOWER(REPLACE($1::text, '_', '')) = LOWER(REPLACE($2, '_', ''));
+                            $$ LANGUAGE sql IMMUTABLE;
+
+                            CREATE OR REPLACE FUNCTION text_eq_order_status(text, order_status) RETURNS boolean AS $$
+                                SELECT LOWER(REPLACE($1, '_', '')) = LOWER(REPLACE($2::text, '_', ''));
+                            $$ LANGUAGE sql IMMUTABLE;
+
+                            CREATE OR REPLACE FUNCTION order_status_neq_text(order_status, text) RETURNS boolean AS $$
+                                SELECT LOWER(REPLACE($1::text, '_', '')) <> LOWER(REPLACE($2, '_', ''));
+                            $$ LANGUAGE sql IMMUTABLE;
+
+                            CREATE OR REPLACE FUNCTION text_neq_order_status(text, order_status) RETURNS boolean AS $$
+                                SELECT LOWER(REPLACE($1, '_', '')) <> LOWER(REPLACE($2::text, '_', ''));
+                            $$ LANGUAGE sql IMMUTABLE;
+
+                            DROP OPERATOR IF EXISTS = (order_status, text);
+                            CREATE OPERATOR = (LEFTARG = order_status, RIGHTARG = text, FUNCTION = order_status_eq_text, COMMUTATOR = =, NEGATOR = <>);
+
+                            DROP OPERATOR IF EXISTS = (text, order_status);
+                            CREATE OPERATOR = (LEFTARG = text, RIGHTARG = order_status, FUNCTION = text_eq_order_status, COMMUTATOR = =, NEGATOR = <>);
+
+                            DROP OPERATOR IF EXISTS <> (order_status, text);
+                            CREATE OPERATOR <> (LEFTARG = order_status, RIGHTARG = text, FUNCTION = order_status_neq_text, COMMUTATOR = <>, NEGATOR = =);
+
+                            DROP OPERATOR IF EXISTS <> (text, order_status);
+                            CREATE OPERATOR <> (LEFTARG = text, RIGHTARG = order_status, FUNCTION = text_neq_order_status, COMMUTATOR = <>, NEGATOR = =);
+
+                            CREATE OR REPLACE FUNCTION showtime_status_eq_text(showtime_status, text) RETURNS boolean AS $$
+                                SELECT LOWER(REPLACE($1::text, '_', '')) = LOWER(REPLACE($2, '_', ''));
+                            $$ LANGUAGE sql IMMUTABLE;
+
+                            CREATE OR REPLACE FUNCTION text_eq_showtime_status(text, showtime_status) RETURNS boolean AS $$
+                                SELECT LOWER(REPLACE($1, '_', '')) = LOWER(REPLACE($2::text, '_', ''));
+                            $$ LANGUAGE sql IMMUTABLE;
+
+                            CREATE OR REPLACE FUNCTION showtime_status_neq_text(showtime_status, text) RETURNS boolean AS $$
+                                SELECT LOWER(REPLACE($1::text, '_', '')) <> LOWER(REPLACE($2, '_', ''));
+                            $$ LANGUAGE sql IMMUTABLE;
+
+                            CREATE OR REPLACE FUNCTION text_neq_showtime_status(text, showtime_status) RETURNS boolean AS $$
+                                SELECT LOWER(REPLACE($1, '_', '')) <> LOWER(REPLACE($2::text, '_', ''));
+                            $$ LANGUAGE sql IMMUTABLE;
+
+                            DROP OPERATOR IF EXISTS = (showtime_status, text);
+                            CREATE OPERATOR = (LEFTARG = showtime_status, RIGHTARG = text, FUNCTION = showtime_status_eq_text, COMMUTATOR = =, NEGATOR = <>);
+
+                            DROP OPERATOR IF EXISTS = (text, showtime_status);
+                            CREATE OPERATOR = (LEFTARG = text, RIGHTARG = showtime_status, FUNCTION = text_eq_showtime_status, COMMUTATOR = =, NEGATOR = <>);
+
+                            DROP OPERATOR IF EXISTS <> (showtime_status, text);
+                            CREATE OPERATOR <> (LEFTARG = showtime_status, RIGHTARG = text, FUNCTION = showtime_status_neq_text, COMMUTATOR = <>, NEGATOR = =);
+
+                            DROP OPERATOR IF EXISTS <> (text, showtime_status);
+                            CREATE OPERATOR <> (LEFTARG = text, RIGHTARG = showtime_status, FUNCTION = text_neq_showtime_status, COMMUTATOR = <>, NEGATOR = =);
+                        ";
+                        await opCmd.ExecuteNonQueryAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger?.LogWarning(ex, "Could not create enum comparison operators in PostgreSQL.");
+                    }
+
+                    try
+                    {
+                        using var normCmd = conn.CreateCommand();
+                        normCmd.CommandText = @"
+                            UPDATE ""Showtimes"" SET ""Status"" = 'OnSale' WHERE LOWER(REPLACE(""Status""::text, '_', '')) = 'onsale' AND ""Status""::text <> 'OnSale';
+                            UPDATE ""Showtimes"" SET ""Status"" = 'Draft' WHERE LOWER(REPLACE(""Status""::text, '_', '')) = 'draft' AND ""Status""::text <> 'Draft';
+                            UPDATE ""Showtimes"" SET ""Status"" = 'Closed' WHERE LOWER(REPLACE(""Status""::text, '_', '')) = 'closed' AND ""Status""::text <> 'Closed';
+
+                            UPDATE orders SET ""Status"" = 'Paid' WHERE LOWER(REPLACE(""Status""::text, '_', '')) = 'paid' AND ""Status""::text <> 'Paid';
+                            UPDATE orders SET ""Status"" = 'Pending' WHERE LOWER(REPLACE(""Status""::text, '_', '')) = 'pending' AND ""Status""::text <> 'Pending';
+                            UPDATE orders SET ""Status"" = 'Cancelled' WHERE LOWER(REPLACE(""Status""::text, '_', '')) = 'cancelled' AND ""Status""::text <> 'Cancelled';
+                            UPDATE orders SET ""Status"" = 'Expired' WHERE LOWER(REPLACE(""Status""::text, '_', '')) = 'expired' AND ""Status""::text <> 'Expired';
+                            UPDATE orders SET ""Status"" = 'NeedsAttention' WHERE LOWER(REPLACE(""Status""::text, '_', '')) = 'needsattention' AND ""Status""::text <> 'NeedsAttention';
+                        ";
+                        await normCmd.ExecuteNonQueryAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger?.LogWarning(ex, "Could not normalize statuses in DB.");
+                    }
                 }
 
                 // 1. Kiểm tra nếu bảng Roles chưa có dữ liệu thì seed 5 roles

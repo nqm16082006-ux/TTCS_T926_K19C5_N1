@@ -539,7 +539,7 @@
 
     // Token Validator Helper
     function getValidToken() {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
       if (!token || token === 'null' || token === 'undefined' || token.trim() === '') {
         return null;
       }
@@ -1374,14 +1374,10 @@
 
           // Kích hoạt Countdown Timer 10 phút
           await restoreMyHoldsOnLoad();
-          showSuccessToast(`Đã giữ thành công ${newlyHeld.length} ghế! Quý khách có 10 phút để hoàn tất thanh toán.`);
+          showSuccessToast(`Đã giữ thành công ${newlyHeld.length} ghế! Đang khởi tạo đơn hàng...`);
 
-          // Cập nhật text nút để chuyển sang thanh toán
-          btn.innerHTML = `
-            <span>Xác nhận &amp; Chuyển sang thanh toán</span>
-            <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
-          `;
-          btn.disabled = false;
+          // Tự động chuyển tiếp sang khởi tạo đơn hàng & thanh toán
+          await createOrderAndProceed();
 
         } else if (res.status === 401) {
           localStorage.removeItem('access_token');
@@ -1482,7 +1478,7 @@
         const token = getValidToken();
         if (!token) return;
 
-        const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/seats/${seatId}/hold`, {
+        const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/seats/${seatId}/hold?cancelOrder=true`, {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
@@ -1500,9 +1496,10 @@
           if (myHeldSeatIds.size === 0) {
             stopHoldCountdown();
           }
+          showSuccessToast(`Đã hủy chọn ghế ${seat.row}${seat.seatNumber}.`);
           return true;
         } else {
-          alert(json?.message || 'Không thể hủy giữ ghế. Vui lòng thử lại.');
+          showConflictToast(json?.message || 'Không thể hủy giữ ghế. Vui lòng thử lại.');
         }
       } catch (err) {
         console.warn("Lỗi khi hủy giữ ghế:", err);
