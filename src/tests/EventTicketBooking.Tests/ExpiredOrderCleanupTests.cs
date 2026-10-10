@@ -9,6 +9,9 @@ using EventTicketBooking.Api.Services.Implementations;
 using EventTicketBooking.Tests.Mocks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using Microsoft.AspNetCore.SignalR;
+using EventTicketBooking.Api.Hubs;
 using Xunit;
 
 namespace EventTicketBooking.Tests
@@ -33,7 +36,7 @@ namespace EventTicketBooking.Tests
                 .Options;
 
             _context = new AppDbContext(options);
-            _cleanupService = new ExpiredOrderCleanupService(_context, NullLogger<ExpiredOrderCleanupService>.Instance);
+            _cleanupService = new ExpiredOrderCleanupService(_context, NullLogger<ExpiredOrderCleanupService>.Instance, new Mock<IHubContext<SeatStatusHub>>().Object);
         }
 
         public void Dispose()
@@ -253,7 +256,7 @@ namespace EventTicketBooking.Tests
             var paymentTx = await _context.PaymentTransactions.FirstAsync(pt => pt.OrderId == order.Id);
 
             var fakeGateway = new FakePaymentGateway();
-            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance);
+            var paymentService = new PaymentService(_context, fakeGateway, NullLogger<PaymentService>.Instance, new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var webhookResult = new PaymentResultDto
             {

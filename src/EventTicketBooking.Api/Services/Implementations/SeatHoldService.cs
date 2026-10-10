@@ -7,6 +7,8 @@ using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Services.Interfaces;
+using EventTicketBooking.Api.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -24,16 +26,19 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly AppDbContext _context;
         private readonly IConnectionMultiplexer? _redis;
         private readonly ILogger<SeatHoldService> _logger;
+        private readonly IHubContext<SeatStatusHub>? _hubContext;
 
         public const int DefaultHoldTtlSeconds = 600; // 10 phút
 
         public SeatHoldService(
             AppDbContext context,
             ILogger<SeatHoldService> logger,
+            IHubContext<SeatStatusHub>? hubContext = null,
             IConnectionMultiplexer? redis = null)
         {
             _context = context;
             _logger = logger;
+            _hubContext = hubContext;
             _redis = redis;
         }
 
@@ -73,6 +78,7 @@ namespace EventTicketBooking.Api.Services.Implementations
 
             // 2. Validate Suất chiếu và Ghế trong Database
             var showtime = await _context.Showtimes
+                .Include(s => s.Event)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.Id == showtimeId, cancellationToken);
 
@@ -83,6 +89,41 @@ namespace EventTicketBooking.Api.Services.Implementations
 
             if (showtime.Status != ShowtimeStatus.OnSale)
                 return HoldSeatsResult.InvalidResult("Suất diễn chưa mở bán hoặc đã đóng bán.");
+
+            // S-42: Kiểm tra giới hạn số lượng vé tối đa mỗi người mua cho suất diễn
+            int maxTickets = showtime.MaxTicketsPerUser > 0
+                ? showtime.MaxTicketsPerUser
+                : (showtime.Event != null && showtime.Event.MaxTicketsPerUser > 0 ? showtime.Event.MaxTicketsPerUser : 10);
+
+            var now = DateTime.UtcNow;
+
+            var alreadyHeldSeatIdsByThisUser = await _context.SeatHold
+                .AsNoTracking()
+                .Where(sh => sh.Seat.ShowtimeId == showtimeId &&
+                             sh.UserId == userId &&
+                             sh.Status == "ACTIVE" &&
+                             sh.ExpiresAt > now)
+                .Select(sh => sh.SeatId)
+                .ToListAsync(cancellationToken);
+
+            var purchasedTicketsCount = await (from o in _context.Orders
+                                               join oi in _context.OrderItems on o.Id equals oi.OrderId
+                                               where o.ShowtimeId == showtimeId &&
+                                                     o.UserId == userId &&
+                                                     o.Status != OrderStatus.Cancelled &&
+                                                     o.Status != OrderStatus.Expired
+                                               select oi.Id).CountAsync(cancellationToken);
+
+            int newlyRequestedCount = seatIds.Count(id => !alreadyHeldSeatIdsByThisUser.Contains(id));
+            int totalTicketsAfterHold = alreadyHeldSeatIdsByThisUser.Count + newlyRequestedCount + purchasedTicketsCount;
+
+            if (totalTicketsAfterHold > maxTickets)
+            {
+                _logger.LogWarning("User {UserId} vượt quá giới hạn vé cho suất chiếu {ShowtimeId}. Đã giữ: {Held}, Đã mua: {Purchased}, Yêu cầu thêm: {New}, Tối đa: {Max}",
+                    userId, showtimeId, alreadyHeldSeatIdsByThisUser.Count, purchasedTicketsCount, newlyRequestedCount, maxTickets);
+                return HoldSeatsResult.InvalidResult(
+                    $"Bạn không thể giữ thêm ghế. Tổng số ghế đang giữ ({alreadyHeldSeatIdsByThisUser.Count}) cộng đã mua ({purchasedTicketsCount}) của tài khoản vượt giới hạn {maxTickets} vé trong suất này (Tối đa {maxTickets} vé).");
+            }
 
             var seats = await _context.Seats
                 .AsNoTracking()
@@ -103,7 +144,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             if (soldSeatIds.Count > 0)
                 return HoldSeatsResult.ConflictResult("Ghế đã được bán.", soldSeatIds);
 
-            var now = DateTime.UtcNow;
+            now = DateTime.UtcNow;
             var expiresAt = now.AddSeconds(DefaultHoldTtlSeconds);
 
             // 3. Chuẩn bị danh sách Redis keys: seat_hold:{event_id}:{seat_id}
@@ -262,8 +303,20 @@ namespace EventTicketBooking.Api.Services.Implementations
                 ShowtimeId = showtimeId,
                 SeatIds = seatIds,
                 ExpiresAt = expiresAt,
-                ServerTime = now
+                ServerTime = now,
+                MaxTicketsPerUser = maxTickets,
+                PurchasedCount = purchasedTicketsCount,
+                ActiveHoldCount = alreadyHeldSeatIdsByThisUser.Count + newlyRequestedCount
             };
+
+            if (_hubContext != null && _hubContext.Clients != null)
+            {
+                var groupClient = _hubContext.Clients.Group(showtimeId.ToString());
+                if (groupClient != null)
+                {
+                    await groupClient.SendAsync("SeatHeld", new { ShowtimeId = showtimeId, SeatIds = seatIds, ExpiresAt = expiresAt });
+                }
+            }
 
             return HoldSeatsResult.SuccessResult(responseData, "Giữ chỗ ghế thành công.");
         }
@@ -275,6 +328,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             Guid showtimeId,
             Guid seatId,
             Guid userId,
+            bool cancelOrder = false,
             CancellationToken cancellationToken = default)
         {
             var now = DateTime.UtcNow;
@@ -304,16 +358,130 @@ namespace EventTicketBooking.Api.Services.Implementations
             var pendingExpirations = await _context.OrderItems
                 .Where(i => i.SeatId == seatId && i.Order.UserId == userId && i.Order.Status == OrderStatus.Pending)
                 .Select(i => i.Order.ExpiresAt).ToListAsync(cancellationToken);
-            if (pendingExpirations.Any(expiry => expiry > DateTimeOffset.UtcNow))
+            if (!cancelOrder && pendingExpirations.Any(expiry => expiry > DateTimeOffset.UtcNow))
+            {
                 return HoldSeatsResult.ConflictResult("Ghế thuộc đơn hàng đang chờ thanh toán.", new List<Guid> { seatId });
+            }
 
-            _context.SeatHold.Remove(hold);
+            hold.Status = "RELEASED";
+
+            // Cập nhật trạng thái ghế trong bảng Seats nếu là HELD
+            var seatEntity = await _context.Seats.FirstOrDefaultAsync(s => s.Id == seatId, cancellationToken);
+            if (seatEntity != null && seatEntity.Status == "HELD")
+            {
+                seatEntity.Status = "AVAILABLE";
+            }
+
+            // Xử lý các đơn hàng Pending có chứa ghế này của người dùng
+            var pendingOrderItems = await _context.OrderItems
+                .Include(i => i.Order)
+                    .ThenInclude(o => o.OrderItems)
+                .Include(i => i.Seat)
+                .Where(i => i.SeatId == seatId && i.Order.UserId == userId && i.Order.Status == OrderStatus.Pending)
+                .ToListAsync(cancellationToken);
+
+            Guid? relatedOrderId = null;
+            foreach (var item in pendingOrderItems)
+            {
+                var order = item.Order;
+                if (order == null) continue;
+                relatedOrderId = order.Id;
+
+                var seatLabel = item.Seat != null ? $"{item.Seat.Row}{item.Seat.SeatNumber}" : (seatEntity != null ? $"{seatEntity.Row}{seatEntity.SeatNumber}" : seatId.ToString());
+
+                // Nếu đơn hàng chỉ có 1 ghế này (hoặc tất cả ghế còn lại đều trùng seatId) -> Huỷ đơn hàng
+                if (order.OrderItems == null || order.OrderItems.Count <= 1 || order.OrderItems.All(oi => oi.SeatId == seatId))
+                {
+                    var oldStatus = order.Status.ToString();
+                    order.Status = OrderStatus.Cancelled;
+                    order.UpdatedAt = DateTimeOffset.UtcNow;
+
+                    _context.OrderAuditLogs.Add(new OrderAuditLog
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = order.Id,
+                        EntityType = "ORDER",
+                        EntityId = order.Id.ToString(),
+                        Action = "ORDER_CANCELLED",
+                        OldStatus = oldStatus,
+                        NewStatus = "Cancelled",
+                        ActorType = "USER",
+                        Actor = userId.ToString(),
+                        ActorUserId = userId,
+                        Timestamp = DateTimeOffset.UtcNow,
+                        Note = $"Người dùng huỷ chọn ghế {seatLabel}, đơn hàng tự động được huỷ."
+                    });
+                }
+                else
+                {
+                    // Đơn hàng gồm nhiều ghế: loại bỏ ghế này và tính lại tổng tiền
+                    order.OrderItems.Remove(item);
+                    _context.OrderItems.Remove(item);
+                    order.CalculateTotal();
+                    order.UpdatedAt = DateTimeOffset.UtcNow;
+
+                    _context.OrderAuditLogs.Add(new OrderAuditLog
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = order.Id,
+                        EntityType = "ORDER",
+                        EntityId = order.Id.ToString(),
+                        Action = "SEAT_REMOVED_FROM_ORDER",
+                        OldStatus = "Pending",
+                        NewStatus = "Pending",
+                        ActorType = "USER",
+                        Actor = userId.ToString(),
+                        ActorUserId = userId,
+                        Timestamp = DateTimeOffset.UtcNow,
+                        Note = $"Người dùng huỷ chọn ghế {seatLabel} khỏi đơn hàng. Tổng tiền cập nhật còn {order.TotalAmount:N0} đ."
+                    });
+                }
+            }
+
+            if (!relatedOrderId.HasValue)
+            {
+                relatedOrderId = await _context.OrderItems
+                    .Where(i => i.SeatId == seatId && i.Order.UserId == userId)
+                    .OrderByDescending(i => i.Order.CreatedAt)
+                    .Select(i => (Guid?)i.OrderId)
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
+
+            if (relatedOrderId.HasValue)
+            {
+                var seatLabel = seatEntity != null ? $"{seatEntity.Row}{seatEntity.SeatNumber}" : seatId.ToString();
+                _context.OrderAuditLogs.Add(new OrderAuditLog
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = relatedOrderId.Value,
+                    EntityType = "SEAT_HOLD",
+                    EntityId = seatId.ToString(),
+                    Action = "SEAT_HOLD_RELEASED",
+                    OldStatus = "ACTIVE",
+                    NewStatus = "RELEASED",
+                    ActorType = "USER",
+                    Actor = userId.ToString(),
+                    ActorUserId = userId,
+                    Timestamp = DateTimeOffset.UtcNow,
+                    Note = $"Người dùng chủ động huỷ giữ chỗ ghế {seatLabel} trên sơ đồ."
+                });
+            }
+
             await _context.SaveChangesAsync(cancellationToken);
 
             if (_redis != null && _redis.IsConnected)
             {
                 var redisKey = (RedisKey)$"seat_hold:{showtime.EventId}:{seatId}";
                 await ReleaseRedisHoldConditionalAsync(new[] { redisKey }, userId);
+            }
+
+            if (_hubContext != null && _hubContext.Clients != null)
+            {
+                var groupClient = _hubContext.Clients.Group(showtimeId.ToString());
+                if (groupClient != null)
+                {
+                    await groupClient.SendAsync("SeatReleased", new { ShowtimeId = showtimeId, SeatIds = new List<Guid> { seatId } });
+                }
             }
 
             return HoldSeatsResult.SuccessResult(null!, "Huỷ giữ ghế thành công.");
@@ -330,14 +498,27 @@ namespace EventTicketBooking.Api.Services.Implementations
         {
             var now = nowOverride ?? DateTime.UtcNow;
 
-            var showtimeExists = await _context.Showtimes
+            var showtime = await _context.Showtimes
                 .AsNoTracking()
-                .AnyAsync(s => s.Id == showtimeId, cancellationToken);
+                .Include(s => s.Event)
+                .FirstOrDefaultAsync(s => s.Id == showtimeId, cancellationToken);
 
-            if (!showtimeExists)
+            if (showtime == null)
             {
                 return HoldSeatsResult.NotFoundResult("Suất chiếu không tồn tại.");
             }
+
+            int maxTickets = showtime.MaxTicketsPerUser > 0
+                ? showtime.MaxTicketsPerUser
+                : (showtime.Event != null && showtime.Event.MaxTicketsPerUser > 0 ? showtime.Event.MaxTicketsPerUser : 10);
+
+            var purchasedTicketsCount = await (from o in _context.Orders
+                                               join oi in _context.OrderItems on o.Id equals oi.OrderId
+                                               where o.ShowtimeId == showtimeId &&
+                                                     o.UserId == userId &&
+                                                     o.Status != OrderStatus.Cancelled &&
+                                                     o.Status != OrderStatus.Expired
+                                               select oi.Id).CountAsync(cancellationToken);
 
             var activeHoldsWithSeats = await (from sh in _context.SeatHold
                                               join s in _context.Seats on sh.SeatId equals s.Id
@@ -362,7 +543,10 @@ namespace EventTicketBooking.Api.Services.Implementations
                     SeatIds = new List<Guid>(),
                     ExpiresAt = DateTime.MinValue,
                     ServerTime = now,
-                    Holds = new List<UserSeatHoldItemDto>()
+                    Holds = new List<UserSeatHoldItemDto>(),
+                    MaxTicketsPerUser = maxTickets,
+                    PurchasedCount = purchasedTicketsCount,
+                    ActiveHoldCount = 0
                 };
 
                 return HoldSeatsResult.SuccessResult(emptyData, "Người dùng không có ghế nào đang giữ cho suất chiếu này.");
@@ -385,7 +569,10 @@ namespace EventTicketBooking.Api.Services.Implementations
                 SeatIds = seatIds,
                 ExpiresAt = earliestExpiration,
                 ServerTime = now,
-                Holds = holdItems
+                Holds = holdItems,
+                MaxTicketsPerUser = maxTickets,
+                PurchasedCount = purchasedTicketsCount,
+                ActiveHoldCount = activeHoldsWithSeats.Count
             };
 
             return HoldSeatsResult.SuccessResult(resultData, "Lấy danh sách ghế đang giữ thành công.");
@@ -422,6 +609,35 @@ namespace EventTicketBooking.Api.Services.Implementations
             {
                 _logger.LogError(ex, "Lỗi khi thực thi hoán tác xóa có điều kiện Redis keys cho User {UserId}.", userId);
             }
+        }
+
+        /// <summary>
+        /// Đếm tổng số vé của người dùng cho một suất chiếu (Bao gồm các ghế đang ACTIVE HOLD + Các ghế đã MUA/ĐẶT THÀNH CÔNG) (Task S-42).
+        /// </summary>
+        public async Task<int> GetUserTicketCountForShowtimeAsync(
+            Guid showtimeId,
+            Guid userId,
+            CancellationToken cancellationToken = default)
+        {
+            var now = DateTime.UtcNow;
+
+            var activeHoldsCount = await (from sh in _context.SeatHold
+                                          join s in _context.Seats on sh.SeatId equals s.Id
+                                          where s.ShowtimeId == showtimeId &&
+                                                sh.UserId == userId &&
+                                                sh.Status == "ACTIVE" &&
+                                                sh.ExpiresAt > now
+                                          select sh.Id).CountAsync(cancellationToken);
+
+            var purchasedTicketsCount = await (from o in _context.Orders
+                                               join oi in _context.OrderItems on o.Id equals oi.OrderId
+                                               where o.ShowtimeId == showtimeId &&
+                                                     o.UserId == userId &&
+                                                     o.Status != OrderStatus.Cancelled &&
+                                                     o.Status != OrderStatus.Expired
+                                               select oi.Id).CountAsync(cancellationToken);
+
+            return activeHoldsCount + purchasedTicketsCount;
         }
     }
 }

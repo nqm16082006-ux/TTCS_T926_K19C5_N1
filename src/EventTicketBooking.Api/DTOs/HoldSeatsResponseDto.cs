@@ -13,6 +13,10 @@ namespace EventTicketBooking.Api.DTOs
         public DateTime ExpiresAt { get; set; }
         public DateTime ServerTime { get; set; } = DateTime.UtcNow;
         public List<UserSeatHoldItemDto>? Holds { get; set; }
+        public int MaxTicketsPerUser { get; set; } = 10;
+        public int PurchasedCount { get; set; }
+        public int ActiveHoldCount { get; set; }
+        public int RemainingAllowance => Math.Max(0, MaxTicketsPerUser - (PurchasedCount + ActiveHoldCount));
     }
 
     public class UserSeatHoldItemDto

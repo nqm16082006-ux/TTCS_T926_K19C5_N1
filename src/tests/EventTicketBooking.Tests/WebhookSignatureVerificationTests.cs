@@ -182,7 +182,7 @@ namespace EventTicketBooking.Tests
                 new PaymentService(
                     _context,
                     gateway,
-                    NullLogger<PaymentService>.Instance);
+                    NullLogger<PaymentService>.Instance, new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var (controller, _) =
                 CreateController(
@@ -252,7 +252,7 @@ namespace EventTicketBooking.Tests
                 new PaymentService(
                     _context,
                     gateway,
-                    NullLogger<PaymentService>.Instance);
+                    NullLogger<PaymentService>.Instance, new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var (controller, _) =
                 CreateController(
@@ -331,7 +331,7 @@ namespace EventTicketBooking.Tests
                 new PaymentService(
                     _context,
                     gateway,
-                    NullLogger<PaymentService>.Instance);
+                    NullLogger<PaymentService>.Instance, new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var (controller, _) =
                 CreateController(
@@ -393,7 +393,7 @@ namespace EventTicketBooking.Tests
                 new PaymentService(
                     _context,
                     gateway,
-                    NullLogger<PaymentService>.Instance);
+                    NullLogger<PaymentService>.Instance, new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var (controller, _) =
                 CreateController(
@@ -518,7 +518,7 @@ namespace EventTicketBooking.Tests
                 new PaymentService(
                     _context,
                     gateway,
-                    new FakeLogger<PaymentService>());
+                    new FakeLogger<PaymentService>(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var (controller, logger) =
                 CreateController(
@@ -592,7 +592,7 @@ namespace EventTicketBooking.Tests
                 new PaymentService(
                     _context,
                     gateway,
-                    new FakeLogger<PaymentService>());
+                    new FakeLogger<PaymentService>(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var (controller, logger) =
                 CreateController(
@@ -676,7 +676,7 @@ namespace EventTicketBooking.Tests
                 new PaymentService(
                     _context,
                     gateway,
-                    new FakeLogger<PaymentService>());
+                    new FakeLogger<PaymentService>(), new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
 
             var (controller, logger) =
                 CreateController(

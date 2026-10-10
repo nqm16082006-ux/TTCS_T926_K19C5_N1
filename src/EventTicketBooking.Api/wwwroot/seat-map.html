@@ -368,7 +368,7 @@
                 <div class="flex items-center gap-2">
                   <span class="material-symbols-outlined text-primary">shopping_bag</span>
                   <h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">
-                    Ghế Đã Chọn (<span class="text-primary font-code-mono" id="selectedSeatsCountText">0</span>)
+                    Ghế Đã Chọn (<span class="text-primary font-code-mono" id="selectedSeatsCountText">0</span><span class="text-outline font-normal text-xs" id="maxTicketsDisplay">/10</span>)
                   </h3>
                 </div>
                 <button onclick="clearAllSelections()" id="btnClearAll" class="font-label-sm text-label-sm text-error hover:underline flex items-center gap-0.5 font-semibold transition-opacity opacity-50 cursor-not-allowed">
@@ -378,6 +378,10 @@
               </div>
 
               <!-- Seat Items List Container -->
+              <div id="userAllowanceInfo" class="hidden text-xs text-on-surface-variant bg-surface-container-low px-2.5 py-1.5 rounded-lg border border-outline-variant/30 flex items-center justify-between">
+                <span class="font-medium">Giới hạn suất: <span id="allowanceLimitText" class="font-bold text-primary">10 vé</span></span>
+                <span id="allowancePurchasedText" class="text-outline font-semibold">Đã mua: 0</span>
+              </div>
               <div class="flex flex-col gap-space-sm min-h-[100px] max-h-80 overflow-y-auto pr-1" id="selectedSeatsListContainer">
                 <div class="text-center py-8 text-on-surface-variant text-sm font-medium flex flex-col items-center justify-center">
                   <span class="material-symbols-outlined text-outline text-3xl mb-1">airline_seat_recline_extra</span>
@@ -531,13 +535,16 @@
     </div>
   </footer>
 
+  <!-- SignalR Client -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
+
   <script>
     // --- 0. API Base URL Detection (cho phép chạy mượt mà cả localhost:5012, Live Server 5500 và file://) ---
     const API_BASE = (window.location.protocol === 'file:' || (['localhost', '127.0.0.1'].includes(window.location.hostname) && window.location.port === '5500')) ? 'http://localhost:5012' : '';
 
     // Token Validator Helper
     function getValidToken() {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
       if (!token || token === 'null' || token === 'undefined' || token.trim() === '') {
         return null;
       }
@@ -549,6 +556,55 @@
     let showtimeId = urlParams.get('showtimeId');
     let eventId = urlParams.get('eventId') || urlParams.get('id');
 
+    // --- SignalR Connection ---
+    let seatHubConnection = null;
+
+    async function initSignalR() {
+      if (!showtimeId) return;
+      if (seatHubConnection) return;
+      
+      seatHubConnection = new signalR.HubConnectionBuilder()
+        .withUrl(`${API_BASE}/hubs/seat-status?showtimeId=${showtimeId}`)
+        .withAutomaticReconnect()
+        .configureLogging(signalR.LogLevel.Information)
+        .build();
+
+      seatHubConnection.on("SeatHeld", (data) => {
+        if (!data || !data.seatIds) return;
+        data.seatIds.forEach(id => {
+          if (!myHeldSeatIds.has(id)) {
+            const seat = seatMap.get(id);
+            if (seat) seat.status = 'HELD';
+            updateSeatButtonState(id);
+            
+            // Remove from local selection if held by someone else
+            if (selectedSeatIds.has(id)) {
+                selectedSeatIds.delete(id);
+            }
+          }
+        });
+        updateCartPanel();
+      });
+
+      seatHubConnection.on("SeatReleased", (data) => {
+        if (!data || !data.seatIds) return;
+        data.seatIds.forEach(id => {
+          if (!myHeldSeatIds.has(id)) {
+            const seat = seatMap.get(id);
+            if (seat) seat.status = 'AVAILABLE';
+            updateSeatButtonState(id);
+          }
+        });
+      });
+
+      try {
+        await seatHubConnection.start();
+        console.log("Connected to SignalR SeatStatusHub");
+      } catch (err) {
+        console.error("SignalR Connection Error: ", err);
+      }
+    }
+
     let allSeats = [];
     let seatMap = new Map();
     let selectedSeatIds = new Set();  // Ghế chọn nháp trên client
@@ -558,6 +614,8 @@
     let bookingActionInFlight = false;
     const bookingRateLimits = new Map();
     let bookingRateLimitTimer = null;
+    let maxTicketsPerUser = 10;  // Giới hạn vé tối đa mỗi người trong suất này (Task S-42)
+    let purchasedCountForUser = 0; // Số vé tài khoản đã mua thành công trong suất này (Task S-42)
 
     // Timer state
     let holdTimerInterval = null;
@@ -630,7 +688,8 @@
           const user = JSON.parse(userStr);
           const roles = (user.roles || []).map(r => (r || '').toLowerCase());
           const isAdmin = roles.includes('admin');
-          const isOrganizer = roles.includes('organizer') || roles.includes('staff');
+          const isStaff = roles.includes('staff');
+          const isOrganizer = roles.includes('organizer');
 
           let portalLink = '';
           if (isAdmin) {
@@ -857,6 +916,15 @@
       const organizer = data.organizerName || 'Live Nation VN & EventPulse';
       document.getElementById('organizerNameMini').textContent = organizer;
 
+      // Cập nhật giới hạn vé tối đa từ API
+      if (data.maxTicketsPerUser && data.maxTicketsPerUser > 0) {
+        maxTicketsPerUser = data.maxTicketsPerUser;
+      }
+      const maxEl = document.getElementById('maxTicketsDisplay');
+      if (maxEl) {
+        maxEl.textContent = `/${maxTicketsPerUser}`;
+      }
+
       // Update back button link
       if (data.eventId || eventId) {
         const evId = data.eventId || eventId;
@@ -1078,8 +1146,9 @@
       if (selectedSeatIds.has(seat.id)) {
         selectedSeatIds.delete(seat.id);
       } else {
-        if (selectedSeatIds.size + myHeldSeatIds.size >= 10) {
-          alert("Quý khách chỉ được chọn tối đa 10 ghế mỗi lượt đặt vé.");
+        const totalAfter = selectedSeatIds.size + myHeldSeatIds.size + purchasedCountForUser;
+        if (totalAfter >= maxTicketsPerUser) {
+          showConflictToast(`Tổng ghế đang giữ (${myHeldSeatIds.size}) cộng đã mua (${purchasedCountForUser}) của bạn đã đạt giới hạn tối đa (${maxTicketsPerUser} vé) trong suất này. Không thể giữ thêm được.`);
           return;
         }
         selectedSeatIds.add(seat.id);
@@ -1138,6 +1207,15 @@
 
       const totalCount = selectedSeatIds.size + myHeldSeatIds.size;
       countEl.textContent = totalCount;
+
+      const allowanceInfo = document.getElementById('userAllowanceInfo');
+      const allowanceLimit = document.getElementById('allowanceLimitText');
+      const allowancePurchased = document.getElementById('allowancePurchasedText');
+      if (allowanceInfo) {
+        allowanceInfo.classList.remove('hidden');
+        if (allowanceLimit) allowanceLimit.textContent = `${maxTicketsPerUser} vé`;
+        if (allowancePurchased) allowancePurchased.textContent = `Đã mua: ${purchasedCountForUser} • Đang giữ: ${myHeldSeatIds.size}`;
+      }
 
       if (totalCount > 0) {
         btnClearAll.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -1347,6 +1425,14 @@
         if (res.ok && json && json.success) {
           const data = json.data;
           const newlyHeld = data.seatIds || [];
+          if (data.maxTicketsPerUser && data.maxTicketsPerUser > 0) {
+            maxTicketsPerUser = data.maxTicketsPerUser;
+          }
+          if (data.purchasedCount !== undefined) {
+            purchasedCountForUser = data.purchasedCount;
+          }
+          const maxEl = document.getElementById('maxTicketsDisplay');
+          if (maxEl) maxEl.textContent = `/${maxTicketsPerUser}`;
 
           newlyHeld.forEach(id => {
             myHeldSeatIds.add(id);
@@ -1360,14 +1446,10 @@
 
           // Kích hoạt Countdown Timer 10 phút
           await restoreMyHoldsOnLoad();
-          showSuccessToast(`Đã giữ thành công ${newlyHeld.length} ghế! Quý khách có 10 phút để hoàn tất thanh toán.`);
+          showSuccessToast(`Đã giữ thành công ${newlyHeld.length} ghế! Đang khởi tạo đơn hàng...`);
 
-          // Cập nhật text nút để chuyển sang thanh toán
-          btn.innerHTML = `
-            <span>Xác nhận &amp; Chuyển sang thanh toán</span>
-            <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
-          `;
-          btn.disabled = false;
+          // Tự động chuyển tiếp sang khởi tạo đơn hàng & thanh toán
+          await createOrderAndProceed();
 
         } else if (res.status === 401) {
           localStorage.removeItem('access_token');
@@ -1477,7 +1559,7 @@
         const token = getValidToken();
         if (!token) return;
 
-        const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/seats/${seatId}/hold`, {
+        const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/seats/${seatId}/hold?cancelOrder=true`, {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
@@ -1495,9 +1577,10 @@
           if (myHeldSeatIds.size === 0) {
             stopHoldCountdown();
           }
+          showSuccessToast(`Đã hủy chọn ghế ${seat.row}${seat.seatNumber}.`);
           return true;
         } else {
-          alert(json?.message || 'Không thể hủy giữ ghế. Vui lòng thử lại.');
+          showConflictToast(json?.message || 'Không thể hủy giữ ghế. Vui lòng thử lại.');
         }
       } catch (err) {
         console.warn("Lỗi khi hủy giữ ghế:", err);
@@ -1688,6 +1771,15 @@
             const serverTime = json.data.serverTime;
             const httpDate = res.headers.get('Date');
 
+            if (json.data.maxTicketsPerUser && json.data.maxTicketsPerUser > 0) {
+              maxTicketsPerUser = json.data.maxTicketsPerUser;
+            }
+            if (json.data.purchasedCount !== undefined) {
+              purchasedCountForUser = json.data.purchasedCount;
+            }
+            const maxEl = document.getElementById('maxTicketsDisplay');
+            if (maxEl) maxEl.textContent = `/${maxTicketsPerUser}`;
+
             myHeldSeatIds.clear();
             const absoluteDeadline = /(Z|[+-]\d{2}:\d{2})$/i.test(expiresAt || "");
             const referenceTime = new Date(serverTime || httpDate || Date.now()).getTime();
@@ -1755,6 +1847,7 @@
       await loadSeats();
       restorePendingSeats();
       await restoreMyHoldsOnLoad();
+      await initSignalR();
     }
 
     document.addEventListener('DOMContentLoaded', initPage);

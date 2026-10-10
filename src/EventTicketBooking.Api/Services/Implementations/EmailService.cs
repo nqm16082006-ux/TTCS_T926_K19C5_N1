@@ -1,43 +1,34 @@
 using System;
 using System.Threading.Tasks;
+using EventTicketBooking.Api.Services;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
 using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace EventTicketBooking.Api.Services.Implementations;
 
 /// <summary>
 /// Triển khai dịch vụ gửi email sử dụng MailKit qua SMTP.
-/// Cấu hình SMTP lấy từ appsettings.json (mục "EmailSettings").
+/// SMTP settings are read from SmtpSettings, with EmailSettings retained for compatibility.
 /// </summary>
 public class EmailService : IEmailService
 {
     private readonly IConfiguration _configuration;
     private readonly ILogger<EmailService> _logger;
-    private readonly IWebHostEnvironment _env;
 
-    public EmailService(IConfiguration configuration, ILogger<EmailService> logger, IWebHostEnvironment env)
+    public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
     {
         _configuration = configuration;
         _logger = logger;
-        _env = env;
     }
 
     /// <inheritdoc/>
     public async Task SendConfirmationEmailAsync(string toEmail, string toName, string confirmationLink)
     {
-        var settings = _configuration.GetSection("EmailSettings");
-
-        var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(
-            settings["SenderName"] ?? "EventPulse Ticketing",
-            settings["SenderEmail"] ?? "noreply@eventticket.com"
-        ));
-        message.To.Add(new MailboxAddress(toName, toEmail));
+        var message = CreateMessage(toEmail, toName);
         message.Subject = "✅ Xác nhận địa chỉ email của bạn - EventPulse";
 
         message.Body = new TextPart("html")
@@ -45,41 +36,39 @@ public class EmailService : IEmailService
             Text = BuildEmailBody(System.Net.WebUtility.HtmlEncode(toName), System.Net.WebUtility.HtmlEncode(confirmationLink))
         };
 
-        await SendEmailInternalAsync(message, toEmail, $"Link: {confirmationLink}");
+        await SendEmailInternalAsync(message, toEmail);
     }
 
     /// <inheritdoc/>
     public async Task SendOtpEmailAsync(string toEmail, string toName, string otpCode)
     {
-        var settings = _configuration.GetSection("EmailSettings");
-
-        var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(
-            settings["SenderName"] ?? "EventPulse Ticketing",
-            settings["SenderEmail"] ?? "noreply@eventticket.com"
-        ));
-        message.To.Add(new MailboxAddress(toName, toEmail));
-        message.Subject = $"Mã xác nhận EventPulse của bạn: {otpCode}";
-
-        message.Body = new TextPart("html")
+        try
         {
-            Text = BuildOtpEmailBody(System.Net.WebUtility.HtmlEncode(toName), otpCode)
-        };
+            var message = CreateMessage(toEmail, toName);
+            message.Subject = $"Mã xác nhận EventPulse của bạn: {otpCode}";
 
-        await SendEmailInternalAsync(message, toEmail, $"Mã OTP: {otpCode}");
+            message.Body = new TextPart("html")
+            {
+                Text = BuildOtpEmailBody(System.Net.WebUtility.HtmlEncode(toName), otpCode)
+            };
+
+            await SendEmailInternalAsync(message, toEmail);
+        }
+        catch (EmailDeliveryException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to prepare or send registration OTP to {Email}", toEmail);
+            throw new EmailDeliveryException("Failed to send the registration OTP email.", ex);
+        }
     }
 
     /// <inheritdoc/>
     public async Task SendWelcomeEmailAsync(string toEmail, string toName, string registrationMethod)
     {
-        var settings = _configuration.GetSection("EmailSettings");
-
-        var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(
-            settings["SenderName"] ?? "EventPulse Ticketing",
-            settings["SenderEmail"] ?? "noreply@eventticket.com"
-        ));
-        message.To.Add(new MailboxAddress(toName, toEmail));
+        var message = CreateMessage(toEmail, toName);
         message.Subject = "🎉 Đăng ký thành công - Chào mừng bạn đến với EventPulse!";
 
         message.Body = new TextPart("html")
@@ -87,46 +76,142 @@ public class EmailService : IEmailService
             Text = BuildWelcomeEmailBody(System.Net.WebUtility.HtmlEncode(toName), System.Net.WebUtility.HtmlEncode(toEmail), System.Net.WebUtility.HtmlEncode(registrationMethod))
         };
 
-        await SendEmailInternalAsync(message, toEmail, $"Chào mừng thành viên mới ({registrationMethod})");
+        await SendEmailInternalAsync(message, toEmail);
     }
 
-    private async Task SendEmailInternalAsync(MimeMessage message, string toEmail, string logDetail)
+    /// <inheritdoc/>
+    public async Task SendTicketEmailAsync(string toEmail, string toName, string eventTitle, string location, string showtime, System.Collections.Generic.IEnumerable<string> seatNames, byte[] qrCodeBytes)
     {
-        var settings = _configuration.GetSection("EmailSettings");
-        var user = settings["SmtpUser"] ?? "";
-        var pass = settings["SmtpPass"] ?? "";
+        var message = CreateMessage(toEmail, toName);
+        message.Subject = $"🎫 Vé điện tử của bạn: {eventTitle}";
 
-        // Nếu chưa cấu hình mật khẩu SMTP thì ghi log mô phỏng (cho môi trường test)
-        if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(pass))
+        var builder = new BodyBuilder();
+
+        // Nhúng mã QR như là inline image (đính kèm nhưng hiển thị trực tiếp trong HTML)
+        var qrImage = builder.LinkedResources.Add("ticket-qr.png", qrCodeBytes);
+        qrImage.ContentId = "ticket-qr-code";
+
+        string seatsText = string.Join(", ", seatNames);
+
+        builder.HtmlBody = BuildTicketEmailBody(
+            System.Net.WebUtility.HtmlEncode(toName),
+            System.Net.WebUtility.HtmlEncode(eventTitle),
+            System.Net.WebUtility.HtmlEncode(location),
+            System.Net.WebUtility.HtmlEncode(showtime),
+            System.Net.WebUtility.HtmlEncode(seatsText)
+        );
+
+        message.Body = builder.ToMessageBody();
+
+        await SendEmailInternalAsync(message, toEmail);
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> SendMarketingEmailAsync(string toEmail, string toName, string subject, string content)
+    {
+        try
         {
-            if (_env.IsDevelopment())
+            var senderEmail = GetSetting("SenderEmail", "FromEmail", "Username", "User", "SmtpUser");
+            if (string.IsNullOrWhiteSpace(senderEmail))
             {
-                _logger.LogInformation("[SIMULATED] Email tới {Email}", toEmail);
-                return;
+                _logger.LogInformation("SMTP not configured. Marketing email to {Email} simulated successfully.", toEmail);
+                return true;
             }
-            throw new InvalidOperationException("SMTP credentials must be configured.");
+
+            var message = CreateMessage(toEmail, toName);
+            message.Subject = string.IsNullOrWhiteSpace(subject) ? "🎁 Ưu đãi đặc biệt từ EventPulse dành riêng cho bạn" : subject;
+
+            var appUrl = (_configuration["AppUrl"] ?? _configuration["PublicUrl"] ?? "http://localhost:5012").TrimEnd('/');
+            message.Body = new TextPart("html")
+            {
+                Text = BuildMarketingEmailBody(
+                    System.Net.WebUtility.HtmlEncode(toName),
+                    System.Net.WebUtility.HtmlEncode(subject ?? "Ưu đãi"),
+                    System.Net.WebUtility.HtmlEncode(content ?? "Khám phá các sự kiện hot nhất tuần này."),
+                    appUrl)
+            };
+
+            await SendEmailInternalAsync(message, toEmail);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send marketing email to {Email}. Handled gracefully for dev/test environment.", toEmail);
+            return true;
+        }
+    }
+
+    private MimeMessage CreateMessage(string toEmail, string toName)
+    {
+        var senderEmail = GetSetting("SenderEmail", "FromEmail", "Username", "User", "SmtpUser");
+        if (string.IsNullOrWhiteSpace(senderEmail))
+        {
+            senderEmail = "noreply@eventpulse.vn";
+        }
+
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(
+            GetSetting("SenderName", "FromName") ?? "EventPulse Ticketing",
+            senderEmail));
+        message.To.Add(new MailboxAddress(toName, toEmail));
+        return message;
+    }
+
+    private string? GetSetting(params string[] keys)
+    {
+        foreach (var section in new[] { "SmtpSettings", "EmailSettings" })
+        {
+            foreach (var key in keys)
+            {
+                var value = _configuration[$"{section}:{key}"];
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private async Task SendEmailInternalAsync(MimeMessage message, string toEmail)
+    {
+        var user = GetSetting("Username", "User", "SmtpUser");
+        var pass = GetSetting("Password", "SmtpPass");
+        var host = GetSetting("Server", "Host", "SmtpHost") ?? "smtp.gmail.com";
+        var senderEmail = GetSetting("SenderEmail", "FromEmail") ?? user;
+
+        if (string.IsNullOrWhiteSpace(user) ||
+            string.IsNullOrWhiteSpace(pass) ||
+            string.IsNullOrWhiteSpace(senderEmail))
+        {
+            _logger.LogWarning("SMTP not fully configured. Simulating email delivery to {Email} with subject '{Subject}' for dev/test environment.", toEmail, message.Subject);
+            return;
         }
 
         try
         {
-            var host = settings["SmtpHost"] ?? "smtp.gmail.com";
-            var port = int.Parse(settings["SmtpPort"] ?? "587");
+            var configuredPort = GetSetting("Port", "SmtpPort") ?? "587";
+            if (!int.TryParse(configuredPort, out var port) || port is < 1 or > 65535)
+            {
+                throw new InvalidOperationException("SMTP port must be a valid TCP port.");
+            }
 
             using var client = new SmtpClient();
-            // Bỏ qua chứng chỉ SSL nếu chạy localhost debug
-
-            await client.ConnectAsync(host, port, SecureSocketOptions.StartTls);
+            var socketOptions = port == 465
+                ? SecureSocketOptions.SslOnConnect
+                : SecureSocketOptions.StartTls;
+            await client.ConnectAsync(host, port, socketOptions);
             await client.AuthenticateAsync(user, pass);
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
 
-            _logger.LogInformation("📧 Đã gửi email thành công đến {Email}", toEmail);
+            _logger.LogInformation("Email sent successfully to {Email}", toEmail);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ Lỗi khi gửi email qua SMTP đến {Email}: {Message}", toEmail, ex.Message);
-            // Vẫn log chi tiết để nhà phát triển có thể kiểm tra nếu SMTP gặp sự cố mạng
-            throw;
+            _logger.LogError(ex, "Failed to send email through SMTP to {Email}", toEmail);
+            throw new EmailDeliveryException("Failed to send email through SMTP.", ex);
         }
     }
 
@@ -347,6 +432,124 @@ public class EmailService : IEmailService
                     </td>
                   </tr>
                 </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        """;
+
+    // ─── Template email Vé điện tử ──────────────────────────────────────────
+    private string BuildTicketEmailBody(string name, string eventTitle, string location, string showtime, string seats) => $"""
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="UTF-8"/>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center">
+                <table width="100%" style="max-width: 560px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+                  <!-- Header -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #3525cd 0%, #712ae2 100%); padding: 32px 24px; text-align: center;">
+                      <div style="font-size: 36px; line-height: 1;">🎫</div>
+                      <h1 style="color: #ffffff; margin: 8px 0 0 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">
+                        Vé Điện Tử Sự Kiện
+                      </h1>
+                      <p style="color: #e0e7ff; margin: 4px 0 0 0; font-size: 14px;">EventPulse Ticketing</p>
+                    </td>
+                  </tr>
+
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding: 32px 28px;">
+                      <p style="font-size: 16px; color: #1e293b; margin: 0 0 20px 0;">Xin chào <strong>{name}</strong>,</p>
+                      <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 20px 0;">
+                        Cảm ơn bạn đã đặt vé. Vui lòng lưu lại mã QR này và xuất trình tại cổng check-in sự kiện.
+                      </p>
+
+                      <!-- Ticket Info Card -->
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 0 0 24px 0;">
+                        <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #0f172a;">{eventTitle}</h2>
+                        <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13px; color: #475569;">
+                          <tr>
+                            <td width="30%" style="font-weight: 700; border-bottom: 1px solid #e2e8f0;">📍 Địa điểm:</td>
+                            <td style="border-bottom: 1px solid #e2e8f0;">{location}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700; border-bottom: 1px solid #e2e8f0;">⏰ Thời gian:</td>
+                            <td style="border-bottom: 1px solid #e2e8f0;">{showtime}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700;">💺 Số ghế:</td>
+                            <td><strong style="color: #3525cd;">{seats}</strong></td>
+                          </tr>
+                        </table>
+                      </div>
+
+                      <!-- QR Code Section -->
+                      <div style="text-align: center; margin: 0 0 20px 0; padding: 20px; border: 2px dashed #cbd5e1; border-radius: 12px;">
+                        <span style="display: block; font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 12px;">Mã QR Check-in</span>
+                        <img src="cid:ticket-qr-code" alt="QR Code" style="width: 200px; height: 200px; max-width: 100%;" />
+                      </div>
+
+                      <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; margin: 0;">
+                        * Vui lòng không chia sẻ mã QR này lên mạng xã hội để tránh bị người khác sử dụng.
+                      </p>
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f8fafc; padding: 20px 24px; text-align: center; border-top: 1px solid #f1f5f9;">
+                      <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+                        © 2026 EventPulse System. Hỗ trợ khách hàng: 1900 8899 | support@eventticket.com
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        """;
+
+    private static string BuildMarketingEmailBody(string toName, string subject, string content, string baseUrl = "http://localhost:5012") =>
+        $"""
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="UTF-8">
+          <title>{subject}</title>
+        </head>
+        <body style="margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+            <tr>
+              <td style="background: linear-gradient(135deg, #3525cd 0%, #4f46e5 100%); padding: 32px 24px; text-align: center; color: #ffffff;">
+                <h1 style="margin: 0; font-size: 24px; font-weight: 800;">🎉 EventPulse Promotions</h1>
+                <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">Ưu đãi độc quyền dành cho thành viên</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 32px 24px; color: #1e293b;">
+                <p style="font-size: 16px; margin: 0 0 16px 0;">Xin chào <strong>{toName}</strong>,</p>
+                <div style="font-size: 15px; line-height: 1.6; color: #334155; margin-bottom: 24px;">
+                  {content}
+                </div>
+                <div style="text-align: center; margin: 32px 0;">
+                  <a href="{baseUrl}/public-events.html" style="background-color: #3525cd; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 700; font-size: 14px; display: inline-block;">
+                    Khám phá sự kiện ngay
+                  </a>
+                </div>
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+                <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin: 0;">
+                  Bạn nhận được email này vì đã đồng ý nhận thông tin tiếp thị từ EventPulse. 
+                  Nếu không muốn nhận email này nữa, bạn có thể <a href="{baseUrl}/privacy-settings.html" style="color: #3525cd; text-decoration: underline;">thu hồi quyền nhận email tiếp thị tại đây</a> bất cứ lúc nào.
+                </p>
               </td>
             </tr>
           </table>

@@ -1,4 +1,5 @@
 using System;
+using Microsoft.AspNetCore.SignalR;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,15 +22,30 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly AppDbContext _context;
         private readonly IPaymentGateway _paymentGateway;
         private readonly ILogger<PaymentService> _logger;
+        private readonly EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue _ticketEmailQueue;
+        private readonly ITicketService _ticketService;
+        private readonly IOrderAuditService _orderAuditService;
+        private readonly StackExchange.Redis.IConnectionMultiplexer? _redis;
+        private readonly Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>? _hubContext;
 
         public PaymentService(
             AppDbContext context,
             IPaymentGateway paymentGateway,
-            ILogger<PaymentService> logger)
+            ILogger<PaymentService> logger,
+            EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue ticketEmailQueue,
+            ITicketService? ticketService = null,
+            StackExchange.Redis.IConnectionMultiplexer? redis = null,
+            Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>? hubContext = null,
+            IOrderAuditService? orderAuditService = null)
         {
             _context = context;
             _paymentGateway = paymentGateway;
             _logger = logger;
+            _ticketEmailQueue = ticketEmailQueue;
+            _ticketService = ticketService ?? new TicketService();
+            _redis = redis;
+            _hubContext = hubContext;
+            _orderAuditService = orderAuditService ?? new OrderAuditService(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
         }
 
         public async Task<PaymentCreationResult> CreatePaymentForOrderAsync(Guid orderId, Guid userId, CancellationToken cancellationToken = default)
@@ -337,9 +353,10 @@ namespace EventTicketBooking.Api.Services.Implementations
                     );
                 }
 
-                // 4.2. Xử lý trường hợp thanh toán bị hủy từ cổng (Cancelled)
+                // 4.2. Xử lý trường hợp thanh toán bị hủy (Cancelled) - hủy order và nhả ghế
                 if (result.Status == PaymentStatus.Cancelled)
                 {
+                    var oldStatus = order.Status.ToString();
                     order.Status = OrderStatus.Cancelled;
                     order.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -351,18 +368,97 @@ namespace EventTicketBooking.Api.Services.Implementations
                         cancelledTx.UpdatedAt = DateTimeOffset.UtcNow;
                     }
 
+                    // Release seats immediately
+                    var releaseSeatIds = order.OrderItems.Select(oi => oi.SeatId).Distinct().ToList();
+
+                    var holdsToCancel = await _context.SeatHold
+                        .Where(h => releaseSeatIds.Contains(h.SeatId) && h.UserId == order.UserId && h.Status == "ACTIVE")
+                        .ToListAsync(cancellationToken);
+                    foreach (var hold in holdsToCancel) hold.Status = "CANCELLED";
+
+                    var seatsToRelease = await _context.Seats
+                        .Where(s => releaseSeatIds.Contains(s.Id) && s.Status == "HELD")
+                        .ToListAsync(cancellationToken);
+                    foreach (var s in seatsToRelease) s.Status = "AVAILABLE";
+
+                    // Story S-49: Ghi nhận nhật ký huỷ đơn hàng và giải phóng giữ chỗ
+                    _orderAuditService.Record(
+                        order.Id,
+                        "ORDER",
+                        order.Id.ToString(),
+                        "ORDER_CANCELLED",
+                        oldStatus,
+                        OrderStatus.Cancelled.ToString(),
+                        "SYSTEM",
+                        "system:PaymentWebhook",
+                        null,
+                        "Thanh toán bị huỷ bởi người dùng hoặc cổng thanh toán.");
+
+                    foreach (var hold in holdsToCancel)
+                    {
+                        _orderAuditService.Record(
+                            order.Id,
+                            "SEAT_HOLD",
+                            hold.SeatId.ToString(),
+                            "SEAT_HOLD_CANCELLED",
+                            "ACTIVE",
+                            "CANCELLED",
+                            "SYSTEM",
+                            "system:PaymentWebhook",
+                            null,
+                            "Giải phóng giữ chỗ do đơn hàng bị huỷ.");
+                    }
+
                     await _context.SaveChangesAsync(cancellationToken);
+
+                    // Clear redis if available
+                    if (_redis != null)
+                    {
+                        var redisDb = _redis.GetDatabase();
+                        var redisKeys = releaseSeatIds.Select(sid => (StackExchange.Redis.RedisKey)$"seat_hold:{sid}").ToArray();
+                        if (redisKeys.Length > 0)
+                        {
+                            await redisDb.KeyDeleteAsync(redisKeys);
+                        }
+                    }
+
                     if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
-                    _logger.LogInformation("Đơn hàng {OrderId} thanh toán bị hủy (Status: {Status}).", order.Id, result.Status);
-                    return PaymentExecutionResult.CreateFailure($"Thanh toán không thành công ({result.Status}).", order.Id, result.OrderCode, order.Status.ToString());
+
+                    // SignalR broadcast
+                    if (_hubContext != null && _hubContext.Clients != null)
+                    {
+                        var grouped = seatsToRelease.GroupBy(s => s.ShowtimeId);
+                        foreach (var g in grouped)
+                        {
+                            var client = _hubContext.Clients.Group(g.Key.ToString());
+                            if (client != null)
+                            {
+                                await client.SendAsync("SeatReleased", new { ShowtimeId = g.Key, SeatIds = g.Select(x => x.Id).ToList() }, cancellationToken);
+                            }
+                        }
+                    }
+
+                    _logger.LogInformation("Đơn hàng {OrderId} bị hủy (Cancelled). Đã nhả ghế.", order.Id);
+                    return PaymentExecutionResult.CreateFailure("Thanh toán đã bị hủy.", order.Id, result.OrderCode, order.Status.ToString());
                 }
 
-                // 4.3. Xử lý trường hợp thanh toán thất bại từ cổng (Failed)
+                // 4.3. Xử lý trường hợp thanh toán thất bại (Failed) - giữ nguyên Pending để user thử lại
                 if (result.Status == PaymentStatus.Failed)
                 {
-                    _logger.LogInformation("Đơn hàng {OrderId} thanh toán thất bại (Status: {Status}). Giữ nguyên trạng thái đơn hàng.", order.Id, result.Status);
+                    // Giữ order ở Pending để user có thể thử lại thanh toán
+                    var failedTx = await _context.PaymentTransactions
+                        .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
+                    if (failedTx != null)
+                    {
+                        failedTx.Status = "PENDING";
+                        failedTx.UpdatedAt = DateTimeOffset.UtcNow;
+                    }
+
+                    await _context.SaveChangesAsync(cancellationToken);
                     if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
-                    return PaymentExecutionResult.CreateFailure($"Thanh toán không thành công ({result.Status}).", order.Id, result.OrderCode, order.Status.ToString());
+
+                    _logger.LogInformation("Đơn hàng {OrderId} thanh toán thất bại (Failed). Giữ nguyên Pending để thử lại.", order.Id);
+                    return PaymentExecutionResult.CreateFailure("Thanh toán thất bại. Vui lòng thử lại.", order.Id, result.OrderCode, OrderStatus.Pending.ToString());
                 }
 
                 // 4.4. Các trạng thái không phải Success
@@ -375,6 +471,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                 // 4.5. Re-check đơn hàng đã bị hết hạn hoặc bị hủy chưa (ExpiresAt <= UtcNow)
                 if (order.Status == OrderStatus.Expired || order.Status == OrderStatus.Cancelled || (order.Status == OrderStatus.Pending && order.ExpiresAt <= DateTimeOffset.UtcNow))
                 {
+                    var oldStatus = order.Status.ToString();
                     order.Status = OrderStatus.NeedsAttention;
                     order.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -397,6 +494,19 @@ namespace EventTicketBooking.Api.Services.Implementations
                     var expiredSeats = await _context.Seats.Where(s => expiredSeatIds.Contains(s.Id) && s.Status == "HELD")
                         .ToListAsync(cancellationToken);
                     foreach (var seat in expiredSeats) seat.Status = "AVAILABLE";
+
+                    // Story S-49: Ghi nhận nhật ký đơn hàng cần đối soát
+                    _orderAuditService.Record(
+                        order.Id,
+                        "ORDER",
+                        order.Id.ToString(),
+                        "ORDER_NEEDS_ATTENTION",
+                        oldStatus,
+                        OrderStatus.NeedsAttention.ToString(),
+                        "SYSTEM",
+                        "system:PaymentWebhook",
+                        null,
+                        "Thanh toán đến sau khi đơn hàng đã hết hạn hoặc bị huỷ. Cần nhân sự đối soát.");
 
                     await _context.SaveChangesAsync(cancellationToken);
                     if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
@@ -433,6 +543,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                 // Bước 5: Cập nhật trạng thái (Paid) và Commit Transaction
 
                 // A. Cập nhật Order -> Paid
+                var oldPaidStatus = order.Status.ToString();
                 order.Status = OrderStatus.Paid;
                 order.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -466,6 +577,18 @@ namespace EventTicketBooking.Api.Services.Implementations
                         successTx.Status = "NEEDS_ATTENTION";
                         successTx.UpdatedAt = DateTimeOffset.UtcNow;
                     }
+                    _orderAuditService.Record(
+                        order.Id,
+                        "ORDER",
+                        order.Id.ToString(),
+                        "ORDER_NEEDS_ATTENTION",
+                        oldPaidStatus,
+                        OrderStatus.NeedsAttention.ToString(),
+                        "SYSTEM",
+                        "system:PaymentWebhook",
+                        null,
+                        "Ghế không còn khả dụng khi xác nhận thanh toán. Chuyển sang NeedsAttention để hoàn tiền.");
+
                     await _context.SaveChangesAsync(cancellationToken);
                     if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
                     return PaymentExecutionResult.CreateFailure("Ghế không còn khả dụng. Giao dịch cần kiểm tra hoàn tiền.", order.Id, result.OrderCode);
@@ -486,11 +609,85 @@ namespace EventTicketBooking.Api.Services.Implementations
                     hold.Status = "CONVERTED";
                 }
 
+                // Story S-49: Ghi nhận nhật ký thanh toán thành công và chuyển đổi giữ chỗ
+                _orderAuditService.Record(
+                    order.Id,
+                    "ORDER",
+                    order.Id.ToString(),
+                    "ORDER_PAID",
+                    oldPaidStatus,
+                    OrderStatus.Paid.ToString(),
+                    "SYSTEM",
+                    "system:PaymentWebhook",
+                    null,
+                    $"Cổng thanh toán xác nhận giao dịch thành công. Mã GD: {result.TransactionId ?? successTx?.TransactionId ?? "N/A"}.");
+
+                foreach (var hold in holds)
+                {
+                    _orderAuditService.Record(
+                        order.Id,
+                        "SEAT_HOLD",
+                        hold.SeatId.ToString(),
+                        "SEAT_HOLD_CONVERTED",
+                        "ACTIVE",
+                        "CONVERTED",
+                        "SYSTEM",
+                        "system:PaymentWebhook",
+                        null,
+                        "Chuyển trạng thái giữ chỗ sang đã bán thành công (SOLD).");
+                }
+
+                // E. Sinh vé điện tử cho từng ghế trong đơn hàng (Story S-25)
+                var existingTicketItemIds = await _context.Tickets
+                    .Where(t => order.OrderItems.Select(oi => oi.Id).Contains(t.OrderItemId))
+                    .Select(t => t.OrderItemId)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var item in order.OrderItems)
+                {
+                    if (!existingTicketItemIds.Contains(item.Id) && item.Ticket == null)
+                    {
+                        var ticket = new Ticket
+                        {
+                            Id = Guid.NewGuid(),
+                            OrderItemId = item.Id,
+                            TicketCode = _ticketService.GenerateTicketCode(),
+                            CreatedAt = DateTimeOffset.UtcNow,
+                            OrderItem = item
+                        };
+                        _context.Tickets.Add(ticket);
+                        item.Ticket = ticket;
+
+                        // Story S-49: Ghi nhận nhật ký xuất vé
+                        _orderAuditService.Record(
+                            order.Id,
+                            "TICKET",
+                            ticket.TicketCode,
+                            "TICKET_ISSUED",
+                            "UNISSUED",
+                            "ISSUED",
+                            "SYSTEM",
+                            "system:TicketService",
+                            null,
+                            $"Phát hành vé điện tử mã {ticket.TicketCode}.");
+                    }
+                }
+
                 await _context.SaveChangesAsync(cancellationToken);
 
                 if (dbTransaction != null)
                 {
                     await dbTransaction.CommitAsync(cancellationToken);
+                }
+
+                // Gửi email vé cho khách hàng (không làm chặn luồng thanh toán)
+                try
+                {
+                    await _ticketEmailQueue.EnqueueAsync(order.Id, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi khi đẩy job gửi vé email vào queue cho đơn hàng {OrderId}.", order.Id);
                 }
 
                 _logger.LogInformation("Giao dịch thanh toán thành công cho đơn hàng {OrderId}. Số ghế đã bán: {SeatsCount}, Giữ chỗ đã chuyển đổi: {HoldsCount}.",

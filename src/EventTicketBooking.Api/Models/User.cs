@@ -18,6 +18,9 @@ namespace EventTicketBooking.Api.Models
         public bool IsActive { get; set; } = false;
         public string? VerificationCode { get; set; }
         public DateTime? VerificationCodeExpiresAt { get; set; }
+        public string TermsVersion { get; set; } = string.Empty;
+        public DateTime? TermsAcceptedAt { get; set; }
+        public bool MarketingEmailOptIn { get; set; }
 
         // Navigation property quan hệ N:N thông qua bảng trung gian UserRoles
         public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();

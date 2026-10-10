@@ -15,5 +15,7 @@ namespace EventTicketBooking.Api.DTOs
 
         [MaxLength(100)]
         public string? FullName { get; set; }
+
+        public bool AcceptTerms { get; set; }
     }
 }

@@ -1,4 +1,4 @@
-using EventTicketBooking.Api.Models;
+﻿using EventTicketBooking.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace EventTicketBooking.Api.Data
@@ -24,13 +24,28 @@ namespace EventTicketBooking.Api.Data
         public DbSet<OrderItem> OrderItems { get; set; } = null!;
         public DbSet<PaymentTransaction> PaymentTransactions { get; set; } = null!;
         public DbSet<PaymentEvent> PaymentEvents { get; set; } = null!;
+        public DbSet<Ticket> Tickets { get; set; } = null!;
         public DbSet<Role> Roles { get; set; } = null!;
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<UserRole> UserRoles { get; set; } = null!;
+        public DbSet<AuditLog> AuditLogs { get; set; } = null!;
+        public DbSet<TicketReadmission> TicketReadmissions { get; set; } = null!;
+        public DbSet<EmailFailureLog> EmailFailureLogs { get; set; } = null!;
+        public DbSet<OrderAuditLog> OrderAuditLogs { get; set; } = null!;
+        public DbSet<OfflineCheckInRecord> OfflineCheckInRecords { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<TicketReadmission>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.StaffName).HasMaxLength(200).IsRequired();
+                entity.Property(x => x.Reason).HasMaxLength(1000).IsRequired();
+                entity.Property(x => x.Gate).HasMaxLength(100).IsRequired();
+                entity.HasOne(x => x.OrderItem).WithMany().HasForeignKey(x => x.OrderItemId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<User>().WithMany().HasForeignKey(x => x.StaffUserId).OnDelete(DeleteBehavior.Restrict);
+            });
 
             if (Database.IsNpgsql())
             {
@@ -44,6 +59,7 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(e => e.Location).IsRequired().HasMaxLength(500);
                 entity.Property(e => e.ImageUrl).HasColumnType("text").HasMaxLength(2000);
                 entity.Property(e => e.TotalSeats).IsRequired();
+                entity.Property(e => e.MaxTicketsPerUser).IsRequired().HasDefaultValue(10);
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
@@ -61,8 +77,11 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(s => s.StartTime).IsRequired();
                 entity.Property(s => s.EndTime).IsRequired();
                 entity.Property(s => s.AvailableSeats).IsRequired();
+                entity.Property(s => s.MaxTicketsPerUser).IsRequired().HasDefaultValue(10);
                 entity.Property(s => s.Status)
-                      .HasConversion<string>();
+                      .HasConversion(
+                          v => v.ToString(),
+                          v => ParseShowtimeStatus(v));
 
                 entity.HasOne(s => s.Event)
                     .WithMany(e => e.Showtimes)
@@ -197,6 +216,19 @@ namespace EventTicketBooking.Api.Data
                 entity.HasIndex(ur => ur.RoleId);
             });
 
+            // Cấu hình bảng AuditLog (S-28): chỉ lưu thay đổi phân quyền
+            modelBuilder.Entity<AuditLog>(entity =>
+            {
+                entity.ToTable("AuditLogs");
+                entity.HasKey(a => a.Id);
+                entity.Property(a => a.ActorUsername).IsRequired().HasMaxLength(50);
+                entity.Property(a => a.OldRoles).IsRequired().HasMaxLength(500);
+                entity.Property(a => a.NewRoles).IsRequired().HasMaxLength(500);
+                entity.Property(a => a.Action).IsRequired().HasMaxLength(50);
+                entity.Property(a => a.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.HasIndex(a => a.TargetUserId);
+            });
+
             // Cấu hình bảng Orders
             modelBuilder.Entity<Order>(entity =>
             {
@@ -209,7 +241,9 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(o => o.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                 entity.Property(o => o.Status)
-                      .HasConversion<string>();
+                      .HasConversion(
+                          v => v.ToString(),
+                          v => ParseOrderStatus(v));
 
                 entity.HasOne(o => o.User)
                       .WithMany()
@@ -287,6 +321,153 @@ namespace EventTicketBooking.Api.Data
                       .IsUnique()
                       .HasDatabaseName("IX_payment_events_TransactionId_Unique");
             });
+
+            // Cấu hình bảng EmailFailureLogs (Task S-27)
+            modelBuilder.Entity<EmailFailureLog>(entity =>
+            {
+                entity.ToTable("EmailFailureLogs");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.TargetEmail).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.ErrorMessage).IsRequired();
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.Attempts).IsRequired().HasDefaultValue(0);
+                entity.Property(e => e.Resolved).HasDefaultValue(false);
+                entity.HasIndex(e => e.OrderId);
+            });
+
+            // Cấu hình bảng tickets (Story S-25)
+            modelBuilder.Entity<Ticket>(entity =>
+            {
+                entity.ToTable("tickets");
+                entity.HasKey(t => t.Id);
+
+                entity.Property(t => t.TicketCode)
+                      .IsRequired()
+                      .HasMaxLength(64);
+
+                entity.Property(t => t.CreatedAt)
+                      .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(t => t.OrderItem)
+                      .WithOne(oi => oi.Ticket)
+                      .HasForeignKey<Ticket>(t => t.OrderItemId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(t => t.OrderItemId)
+                      .IsUnique()
+                      .HasDatabaseName("IX_tickets_OrderItemId_Unique");
+
+                entity.HasIndex(t => t.TicketCode)
+                      .IsUnique()
+                      .HasDatabaseName("IX_tickets_TicketCode_Unique");
+            });
+
+            // Cấu hình bảng nhật ký thao tác đơn hàng và vé (Story S-49)
+            modelBuilder.Entity<OrderAuditLog>(entity =>
+            {
+                entity.ToTable("order_audit_logs");
+                entity.HasKey(l => l.Id);
+                entity.Property(l => l.EntityType).IsRequired().HasMaxLength(50);
+                entity.Property(l => l.EntityId).HasMaxLength(100);
+                entity.Property(l => l.Action).IsRequired().HasMaxLength(100);
+                entity.Property(l => l.OldStatus).HasMaxLength(50);
+                entity.Property(l => l.NewStatus).IsRequired().HasMaxLength(50);
+                entity.Property(l => l.ActorType).IsRequired().HasMaxLength(50);
+                entity.Property(l => l.Actor).IsRequired().HasMaxLength(150);
+                entity.Property(l => l.Timestamp).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(l => l.Note).HasMaxLength(1000);
+
+                entity.HasOne(l => l.Order)
+                      .WithMany()
+                      .HasForeignKey(l => l.OrderId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(l => l.OrderId).HasDatabaseName("IX_order_audit_logs_OrderId");
+                entity.HasIndex(l => l.Timestamp).HasDatabaseName("IX_order_audit_logs_Timestamp");
+                entity.HasIndex(l => l.EntityType).HasDatabaseName("IX_order_audit_logs_EntityType");
+            });
+
+            // Cấu hình bảng OfflineCheckInRecords (Story S-35)
+            modelBuilder.Entity<OfflineCheckInRecord>(entity =>
+            {
+                entity.ToTable("OfflineCheckInRecords");
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.OfflineScanId)
+                      .IsRequired()
+                      .HasMaxLength(100);
+
+                entity.Property(x => x.TicketCode)
+                      .IsRequired()
+                      .HasMaxLength(64);
+
+                entity.Property(x => x.GateName)
+                      .IsRequired()
+                      .HasMaxLength(100);
+
+                entity.Property(x => x.Status)
+                      .IsRequired()
+                      .HasMaxLength(20);
+
+                entity.Property(x => x.ConflictReason)
+                      .HasMaxLength(100);
+
+                entity.Property(x => x.ExistingCheckInGate)
+                      .HasMaxLength(100);
+
+                entity.Property(x => x.ReceivedAtServer)
+                      .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasIndex(x => x.OfflineScanId)
+                      .IsUnique()
+                      .HasDatabaseName("UX_OfflineCheckInRecords_OfflineScanId");
+
+                entity.HasIndex(x => x.TicketCode);
+                entity.HasIndex(x => x.ShowtimeId);
+
+                entity.HasOne(x => x.OrderItem)
+                      .WithMany()
+                      .HasForeignKey(x => x.OrderItemId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(x => x.Showtime)
+                      .WithMany()
+                      .HasForeignKey(x => x.ShowtimeId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(x => x.SyncedByUser)
+                      .WithMany()
+                      .HasForeignKey(x => x.SyncedByUserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+        }
+
+        public static ShowtimeStatus ParseShowtimeStatus(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return ShowtimeStatus.Draft;
+            var normalized = value.Trim().ToLowerInvariant().Replace("_", "");
+            return normalized switch
+            {
+                "onsale" => ShowtimeStatus.OnSale,
+                "closed" => ShowtimeStatus.Closed,
+                "draft" => ShowtimeStatus.Draft,
+                _ => Enum.TryParse<ShowtimeStatus>(value, true, out var result) ? result : ShowtimeStatus.Draft
+            };
+        }
+
+        public static OrderStatus ParseOrderStatus(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return OrderStatus.Pending;
+            var normalized = value.Trim().ToLowerInvariant().Replace("_", "");
+            return normalized switch
+            {
+                "pending" => OrderStatus.Pending,
+                "paid" => OrderStatus.Paid,
+                "cancelled" => OrderStatus.Cancelled,
+                "expired" => OrderStatus.Expired,
+                "needsattention" => OrderStatus.NeedsAttention,
+                _ => Enum.TryParse<OrderStatus>(value, true, out var result) ? result : OrderStatus.Pending
+            };
         }
     }
 }

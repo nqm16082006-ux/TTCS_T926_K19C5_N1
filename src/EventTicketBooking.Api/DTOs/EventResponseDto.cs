@@ -16,6 +16,7 @@ namespace EventTicketBooking.Api.DTOs
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
         public int TotalSeats { get; set; }
+        public int MaxTicketsPerUser { get; set; } = 10;
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public List<ShowtimeResponseDto> Showtimes { get; set; } = new List<ShowtimeResponseDto>();

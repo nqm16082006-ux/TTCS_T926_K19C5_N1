@@ -55,6 +55,85 @@ namespace EventTicketBooking.Tests
         }
 
         [Fact]
+        public async Task GetSalesByShowtime_ShouldReturnAvailableTicketsPerCategory()
+        {
+            var ev = new Event
+            {
+                Id = Guid.NewGuid(),
+                OwnerId = _userId,
+                Title = "Test Event",
+                Location = "Location",
+                StartTime = DateTime.UtcNow.AddDays(1),
+                EndTime = DateTime.UtcNow.AddDays(2),
+                TotalSeats = 4
+            };
+            var showtime = new Showtime
+            {
+                Id = Guid.NewGuid(),
+                EventId = ev.Id,
+                AvailableSeats = 4,
+                StartTime = ev.StartTime,
+                EndTime = ev.EndTime
+            };
+            var standard = new SeatCategory { ShowtimeId = showtime.Id, Name = "Standard", Price = 75_000 };
+            var vip = new SeatCategory { ShowtimeId = showtime.Id, Name = "VIP", Price = 150_000 };
+            showtime.SeatCategories.Add(standard);
+            showtime.SeatCategories.Add(vip);
+            ev.Showtimes.Add(showtime);
+
+            var soldSeat = new Seat { ShowtimeId = showtime.Id, SeatCategoryId = standard.Id, Row = "A", SeatNumber = 1 };
+            var availableStandardSeat = new Seat { ShowtimeId = showtime.Id, SeatCategoryId = standard.Id, Row = "A", SeatNumber = 2 };
+            var heldVipSeat = new Seat { ShowtimeId = showtime.Id, SeatCategoryId = vip.Id, Row = "B", SeatNumber = 1 };
+            var availableVipSeat = new Seat { ShowtimeId = showtime.Id, SeatCategoryId = vip.Id, Row = "B", SeatNumber = 2 };
+            _context.Seats.AddRange(soldSeat, availableStandardSeat, heldVipSeat, availableVipSeat);
+            _context.Orders.Add(new Order
+            {
+                UserId = _userId,
+                ShowtimeId = showtime.Id,
+                Status = OrderStatus.Paid,
+                TotalAmount = 75_000,
+                ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
+                OrderItems =
+                {
+                    new OrderItem
+                    {
+                        SeatId = soldSeat.Id,
+                        Seat = soldSeat,
+                        Price = 75_000
+                    }
+                }
+            });
+            _context.SeatHold.Add(new SeatHolds
+            {
+                SeatId = heldVipSeat.Id,
+                Seat = heldVipSeat,
+                UserId = _userId,
+                Status = "ACTIVE",
+                ExpiresAt = DateTime.UtcNow.AddMinutes(5)
+            });
+            _context.Events.Add(ev);
+            await _context.SaveChangesAsync();
+
+            var result = await _controller.GetSalesByShowtime();
+
+            var okResult = Assert.IsType<OkObjectResult>(result);
+            var response = Assert.IsType<ApiResponse<ShowtimeSalesReportDto>>(okResult.Value);
+            var report = Assert.IsType<ShowtimeSalesReportDto>(response.Data);
+            var sales = Assert.Single(report.Showtimes);
+            var standardSales = Assert.Single(sales.RevenueByCategory, category => category.Name == "Standard");
+            var vipSales = Assert.Single(sales.RevenueByCategory, category => category.Name == "VIP");
+
+            Assert.Equal(1, standardSales.TicketSoldCount);
+            Assert.Equal(1, standardSales.AvailableTickets);
+            Assert.Equal(1, standardSales.AvailableQuantity);
+            Assert.Equal(75_000, standardSales.Revenue);
+            Assert.Equal(1, vipSales.HeldCount);
+            Assert.Equal(1, vipSales.AvailableTickets);
+            Assert.Equal(1, vipSales.AvailableQuantity);
+            Assert.Equal(2, sales.AvailableTickets);
+        }
+
+        [Fact]
         public async Task OpenSale_ShouldReturnOk_WhenConditionsAreMet()
         {
             // Arrange

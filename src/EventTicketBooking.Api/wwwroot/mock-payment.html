@@ -228,8 +228,7 @@
     const API_BASE = (window.location.protocol === 'file:' || (['localhost', '127.0.0.1'].includes(window.location.hostname) && ['5500', '5501'].includes(window.location.port))) ? 'http://localhost:5012' : '';
     const params = new URLSearchParams(window.location.search);
     const orderId = params.get('orderId') || '';
-    const initialAmount = params.get('amount') || '0';
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || '';
 
     document.getElementById('orderCodeLabel').textContent = `MÃ ĐƠN: ${orderId.substring(0, 8).toUpperCase()}`;
     document.getElementById('orderTransferContent').textContent = `PAY ${orderId.substring(0, 8).toUpperCase()}`;
@@ -272,7 +271,7 @@
       try {
         const res = await fetch(`${API_BASE}/api/mock-payment/callback`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({
             orderId: orderId,
             status: isSuccess ? 'SUCCESS' : 'FAILED'

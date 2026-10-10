@@ -11,6 +11,10 @@ namespace EventTicketBooking.Api.DTOs
         /// Chế độ gọi: "register" (Đăng ký) hoặc "login" (Đăng nhập)
         /// </summary>
         public string? Mode { get; set; }
+
+        public bool AcceptTerms { get; set; }
+
+        public bool AcceptCurrentTerms { get; set; }
     }
 
     public class ResendOtpDto

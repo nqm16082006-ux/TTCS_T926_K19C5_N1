@@ -91,7 +91,9 @@ namespace EventTicketBooking.Api.Controllers
         public async Task<IActionResult> CancelSeatHold(
             Guid showtimeId,
             Guid seatId,
-            CancellationToken cancellationToken)
+            [FromQuery] bool cancelOrder = false,
+            [FromQuery] bool force = false,
+            CancellationToken cancellationToken = default)
         {
             var userId = GetCurrentUserId();
             if (!userId.HasValue)
@@ -103,6 +105,7 @@ namespace EventTicketBooking.Api.Controllers
                 showtimeId,
                 seatId,
                 userId.Value,
+                cancelOrder || force,
                 cancellationToken);
 
             return result.Status switch
@@ -163,7 +166,7 @@ namespace EventTicketBooking.Api.Controllers
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<SeatImportResultDto>> Import(
             Guid showtimeId,
-            [FromForm] IFormFile? file,
+            IFormFile? file,
             CancellationToken cancellationToken)
         {
             var db = HttpContext.RequestServices.GetRequiredService<AppDbContext>();
@@ -232,7 +235,7 @@ namespace EventTicketBooking.Api.Controllers
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<SeatImportItemDto>>> Preview(
-            [FromForm] IFormFile? file,
+            IFormFile? file,
             CancellationToken cancellationToken)
         {
             if (file?.Length > 5 * 1024 * 1024)

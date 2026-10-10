@@ -31,6 +31,43 @@ services:
       timeout: 5s
       retries: 5
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: event_ticket_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5012
+      PORT: 5012
+      Database__Provider: Postgres
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-event_ticket_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password_123}
+      ConnectionStrings__Redis: redis:6379
+      SmtpSettings__Server: ${SmtpSettings__Server:-smtp.gmail.com}
+      SmtpSettings__Port: ${SmtpSettings__Port:-587}
+      SmtpSettings__SenderName: ${SmtpSettings__SenderName:-EventPulse Ticketing}
+      SmtpSettings__SenderEmail: ${SmtpSettings__SenderEmail:-}
+      SmtpSettings__Username: ${SmtpSettings__Username:-}
+      SmtpSettings__Password: ${SmtpSettings__Password:-}
+    ports:
+      - "5012:5012"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5012/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
 volumes:
   postgres_data:
   redis_data:

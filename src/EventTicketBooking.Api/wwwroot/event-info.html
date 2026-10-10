@@ -263,43 +263,13 @@
                   <span class="w-1.5 h-6 rounded-full bg-secondary inline-block"></span>
                   Sơ đồ tổng quan khán phòng
                 </h2>
-                <span class="font-label-sm text-label-sm text-outline font-code-mono" id="totalSeatsBadge">Quy mô: 3.500 ghế</span>
-              </div>
-
-              <div class="relative bg-surface-container-low rounded-lg p-space-md overflow-hidden flex flex-col items-center">
-                <div class="w-full max-w-md h-7 rounded-t-full bg-primary/20 flex items-center justify-center font-label-sm text-label-sm text-primary mb-space-md tracking-widest uppercase font-bold">
-                  SÂN KHẤU CHÍNH (MAIN STAGE)
-                </div>
-
-                <svg class="w-full max-w-lg h-auto text-on-surface select-none" fill="none" viewBox="0 0 460 220" xmlns="http://www.w3.org/2000/svg">
-                  <!-- VIP Area -->
-                  <path d="M 60 40 Q 230 10 400 40 L 420 80 Q 230 50 40 80 Z" fill="#8a4cfc" fill-opacity="0.85"></path>
-                  <text fill="#ffffff" font-size="11" font-weight="700" letter-spacing="1" text-anchor="middle" x="230" y="65">KHU VỰC V.I.P</text>
-                  
-                  <!-- Platinum Area -->
-                  <path d="M 40 90 Q 230 60 420 90 L 440 140 Q 230 110 20 140 Z" fill="#3525cd" fill-opacity="0.85"></path>
-                  <text fill="#ffffff" font-size="11" font-weight="700" letter-spacing="1" text-anchor="middle" x="230" y="118">KHU PLATINUM</text>
-                  
-                  <!-- Standard Area -->
-                  <path d="M 20 150 Q 230 120 440 150 L 455 200 Q 230 170 5 200 Z" fill="#777587" fill-opacity="0.35"></path>
-                  <text fill="#131b2e" font-size="11" font-weight="700" letter-spacing="1" text-anchor="middle" x="230" y="178">KHU STANDARD</text>
-                </svg>
-
-                <div class="flex flex-wrap items-center justify-center gap-space-md mt-space-md pt-space-sm" id="categoriesLegend">
-                  <div class="flex items-center gap-1.5 font-label-sm text-label-sm text-on-surface">
-                    <span class="w-3.5 h-3.5 rounded bg-secondary-container"></span>
-                    <span id="legendVip">VIP: Cao cấp</span>
-                  </div>
-                  <div class="flex items-center gap-1.5 font-label-sm text-label-sm text-on-surface">
-                    <span class="w-3.5 h-3.5 rounded bg-primary"></span>
-                    <span id="legendPlatinum">Platinum: Tiêu chuẩn</span>
-                  </div>
-                  <div class="flex items-center gap-1.5 font-label-sm text-label-sm text-on-surface">
-                    <span class="w-3.5 h-3.5 rounded bg-outline-variant"></span>
-                    <span id="legendStandard">Standard: Phổ thông</span>
-                  </div>
+                <div class="flex items-center gap-2">
+                  <span class="font-label-sm text-label-sm text-outline font-code-mono" id="totalSeatsBadge">Quy mô: 3.500 ghế</span>
+                  <span class="px-2 py-0.5 rounded-full bg-primary-fixed/30 text-primary font-label-sm text-xs font-bold" id="eventMaxTicketsBadge">Tối đa 10 vé/người</span>
                 </div>
               </div>
+
+              <div id="seatingMapOverview" class="bg-surface-container-low rounded-lg p-space-md"></div>
             </section>
 
             <!-- SECTION 3: Địa điểm & Bản đồ hướng dẫn -->
@@ -635,7 +605,8 @@
           const user = JSON.parse(userStr);
           const roles = (user.roles || []).map(r => (r || '').toLowerCase());
           const isAdmin = roles.includes('admin');
-          const isOrganizer = roles.includes('organizer') || roles.includes('staff');
+          const isStaff = roles.includes('staff');
+          const isOrganizer = roles.includes('organizer');
 
           let portalLinkHtml = '';
           if (isAdmin) {
@@ -860,9 +831,11 @@
       // 7. Quy mô & Sơ đồ ghế
       const totalSeats = ev.totalSeats ?? 0;
       document.getElementById('totalSeatsBadge').innerText = `Quy mô: ${totalSeats.toLocaleString('vi-VN')} ghế`;
-      document.getElementById('legendVip').innerText = `VIP: ${formatCurrency(maxP)}`;
-      document.getElementById('legendStandard').innerText = `Standard: ${formatCurrency(minP)}`;
-      document.getElementById('legendPlatinum').innerText = 'Giá từng hạng ghế được hiển thị tại sơ đồ ghế';
+      const maxTicketsBadge = document.getElementById('eventMaxTicketsBadge');
+      if (maxTicketsBadge) {
+        maxTicketsBadge.innerText = `Tối đa ${ev.maxTicketsPerUser || 10} vé/suất`;
+      }
+      renderSeatingMapOverview(ev.showtimes || [], activeShowtimeId);
 
       // 8. Địa điểm & Bản đồ
       document.getElementById('locationTitle').innerHTML = `
@@ -903,8 +876,10 @@
 
       showtimes.forEach((st, idx) => {
         const dt = formatDateTime(st.startTime);
-        const isOnSale = st.status === 'OnSale';
-        const available = st.remainingSeats ?? st.availableSeats ?? 0;
+        const isOnSale = !st.status || st.status.toLowerCase() === 'onsale';
+        const available = (typeof st.remainingSeats === 'number' && st.remainingSeats >= 0)
+          ? st.remainingSeats
+          : (st.availableSeats ?? 0);
         const isSoldOut = available <= 0;
 
         const minP = st.minPrice ?? defaultMin;
@@ -946,6 +921,10 @@
                   Còn ${available.toLocaleString('vi-VN')} ghế trống
                 </div>
                 <div class="font-label-md text-label-md text-on-surface font-code-mono font-semibold">${priceText}</div>
+                <div class="text-[11px] text-outline font-semibold flex items-center gap-1 mt-0.5">
+                  <span class="material-symbols-outlined text-[14px] text-primary">confirmation_number</span>
+                  <span>Tối đa ${st.maxTicketsPerUser || (currentEvent && currentEvent.maxTicketsPerUser) || 10} vé/suất</span>
+                </div>
               </div>
               <a href="${seatMapUrl}" class="h-11 px-5 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-1.5 shadow-sm hover:shadow active:scale-95 transition-all font-bold shrink-0">
                 <span>Chọn ghế ngay</span>
@@ -989,5 +968,6 @@
     // Initialize when DOM is ready
     document.addEventListener('DOMContentLoaded', initPage);
   </script>
+<script src="./seating-map-image.js"></script>
 </body>
 </html>

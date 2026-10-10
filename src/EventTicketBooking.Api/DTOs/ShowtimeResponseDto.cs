@@ -6,11 +6,19 @@ namespace EventTicketBooking.Api.DTOs
 {
     public class ShowtimeResponseDto
     {
+        public string? SeatingMapImageUrl { get; set; }
         public Guid Id { get; set; }
         public Guid EventId { get; set; }
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
         public int AvailableSeats { get; set; }
+        public int MaxTicketsPerUser { get; set; } = 10;
+        public int RemainingTickets { get; set; }
+        public int AvailableTickets
+        {
+            get => RemainingTickets;
+            set => RemainingTickets = value;
+        }
         public int? ActualSeatCount { get; set; }
         public int SoldSeatCount { get; set; }
         public EventTicketBooking.Api.Models.ShowtimeStatus Status { get; set; }
@@ -30,6 +38,9 @@ namespace EventTicketBooking.Api.DTOs
         public DateTime EndTime { get; set; }
 
         public int AvailableSeats { get; set; }
+
+        [Range(1, int.MaxValue, ErrorMessage = "Số lượng vé tối đa mỗi người mua phải lớn hơn 0.")]
+        public int? MaxTicketsPerUser { get; set; }
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
@@ -52,6 +63,9 @@ namespace EventTicketBooking.Api.DTOs
         public DateTime EndTime { get; set; }
 
         public int? AvailableSeats { get; set; }
+
+        [Range(1, int.MaxValue, ErrorMessage = "Số lượng vé tối đa mỗi người mua phải lớn hơn 0.")]
+        public int? MaxTicketsPerUser { get; set; }
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {

@@ -17,6 +17,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using Microsoft.AspNetCore.SignalR;
+using EventTicketBooking.Api.Hubs;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -53,7 +56,7 @@ namespace EventTicketBooking.Tests
             var logger = NullLogger<ShowtimeSeatsController>.Instance;
             var serviceLogger = NullLogger<SeatHoldService>.Instance;
 
-            var seatHoldService = new SeatHoldService(context, serviceLogger, redis: null);
+            var seatHoldService = new SeatHoldService(context, serviceLogger, new Mock<IHubContext<SeatStatusHub>>().Object, redis: null);
             var importService = new SeatImportService(context);
 
             var controller = new ShowtimeSeatsController(importService, seatHoldService, logger);

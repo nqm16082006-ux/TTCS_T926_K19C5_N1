@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html class="h-full" lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Vé của tôi - EventPulse</title>
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: { extend: {
+        colors: {
+          "primary": "#3525cd", "on-primary": "#ffffff", "surface": "#faf8ff",
+          "on-surface": "#131b2e", "outline-variant": "#c7c4d8", "surface-container-lowest": "#ffffff",
+          "primary-fixed": "#e2dfff", "on-primary-fixed-variant": "#3323cc", "error": "#ba1a1a"
+        },
+        fontFamily: { "body": ["Plus Jakarta Sans", "sans-serif"], "mono": ["JetBrains Mono", "monospace"] }
+      } }
+    };
+  </script>
+  <script src="./security.js"></script>
+  <script src="./qrcode.min.js"></script>
+</head>
+<body class="bg-[#f8f9fc] font-body text-slate-800 antialiased min-h-screen flex flex-col justify-between">
+
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
+    <div class="h-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-6">
+        <a class="flex items-center gap-2.5 group" href="./public-events.html">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-primary text-white flex items-center justify-center shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+            <span class="material-symbols-outlined text-[22px]">confirmation_number</span>
+          </div>
+          <span class="text-xl tracking-tight font-extrabold bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent">EventPulse</span>
+        </a>
+        <nav class="hidden md:flex items-center gap-1">
+          <a class="px-3.5 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:text-primary hover:bg-slate-50 transition" href="./public-events.html">Khám phá sự kiện</a>
+          <a class="px-3.5 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:text-primary hover:bg-slate-50 transition" href="./my-orders.html">Đơn hàng của tôi</a>
+          <a class="px-3.5 py-2 rounded-lg text-sm font-bold text-primary bg-indigo-50 transition flex items-center gap-1.5" href="./my-tickets.html">
+            <span class="material-symbols-outlined text-[18px]">local_activity</span>
+            <span>Vé của tôi</span>
+          </a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-3" id="navAuthContainer">
+        <div class="w-8 h-8 rounded-full bg-slate-200 animate-pulse"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
+    <div class="mb-8">
+      <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-400 mb-2">
+        <a href="./public-events.html" class="hover:text-primary transition flex items-center gap-1">
+          <span class="material-symbols-outlined text-[14px]">home</span> Trang chủ
+        </a>
+        <span>/</span>
+        <span class="text-slate-600">Vé của tôi</span>
+      </div>
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+            <span>Vé điện tử của tôi</span>
+            <span id="totalBadge" class="hidden text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700">0 vé</span>
+          </h1>
+          <p class="text-sm text-slate-500 mt-1">Xem vé, mở mã QR để soát vé tại cửa và tải ảnh QR của đúng vé bạn đang xem.</p>
+        </div>
+        <div class="flex items-center gap-2.5">
+          <button onclick="loadMyTickets(true)" class="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl border border-slate-200 shadow-sm transition active:scale-95">
+            <span class="material-symbols-outlined text-[18px]" id="refreshSpinner">refresh</span>
+            <span>Làm mới</span>
+          </button>
+          <a href="./public-events.html" class="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md shadow-indigo-500/20 transition active:scale-95">
+            <span class="material-symbols-outlined text-[18px]">explore</span>
+            <span>Mua vé mới</span>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div id="loadingState" class="py-20 flex flex-col items-center justify-center">
+      <div class="w-12 h-12 border-4 border-indigo-200 border-t-primary rounded-full animate-spin mb-4"></div>
+      <p class="text-sm font-semibold text-slate-500">Đang tải vé điện tử của bạn...</p>
+    </div>
+
+    <div id="unauthState" class="hidden bg-white rounded-3xl border border-slate-200/80 p-12 text-center max-w-md mx-auto my-6 shadow-sm">
+      <div class="w-20 h-20 mx-auto rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4">
+        <span class="material-symbols-outlined text-[42px]">lock</span>
+      </div>
+      <h3 class="text-lg font-bold text-slate-800 mb-1">Yêu cầu đăng nhập</h3>
+      <p class="text-sm text-slate-500 mb-6">Vui lòng đăng nhập để xem các vé điện tử thuộc tài khoản của bạn.</p>
+      <a href="./login.html" class="inline-flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md shadow-indigo-500/20 transition active:scale-95">
+        <span>Đăng nhập ngay</span><span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+      </a>
+    </div>
+
+    <div id="emptyState" class="hidden bg-white rounded-3xl border border-slate-200/80 p-12 text-center max-w-lg mx-auto my-6 shadow-sm">
+      <div class="w-20 h-20 mx-auto rounded-2xl bg-indigo-50 text-primary flex items-center justify-center mb-4">
+        <span class="material-symbols-outlined text-[42px]">local_activity</span>
+      </div>
+      <h3 class="text-lg font-bold text-slate-800 mb-1">Chưa có vé nào</h3>
+      <p class="text-sm text-slate-500 mb-6" id="emptyDesc">Bạn chưa có vé điện tử hợp lệ. Vé sẽ xuất hiện sau khi đơn hàng được thanh toán thành công.</p>
+      <a href="./public-events.html" class="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md shadow-indigo-500/20 transition active:scale-95">
+        <span class="material-symbols-outlined text-[18px]">explore</span><span>Khám phá sự kiện ngay</span>
+      </a>
+    </div>
+
+    <div id="ticketsWrap" class="hidden space-y-10">
+      <section>
+        <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-[18px] text-emerald-600">event_upcoming</span> Sắp diễn ra
+        </h2>
+        <div id="upcomingList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"></div>
+      </section>
+      <section>
+        <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-[18px] text-slate-400">history</span> Đã diễn ra
+        </h2>
+        <div id="pastList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"></div>
+      </section>
+    </div>
+  </main>
+
+  <div id="ticketModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden my-8">
+      <div class="px-6 py-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-primary text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
+            <span class="material-symbols-outlined text-[24px]">qr_code_2</span>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-white">Chi tiết vé điện tử</h3>
+            <p class="text-xs text-indigo-200 font-medium">QR có chữ ký số ECDSA P-256 chống làm giả</p>
+          </div>
+        </div>
+        <button onclick="closeTicketModal()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+      <div class="p-6 max-h-[75vh] overflow-y-auto" id="ticketModalBody"></div>
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
+        <span class="text-xs text-slate-400 font-medium flex items-center gap-1">
+          <span class="material-symbols-outlined text-[16px] text-emerald-600">verified</span> Đưa mã này cho nhân viên soát vé
+        </span>
+        <div class="flex items-center gap-2">
+          <button id="downloadQrBtn" onclick="downloadCurrentQr()" class="hidden px-4 py-2 bg-primary hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[18px]">download</span> Tải ảnh QR
+          </button>
+          <button onclick="closeTicketModal()" class="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold rounded-xl transition">Đóng</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed bottom-6 right-6 z-50 hidden bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 flex items-center gap-2.5 text-sm font-semibold">
+    <span class="material-symbols-outlined text-[20px] text-emerald-400" id="toastIcon">check_circle</span>
+    <span id="toastMessage">Thông báo</span>
+  </div>
+
+  <footer class="bg-white border-t border-slate-200/80 py-6 mt-12 text-center text-xs text-slate-400 font-medium">
+    <p>© 2026 EventPulse - Hệ Thống Bán Vé Sự Kiện Trực Tuyến Thời Gian Thực. Bảo lưu mọi quyền.</p>
+  </footer>
+  <script>
+    // S-38: Vé của tôi. Tái sử dụng endpoint S-25 (/orders/{id}/tickets) + S-32 (/orders/my-orders).
+    // Phân quyền: my-orders chỉ trả đơn của user hiện tại; /tickets tự chặn 403 nếu không phải chủ đơn.
+    let allTicketsCache = [];
+    let currentTicket = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderNavAuth();
+      loadMyTickets();
+    });
+
+    function renderNavAuth() {
+      const container = document.getElementById('navAuthContainer');
+      const token = localStorage.getItem('access_token');
+      const userStr = localStorage.getItem('user_info');
+      if (!token || !userStr) {
+        container.innerHTML = `
+          <a href="./login.html" class="px-4 py-2 rounded-xl text-sm font-bold text-primary bg-indigo-50 hover:bg-indigo-100 transition">Đăng nhập</a>
+          <a href="./register.html" class="px-4 py-2 rounded-xl text-sm font-bold text-white bg-primary hover:bg-indigo-700 transition shadow-sm">Đăng ký</a>`;
+        return;
+      }
+      try {
+        const user = JSON.parse(userStr);
+        const roles = user.roles || (user.role ? [user.role] : ['Customer']);
+        container.innerHTML = `
+          <div class="flex items-center gap-2.5 pl-2 sm:border-l border-slate-200">
+            <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-xs shadow-sm">
+              ${escapeHtml((user.fullName || user.username || 'U')[0].toUpperCase())}
+            </div>
+            <div class="text-left hidden md:block">
+              <div class="text-xs font-bold text-slate-800 leading-tight">${escapeHtml(user.fullName || user.username)}</div>
+              <div class="text-[11px] text-slate-400">${escapeHtml(roles[0] || 'Khách hàng')}</div>
+            </div>
+            <button onclick="handleLogout()" title="Đăng xuất" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition ml-1">
+              <span class="material-symbols-outlined text-[18px]">logout</span>
+            </button>
+          </div>`;
+      } catch {
+        localStorage.clear();
+        window.location.reload();
+      }
+    }
+
+    function handleLogout() {
+      localStorage.clear();
+      window.location.href = './login.html';
+    }
+    async function loadMyTickets(isRefresh = false) {
+      const token = localStorage.getItem('access_token');
+      const loadingState = document.getElementById('loadingState');
+      const emptyState = document.getElementById('emptyState');
+      const unauthState = document.getElementById('unauthState');
+      const ticketsWrap = document.getElementById('ticketsWrap');
+      const emptyDesc = document.getElementById('emptyDesc');
+      const refreshSpinner = document.getElementById('refreshSpinner');
+
+      if (isRefresh && refreshSpinner) refreshSpinner.classList.add('animate-spin');
+
+      if (!token) {
+        loadingState.classList.add('hidden');
+        ticketsWrap.classList.add('hidden');
+        emptyState.classList.add('hidden');
+        unauthState.classList.remove('hidden');
+        if (refreshSpinner) refreshSpinner.classList.remove('animate-spin');
+        return;
+      }
+
+      unauthState.classList.add('hidden');
+      loadingState.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+      ticketsWrap.classList.add('hidden');
+
+      try {
+        const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+        // 1) Lấy TẤT CẢ đơn của user (phân trang để giảm số request).
+        const orders = [];
+        let page = 1, totalPages = 1;
+        do {
+          const res = await fetch(`/api/v1/orders/my-orders?page=${page}&pageSize=50`, { headers });
+          if (res.status === 401) {
+            localStorage.removeItem('access_token');
+            loadingState.classList.add('hidden');
+            unauthState.classList.remove('hidden');
+            if (refreshSpinner) refreshSpinner.classList.remove('animate-spin');
+            return;
+          }
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || 'Không thể tải đơn hàng.');
+          const paged = data.data || {};
+          orders.push(...(paged.items || []));
+          totalPages = paged.totalPages || 1;
+          page++;
+        } while (page <= totalPages);
+
+        // 2) Đơn Paid -> lấy vé (S-25). Đơn Cancelled/Expired -> vé đã huỷ (hiển thị mờ, không QR).
+        const validTickets = [];
+        const cancelledTickets = [];
+        const now = Date.now();
+
+        for (const order of orders) {
+          const startMs = order.showtimeStartTime ? new Date(order.showtimeStartTime).getTime() : null;
+          const isUpcoming = startMs !== null && startMs >= now;
+
+          if (order.status === 'Paid') {
+            let tRes;
+            try { tRes = await fetch(`/api/v1/orders/${order.id}/tickets`, { headers }); }
+            catch (_) { continue; }
+            if (!tRes.ok) continue; // 403/404 -> bỏ qua
+            const tJson = await tRes.json();
+            for (const t of ((tJson && tJson.data) || [])) {
+              validTickets.push({
+                kind: 'valid', orderId: order.id, orderStatus: order.status,
+                ticketId: t.id, ticketCode: t.ticketCode, qrPayload: t.qrPayload || t.ticketCode,
+                eventTitle: t.eventTitle || order.eventTitle,
+                eventLocation: t.eventLocation || order.eventLocation,
+                eventImageUrl: order.eventImageUrl,
+                showtimeStartTime: t.showtimeStartTime || order.showtimeStartTime,
+                seatName: t.seatName || (t.seatRow ? `${t.seatRow}${t.seatNumber}` : 'Chưa định vị'),
+                categoryName: t.categoryName || 'Tiêu chuẩn',
+                price: t.price, startMs, isUpcoming
+              });
+            }
+          } else if (order.status === 'Cancelled' || order.status === 'Expired') {
+            const seats = (order.seatNames && order.seatNames.length) ? order.seatNames.join(', ')
+              : (order.items ? order.items.map(i => i.seatName).filter(Boolean).join(', ') : 'Chưa định vị');
+            cancelledTickets.push({
+              kind: 'cancelled', orderId: order.id, orderStatus: order.status,
+              eventTitle: order.eventTitle, eventLocation: order.eventLocation,
+              eventImageUrl: order.eventImageUrl, showtimeStartTime: order.showtimeStartTime,
+              seatName: seats,
+              categoryName: order.items && order.items[0] ? order.items[0].categoryName : 'Tiêu chuẩn',
+              price: order.totalAmount, startMs, isUpcoming
+            });
+          }
+        }
+
+        allTicketsCache = [...validTickets, ...cancelledTickets];
+        loadingState.classList.add('hidden');
+
+        if (allTicketsCache.length === 0) {
+          emptyDesc.textContent = 'Bạn chưa có vé điện tử hợp lệ. Vé sẽ xuất hiện sau khi đơn hàng được thanh toán thành công.';
+          emptyState.classList.remove('hidden');
+          return;
+        }
+
+        const totalBadge = document.getElementById('totalBadge');
+        if (totalBadge) { totalBadge.textContent = `${allTicketsCache.length} vé`; totalBadge.classList.remove('hidden'); }
+        renderTickets(allTicketsCache);
+      } catch (err) {
+        console.error('Lỗi tải vé của tôi:', err);
+        loadingState.classList.add('hidden');
+        document.getElementById('emptyDesc').textContent = 'Lỗi kết nối khi tải vé: ' + (err.message || 'Không thể truy cập máy chủ.');
+        emptyState.classList.remove('hidden');
+      } finally {
+        const refreshSpinner = document.getElementById('refreshSpinner');
+        if (refreshSpinner) refreshSpinner.classList.remove('animate-spin');
+      }
+    }
+    // Sắp xếp: vé sắp diễn ra trước (gần nhất lên đầu), vé đã qua sau (gần nhất lên đầu).
+    function sortTickets(list) {
+      return list.slice().sort((a, b) => {
+        if (a.isUpcoming !== b.isUpcoming) return a.isUpcoming ? -1 : 1;
+        const ta = a.startMs ?? Infinity;
+        const tb = b.startMs ?? Infinity;
+        return a.isUpcoming ? ta - tb : tb - ta;
+      });
+    }
+
+    function renderTickets(tickets) {
+      const ticketsWrap = document.getElementById('ticketsWrap');
+      const upcomingList = document.getElementById('upcomingList');
+      const pastList = document.getElementById('pastList');
+      upcomingList.innerHTML = '';
+      pastList.innerHTML = '';
+
+      const upcoming = sortTickets(tickets.filter(t => t.isUpcoming));
+      const past = sortTickets(tickets.filter(t => !t.isUpcoming));
+
+      upcoming.forEach((t, i) => upcomingList.appendChild(buildTicketCard(t, 0, i)));
+      past.forEach((t, i) => pastList.appendChild(buildTicketCard(t, 1, i)));
+
+      upcomingList.parentElement.classList.toggle('hidden', upcoming.length === 0);
+      pastList.parentElement.classList.toggle('hidden', past.length === 0);
+      ticketsWrap.classList.remove('hidden');
+    }
+
+    function buildTicketCard(t, bucket, index) {
+      const card = document.createElement('div');
+      const cancelled = t.kind === 'cancelled';
+      card.className = `bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition overflow-hidden ${cancelled ? 'opacity-60 saturate-50' : ''}`;
+
+      const eventImage = t.eventImageUrl || 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=600&q=80';
+      const timeStr = t.showtimeStartTime ? formatDateTime(t.showtimeStartTime) : 'Chưa xác định';
+
+      let statusBadge;
+      if (cancelled && t.orderStatus === 'Cancelled') {
+        statusBadge = `<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border bg-rose-50 text-rose-700 border-rose-200"><span class="material-symbols-outlined text-[14px]">cancel</span>Đã huỷ</span>`;
+      } else if (cancelled && t.orderStatus === 'Expired') {
+        statusBadge = `<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border bg-slate-100 text-slate-600 border-slate-200"><span class="material-symbols-outlined text-[14px]">timer_off</span>Đã hết hạn</span>`;
+      } else {
+        statusBadge = `<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200"><span class="material-symbols-outlined text-[14px]">check_circle</span>Hợp lệ</span>`;
+      }
+
+      const actionBtn = cancelled
+        ? `<button onclick="openTicketModal(${bucket}, ${index})" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">visibility</span>Xem chi tiết</button>`
+        : `<button onclick="openTicketModal(${bucket}, ${index})" class="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">qr_code_2</span>Mở mã QR</button>`;
+
+      card.innerHTML = `
+        <div class="flex items-start gap-4 p-5">
+          <div class="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
+            <img src="${escapeHtml(eventImage)}" alt="${escapeHtml(t.eventTitle || 'Sự kiện')}" class="w-full h-full object-cover">
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm sm:text-base font-bold text-slate-900 truncate">${escapeHtml(t.eventTitle || 'Sự kiện')}</h4>
+            <div class="text-xs text-slate-500 mt-1 flex items-center gap-1"><span class="material-symbols-outlined text-[14px] text-slate-400">schedule</span>${timeStr}</div>
+            <div class="text-xs text-slate-500 mt-1 flex items-center gap-1 truncate"><span class="material-symbols-outlined text-[14px] text-slate-400">event_seat</span>${escapeHtml(t.seatName || 'Chưa định vị')} • ${escapeHtml(t.categoryName || 'Tiêu chuẩn')}</div>
+            <div class="mt-2 flex items-center justify-between gap-2">${statusBadge}<span class="text-xs font-bold text-slate-700">${formatCurrency(t.price)}</span></div>
+            <div class="mt-3">${actionBtn}</div>
+          </div>
+        </div>`;
+      return card;
+    }
+    function openTicketModal(bucket, index) {
+      const list = sortTickets(allTicketsCache.filter(t => (bucket === 0 ? t.isUpcoming : !t.isUpcoming)));
+      const t = list[index];
+      if (!t) return;
+      currentTicket = t;
+
+      const modal = document.getElementById('ticketModal');
+      const modalBody = document.getElementById('ticketModalBody');
+      const downloadBtn = document.getElementById('downloadQrBtn');
+      const cancelled = t.kind === 'cancelled';
+      const timeStr = t.showtimeStartTime ? formatDateTime(t.showtimeStartTime) : 'Chưa xác định';
+
+      if (cancelled) {
+        // Vé đã huỷ: KHÔNG hiển thị QR dùng được, chỉ trạng thái rõ ràng.
+        downloadBtn.classList.add('hidden');
+        modalBody.innerHTML = `
+          <div class="text-center py-4">
+            <div class="w-16 h-16 mx-auto rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center mb-4">
+              <span class="material-symbols-outlined text-[36px]">block</span>
+            </div>
+            <h4 class="text-lg font-bold text-slate-800">${escapeHtml(t.eventTitle || 'Sự kiện')}</h4>
+            <p class="text-sm text-slate-500 mt-1">${timeStr}</p>
+            <div class="inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-bold border ${t.orderStatus === 'Cancelled' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-100 text-slate-600 border-slate-200'}">
+              <span class="material-symbols-outlined text-[14px]">${t.orderStatus === 'Cancelled' ? 'cancel' : 'timer_off'}</span>
+              ${t.orderStatus === 'Cancelled' ? 'Vé đã bị huỷ' : 'Đơn đã hết hạn'}
+            </div>
+            <p class="text-xs text-slate-400 mt-4">Vé này không còn hiệu lực và không thể sử dụng để vào cổng. Mã QR không được cung cấp.</p>
+            <div class="mt-4 grid grid-cols-2 gap-2 text-xs text-left">
+              <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100"><span class="text-slate-400 block text-[10px]">Vị trí ghế:</span><span class="font-bold text-slate-700">${escapeHtml(t.seatName || 'Chưa định vị')}</span></div>
+              <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100"><span class="text-slate-400 block text-[10px]">Hạng vé:</span><span class="font-bold text-slate-700">${escapeHtml(t.categoryName || 'Tiêu chuẩn')}</span></div>
+            </div>
+          </div>`;
+        modal.classList.remove('hidden');
+        return;
+      }
+
+      // Vé hợp lệ: QR lớn để quét từ màn hình điện thoại + nút tải ảnh.
+      downloadBtn.classList.remove('hidden');
+      modalBody.innerHTML = `
+        <div class="text-center">
+          <h4 class="text-lg font-bold text-slate-900">${escapeHtml(t.eventTitle || 'Sự kiện')}</h4>
+          <p class="text-sm text-slate-500 mt-1 flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[16px] text-slate-400">schedule</span>${timeStr}</p>
+          <p class="text-xs text-slate-500 mt-1 flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[16px] text-slate-400">event_seat</span>${escapeHtml(t.seatName || 'Chưa định vị')} • ${escapeHtml(t.categoryName || 'Tiêu chuẩn')}</p>
+          <div class="mt-4 inline-block bg-white p-4 rounded-2xl border-2 border-slate-200 shadow-sm">
+            <div id="modalQrBox" class="w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center"></div>
+          </div>
+          <p class="text-[11px] font-mono text-slate-400 mt-3 font-bold uppercase tracking-wider">${escapeHtml(t.ticketCode || '')}</p>
+          <p class="text-[11px] text-emerald-700 font-semibold mt-1 flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[15px] text-emerald-600">verified</span> Mã QR đã ký số ECDSA (chống làm giả)</p>
+        </div>`;
+      modal.classList.remove('hidden');
+
+      // Vẽ QR lớn (payload có chữ ký của S-26). QRCode.js tạo <canvas> -> dùng để tải ảnh PNG.
+      setTimeout(() => {
+        const qrBox = document.getElementById('modalQrBox');
+        if (!qrBox) return;
+        qrBox.innerHTML = '';
+        const payload = t.qrPayload || t.ticketCode;
+        if (typeof QRCode !== 'undefined' && payload) {
+          new QRCode(qrBox, { text: payload, width: 256, height: 256, colorDark: '#131b2e', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+        } else {
+          qrBox.innerHTML = `<div class="text-xs text-slate-500 font-mono break-all">${escapeHtml(payload || '')}</div>`;
+        }
+      }, 30);
+    }
+
+    function downloadCurrentQr() {
+      if (!currentTicket || currentTicket.kind !== 'valid') {
+        showToast('Chỉ tải được ảnh QR của vé hợp lệ.', true);
+        return;
+      }
+      const qrBox = document.getElementById('modalQrBox');
+      const canvas = qrBox ? qrBox.querySelector('canvas') : null;
+      if (!canvas) { showToast('Chưa thể tải ảnh QR. Vui lòng thử lại.', true); return; }
+      try {
+        const dataUrl = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        const safeCode = (currentTicket.ticketCode || 've').replace(/[^A-Za-z0-9\-]/g, '');
+        a.href = dataUrl;
+        a.download = `QR-${safeCode}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast('Đã tải ảnh mã QR.');
+      } catch (_) {
+        showToast('Không thể tải ảnh QR.', true);
+      }
+    }
+
+    function closeTicketModal() {
+      document.getElementById('ticketModal').classList.add('hidden');
+      currentTicket = null;
+    }
+    function formatCurrency(amount) {
+      if (amount === null || amount === undefined) return '0 ₫';
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    }
+
+    function formatDateTime(isoString) {
+      if (!isoString) return '--/--/----';
+      const d = new Date(isoString);
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} - ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    }
+
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast');
+      const toastIcon = document.getElementById('toastIcon');
+      const toastMessage = document.getElementById('toastMessage');
+      toastMessage.textContent = message;
+      if (isError) {
+        toastIcon.textContent = 'error';
+        toastIcon.className = "material-symbols-outlined text-[20px] text-rose-400";
+      } else {
+        toastIcon.textContent = 'check_circle';
+        toastIcon.className = "material-symbols-outlined text-[20px] text-emerald-400";
+      }
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3000);
+    }
+  </script>
+</body>
+</html>

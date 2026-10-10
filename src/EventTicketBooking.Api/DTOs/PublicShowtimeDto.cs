@@ -5,6 +5,7 @@ namespace EventTicketBooking.Api.DTOs
 {
     public class PublicShowtimeDto
     {
+        public string? SeatingMapImageUrl { get; set; }
         public Guid Id { get; set; }
 
         public Guid EventId { get; set; }
@@ -27,6 +28,14 @@ namespace EventTicketBooking.Api.DTOs
 
         public int TotalSeats { get; set; }
 
+        public int RemainingTickets { get; set; }
+
+        public int AvailableTickets
+        {
+            get => RemainingTickets;
+            set => RemainingTickets = value;
+        }
+
         /// <summary>
         /// Số ghế thực tế còn có thể mua: loại trừ ghế SOLD và ghế đang có active hold chưa hết hạn.
         /// </summary>
@@ -37,6 +46,8 @@ namespace EventTicketBooking.Api.DTOs
         public decimal MinPrice { get; set; }
 
         public decimal MaxPrice { get; set; }
+
+        public int MaxTicketsPerUser { get; set; } = 10;
     }
 
     public class PublicEventDetailDto
@@ -60,6 +71,8 @@ namespace EventTicketBooking.Api.DTOs
         public int TotalSeats { get; set; }
 
         public int AvailableSeats { get; set; }
+
+        public int MaxTicketsPerUser { get; set; } = 10;
 
         public decimal MinPrice { get; set; }
 

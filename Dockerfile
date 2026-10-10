@@ -14,9 +14,10 @@ RUN dotnet publish "EventTicketBooking.Api.csproj" -c Release -o /app/publish /p
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
-EXPOSE 5000
+EXPOSE 5012
 
-ENV ASPNETCORE_URLS=http://+:5000
+ENV ASPNETCORE_URLS=http://+:5012
+ENV PORT=5012
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 # Install curl for healthcheck in container

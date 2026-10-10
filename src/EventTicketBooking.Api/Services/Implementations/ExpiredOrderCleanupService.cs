@@ -8,6 +8,8 @@ using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.SignalR;
+using EventTicketBooking.Api.Hubs;
 
 namespace EventTicketBooking.Api.Services.Implementations
 {
@@ -19,13 +21,19 @@ namespace EventTicketBooking.Api.Services.Implementations
     {
         private readonly AppDbContext _dbContext;
         private readonly ILogger<ExpiredOrderCleanupService> _logger;
+        private readonly IHubContext<SeatStatusHub>? _hubContext;
+        private readonly IOrderAuditService _orderAuditService;
 
         public ExpiredOrderCleanupService(
             AppDbContext dbContext,
-            ILogger<ExpiredOrderCleanupService> logger)
+            ILogger<ExpiredOrderCleanupService> logger,
+            IHubContext<SeatStatusHub>? hubContext = null,
+            IOrderAuditService? orderAuditService = null)
         {
             _dbContext = dbContext;
             _logger = logger;
+            _hubContext = hubContext;
+            _orderAuditService = orderAuditService ?? new OrderAuditService(dbContext, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
         }
 
         public async Task<int> CleanupExpiredOrdersAsync(DateTimeOffset? fakeNow = null, CancellationToken cancellationToken = default)
@@ -84,9 +92,23 @@ namespace EventTicketBooking.Api.Services.Implementations
 
                 foreach (var order in expiredOrders)
                 {
+                    var oldStatus = order.Status.ToString();
                     order.Status = OrderStatus.Expired;
                     order.UpdatedAt = now;
                     cancelledCount++;
+
+                    // Story S-49: Ghi nhận nhật ký huỷ đơn hàng do quá hạn bởi Background Job
+                    _orderAuditService.Record(
+                        order.Id,
+                        "ORDER",
+                        order.Id.ToString(),
+                        "ORDER_EXPIRED",
+                        oldStatus,
+                        OrderStatus.Expired.ToString(),
+                        "BACKGROUND_JOB",
+                        "job:ExpiredOrderCleanupWorker",
+                        null,
+                        "Job nền quét và huỷ đơn hàng do quá hạn thời gian thanh toán.");
 
                     if (order.OrderItems != null && order.OrderItems.Any())
                     {
@@ -106,6 +128,23 @@ namespace EventTicketBooking.Api.Services.Implementations
                     foreach (var hold in activeHolds)
                     {
                         hold.Status = "EXPIRED";
+
+                        // Story S-49: Ghi nhận nhật ký giải phóng giữ chỗ cho từng đơn hàng tương ứng
+                        var relatedOrder = expiredOrders.FirstOrDefault(o => o.OrderItems.Any(oi => oi.SeatId == hold.SeatId));
+                        if (relatedOrder != null)
+                        {
+                            _orderAuditService.Record(
+                                relatedOrder.Id,
+                                "SEAT_HOLD",
+                                hold.SeatId.ToString(),
+                                "SEAT_HOLD_EXPIRED",
+                                "ACTIVE",
+                                "EXPIRED",
+                                "BACKGROUND_JOB",
+                                "job:ExpiredOrderCleanupWorker",
+                                null,
+                                "Job nền giải phóng giữ chỗ của đơn hàng đã hết hạn.");
+                        }
                     }
 
                     // 2. Chuyển trạng thái ghế từ HELD về AVAILABLE
@@ -117,9 +156,25 @@ namespace EventTicketBooking.Api.Services.Implementations
                     {
                         seat.Status = "AVAILABLE";
                     }
-                }
+                    await _dbContext.SaveChangesAsync(cancellationToken);
 
-                await _dbContext.SaveChangesAsync(cancellationToken);
+                    if (_hubContext != null && _hubContext.Clients != null)
+                    {
+                        var grouped = heldSeats.GroupBy(s => s.ShowtimeId);
+                        foreach (var group in grouped)
+                        {
+                            var groupClient = _hubContext.Clients.Group(group.Key.ToString());
+                            if (groupClient != null)
+                            {
+                                await groupClient.SendAsync("SeatReleased", new { ShowtimeId = group.Key, SeatIds = group.Select(s => s.Id).ToList() }, cancellationToken);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+                }
 
                 if (transaction != null)
                 {

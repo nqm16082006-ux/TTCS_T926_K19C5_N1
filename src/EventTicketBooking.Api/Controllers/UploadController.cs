@@ -38,7 +38,7 @@ namespace EventTicketBooking.Api.Controllers
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> UploadImage([FromForm] IFormFile? file)
+        public async Task<IActionResult> UploadImage(IFormFile? file)
         {
             if (file == null || file.Length == 0)
             {

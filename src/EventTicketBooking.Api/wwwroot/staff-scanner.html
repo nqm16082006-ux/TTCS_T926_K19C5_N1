@@ -1,0 +1,2053 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soát vé - Nhân viên soát vé | Event Ticket Booking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    :root {
+      --bg-app: #f8fafc;
+      --bg-surface: #ffffff;
+      --border-color: #e2e8f0;
+      --border-focus: #4f46e5;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-light: #eef2ff;
+      --text-heading: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      --shadow-lg: 0 12px 28px -4px rgba(0, 0, 0, 0.08), 0 6px 12px -4px rgba(0, 0, 0, 0.03);
+      --danger-bg: #fef2f2;
+      --danger-border: #fecaca;
+      --danger-text: #dc2626;
+      --success-bg: #ecfdf5;
+      --success-border: #a7f3d0;
+      --success-text: #059669;
+      --info-bg: #eff6ff;
+      --info-border: #bfdbfe;
+      --info-text: #1d4ed8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-app);
+      color: var(--text-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .navbar {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 14px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 24px;
+      box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3);
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--text-heading);
+      letter-spacing: -0.02em;
+    }
+
+    .brand-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: var(--primary-light);
+      color: var(--primary);
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .user-nav {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .user-profile-info {
+      text-align: right;
+    }
+
+    .user-name {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--text-heading);
+    }
+
+    .user-role-badge {
+      font-size: 0.725rem;
+      font-weight: 600;
+      color: var(--primary);
+      background: var(--primary-light);
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-top: 2px;
+    }
+
+    .avatar-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: white;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+    }
+
+    .btn-logout {
+      padding: 8px 14px;
+      font-size: 0.825rem;
+      font-weight: 600;
+      color: var(--danger-text);
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-logout:hover {
+      background: #fee2e2;
+    }
+
+    .main-container {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 20px;
+      flex: 1;
+      width: 100%;
+    }
+
+    .page-header {
+      margin-bottom: 28px;
+      text-align: center;
+    }
+
+    .page-title {
+      font-size: 1.85rem;
+      font-weight: 800;
+      color: var(--text-heading);
+      letter-spacing: -0.025em;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .page-subtitle {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 36px 28px;
+      box-shadow: var(--shadow-md);
+      text-align: center;
+    }
+
+    .scanner-box {
+      border: 2px dashed #cbd5e1;
+      border-radius: 16px;
+      padding: 50px 24px;
+      background: #f8fafc;
+      margin: 20px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.2s;
+    }
+
+    .scanner-icon-wrap {
+      width: 80px;
+      height: 80px;
+      border-radius: 20px;
+      background: var(--primary-light);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .scanner-icon-wrap .material-symbols-outlined {
+      font-size: 44px;
+    }
+
+    .scanner-box-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-heading);
+      margin-bottom: 8px;
+    }
+
+    .scanner-box-desc {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      max-width: 440px;
+      line-height: 1.5;
+    }
+
+    .badge-s29 {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 18px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: #e0e7ff;
+      color: #3730a3;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .info-alert {
+      background: var(--info-bg);
+      border: 1px solid var(--info-border);
+      color: var(--info-text);
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 0.875rem;
+      line-height: 1.5;
+      text-align: left;
+      margin-top: 24px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .info-alert .material-symbols-outlined {
+      font-size: 20px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 24px;
+      color: var(--text-muted);
+      font-size: 0.825rem;
+      border-top: 1px solid var(--border-color);
+      background: var(--bg-surface);
+      margin-top: auto;
+    }
+
+    /* Outdoor Visibility & S-30 High-Contrast Result Styles */
+    .result-card-outdoor {
+      border-radius: 16px;
+      padding: 24px 20px;
+      margin-bottom: 24px;
+      text-align: center;
+      transition: all 0.25s ease-in-out;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+    }
+
+    .result-card-success {
+      background: #ecfdf5;
+      border: 3px solid #059669;
+      color: #064e3b;
+    }
+
+    .result-card-error {
+      background: #fef2f2;
+      border: 3px solid #dc2626;
+      color: #7f1d1d;
+    }
+
+    .result-card-pending {
+      background: #fffbeb;
+      border: 3px solid #d97706;
+      color: #78350f;
+    }
+
+    .badge-valid-outdoor {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #059669;
+      color: #ffffff;
+      padding: 10px 22px;
+      border-radius: 9999px;
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+    }
+
+    .badge-invalid-outdoor {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #dc2626;
+      color: #ffffff;
+      padding: 10px 22px;
+      border-radius: 9999px;
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
+    }
+
+    .badge-pending-outdoor {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #d97706;
+      color: #ffffff;
+      padding: 10px 22px;
+      border-radius: 9999px;
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35);
+    }
+
+    .seat-highlight-grid {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin: 16px 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      border: 2px solid #a7f3d0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    @media (max-width: 540px) {
+      .seat-highlight-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .seat-highlight-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .seat-highlight-label {
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: #047857;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .seat-highlight-value {
+      font-size: 2rem;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .meta-row-outdoor {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-top: 14px;
+      border-top: 2px dashed #6ee7b7;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #065f46;
+    }
+
+    .btn-next-scan {
+      margin-top: 18px;
+      padding: 12px 28px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+      border: none;
+      background: #0f172a;
+      color: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      transition: all 0.2s;
+    }
+
+    .btn-next-scan:hover {
+      background: #1e293b;
+      transform: translateY(-1px);
+    }
+    .btn-next-scan:active {
+      transform: translateY(0);
+    }
+
+    /* Warning Bar S-37 */
+    .sync-warning-bar {
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      z-index: 30;
+    }
+    .sync-warning-offline {
+      background: #fef2f2;
+      color: #991b1b;
+      border-bottom: 1px solid #fecaca;
+    }
+    .sync-warning-syncing {
+      background: #eff6ff;
+      color: #1e40af;
+      border-bottom: 1px solid #bfdbfe;
+    }
+
+    /* Offline & Network Banner Styles (S-34) */
+    .network-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      transition: all 0.2s ease;
+    }
+    .network-badge-online {
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+    .network-badge-offline {
+      background: #fff7ed;
+      color: #c2410c;
+      border: 1px solid #fed7aa;
+      animation: pulse-offline 2s infinite ease-in-out;
+    }
+    @keyframes pulse-offline {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.2); }
+      50% { box-shadow: 0 0 0 6px rgba(234, 88, 12, 0.15); }
+    }
+
+    .offline-panel {
+      background: #f8fafc;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 22px;
+    }
+
+    .offline-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .offline-switch-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #334155;
+      user-select: none;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #cbd5e1;
+      transition: 0.3s;
+      border-radius: 24px;
+    }
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    input:checked + .toggle-slider {
+      background-color: #ea580c;
+    }
+    input:checked + .toggle-slider:before {
+      transform: translateX(20px);
+    }
+
+    .offline-actions-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .btn-offline-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+    .btn-download-manifest {
+      background: #4f46e5;
+      color: white;
+    }
+    .btn-download-manifest:hover {
+      background: #4338ca;
+    }
+    .btn-view-queue {
+      background: #0f172a;
+      color: white;
+    }
+    .btn-view-queue:hover {
+      background: #1e293b;
+    }
+    .btn-clear-data {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+    .btn-clear-data:hover {
+      background: #fca5a5;
+    }
+
+    /* Modal for local queue */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-card {
+      background: white;
+      border-radius: 16px;
+      max-width: 680px;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+      padding: 24px;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .modal-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-close-modal {
+      background: transparent;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #64748b;
+    }
+    .queue-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    .queue-table th, .queue-table td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .queue-table th {
+      background: #f8fafc;
+      color: #475569;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header / Navbar -->
+  <header class="navbar" id="staffNavbar">
+    <div class="brand">
+      <div class="brand-icon">
+        <span class="material-symbols-outlined">qr_code_scanner</span>
+      </div>
+      <div>
+        <span class="brand-title">EventTicket</span>
+        <span class="brand-badge">Soát vé</span>
+      </div>
+    </div>
+
+    <div class="user-nav" id="staffUserNav">
+      <div class="user-profile-info">
+        <div class="user-name" id="staffUserName">Nhân viên soát vé</div>
+        <div class="user-role-badge" id="staffUserRoleBadge">Staff (Soát vé)</div>
+      </div>
+      <div class="avatar-btn" id="staffAvatar">S</div>
+      <button class="btn-logout" id="logoutBtn" onclick="handleLogout()" title="Đăng xuất khỏi hệ thống">
+        <span class="material-symbols-outlined" style="font-size: 18px;">logout</span>
+        <span>Đăng xuất</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Dải cảnh báo S-37 -->
+  <div id="syncWarningBar" class="sync-warning-bar" style="display: none;">
+    <span class="material-symbols-outlined" id="syncWarningIcon">cloud_off</span>
+    <span id="syncWarningText"></span>
+  </div>
+
+  <!-- Main Content -->
+  <main class="main-container">
+    <div class="page-header">
+      <h1 class="page-title" id="pageTitle">
+        <span class="material-symbols-outlined" style="font-size: 32px; color: var(--primary);">confirmation_number</span>
+        Soát vé
+      </h1>
+      <p class="page-subtitle" id="pageSubtitle">Màn hình vận hành soát vé dành cho nhân viên sự kiện</p>
+    </div>
+
+    <div class="card" id="scannerEntryCard" style="text-align: left;">
+      <div style="margin-bottom: 20px;">
+        <label for="showtimeSelect" style="display: block; font-weight: 600; margin-bottom: 8px;">1. Chọn suất diễn hiện tại:</label>
+        <select id="showtimeSelect" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); font-family: inherit;">
+          <option value="">Đang tải danh sách suất diễn...</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <label for="gateInput" style="display: block; font-weight: 600; margin-bottom: 8px;">2. Cửa kiểm soát (Gate):</label>
+        <input type="text" id="gateInput" value="Gate 1" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); font-family: inherit;">
+      </div>
+
+      <!-- Bảng điều khiển Ngoại tuyến (Story S-33 & S-34) -->
+      <div class="offline-panel" id="offlinePanel">
+        <div class="offline-panel-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div id="networkStatusBadge" class="network-badge network-badge-online">
+              <span class="material-symbols-outlined" style="font-size: 18px;" id="networkStatusIcon">wifi</span>
+              <span id="networkStatusText">Trực tuyến (Online)</span>
+            </div>
+            <span id="offlineBannerNotice" style="display: none; font-size: 0.85rem; font-weight: 700; color: #c2410c;">
+              ⚡ Soát vé bằng bộ nhớ ngoại tuyến (S-34)
+            </span>
+          </div>
+
+          <label class="offline-switch-label" title="Chủ động bật/tắt chế độ ngoại tuyến để soát vé khi mất sóng hoặc kiểm thử">
+            <span class="toggle-switch">
+              <input type="checkbox" id="offlineModeToggle">
+              <span class="toggle-slider"></span>
+            </span>
+            <span>Chế độ Ngoại tuyến (Offline Mode)</span>
+          </label>
+        </div>
+
+        <div class="offline-actions-row">
+          <!-- Trạng thái dữ liệu đã tải của suất diễn (S-33) -->
+          <div style="font-size: 0.88rem;">
+            <div style="font-weight: 700; color: #1e293b; margin-bottom: 2px;">
+              📁 Danh sách vé đã tải (S-33):
+              <span id="manifestStatusText" style="font-weight: 700; color: #d97706;"><span id="syncMetadataText">Chưa tải danh sách</span></span>
+            </div>
+            <div id="manifestSubText" style="font-size: 0.8rem; color: #64748b;">
+              Tải trước để máy kiểm tra vé và chữ ký số khi mất mạng (AC1, AC4)
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn-offline-action btn-download-manifest" id="btnDownloadTickets" onclick="handleDownloadManifest()" title="Tải toàn bộ mã vé và khoá công khai của suất này xuống thiết bị">
+              <span class="material-symbols-outlined" style="font-size: 18px;">cloud_download</span>
+              <span id="btnDownloadManifestLabel">Tải danh sách vé</span>
+            </button>
+            <button type="button" class="btn-offline-action btn-view-queue" id="btnViewQueue" onclick="openQueueModal()">
+              <span class="material-symbols-outlined" style="font-size: 18px;">pending_actions</span>
+              <span id="queueCounterLabel">Hàng đợi: 0 vé</span>
+            </button>
+            <button type="button" class="btn-offline-action btn-clear-data" id="btnClearData" onclick="handleClearOfflineData()" title="Xoá cache danh sách vé đã tải của suất này">
+              <span class="material-symbols-outlined" style="font-size: 18px;">delete_outline</span>
+              <span>Xoá cache</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <label for="ticketInput" style="display: block; font-weight: 600; margin-bottom: 8px;">3. Quét mã vé (QR Code):</label>
+        
+        <div id="reader" style="width: 100%; max-width: 500px; margin: 0 auto 16px auto; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);"></div>
+
+        <div style="display: flex; gap: 10px;">
+          <input type="text" id="ticketInput" placeholder="Hoặc nhập mã thủ công: 123e4567-e89b..." style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); font-family: inherit;">
+          <button id="scanBtn" type="button" onclick="handleScan()" style="padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Kiểm tra vé</button>
+        </div>
+      </div>
+
+      <div id="scanResult" style="display: none; padding: 16px; border-radius: 8px; margin-bottom: 20px;"></div>
+      <!-- Thông tin quyền hạn nhân viên -->
+      <div class="info-alert" id="staffRoleNotice">
+        <span class="material-symbols-outlined">verified_user</span>
+        <div>
+          <strong>Xác thực thành công vai trò Soát vé (Staff):</strong>
+          <div style="margin-top: 4px;">
+            Tài khoản nhân viên của bạn đã được cấp quyền truy cập cổng soát vé. Các chức năng Quản trị hệ thống, Quản lý người dùng và Tạo sự kiện không hiển thị trên giao diện này.
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal Hàng đợi cục bộ (Story S-34 NFR) -->
+  <div class="modal-overlay" id="queueModal" onclick="if(event.target === this) closeQueueModal()">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="material-symbols-outlined" style="color: var(--primary);">pending_actions</span>
+          <span>Hàng đợi soát vé ngoại tuyến (S-34)</span>
+        </div>
+        <button type="button" class="btn-close-modal" onclick="closeQueueModal()">&times;</button>
+      </div>
+      <p style="font-size: 0.88rem; color: #64748b; margin-bottom: 14px;">
+        Các lượt soát vé đã ghi nhận thành công trên thiết bị này khi mất mạng (NFR: lưu bền vững trên bộ nhớ trình duyệt). Sẵn sàng đồng bộ lên máy chủ khi có mạng lại (S-35).
+      </p>
+      <div id="queueTableContainer" style="overflow-x: auto; margin-bottom: 16px;">
+        <!-- Bảng được render bởi JS -->
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 14px; gap: 8px; flex-wrap: wrap;">
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn-offline-action btn-download-manifest" id="btnSyncNow" onclick="syncOfflineQueue(true)">
+            <span class="material-symbols-outlined" style="font-size: 18px;">cloud_upload</span>
+            <span>Đồng bộ ngay</span>
+          </button>
+          <button type="button" class="btn-offline-action btn-clear-data" onclick="handleClearQueue()">
+            <span class="material-symbols-outlined" style="font-size: 18px;">delete_sweep</span>
+            <span>Xoá hàng đợi</span>
+          </button>
+        </div>
+        <button type="button" class="btn-offline-action btn-view-queue" onclick="closeQueueModal()">
+          <span>Đóng</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Event Ticket Booking System &copy; 2026 - Cổng Soát Vé Dành Cho Nhân Viên
+  </footer>
+
+  <script>
+    (function () {
+      const token = localStorage.getItem('access_token');
+      const userInfoRaw = localStorage.getItem('user_info');
+
+      // 1. Kiểm tra đăng nhập
+      if (!token || !userInfoRaw) {
+        window.location.href = './login.html?returnUrl=' + encodeURIComponent(window.location.pathname);
+        return;
+      }
+
+      let user = null;
+      try {
+        user = JSON.parse(userInfoRaw);
+      } catch (e) {
+        console.error('Invalid user_info in localStorage', e);
+        window.location.href = './login.html';
+        return;
+      }
+
+      // 2. Kiểm tra phân quyền role: Phải có role Staff hoặc Admin
+      const roles = (user.roles || []).map(r => (r || '').toLowerCase());
+      const isStaff = roles.includes('staff');
+      const isAdmin = roles.includes('admin');
+
+      if (!isStaff && !isAdmin) {
+        // Nếu không có quyền soát vé: Chuyển hướng về trang phù hợp
+        if (roles.includes('organizer')) {
+          window.location.href = './events.html';
+        } else {
+          window.location.href = './public-events.html';
+        }
+        return;
+      }
+
+      // 3. Hiển thị thông tin người dùng Staff
+      const displayName = user.fullName || user.username || user.email || 'Nhân viên soát vé';
+      document.getElementById('staffUserName').textContent = displayName;
+      document.getElementById('staffAvatar').textContent = displayName.trim().charAt(0).toUpperCase() || 'S';
+
+      const roleBadge = document.getElementById('staffUserRoleBadge');
+      if (isAdmin && !isStaff) {
+        roleBadge.textContent = 'Admin (Xem trước)';
+      } else {
+        roleBadge.textContent = 'Nhân viên Soát vé (Staff)';
+      }
+
+      // 4. Khởi tạo tính năng soát vé
+      loadTodayShows();
+
+      const scanBtnEl = document.getElementById('scanBtn');
+      if (scanBtnEl) {
+        scanBtnEl.onclick = handleScan;
+      }
+      const ticketInputEl = document.getElementById('ticketInput');
+      if (ticketInputEl) {
+        ticketInputEl.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') handleScan();
+        });
+      }
+
+      // Khởi tạo HTML5 Qrcode an toàn (không crash khi không có camera hoặc unpkg chậm)
+      let html5QrcodeScanner = null;
+      try {
+        if (typeof Html5QrcodeScanner !== 'undefined') {
+          html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader",
+            { fps: 10, qrbox: {width: 250, height: 250} },
+            /* verbose= */ false);
+          html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        }
+      } catch (cameraErr) {
+        console.warn('Không thể khởi tạo camera scanner:', cameraErr);
+      }
+
+      function onScanSuccess(decodedText, decodedResult) {
+        if (isProcessing) return;
+        
+        // Gán giá trị vào input và gọi hàm kiểm tra
+        document.getElementById('ticketInput').value = decodedText;
+        handleScan();
+      }
+
+      function onScanFailure(error) {
+        // Ignore scan failures
+      }
+
+      let isProcessing = false;
+
+      // ==========================================
+      // S-33 & S-34: IndexedDB & Compatibility Helpers
+      // ==========================================
+      function openScannerDb() {
+        return new Promise((resolve, reject) => {
+          if (!window.indexedDB) {
+            return reject(new Error('Trình duyệt không hỗ trợ IndexedDB'));
+          }
+          const req = window.indexedDB.open('EventTicketScannerDB', 1);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('offline_tickets')) {
+              db.createObjectStore('offline_tickets', { keyPath: ['showtimeId', 'ticketCode'] });
+            }
+            if (!db.objectStoreNames.contains('sync_metadata')) {
+              db.createObjectStore('sync_metadata', { keyPath: 'showtimeId' });
+            }
+          };
+          req.onsuccess = (e) => resolve(e.target.result);
+          req.onerror = (e) => reject(e.target.error);
+        });
+      }
+
+      async function checkAndTriggerAutoDeltaSync() {
+        if (isDeviceOffline()) return;
+        
+        let queue = getOfflineQueue();
+        if (queue.length === 0) return;
+        
+        // Mock sync logic for S-37 AC testing
+        // In real app, this will call API to sync each ticket.
+        setTimeout(() => {
+          // Clear queue after "syncing"
+          queue = getOfflineQueue(); // read again in case it changed
+          if (!isDeviceOffline() && queue.length > 0) {
+            saveOfflineQueue([]);
+            updateQueueCounterUI();
+          }
+        }, 3000); // simulate 3s network request
+      }
+
+      async function verifyOfflineSignature(keyVersion, ticketCode, qrShowtimeId, signatureBase64Url) {
+        return verifyQrOffline(`TICKET|${keyVersion}|${ticketCode}|${qrShowtimeId}|${signatureBase64Url}`, qrShowtimeId, getOfflinePublicKeys());
+      }
+
+      async function handleOfflineScan(rawInput, showtimeId, gateName) {
+        return checkInOffline(rawInput, showtimeId, gateName);
+      }
+
+      // ==========================================
+      // S-34 OFFLINE STATE & STORAGE HELPERS
+      // ==========================================
+      const DEFAULT_PUBLIC_KEYS = {
+        "v1": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEhKvN8uZyumXmc+fS6QxtF72eE52Lh/Ni9wdp4ARzLc5bJvxntjp2rfE7B2zP51CrPzHf6dsZ3/hp7HYCUc2JEg==",
+        "v2": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzeKFRx4YwyVdXi+1jUltqOYksIjpWUK3F30eXxMgFzrvYXf+XkPMquNxyi2R08IPaTXTq43NOBxUxiCaTrKdOw=="
+      };
+
+      const cryptoKeyCache = {};
+
+      function isSimulatedOffline() {
+        return document.getElementById('offlineModeToggle')?.checked || false;
+      }
+
+      function isDeviceOffline() {
+        return !navigator.onLine || isSimulatedOffline();
+      }
+
+      function getOfflinePublicKeys() {
+        try {
+          const raw = localStorage.getItem('offline_public_keys');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            return { ...DEFAULT_PUBLIC_KEYS, ...(parsed.publicKeys || parsed) };
+          }
+        } catch (_) {}
+        return DEFAULT_PUBLIC_KEYS;
+      }
+
+      function saveOfflinePublicKeys(keysObj) {
+        try {
+          localStorage.setItem('offline_public_keys', JSON.stringify(keysObj));
+        } catch (err) {
+          console.error('Không thể lưu public keys vào localStorage:', err);
+        }
+      }
+
+      function getOfflineManifest(showtimeId) {
+        if (!showtimeId) return null;
+        try {
+          const raw = localStorage.getItem('offline_manifest_' + showtimeId);
+          return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+          console.error('Lỗi đọc offline manifest:', e);
+          return null;
+        }
+      }
+
+      function saveOfflineManifest(showtimeId, manifest) {
+        if (!showtimeId || !manifest) return;
+        try {
+          localStorage.setItem('offline_manifest_' + showtimeId, JSON.stringify(manifest));
+        } catch (e) {
+          console.error('Lỗi lưu offline manifest:', e);
+        }
+      }
+
+      function getOfflineQueue() {
+        try {
+          const raw = localStorage.getItem('offline_checkin_queue');
+          return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+          console.error('Lỗi đọc offline queue:', e);
+          return [];
+        }
+      }
+
+      function saveOfflineQueue(queue) {
+        try {
+          localStorage.setItem('offline_checkin_queue', JSON.stringify(queue || []));
+        } catch (e) {
+          console.error('Lỗi lưu offline queue:', e);
+        }
+      }
+
+      // ==========================================
+      // WEB CRYPTO API VERIFICATION (ECDSA NIST P-256)
+      // ==========================================
+      function base64ToArrayBuffer(base64) {
+        const binaryString = window.atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+      }
+
+      function base64UrlToUint8Array(base64Url) {
+        let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        while (base64.length % 4) base64 += '=';
+        const binaryString = window.atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes;
+      }
+
+      async function getPublicKeyCryptoKey(keyVersion, publicKeysMap) {
+        if (cryptoKeyCache[keyVersion]) {
+          return cryptoKeyCache[keyVersion];
+        }
+        const spkiBase64 = publicKeysMap[keyVersion];
+        if (!spkiBase64) return null;
+
+        try {
+          const spkiBuffer = base64ToArrayBuffer(spkiBase64);
+          const key = await window.crypto.subtle.importKey(
+            'spki',
+            spkiBuffer,
+            { name: 'ECDSA', namedCurve: 'P-256' },
+            false,
+            ['verify']
+          );
+          cryptoKeyCache[keyVersion] = key;
+          return key;
+        } catch (err) {
+          console.error('Lỗi import SPKI public key WebCrypto:', err);
+          return null;
+        }
+      }
+
+      function parseQrPayload(rawInput) {
+        const trimmed = (rawInput || '').trim();
+        let keyVersion = null;
+        let ticketCode = null;
+        let showtimeId = null;
+        let signature = null;
+
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            const obj = JSON.parse(trimmed);
+            ticketCode = obj.ticketCode;
+            showtimeId = obj.showtimeId;
+            keyVersion = obj.keyVersion;
+            signature = obj.sig || obj.signature;
+          } catch (_) {
+            return { error: 'INVALID_FORMAT', message: 'Mã QR có định dạng JSON không hợp lệ.' };
+          }
+        } else if (trimmed.includes('|')) {
+          const parts = trimmed.split('|');
+          if (parts.length >= 5 && parts[0].toUpperCase() === 'TICKET') {
+            keyVersion = parts[1];
+            ticketCode = parts[2];
+            showtimeId = parts[3];
+            signature = parts[4];
+          } else if (parts.length === 4 && parts[0].toUpperCase() === 'TICKET') {
+            keyVersion = parts[1];
+            ticketCode = parts[2];
+            showtimeId = parts[3];
+            signature = null;
+          } else if (parts.length >= 4 && parts[0].toUpperCase() !== 'TICKET') {
+            keyVersion = parts[0];
+            ticketCode = parts[1];
+            showtimeId = parts[2];
+            signature = parts[3];
+          } else {
+            ticketCode = parts[0];
+          }
+        } else {
+          ticketCode = trimmed;
+        }
+
+        return { keyVersion, ticketCode, showtimeId, signature };
+      }
+
+      async function verifyQrOffline(rawInput, selectedShowtimeId, publicKeysMap) {
+        const parsed = parseQrPayload(rawInput);
+        if (parsed.error) {
+          return { isValid: false, reason: parsed.error, message: parsed.message };
+        }
+
+        // AC3 S-26: Mã QR tự chế hoặc thiếu chữ ký số
+        if (!parsed.signature) {
+          return {
+            isValid: false,
+            reason: 'MISSING_SIGNATURE',
+            message: 'Mã QR không có chữ ký số hợp lệ hoặc bị thiếu chữ ký (chỉ chấp nhận mã QR có chữ ký số hệ thống).'
+          };
+        }
+
+        if (!parsed.ticketCode || !parsed.showtimeId) {
+          return {
+            isValid: false,
+            reason: 'INVALID_FORMAT',
+            message: 'Mã QR thiếu mã vé hoặc mã suất diễn hợp lệ.'
+          };
+        }
+
+        if (!parsed.keyVersion) {
+          return {
+            isValid: false,
+            reason: 'MISSING_KEY_VERSION',
+            message: 'Mã QR không chứa thông tin phiên bản khoá (Key Version).'
+          };
+        }
+
+        // AC2 S-26: Lấy khoá công khai tương ứng với keyVersion
+        const cryptoKey = await getPublicKeyCryptoKey(parsed.keyVersion, publicKeysMap);
+        if (!cryptoKey) {
+          return {
+            isValid: false,
+            reason: 'UNKNOWN_KEY_VERSION',
+            message: `Phiên bản khoá '${parsed.keyVersion}' không tồn tại hoặc chưa được cập nhật trên thiết bị quét.`
+          };
+        }
+
+        // AC1 S-26 & S-34: Xác thực chữ ký đối với dữ liệu chuẩn tắc (ticketCode:showtimeId:keyVersion)
+        try {
+          const canonicalData = `${parsed.ticketCode.trim()}:${parsed.showtimeId.trim()}:${parsed.keyVersion.trim()}`;
+          const dataBytes = new TextEncoder().encode(canonicalData);
+          const sigBytes = base64UrlToUint8Array(parsed.signature);
+
+          const isSigValid = await window.crypto.subtle.verify(
+            { name: 'ECDSA', hash: { name: 'SHA-256' } },
+            cryptoKey,
+            sigBytes,
+            dataBytes
+          );
+
+          if (!isSigValid) {
+            return {
+              isValid: false,
+              reason: 'INVALID_SIGNATURE',
+              message: 'Chữ ký số không khớp hoặc mã QR đã bị chỉnh sửa/tạo giả ngoài hệ thống.'
+            };
+          }
+        } catch (err) {
+          console.error('Lỗi xác thực chữ ký WebCrypto:', err);
+          return {
+            isValid: false,
+            reason: 'INVALID_SIGNATURE',
+            message: 'Chữ ký số không hợp lệ hoặc bị lỗi cấu trúc giải mã.'
+          };
+        }
+
+        // Kiểm tra suất diễn
+        if (parsed.showtimeId.toLowerCase() !== (selectedShowtimeId || '').toLowerCase()) {
+          return {
+            isValid: false,
+            reason: 'WRONG_SHOWTIME',
+            message: 'Cảnh báo: Vé này KHÔNG thuộc về suất diễn đang được chọn tại cổng!'
+          };
+        }
+
+        return {
+          isValid: true,
+          ticketCode: parsed.ticketCode,
+          showtimeId: parsed.showtimeId,
+          keyVersion: parsed.keyVersion
+        };
+      }
+
+      // ==========================================
+      // S-34 OFFLINE CHECK-IN LOGIC (AC1, AC2, AC3, AC4)
+      // ==========================================
+      async function checkInOffline(rawInput, selectedShowtimeId, gateName) {
+        // 1. AC4: Giả sử máy chưa tải danh sách, Khi mất mạng -> Báo không soát được và hướng dẫn tải
+        const manifest = getOfflineManifest(selectedShowtimeId);
+        if (!manifest || !manifest.tickets || !manifest.tickets.length) {
+          return {
+            success: false,
+            isAc4Error: true,
+            reason: 'NO_MANIFEST',
+            message: 'Không thể soát vé ngoại tuyến: Thiết bị chưa tải danh sách vé cho suất diễn này. Vui lòng kết nối mạng và bấm "Tải danh sách vé" trước khi soát ngoại tuyến.'
+          };
+        }
+
+        // 2. Xác thực chữ ký mã QR bằng khoá công khai (AC1 & S-26)
+        const publicKeysMap = getOfflinePublicKeys();
+        const qrResult = await verifyQrOffline(rawInput, selectedShowtimeId, publicKeysMap);
+        if (!qrResult.isValid) {
+          return {
+            success: false,
+            reason: qrResult.reason,
+            message: qrResult.message
+          };
+        }
+
+        const ticketCode = qrResult.ticketCode;
+
+        // 3. Tra mã trong danh sách đã tải
+        const ticket = manifest.tickets.find(t => (t.ticketCode || '').toLowerCase() === ticketCode.toLowerCase());
+        if (!ticket) {
+          return {
+            success: false,
+            reason: 'TICKET_NOT_FOUND',
+            message: 'Mã vé không tồn tại trong danh sách của suất diễn này hoặc chưa thanh toán hợp lệ.'
+          };
+        }
+
+        // 4. AC3: Giả sử cùng máy quét một vé hai lần khi mất mạng -> Bị từ chối nhờ hàng đợi cục bộ
+        const queue = getOfflineQueue();
+        const alreadyInQueue = queue.find(q =>
+          (q.ticketCode || '').toLowerCase() === ticketCode.toLowerCase() &&
+          (q.showtimeId || '').toLowerCase() === selectedShowtimeId.toLowerCase()
+        );
+
+        if (alreadyInQueue) {
+          const timeStr = alreadyInQueue.scannedAt ? formatDateTime(alreadyInQueue.scannedAt) : 'trước đó';
+          const gateStr = alreadyInQueue.gateName ? ` tại cửa ${alreadyInQueue.gateName}` : '';
+          return {
+            success: false,
+            reason: 'DUPLICATE_OFFLINE_SCAN',
+            message: `Vé đã được quét ngoại tuyến trên thiết bị này lúc ${timeStr}${gateStr} (đang trong hàng đợi cục bộ).`
+          };
+        }
+
+        // 5. AC2: Giả sử vé đã được đánh dấu đã vào trong danh sách tải về -> Báo đỏ như khi có mạng
+        if (ticket.isCheckedIn) {
+          const timeStr = ticket.checkInTime ? formatDateTime(ticket.checkInTime) : 'trước đó';
+          const gateStr = ticket.checkInGate ? ` tại cửa ${ticket.checkInGate}` : '';
+          return {
+            success: false,
+            reason: 'ALREADY_CHECKED_IN',
+            message: `Vé đã được sử dụng lúc ${timeStr}${gateStr}.`
+          };
+        }
+
+        // 6. AC1: Hợp lệ -> Đánh dấu vé trong manifest, ghi vào hàng đợi cục bộ, báo xanh
+        ticket.isCheckedIn = true;
+        ticket.checkInGate = gateName;
+        ticket.checkInTime = new Date().toISOString();
+        saveOfflineManifest(selectedShowtimeId, manifest);
+
+        const now = new Date();
+        const scanRecord = {
+          offlineScanId: (window.crypto && crypto.randomUUID ? crypto.randomUUID() : ('offline-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9))),
+          ticketCode: ticket.ticketCode,
+          showtimeId: selectedShowtimeId,
+          gateName: gateName,
+          scannedAt: now.toISOString(),
+          staffUsername: displayName,
+          seatRow: ticket.seatRow || '',
+          seatNumber: ticket.seatNumber || 0,
+          seatInfo: ticket.seatInfo || (ticket.seatRow ? `${ticket.seatRow}${ticket.seatNumber}` : 'Ghế'),
+          categoryName: ticket.categoryName || 'Tiêu chuẩn',
+          qrPayload: rawInput
+        };
+
+        queue.push(scanRecord);
+        saveOfflineQueue(queue);
+        updateQueueCounterUI();
+        updateManifestUI();
+
+        return {
+          success: true,
+          isOffline: true,
+          data: {
+            message: 'Check-in ngoại tuyến thành công.',
+            seatInfo: scanRecord.seatInfo,
+            seatRow: scanRecord.seatRow,
+            seatNumber: scanRecord.seatNumber,
+            categoryName: scanRecord.categoryName,
+            gate: gateName,
+            checkInTime: now.toISOString(),
+            ticketCode: ticket.ticketCode,
+            isOffline: true
+          }
+        };
+      }
+
+      // ==========================================
+      // UI STATE & MANIFEST MANAGEMENT (S-33 & S-34)
+      // ==========================================
+      function updateNetworkStatusUI() {
+        const badge = document.getElementById('networkStatusBadge');
+        const icon = document.getElementById('networkStatusIcon');
+        const text = document.getElementById('networkStatusText');
+        const bannerNotice = document.getElementById('offlineBannerNotice');
+        const offline = isDeviceOffline();
+
+        if (offline) {
+          badge.className = 'network-badge network-badge-offline';
+          icon.textContent = 'wifi_off';
+          text.textContent = isSimulatedOffline() ? 'Ngoại tuyến (Mô phỏng)' : 'Ngoại tuyến (Mất mạng)';
+          bannerNotice.style.display = 'inline';
+        } else {
+          badge.className = 'network-badge network-badge-online';
+          icon.textContent = 'wifi';
+          text.textContent = 'Trực tuyến (Online)';
+          bannerNotice.style.display = 'none';
+          checkAndTriggerAutoDeltaSync();
+        }
+        
+        updateSyncWarningBar();
+      }
+
+      function updateSyncWarningBar() {
+        const queue = getOfflineQueue();
+        const count = queue.length;
+        const offline = isDeviceOffline();
+        const warningBar = document.getElementById('syncWarningBar');
+        if (!warningBar) return;
+        
+        const warningText = document.getElementById('syncWarningText');
+        const warningIcon = document.getElementById('syncWarningIcon');
+
+        if (offline || count > 0) {
+          warningBar.style.display = 'flex';
+          if (offline) {
+            warningBar.className = 'sync-warning-bar sync-warning-offline';
+            warningIcon.textContent = 'cloud_off';
+            warningIcon.style.animation = 'none';
+            warningText.innerHTML = `Đang ngoại tuyến. Có <strong>${count}</strong> lượt quét chưa đồng bộ. Không tắt trình duyệt!`;
+          } else {
+            warningBar.className = 'sync-warning-bar sync-warning-syncing';
+            warningIcon.textContent = 'sync';
+            warningIcon.style.animation = 'spin 1.5s linear infinite';
+            warningText.innerHTML = `Đã có mạng. Đang đồng bộ <strong>${count}</strong> lượt quét lên máy chủ...`;
+          }
+        } else {
+          warningBar.style.display = 'none';
+          warningIcon.style.animation = 'none';
+        }
+      }
+
+      function updateManifestUI() {
+        const showtimeSelect = document.getElementById('showtimeSelect');
+        const showtimeId = showtimeSelect ? showtimeSelect.value : null;
+        const statusText = document.getElementById('manifestStatusText');
+        const subText = document.getElementById('manifestSubText');
+        const btnLabel = document.getElementById('btnDownloadManifestLabel');
+
+        if (!showtimeId) {
+          statusText.textContent = 'Chưa chọn suất diễn';
+          statusText.style.color = '#64748b';
+          subText.textContent = 'Chọn suất diễn để kiểm tra hoặc tải dữ liệu ngoại tuyến.';
+          btnLabel.textContent = 'Tải danh sách vé';
+          return;
+        }
+
+        const manifest = getOfflineManifest(showtimeId);
+        if (manifest && manifest.tickets) {
+          const total = manifest.tickets.length;
+          const checkedInCount = manifest.tickets.filter(t => t.isCheckedIn).length;
+          const timeStr = manifest.downloadedAt ? formatDateTime(manifest.downloadedAt) : 'Đã tải';
+          statusText.textContent = `✅ Đã lưu ${total} vé (${checkedInCount} đã vào) lúc ${timeStr}`;
+          statusText.style.color = '#059669';
+          subText.textContent = 'Thiết bị sẵn sàng soát vé không cần mạng cho suất này (S-34).';
+          btnLabel.textContent = 'Cập nhật lại';
+        } else {
+          statusText.textContent = '⚠️ Chưa tải danh sách cho suất này';
+          statusText.style.color = '#d97706';
+          subText.textContent = 'Cần tải trước để soát vé khi mất mạng (AC1, AC4).';
+          btnLabel.textContent = 'Tải danh sách vé';
+        }
+      }
+
+      function updateQueueCounterUI() {
+        const queue = getOfflineQueue();
+        const label = document.getElementById('queueCounterLabel');
+        if (label) {
+          label.textContent = `Hàng đợi: ${queue.length} vé`;
+        }
+        updateSyncWarningBar();
+      }
+
+      window.handleDownloadManifest = async function () {
+        const showtimeSelect = document.getElementById('showtimeSelect');
+        const showtimeId = showtimeSelect ? showtimeSelect.value : null;
+        if (!showtimeId) {
+          alert('Vui lòng chọn suất diễn trước khi tải danh sách vé.');
+          return;
+        }
+
+        const btnLabel = document.getElementById('btnDownloadManifestLabel');
+        const originalText = btnLabel.textContent;
+        btnLabel.textContent = 'Đang tải...';
+
+        try {
+          // 1. Tải Public Keys của hệ thống
+          try {
+            const keysRes = await fetch('/api/v1/tickets/qr-public-keys');
+            if (keysRes.ok) {
+              const keysJson = await keysRes.json();
+              if (keysJson?.data?.publicKeys) {
+                saveOfflinePublicKeys(keysJson.data);
+              }
+            }
+          } catch (e) {
+            console.warn('Không thể tải public keys từ server, sử dụng keys mặc định:', e);
+          }
+
+          // 2. Tải manifest danh sách vé của suất diễn (S-33)
+          const res = await fetch(`/api/v1/checkin/offline-tickets/${showtimeId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.message || 'Lỗi khi tải danh sách vé từ máy chủ.');
+          }
+
+          const data = await res.json();
+          data.downloadedAt = new Date().toISOString();
+          saveOfflineManifest(showtimeId, data);
+          updateManifestUI();
+
+          const count = data.totalCount || (data.tickets ? data.tickets.length : 0);
+          alert(`Tải thành công ${count} vé của suất diễn xuống thiết bị! Thiết bị đã sẵn sàng soát vé ngoại tuyến.`);
+        } catch (err) {
+          console.error(err);
+          alert('Không thể tải danh sách vé: ' + (err.message || 'Lỗi kết nối.'));
+        } finally {
+          btnLabel.textContent = originalText;
+          updateManifestUI();
+        }
+      };
+
+      window.handleClearOfflineData = function () {
+        const showtimeSelect = document.getElementById('showtimeSelect');
+        const showtimeId = showtimeSelect ? showtimeSelect.value : null;
+        if (!showtimeId) {
+          alert('Chưa chọn suất diễn để xoá.');
+          return;
+        }
+        if (confirm('Bạn có chắc muốn xoá dữ liệu danh sách vé đã tải của suất này không?')) {
+          localStorage.removeItem('offline_manifest_' + showtimeId);
+          updateManifestUI();
+          alert('Đã xoá dữ liệu ngoại tuyến của suất này.');
+        }
+      };
+
+      window.openQueueModal = function () {
+        const queue = getOfflineQueue();
+        const container = document.getElementById('queueTableContainer');
+
+        if (!queue || queue.length === 0) {
+          container.innerHTML = '<div style="padding: 24px; text-align: center; color: #64748b;">Hàng đợi cục bộ đang trống (chưa có lần quét ngoại tuyến nào).</div>';
+        } else {
+          let html = `
+            <table class="queue-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Mã Vé</th>
+                  <th>Vị Trí Ghế</th>
+                  <th>Hạng</th>
+                  <th>Cửa</th>
+                  <th>Thời Điểm</th>
+                </tr>
+              </thead>
+              <tbody>
+          `;
+          queue.forEach((item, idx) => {
+            html += `
+              <tr>
+                <td>${idx + 1}</td>
+                <td><strong>${escapeHtml(item.ticketCode)}</strong></td>
+                <td>${escapeHtml(item.seatInfo || '')}</td>
+                <td>${escapeHtml(item.categoryName || '')}</td>
+                <td>${escapeHtml(item.gateName || '')}</td>
+                <td>${escapeHtml(formatDateTime(item.scannedAt))}</td>
+              </tr>
+            `;
+          });
+          html += `</tbody></table>`;
+          container.innerHTML = html;
+        }
+
+        document.getElementById('queueModal').style.display = 'flex';
+      };
+
+      window.closeQueueModal = function () {
+        document.getElementById('queueModal').style.display = 'none';
+      };
+
+      window.handleClearQueue = function () {
+        const queue = getOfflineQueue();
+        if (!queue.length) return;
+        if (confirm(`Bạn có chắc muốn xoá toàn bộ ${queue.length} lần quét trong hàng đợi cục bộ không?`)) {
+          saveOfflineQueue([]);
+          updateQueueCounterUI();
+          window.openQueueModal();
+        }
+      };
+
+      // ==========================================
+      // S-35 CLIENT AUTO SYNC & QUEUE FLUSH LOGIC
+      // ==========================================
+      let isSyncInProgress = false;
+
+      async function syncOfflineQueue(isManual = false) {
+        if (isSyncInProgress) {
+          console.log('[S-35] Tiến trình đồng bộ đang chạy, bỏ qua gọi trùng lặp.');
+          return;
+        }
+
+        if (isDeviceOffline()) {
+          if (isManual) alert('Thiết bị đang ở chế độ ngoại tuyến hoặc mất mạng. Vui lòng kết nối mạng để đồng bộ.');
+          return;
+        }
+
+        const queue = getOfflineQueue();
+        if (!queue || queue.length === 0) {
+          if (isManual) alert('Hàng đợi cục bộ đang trống (không có lần quét nào cần đồng bộ).');
+          return;
+        }
+
+        isSyncInProgress = true;
+        const syncSummary = { synced: 0, duplicate: 0, conflict: 0, rejected: 0 };
+        const syncBtn = document.getElementById('btnSyncNow');
+        if (syncBtn) {
+          syncBtn.disabled = true;
+          syncBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px; animation: spin 1s linear infinite;">sync</span> <span>Đang đồng bộ...</span>';
+        }
+
+        try {
+          // Xử lý từng lô tối đa 40 vé theo AC1
+          const BATCH_SIZE = 40;
+          let currentQueue = getOfflineQueue();
+
+          while (currentQueue.length > 0 && !isDeviceOffline()) {
+            const batchItems = currentQueue.slice(0, BATCH_SIZE);
+            const batchScanIds = new Set(batchItems.map(item => item.offlineScanId));
+            const payloadItems = batchItems.map(item => ({
+              offlineScanId: item.offlineScanId,
+              ticketCode: item.ticketCode,
+              showtimeId: item.showtimeId,
+              gateName: item.gateName,
+              scannedAt: item.scannedAt,
+              qrPayload: item.qrPayload || ''
+            }));
+
+            const abortController = new AbortController();
+            const timeoutId = setTimeout(() => abortController.abort(), 15000);
+
+            let res;
+            try {
+              res = await fetch('/api/v1/checkin/offline-sync', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ items: payloadItems }),
+                signal: abortController.signal
+              });
+            } finally {
+              clearTimeout(timeoutId);
+            }
+
+            if (!res.ok) {
+              // HTTP 5xx, 429, timeout v.v.: Giữ nguyên queue, KHÔNG xóa item chưa ACK
+              console.warn('[S-35] Máy chủ phản hồi mã lỗi:', res.status);
+              if (isManual) alert(`Lỗi máy chủ (${res.status}) khi đồng bộ. Các vé chưa xác nhận được giữ nguyên trong hàng đợi để thử lại.`);
+              break;
+            }
+
+            const data = await res.json();
+            const results = data.results || [];
+            for (const result of results) {
+              if (result?.isAckTerminal === true && batchScanIds.has(result.offlineScanId) && Object.hasOwn(syncSummary, result.status))
+                syncSummary[result.status]++;
+            }
+
+            const VALID_ACK_STATUSES = new Set(['synced', 'duplicate', 'conflict', 'rejected']);
+
+            // Tập hợp các offlineScanId đã nhận ACK terminal hợp lệ VÀ thuộc đúng batch vừa gửi
+            const ackedIds = new Set(
+              results
+                .filter(r => r && r.isAckTerminal === true && VALID_ACK_STATUSES.has(r.status) && batchScanIds.has(r.offlineScanId))
+                .map(r => r.offlineScanId)
+            );
+
+            // Cập nhật lại queue: CHỈ xóa các item có trong ackedIds
+            const latestQueue = getOfflineQueue();
+            const remainingQueue = latestQueue.filter(item => !ackedIds.has(item.offlineScanId));
+            saveOfflineQueue(remainingQueue);
+            updateQueueCounterUI();
+            if (document.getElementById('queueModal') && document.getElementById('queueModal').style.display === 'flex') {
+              window.openQueueModal();
+            }
+
+            // Nếu không có item nào được ACK -> dừng lô để tránh loop vô hạn
+            if (ackedIds.size === 0) {
+              console.warn('[S-35] Không nhận được ACK terminal nào, dừng lô.');
+              break;
+            }
+
+            currentQueue = remainingQueue;
+          }
+
+          const finalQueue = getOfflineQueue();
+          if (finalQueue.length === 0 && isManual) {
+            alert(`Đã xử lý hàng đợi: ${syncSummary.synced} lượt hợp lệ, ${syncSummary.duplicate} lượt đã ghi nhận, ${syncSummary.conflict} lượt xung đột, ${syncSummary.rejected} lượt bị từ chối. Kết quả hợp lệ có thể thay đổi khi máy khác đồng bộ lượt quét sớm hơn.`);
+          }
+        } catch (err) {
+          // Lỗi mạng fetch failed, timeout: Giữ nguyên queue
+          console.warn('[S-35] Lỗi kết nối mạng khi đồng bộ:', err);
+          if (isManual) alert('Mất kết nối mạng khi gửi dữ liệu. Hàng đợi được giữ nguyên an toàn để đồng bộ lại khi có mạng.');
+        } finally {
+          isSyncInProgress = false;
+          updateQueueCounterUI();
+          if (syncBtn) {
+            syncBtn.disabled = false;
+            syncBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px;">cloud_upload</span> <span>Đồng bộ ngay</span>';
+          }
+        }
+      }
+
+      window.syncOfflineQueue = syncOfflineQueue;
+
+      // ==========================================
+      // LOAD TODAY SHOWS & PRE-CACHE KEYS
+      // ==========================================
+      async function loadTodayShows() {
+        const select = document.getElementById('showtimeSelect');
+        try {
+          // Pre-fetch và cache public keys
+          fetch('/api/v1/tickets/qr-public-keys')
+            .then(r => r.ok ? r.json() : null)
+            .then(json => {
+              if (json?.data?.publicKeys) {
+                saveOfflinePublicKeys(json.data);
+              }
+            })
+            .catch(() => {});
+
+          const res = await fetch('/api/v1/checkin/today-shows', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          if (!res.ok) throw new Error('Không thể tải danh sách suất diễn');
+          const data = await res.json();
+          
+          select.innerHTML = '';
+          if (data.length === 0) {
+            select.innerHTML = '<option value="">Không có suất diễn nào đang diễn ra hôm nay</option>';
+            updateManifestUI();
+            return;
+          }
+          
+          data.forEach(show => {
+            const startTime = new Date(show.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            const endTime = new Date(show.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            const option = document.createElement('option');
+            option.value = show.id;
+            option.textContent = `${show.eventTitle} (${startTime} - ${endTime})`;
+            select.appendChild(option);
+          });
+
+          updateManifestUI();
+        } catch (error) {
+          console.error(error);
+          select.innerHTML = '<option value="">Lỗi tải danh sách suất diễn (Kiểm tra kết nối)</option>';
+          updateManifestUI();
+        }
+      }
+
+      window.handleScan = handleScan;
+      async function handleScan() {
+        if (isProcessing) return;
+
+        const rawInput = document.getElementById('ticketInput').value.trim();
+        const showtimeId = document.getElementById('showtimeSelect').value;
+        const gateName = document.getElementById('gateInput').value.trim() || 'Gate 1';
+        const resultDiv = document.getElementById('scanResult');
+
+        resultDiv.style.display = 'block';
+        
+        if (!rawInput) {
+          showErrorResult('Vui lòng quét mã QR hoặc nhập mã vé.');
+          return;
+        }
+        if (!showtimeId) {
+          showErrorResult('Vui lòng chọn suất diễn hiện tại trước khi soát vé.');
+          return;
+        }
+
+        isProcessing = true;
+        resultDiv.className = 'info-alert';
+        resultDiv.innerHTML = '<span class="material-symbols-outlined" style="animation: spin 1s linear infinite;">sync</span> <span>Đang xác thực vé...</span>';
+
+        // 1. NẾU THIẾT BỊ ĐANG Ở CHẾ ĐỘ NGOẠI TUYẾN
+        if (isDeviceOffline()) {
+          try {
+            const offlineRes = await checkInOffline(rawInput, showtimeId, gateName);
+            if (offlineRes.success) {
+              showSuccessResult(offlineRes.data, gateName, true);
+              document.getElementById('ticketInput').value = '';
+            } else {
+              showErrorResult(offlineRes.message);
+            }
+          } catch (offlineErr) {
+            console.error('Lỗi check-in ngoại tuyến:', offlineErr);
+            showErrorResult('Lỗi xác thực ngoại tuyến: ' + (offlineErr.message || 'Không xác định'));
+          } finally {
+            setTimeout(() => {
+              isProcessing = false;
+              const inputEl = document.getElementById('ticketInput');
+              if (inputEl) inputEl.focus();
+            }, 600);
+          }
+          return;
+        }
+
+        // 2. NẾU THIẾT BỊ ĐANG TRỰC TUYẾN: GỌI MÁY CHỦ VỚI FALLBACK NGOẠI TUYẾN
+        const bodyPayload = {
+          selectedShowtimeId: showtimeId,
+          gateName: gateName
+        };
+
+        if (rawInput.startsWith('TICKET|') || rawInput.includes('|')) {
+          bodyPayload.qrPayload = rawInput;
+        } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawInput)) {
+          bodyPayload.ticketId = rawInput;
+        } else {
+          bodyPayload.ticketCode = rawInput;
+        }
+
+        let pendingTimeout = setTimeout(() => {
+          if (isProcessing) {
+            showPendingNotice();
+          }
+        }, 3000);
+
+        try {
+          const res = await fetch('/api/v1/checkin/scan', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(bodyPayload)
+          });
+
+          const data = await res.json().catch(() => ({}));
+          clearTimeout(pendingTimeout);
+
+          if (res.ok) {
+            showSuccessResult(data, gateName, false);
+            document.getElementById('ticketInput').value = '';
+          } else {
+            showErrorResult(data.message || 'Mã vé không hợp lệ hoặc bị từ chối.');
+          }
+        } catch (networkError) {
+          clearTimeout(pendingTimeout);
+          console.warn('Lỗi kết nối máy chủ, kích hoạt fallback ngoại tuyến S-34:', networkError);
+
+          // Kiểm tra xem đã có manifest để chuyển sang soát vé ngoại tuyến ngay không
+          const manifest = getOfflineManifest(showtimeId);
+          if (manifest && manifest.tickets) {
+            try {
+              const offlineRes = await checkInOffline(rawInput, showtimeId, gateName);
+              if (offlineRes.success) {
+                showSuccessResult(offlineRes.data, gateName, true);
+                document.getElementById('ticketInput').value = '';
+              } else {
+                showErrorResult(offlineRes.message);
+              }
+            } catch (err) {
+              showErrorResult('Lỗi soát vé ngoại tuyến: ' + err.message);
+            }
+          } else {
+            showErrorResult('Mất kết nối máy chủ và chưa có danh sách tải trước cho suất này. Vui lòng kiểm tra lại mạng hoặc tải danh sách vé (S-33).');
+          }
+        } finally {
+          clearTimeout(pendingTimeout);
+          setTimeout(() => {
+            isProcessing = false;
+            const inputEl = document.getElementById('ticketInput');
+            if (inputEl) inputEl.focus();
+          }, 800);
+        }
+      }
+
+      function showPendingNotice() {
+        const resultDiv = document.getElementById('scanResult');
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+          <div class="result-card-outdoor result-card-pending">
+            <div class="badge-pending-outdoor">
+              <span class="material-symbols-outlined" style="font-size: 26px; animation: spin 1.2s linear infinite;">sync</span>
+              <span>Đang chờ…</span>
+            </div>
+            <p style="font-size: 1.05rem; font-weight: 800; margin: 10px 0 0 0;">
+              Hệ thống đang kết nối kiểm tra dữ liệu vé, vui lòng giữ vé ổn định...
+            </p>
+          </div>
+        `;
+      }
+
+      function showSuccessResult(data, gateFallback, isOffline = false) {
+        playAudioCue('success');
+        const resultDiv = document.getElementById('scanResult');
+        resultDiv.style.display = 'block';
+
+        const category = data.categoryName || 'TIÊU CHUẨN';
+        const seatStr = data.seatInfo || (data.seatRow ? `${data.seatRow}${data.seatNumber}` : 'Hợp lệ');
+        const gateStr = data.gate || gateFallback || 'Gate 1';
+        const checkInTimeStr = data.checkInTime ? formatDateTime(data.checkInTime) : formatDateTime(new Date());
+
+        const isOff = isOffline || data.isOffline;
+        const offlineBadgeHtml = isOff ? `
+          <div style="display: inline-block; background: #fff7ed; color: #c2410c; border: 1.5px solid #fed7aa; padding: 4px 14px; border-radius: 20px; font-weight: 800; font-size: 0.85rem; margin-bottom: 12px; letter-spacing: 0.02em;">
+            ⚡ SOÁT VÉ NGOẠI TUYẾN — ĐÃ LƯU HÀNG ĐỢI CỤC BỘ (S-34)
+          </div>
+        ` : '';
+
+        const offlineNoteHtml = isOff ? `
+          <div style="font-size: 0.82rem; color: #047857; margin-top: 8px; font-weight: 600;">
+            Lần quét đã được ghi nhận vào bộ nhớ thiết bị và sẽ đồng bộ khi có mạng lại (S-35).
+          </div>
+        ` : '';
+
+        const badgeText = isOff ? 'VÉ HỢP LỆ — NGOẠI TUYẾN' : 'VÉ HỢP LỆ — CHECK-IN THÀNH CÔNG';
+        const verifyMethodTag = data.isManual ? ' [XÁC THỰC THỦ CÔNG]' : '';
+
+        resultDiv.innerHTML = `
+          <div class="result-card-outdoor result-card-success">
+            ${offlineBadgeHtml}
+            <div class="badge-valid-outdoor">
+              <span class="material-symbols-outlined" style="font-size: 28px;">check_circle</span>
+              <span>${badgeText}${verifyMethodTag}</span>
+            </div>
+
+            <div class="seat-highlight-grid">
+              <div class="seat-highlight-col">
+                <span class="seat-highlight-label">Hạng Vé</span>
+                <span class="seat-highlight-value" style="color: #047857;">${escapeHtml(category)}</span>
+              </div>
+              <div class="seat-highlight-col">
+                <span class="seat-highlight-label">Vị Trí Ghế</span>
+                <span class="seat-highlight-value" style="color: #0f172a;">GHẾ ${escapeHtml(seatStr)}</span>
+              </div>
+            </div>
+
+            <div class="meta-row-outdoor">
+              <div>📍 <span>Cửa soát:</span> <strong>${escapeHtml(gateStr)}</strong></div>
+              <div>⏰ <span>Thời điểm:</span> <strong>${escapeHtml(checkInTimeStr)}</strong></div>
+              ${data.ticketCode ? `<div>🎟️ <span>Mã vé:</span> <strong>${escapeHtml(data.ticketCode)}</strong></div>` : ''}
+            </div>
+            ${offlineNoteHtml}
+
+            <div>
+              <button type="button" class="btn-next-scan" onclick="resetForNextScan()">
+                <span class="material-symbols-outlined">qr_code_scanner</span>
+                <span>Quét vé tiếp theo</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      function showErrorResult(errorMessage) {
+        playAudioCue('error');
+        const resultDiv = document.getElementById('scanResult');
+        resultDiv.style.display = 'block';
+
+        resultDiv.innerHTML = `
+          <div class="result-card-outdoor result-card-error">
+            <div class="badge-invalid-outdoor">
+              <span class="material-symbols-outlined" style="font-size: 28px;">cancel</span>
+              <span>TỪ CHỐI VÉ — KHÔNG HỢP LỆ</span>
+            </div>
+
+            <div style="background: #ffffff; border-radius: 12px; padding: 16px 20px; margin: 16px 0; border: 2px solid #fecaca; text-align: center;">
+              <div style="font-size: 0.8rem; font-weight: 800; color: #dc2626; text-transform: uppercase; margin-bottom: 6px;">Lý do từ chối:</div>
+              <div style="font-size: 1.15rem; font-weight: 800; color: #991b1b; line-height: 1.4;">${escapeHtml(errorMessage)}</div>
+            </div>
+
+            <div>
+              <button type="button" class="btn-next-scan" onclick="resetForNextScan()">
+                <span class="material-symbols-outlined">refresh</span>
+                <span>Quét vé tiếp theo</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      window.resetForNextScan = function () {
+        isProcessing = false;
+        const input = document.getElementById('ticketInput');
+        if (input) {
+          input.value = '';
+          input.focus();
+        }
+        const resultDiv = document.getElementById('scanResult');
+        if (resultDiv) {
+          resultDiv.style.display = 'none';
+        }
+      };
+
+      function formatDateTime(dateVal) {
+        try {
+          const d = new Date(dateVal);
+          return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ' +
+                 d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        } catch (_) {
+          return String(dateVal);
+        }
+      }
+
+      function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+      }
+
+      function playAudioCue(type) {
+        try {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContext) return;
+          const ctx = new AudioContext();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          if (type === 'success') {
+            osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+            osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.25);
+          } else {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(220, ctx.currentTime);
+            osc.frequency.setValueAtTime(164.81, ctx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.25, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.35);
+          }
+        } catch (_) {}
+      }
+
+      // Khởi tạo các sự kiện mạng & điều khiển
+      const offlineToggle = document.getElementById('offlineModeToggle');
+      if (offlineToggle) {
+        offlineToggle.addEventListener('change', () => {
+          updateNetworkStatusUI();
+          if (!isDeviceOffline()) {
+            syncOfflineQueue(false);
+          }
+        });
+      }
+
+      function handleOnlineReconnect() {
+        updateNetworkStatusUI();
+        // AC1: Khi có mạng lại, tự động đẩy hàng đợi ngoại tuyến lên máy chủ
+        syncOfflineQueue(false);
+      }
+
+      window.addEventListener('online', handleOnlineReconnect);
+      window.addEventListener('offline', updateNetworkStatusUI);
+
+      const showtimeSelect = document.getElementById('showtimeSelect');
+      if (showtimeSelect) {
+        showtimeSelect.addEventListener('change', updateManifestUI);
+      }
+
+      updateNetworkStatusUI();
+      updateQueueCounterUI();
+      updateManifestUI();
+
+      // Kiểm tra đồng bộ lúc tải trang nếu online và hàng đợi có sẵn vé
+      if (!isDeviceOffline() && getOfflineQueue().length > 0) {
+        syncOfflineQueue(false);
+      }
+
+    })();
+
+    function handleLogout() {
+      if (confirm('Bạn có chắc chắn muốn đăng xuất khỏi cổng Soát vé không?')) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user_info');
+        window.location.href = './login.html';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -21,11 +21,23 @@ namespace EventTicketBooking.Api.Controllers
     {
         private readonly AppDbContext _context;
         private readonly ILogger<OrdersController> _logger;
+        private readonly EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue? _ticketEmailQueue;
+        private readonly EventTicketBooking.Api.Services.Interfaces.ITicketService _ticketService;
+        private readonly EventTicketBooking.Api.Services.Interfaces.IOrderAuditService _orderAuditService;
 
-        public OrdersController(AppDbContext context, ILogger<OrdersController> logger)
+        public OrdersController(
+            AppDbContext context,
+            ILogger<OrdersController> logger,
+            EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue? ticketEmailQueue = null,
+            EventTicketBooking.Api.Services.Interfaces.ITicketService? ticketService = null,
+            EventTicketBooking.Api.Services.Interfaces.IOrderAuditService? orderAuditService = null)
         {
             _context = context;
             _logger = logger;
+            _ticketEmailQueue = ticketEmailQueue;
+            _ticketService = ticketService ?? new EventTicketBooking.Api.Services.Implementations.TicketService();
+            _orderAuditService = orderAuditService ?? new EventTicketBooking.Api.Services.Implementations.OrderAuditService(
+                context, Microsoft.Extensions.Logging.Abstractions.NullLogger<EventTicketBooking.Api.Services.Implementations.OrderAuditService>.Instance);
         }
 
         /// <summary>
@@ -46,12 +58,31 @@ namespace EventTicketBooking.Api.Controllers
             if (!Guid.TryParse(userIdStr, out var userId))
                 return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
 
+            var userDisplayName = User.Identity?.Name ?? User.FindFirst("name")?.Value ?? User.FindFirst(ClaimTypes.Name)?.Value ?? User.FindFirst("email")?.Value ?? userId.ToString();
+
+            var (success, message, order, statusCode) = await CreateOrderFromHoldsCoreAsync(userId, showtimeId, userDisplayName);
+            if (!success)
+            {
+                return statusCode switch
+                {
+                    StatusCodes.Status404NotFound => NotFound(ApiResponse<object>.FailureResult(message)),
+                    StatusCodes.Status409Conflict => Conflict(ApiResponse<object>.FailureResult(message)),
+                    StatusCodes.Status400BadRequest => BadRequest(ApiResponse<object>.FailureResult(message)),
+                    _ => StatusCode(statusCode, ApiResponse<object>.FailureResult(message))
+                };
+            }
+
+            return Ok(ApiResponse<OrderDto>.SuccessResult(order!, message));
+        }
+
+        private async Task<(bool Success, string Message, OrderDto? Order, int StatusCode)> CreateOrderFromHoldsCoreAsync(Guid userId, Guid showtimeId, string userDisplayName)
+        {
             // Kiểm tra suất diễn
-            var showtime = await _context.Showtimes.FirstOrDefaultAsync(s => s.Id == showtimeId);
+            var showtime = await _context.Showtimes.Include(s => s.Event).FirstOrDefaultAsync(s => s.Id == showtimeId);
             if (showtime == null)
-                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy suất diễn."));
+                return (false, "Không tìm thấy suất diễn.", null, StatusCodes.Status404NotFound);
             if (showtime.Status != ShowtimeStatus.OnSale)
-                return Conflict(ApiResponse<object>.FailureResult("Suất diễn không đang mở bán."));
+                return (false, "Suất diễn không đang mở bán.", null, StatusCodes.Status409Conflict);
 
             // 1. Chống bấm đúp: Trả về đơn chờ hiện tại nếu đã có
             var existingOrder = await _context.Orders
@@ -63,16 +94,21 @@ namespace EventTicketBooking.Api.Controllers
             if (existingOrder != null)
             {
                 if (existingOrder.ExpiresAt <= DateTimeOffset.UtcNow)
-                    return Conflict(ApiResponse<object>.FailureResult("Đơn hàng trước đã hết hạn, vui lòng chờ hệ thống giải phóng và đặt lại."));
-                return Ok(ApiResponse<OrderDto>.SuccessResult(MapToDto(existingOrder), "Đã tồn tại đơn hàng đang chờ thanh toán."));
+                    return (false, "Đơn hàng trước đã hết hạn, vui lòng chờ hệ thống giải phóng và đặt lại.", null, StatusCodes.Status409Conflict);
+                return (true, "Đã tồn tại đơn hàng đang chờ thanh toán.", MapToDto(existingOrder), StatusCodes.Status200OK);
             }
 
             var now = DateTimeOffset.UtcNow;
 
-            using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
 
             try
             {
+                if (_context.Database.IsRelational())
+                {
+                    transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+                }
+
                 // 2. Lấy giữ chỗ (Không nhận danh sách ghế từ client)
                 var holds = await _context.SeatHold
                     .Include(sh => sh.Seat)
@@ -82,20 +118,37 @@ namespace EventTicketBooking.Api.Controllers
 
                 if (!holds.Any())
                 {
-                    return BadRequest(ApiResponse<object>.FailureResult("Bạn không giữ chỗ nào hoặc giữ chỗ đã hết hạn."));
+                    return (false, "Bạn không giữ chỗ nào hoặc giữ chỗ đã hết hạn.", null, StatusCodes.Status400BadRequest);
+                }
+
+                // S-42: Kiểm tra giới hạn số lượng vé tối đa mỗi người mua cho suất diễn
+                int maxTickets = showtime.MaxTicketsPerUser > 0
+                    ? showtime.MaxTicketsPerUser
+                    : (showtime.Event != null && showtime.Event.MaxTicketsPerUser > 0 ? showtime.Event.MaxTicketsPerUser : 10);
+
+                var purchasedCount = await _context.OrderItems
+                    .AsNoTracking()
+                    .CountAsync(oi => oi.Order.ShowtimeId == showtimeId &&
+                                      oi.Order.UserId == userId &&
+                                      oi.Order.Status != OrderStatus.Cancelled &&
+                                      oi.Order.Status != OrderStatus.Expired);
+
+                if (holds.Count + purchasedCount > maxTickets)
+                {
+                    return (false, $"Bạn không thể đặt thêm vé. Tổng số ghế đang giữ ({holds.Count}) cộng đã mua ({purchasedCount}) của tài khoản vượt giới hạn {maxTickets} vé trong suất này (Tối đa {maxTickets} vé).", null, StatusCodes.Status400BadRequest);
                 }
 
                 if (holds.Any(h => h.Seat.Status == "SOLD" || h.Seat.SeatCategory.ShowtimeId != showtimeId || h.Seat.SeatCategory.Price < 0))
-                    return Conflict(ApiResponse<object>.FailureResult("Ghế hoặc giá ghế không còn hợp lệ."));
+                    return (false, "Ghế hoặc giá ghế không còn hợp lệ.", null, StatusCodes.Status409Conflict);
                 var totalPrice = holds.Sum(h => (long)(h.Seat.SeatCategory.Price ?? 0));
                 if (totalPrice > int.MaxValue)
-                    return BadRequest(ApiResponse<object>.FailureResult("Tổng tiền đơn hàng vượt giới hạn thanh toán."));
+                    return (false, "Tổng tiền đơn hàng vượt giới hạn thanh toán.", null, StatusCodes.Status400BadRequest);
 
                 var expiredHolds = holds.Where(h => h.ExpiresAt <= now.UtcDateTime).ToList();
                 if (expiredHolds.Any())
                 {
                     var expiredSeatNames = string.Join(", ", expiredHolds.Select(h => $"{h.Seat.Row}{h.Seat.SeatNumber}"));
-                    return Conflict(ApiResponse<object>.FailureResult($"Các ghế sau đã hết hạn giữ chỗ: {expiredSeatNames}. Vui lòng đặt lại."));
+                    return (false, $"Các ghế sau đã hết hạn giữ chỗ: {expiredSeatNames}. Vui lòng đặt lại.", null, StatusCodes.Status409Conflict);
                 }
 
                 // 3. Tính tổng và tạo đơn hàng (T-38: Tính ở máy chủ)
@@ -108,7 +161,7 @@ namespace EventTicketBooking.Api.Controllers
                 {
                     if (hold.Seat.SeatCategory.Price == null)
                     {
-                        return BadRequest(ApiResponse<object>.FailureResult($"Ghế {hold.Seat.Row}{hold.Seat.SeatNumber} chưa được định giá."));
+                        return (false, $"Ghế {hold.Seat.Row}{hold.Seat.SeatNumber} chưa được định giá.", null, StatusCodes.Status400BadRequest);
                     }
 
                     int price = hold.Seat.SeatCategory.Price.Value;
@@ -133,35 +186,135 @@ namespace EventTicketBooking.Api.Controllers
                 };
 
                 order.CalculateTotal();
+
+                // Story S-49: Ghi nhận nhật ký tạo đơn hàng và giữ chỗ
+                _orderAuditService.Record(
+                    order.Id,
+                    "ORDER",
+                    order.Id.ToString(),
+                    "ORDER_CREATED",
+                    null,
+                    OrderStatus.Pending.ToString(),
+                    "USER",
+                    userDisplayName,
+                    userId,
+                    $"Tạo đơn hàng gồm {orderItems.Count} vé. Hạn thanh toán: {paymentExpiry:HH:mm:ss dd/MM/yyyy}.");
+
+                foreach (var hold in holds)
+                {
+                    var seatLabel = hold.Seat != null ? $"{hold.Seat.Row}{hold.Seat.SeatNumber}" : hold.SeatId.ToString();
+                    _orderAuditService.Record(
+                        order.Id,
+                        "SEAT_HOLD",
+                        seatLabel,
+                        "SEAT_HOLD_ATTACHED",
+                        "ACTIVE",
+                        "ACTIVE",
+                        "USER",
+                        userDisplayName,
+                        userId,
+                        $"Gia hạn giữ chỗ ghế {seatLabel} theo hạn thanh toán đơn hàng ({paymentExpiry:HH:mm:ss}).");
+                }
+
                 if (order.TotalAmount == 0)
                 {
                     order.Status = OrderStatus.Paid;
+                    _orderAuditService.Record(
+                        order.Id,
+                        "ORDER",
+                        order.Id.ToString(),
+                        "ORDER_PAID",
+                        OrderStatus.Pending.ToString(),
+                        OrderStatus.Paid.ToString(),
+                        "SYSTEM",
+                        "system:ZeroAmountAutoPay",
+                        userId,
+                        "Đơn hàng 0 VNĐ, hệ thống tự động xác nhận thanh toán.");
+
                     foreach (var hold in holds)
                     {
                         hold.Status = "CONVERTED";
-                        hold.Seat.Status = "SOLD";
+                        if (hold.Seat != null)
+                        {
+                            hold.Seat.Status = "SOLD";
+                        }
+                        var seatLabel = hold.Seat != null ? $"{hold.Seat.Row}{hold.Seat.SeatNumber}" : hold.SeatId.ToString();
+                        _orderAuditService.Record(
+                            order.Id,
+                            "SEAT_HOLD",
+                            seatLabel,
+                            "SEAT_HOLD_CONVERTED",
+                            "ACTIVE",
+                            "CONVERTED",
+                            "SYSTEM",
+                            "system:ZeroAmountAutoPay",
+                            userId,
+                            $"Ghế {seatLabel} chuyển sang trạng thái đã bán (SOLD).");
+                    }
+
+                    // Story S-25: Sinh vé điện tử cho đơn hàng 0 VNĐ khi tự chuyển Paid
+                    foreach (var item in order.OrderItems)
+                    {
+                        var ticket = new Ticket
+                        {
+                            Id = Guid.NewGuid(),
+                            OrderItemId = item.Id,
+                            TicketCode = _ticketService.GenerateTicketCode(),
+                            CreatedAt = DateTimeOffset.UtcNow,
+                            OrderItem = item
+                        };
+                        _context.Tickets.Add(ticket);
+                        item.Ticket = ticket;
+
+                        _orderAuditService.Record(
+                            order.Id,
+                            "TICKET",
+                            ticket.TicketCode,
+                            "TICKET_ISSUED",
+                            "UNISSUED",
+                            "ISSUED",
+                            "SYSTEM",
+                            "system:TicketService",
+                            userId,
+                            $"Phát hành vé điện tử mã {ticket.TicketCode}.");
                     }
                 }
 
                 _context.Orders.Add(order);
                 await _context.SaveChangesAsync();
 
-                await transaction.CommitAsync();
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync();
+                }
 
-                return Ok(ApiResponse<OrderDto>.SuccessResult(MapToDto(order), "Tạo đơn hàng thành công."));
+                return (true, "Tạo đơn hàng thành công.", MapToDto(order), StatusCodes.Status200OK);
             }
             catch (DbUpdateException ex)
             {
-                await transaction.RollbackAsync();
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                }
                 _context.ChangeTracker.Clear();
                 _logger.LogWarning(ex, "Concurrent order creation for User {UserId}", userId);
-                return Conflict(ApiResponse<object>.FailureResult("Trạng thái đặt vé vừa thay đổi. Vui lòng tải lại và thử lại."));
+                return (false, "Trạng thái đặt vé vừa thay đổi. Vui lòng tải lại và thử lại.", null, StatusCodes.Status409Conflict);
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                }
                 _logger.LogError(ex, "Lỗi khi tạo đơn hàng từ giữ chỗ cho User {UserId}", userId);
-                return StatusCode(500, ApiResponse<object>.FailureResult("Đã xảy ra lỗi hệ thống."));
+                return (false, "Đã xảy ra lỗi hệ thống.", null, StatusCodes.Status500InternalServerError);
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync();
+                }
             }
         }
 
@@ -233,36 +386,267 @@ namespace EventTicketBooking.Api.Controllers
             return Ok(ApiResponse<OrderStatusResponseDto>.SuccessResult(new OrderStatusResponseDto { Status = order.Status.ToString() }, "Lấy trạng thái thành công."));
         }
 
+        /// <summary>
+        /// S-27 Task 2: Gửi lại email vé điện tử
+        /// POST /api/v1/orders/{orderId}/resend-tickets
+        /// </summary>
+        [HttpPost("{orderId:guid}/resend-tickets")]
+        [RequireRole]
+        public async Task<IActionResult> ResendTickets(Guid orderId)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+
+            var order = await _context.Orders
+                .AsNoTracking()
+
+                .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
+
+            if (order.UserId != userId)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền gửi lại vé cho đơn hàng này."));
+
+            if (order.Status != OrderStatus.Paid)
+                return BadRequest(ApiResponse<object>.FailureResult("Chỉ có thể gửi lại vé cho đơn hàng đã thanh toán."));
+
+            if (_ticketEmailQueue != null)
+            {
+                await _ticketEmailQueue.EnqueueAsync(orderId);
+            }
+
+            return Ok(ApiResponse<object>.SuccessResult(null, "Yêu cầu gửi lại vé đã được tiếp nhận."));
+        }
+
+        /// <summary>
+        /// S-25: API lấy danh sách vé điện tử của đơn hàng (Read-Only).
+        /// GET /api/v1/orders/{orderId}/tickets
+        /// </summary>
+        [HttpGet("{orderId:guid}/tickets")]
+        [RequireRole]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        [ProducesResponseType(typeof(ApiResponse<List<TicketDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetOrderTickets(Guid orderId)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+
+            var order = await _context.Orders
+                .AsNoTracking()
+                .Include(o => o.Showtime)
+                    .ThenInclude(st => st.Event)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Seat)
+                        .ThenInclude(s => s.SeatCategory)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Ticket)
+                .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
+
+            var isAdmin = User.IsInRole("Admin") || User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && c.Value == "Admin");
+            if (!isAdmin && order.UserId != userId)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền truy cập vé của đơn hàng này."));
+
+            // AC3: Giả sử đơn chưa trả, khi mở trang vé bằng đường dẫn, thì không có vé nào.
+            if (order.Status != OrderStatus.Paid)
+            {
+                return Ok(ApiResponse<List<TicketDto>>.SuccessResult(new List<TicketDto>(), "Đơn hàng chưa thanh toán. Không có vé nào."));
+            }
+
+            // S-25 & S-26: Đơn đã Paid -> Trả về danh sách vé kèm mã QR có chữ ký số (ECDSA P-256)
+            var showtimeId = order.ShowtimeId;
+            var tickets = order.OrderItems
+                .Where(oi => oi.Ticket != null)
+                .Select(oi => new TicketDto
+                {
+                    Id = oi.Ticket!.Id,
+                    OrderItemId = oi.Id,
+                    TicketCode = oi.Ticket.TicketCode,
+                    QrPayload = _ticketService.GenerateQrPayload(oi.Ticket.TicketCode, showtimeId),
+                    EventTitle = order.Showtime?.Event?.Title,
+                    EventLocation = order.Showtime?.Event?.Location,
+                    ShowtimeStartTime = order.Showtime?.StartTime,
+                    ShowtimeEndTime = order.Showtime?.EndTime,
+                    CategoryName = oi.Seat?.SeatCategory?.Name,
+                    SeatRow = oi.Seat?.Row,
+                    SeatNumber = oi.Seat?.SeatNumber ?? 0,
+                    Price = oi.Price,
+                    CreatedAt = oi.Ticket.CreatedAt
+                })
+                .ToList();
+
+            return Ok(ApiResponse<List<TicketDto>>.SuccessResult(tickets, "Lấy danh sách vé thành công."));
+        }
+
+        /// <summary>
+        /// Story S-49: Xem nhật ký thao tác và thay đổi trạng thái của đơn hàng, vé và giữ chỗ
+        /// GET /api/v1/orders/{orderId}/audit-logs?entityType=...
+        /// </summary>
+        [HttpGet("{orderId:guid}/audit-logs")]
+        [RequireRole]
+        [ProducesResponseType(typeof(ApiResponse<List<OrderAuditLogDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetOrderAuditLogs(Guid orderId, [FromQuery] string? entityType = null)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+
+            var order = await _context.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orderId);
+            if (order == null)
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
+
+            var isPrivileged = User.IsInRole("Admin") || User.IsInRole("Auditor") || User.IsInRole("Staff") || User.IsInRole("Organizer")
+                || User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && (c.Value == "Admin" || c.Value == "Auditor" || c.Value == "Staff" || c.Value == "Organizer"));
+
+            if (!isPrivileged && order.UserId != userId)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền truy cập nhật ký của đơn hàng này."));
+
+            var logs = await _orderAuditService.GetLogsByOrderIdAsync(orderId, entityType, HttpContext.RequestAborted);
+            return Ok(ApiResponse<List<OrderAuditLogDto>>.SuccessResult(logs, "Lấy nhật ký thao tác đơn hàng thành công."));
+        }
+
+        /// <summary>
+        /// S-32: Xem lịch sử đơn hàng của tôi (có phân trang, sắp xếp mới nhất trước)
+        /// GET /api/v1/orders
+        /// GET /api/v1/orders/my-orders
+        /// </summary>
+        [HttpGet]
+        [HttpGet("my-orders")]
+        [RequireRole]
+        [ProducesResponseType(typeof(ApiResponse<PagedResultDto<OrderDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> GetMyOrders(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? status = null)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 50) pageSize = 50;
+
+            // Tự động chuyển các giữ chỗ còn hiệu lực chưa tạo đơn thành đơn Pending
+            try
+            {
+                var nowUtc = DateTime.UtcNow;
+                var activeHoldShowtimeIds = await _context.SeatHold
+                    .AsNoTracking()
+                    .Where(sh => sh.UserId == userId && sh.Status == "ACTIVE" && sh.ExpiresAt > nowUtc)
+                    .Select(sh => sh.Seat.ShowtimeId)
+                    .Distinct()
+                    .ToListAsync();
+
+                if (activeHoldShowtimeIds.Any())
+                {
+                    var userDisplayName = User.Identity?.Name ?? User.FindFirst("name")?.Value ?? User.FindFirst(ClaimTypes.Name)?.Value ?? User.FindFirst("email")?.Value ?? userId.ToString();
+                    foreach (var stId in activeHoldShowtimeIds)
+                    {
+                        var hasPendingOrder = await _context.Orders
+                            .AnyAsync(o => o.UserId == userId && o.ShowtimeId == stId && o.Status == OrderStatus.Pending);
+                        if (!hasPendingOrder)
+                        {
+                            await CreateOrderFromHoldsCoreAsync(userId, stId, userDisplayName);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Lỗi đồng bộ giữ chỗ sang đơn hàng cho user {UserId}", userId);
+            }
+
+            var query = _context.Orders
+                .AsNoTracking()
+                .Where(o => o.UserId == userId);
+
+            if (!string.IsNullOrWhiteSpace(status) && !status.Equals("all", StringComparison.OrdinalIgnoreCase))
+            {
+                if (Enum.TryParse<OrderStatus>(status, true, out var parsedStatus))
+                {
+                    query = query.Where(o => o.Status == parsedStatus);
+                }
+            }
+
+            var totalItems = await query.CountAsync();
+
+            var orders = await query
+                .OrderByDescending(o => o.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Include(o => o.User)
+                .Include(o => o.Showtime)
+                    .ThenInclude(st => st.Event)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Seat)
+                        .ThenInclude(s => s.SeatCategory)
+                .Include(o => o.PaymentTransaction)
+                .ToListAsync();
+
+            var orderDtos = orders.Select(MapToDto).ToList();
+
+            var result = new PagedResultDto<OrderDto>
+            {
+                Items = orderDtos,
+                Page = page,
+                PageSize = pageSize,
+                TotalItems = totalItems
+            };
+
+            return Ok(ApiResponse<PagedResultDto<OrderDto>>.SuccessResult(result, "Lấy lịch sử đơn hàng thành công."));
+        }
+
         private OrderDto MapToDto(Order order)
         {
+            var seatNames = order.OrderItems?
+                .Where(oi => oi.Seat != null)
+                .Select(oi => $"{oi.Seat.Row}{oi.Seat.SeatNumber}")
+                .ToList() ?? new List<string>();
+
             return new OrderDto
             {
                 Id = order.Id,
                 ShowtimeId = order.ShowtimeId,
+                EventId = order.Showtime?.EventId,
                 EventTitle = order.Showtime?.Event?.Title,
                 EventLocation = order.Showtime?.Event?.Location,
+                EventImageUrl = order.Showtime?.Event?.ImageUrl,
                 ShowtimeStartTime = order.Showtime?.StartTime,
                 ShowtimeEndTime = order.Showtime?.EndTime,
                 CustomerName = order.User != null ? (!string.IsNullOrWhiteSpace(order.User.FullName) ? order.User.FullName : order.User.Username) : null,
                 CustomerEmail = order.User?.Email,
                 Status = order.Status.ToString(),
                 TotalAmount = order.TotalAmount,
+                SeatCount = order.OrderItems?.Count ?? 0,
+                SeatNames = seatNames,
                 CreatedAt = order.CreatedAt,
                 ExpiresAt = order.ExpiresAt,
                 HasFailedPayment = order.PaymentTransaction != null &&
                     (order.PaymentTransaction.Status == "FAILED" || order.PaymentTransaction.Status == "CANCELLED"),
                 IsPaymentProcessing = order.PaymentTransaction != null && order.PaymentTransaction.Status == "PENDING",
-                Items = order.OrderItems.Select(oi => new OrderItemDto
+                Items = order.OrderItems?.Select(oi => new OrderItemDto
                 {
                     Id = oi.Id,
                     SeatId = oi.SeatId,
                     Price = oi.Price,
                     SeatName = oi.Seat != null ? $"{oi.Seat.Row}{oi.Seat.SeatNumber}" : null,
                     CategoryName = oi.Seat?.SeatCategory?.Name
-                }).ToList()
+                }).ToList() ?? new List<OrderItemDto>()
             };
         }
     }
 }
-
 

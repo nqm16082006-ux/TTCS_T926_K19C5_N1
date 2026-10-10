@@ -609,6 +609,18 @@
                     <span class="absolute right-3.5 top-3 font-label-sm text-label-sm text-outline font-bold">Ghế</span>
                   </div>
                 </div>
+
+                <!-- Max Tickets Per User (Task S-42) -->
+                <div class="flex flex-col gap-1.5">
+                  <label class="font-label-lg text-label-lg text-on-surface font-bold" for="maxTicketsPerUser">
+                    Giới hạn số vé mỗi tài khoản được mua trong một suất <span class="text-outline font-normal text-sm">(Mặc định: 10 vé/suất)</span>
+                  </label>
+                  <div class="relative">
+                    <input class="w-full h-11 px-3.5 rounded-lg bg-surface-container-lowest text-on-surface font-body-md shadow-sm border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary font-bold" id="maxTicketsPerUser" min="1" max="100" placeholder="Ví dụ: 4" type="number" value="10">
+                    <span class="absolute right-3.5 top-3 font-label-sm text-label-sm text-outline font-bold">Vé/suất</span>
+                  </div>
+                  <p class="font-body-sm text-body-sm text-outline">Ban tổ chức đặt giới hạn theo suất. Tổng ghế đang giữ cộng đã mua của một tài khoản vượt giới hạn thì không giữ thêm được.</p>
+                </div>
               </div>
 
               <!-- Tags / Keywords -->
@@ -876,6 +888,10 @@
               <span class="material-symbols-outlined text-[16px]">chair</span>
               <span>3.500 vé</span>
             </span>
+            <span class="flex items-center gap-1 font-bold text-primary" id="modalPreviewMaxTickets">
+              <span class="material-symbols-outlined text-[16px]">confirmation_number</span>
+              <span>Tối đa 10 vé/người</span>
+            </span>
           </div>
           <p class="text-xs text-on-surface-variant leading-relaxed line-clamp-3 mb-4" id="modalPreviewDesc">
             Mô tả sự kiện...
@@ -895,7 +911,7 @@
   <!-- SCRIPT LOGIC -->
   <script>
     const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:5012' : '';
-    let token = localStorage.getItem('access_token');
+    let token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
     let currentPosterUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuD5BeuDSNhed6YSukUGH4tRPe-CcJL2BEEqSGi2zphmeHuFOkA9hM5bBeH63-Us_Pf0DWJjisfton9WHqAbFBhkCE-cj9J9u8nIhsL8K8a_kU3dTUEkMEFyGNmiDbxL9kIgPnsSF8Mxgd4MgMNvu3Vh52Ba5C8bdJyg_SzQa4PjZYki1XqdLIQA2w7gs14DkCCRkiBgpQHapoqDtIf3UJcUsd2Qrr5aoSCvJzuNfqFfFWuMMZ2zNMb91w";
     let isSubmitting = false;
     let editEventId = null;
@@ -912,7 +928,12 @@
         try {
           const user = JSON.parse(userStr);
           const roles = (user.roles || []).map(r => (r || '').toLowerCase());
-          const isAllowed = roles.includes('organizer') || roles.includes('admin') || roles.includes('staff');
+          if (roles.includes('staff') && !roles.includes('organizer') && !roles.includes('admin')) {
+            window.location.href = './staff-scanner.html';
+            return;
+          }
+
+          const isAllowed = roles.includes('organizer') || roles.includes('admin');
           
           if (!isAllowed) {
             alert('Bạn không có quyền truy cập trang Quản lý sự kiện (Chỉ dành cho Ban Tổ Chức / Admin).');
@@ -1008,6 +1029,7 @@
           document.getElementById('eventStartTime').value = formatInputDate(new Date(ev.startTime));
           document.getElementById('eventEndTime').value = formatInputDate(new Date(ev.endTime));
           document.getElementById('capacity').value = (ev.totalSeats || 0).toLocaleString('vi-VN');
+          document.getElementById('maxTicketsPerUser').value = ev.maxTicketsPerUser || 10;
 
           // Description parsing
           const desc = ev.description || '';
@@ -1375,9 +1397,9 @@
       const title = document.getElementById('eventName').value.trim();
       const category = document.getElementById('eventCategory').value;
       const shortDesc = document.getElementById('shortDesc').value.trim();
-      const detailedHtml = document.getElementById('detailedDesc').innerHTML.trim();
-      
-      const venueType = document.querySelector('input[name="venueType"]:checked').value;
+      const detailedHtml = (document.getElementById('detailedDesc')?.innerHTML || '').trim();
+      token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+      const venueType = document.querySelector('input[name="venueType"]:checked')?.value || 'offline';
       const venueName = document.getElementById('venueName').value.trim();
       const venueCity = document.getElementById('venueCity').value;
       const venueAddress = document.getElementById('venueAddress').value.trim();
@@ -1431,6 +1453,14 @@
       const tags = Array.from(document.querySelectorAll('.hashtag-pill span')).map(s => s.textContent).join(' ');
       const combinedDescription = `${shortDesc}\n\n${detailedHtml}\n\n[Thẻ: ${tags}] [Thể loại: ${category}]`;
 
+      const maxTicketsPerUserVal = parseInt(document.getElementById('maxTicketsPerUser').value, 10);
+      if (!isNaN(maxTicketsPerUserVal) && maxTicketsPerUserVal <= 0) {
+        showAlert('Số vé tối đa mỗi người được đặt phải lớn hơn 0 (Tối thiểu 1 vé).', 'error');
+        document.getElementById('maxTicketsPerUser').focus();
+        return;
+      }
+      const maxTicketsPerUser = (!isNaN(maxTicketsPerUserVal) && maxTicketsPerUserVal > 0) ? maxTicketsPerUserVal : 10;
+
       const requestPayload = {
         title: title,
         description: combinedDescription,
@@ -1438,7 +1468,8 @@
         imageUrl: currentPosterUrl,
         startTime: startDate.toISOString(),
         endTime: endDate.toISOString(),
-        totalSeats: totalSeats
+        totalSeats: totalSeats,
+        maxTicketsPerUser: maxTicketsPerUser
       };
 
       setButtonLoading(true);
@@ -1548,6 +1579,11 @@
       document.getElementById('modalPreviewDesc').textContent = shortDesc;
       document.getElementById('modalPreviewLocation').querySelector('span:last-child').textContent = `${venueName} (${venueCity})`;
       document.getElementById('modalPreviewSeats').querySelector('span:last-child').textContent = `${capacity} ghế`;
+      const maxTicketsEl = document.getElementById('modalPreviewMaxTickets');
+      if (maxTicketsEl) {
+        const maxVal = document.getElementById('maxTicketsPerUser').value || '10';
+        maxTicketsEl.querySelector('span:last-child').textContent = `Tối đa ${maxVal} vé/người`;
+      }
       document.getElementById('modalPreviewImg').src = currentPosterUrl;
 
       const tagsContainer = document.getElementById('modalPreviewTags');
