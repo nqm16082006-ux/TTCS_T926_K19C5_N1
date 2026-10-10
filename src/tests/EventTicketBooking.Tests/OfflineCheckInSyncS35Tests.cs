@@ -79,6 +79,157 @@ namespace EventTicketBooking.Tests
             };
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task S36_PreviouslySyncedTicket_BatchCanReturnToOriginalGateWithEarlierTime(bool relational)
+        {
+            using var seedContext = relational ? await CreateSharedSqliteContextAsync() : null;
+            var seedDb = seedContext ?? _inMemoryContext;
+            var (showtime, tickets, _) = await SeedScenarioAsync(seedDb, 1);
+            var ticket = tickets[0];
+            var earliestTime = DateTimeOffset.UtcNow.AddMinutes(-20);
+            OfflineScanBatchItemDto Scan(string id, string gate, int seconds) => new()
+            {
+                OfflineScanId = id,
+                TicketCode = ticket.TicketCode,
+                ShowtimeId = showtime.Id,
+                GateName = gate,
+                ScannedAt = earliestTime.AddSeconds(seconds),
+                QrPayload = _qrService.SignTicket(ticket.TicketCode, showtime.Id)
+            };
+            await CreateController(seedDb).OfflineSync(new() { Items = new() { Scan("original-a", "A", 10) } });
+            // A new request starts with a checked-in entity tracked at gate A.
+            using var batchContext = relational ? await CreateSharedSqliteContextAsync() : null;
+            var batchDb = batchContext ?? seedDb;
+            var scans = new List<OfflineScanBatchItemDto> { Scan("new-b", "B", 5), Scan("earliest-a", "A", 0) };
+            var result = Assert.IsType<OfflineSyncBatchResponseDto>(Assert.IsType<OkObjectResult>(
+                await CreateController(batchDb).OfflineSync(new() { Items = scans })).Value);
+            Assert.Equal(0, result.RejectedCount);
+            Assert.Equal(1, result.SyncedCount);
+            Assert.Equal(1, result.ConflictCount);
+            Assert.Equal("synced", result.Results[1].Status);
+            var winner = await batchDb.OrderItems.AsNoTracking().SingleAsync(o => o.Id == ticket.OrderItemId);
+            Assert.Equal("A", winner.CheckInGate);
+            Assert.Equal(earliestTime, winner.CheckInTime);
+            var records = await batchDb.OfflineCheckInRecords.AsNoTracking().ToListAsync();
+            Assert.Equal("earliest-a", Assert.Single(records, r => !r.IsConflict).OfflineScanId);
+            Assert.Equal(3, records.Count);
+            Assert.All(records.Where(r => r.IsConflict), r =>
+            {
+                Assert.Equal("A", r.ExistingCheckInGate);
+                Assert.Equal(earliestTime, r.ExistingCheckInTime);
+            });
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task S36_EarliestDeviceTimeWins_RegardlessOfArrivalOrder(bool relational, bool reverse)
+        {
+            using var context = relational ? await CreateSharedSqliteContextAsync() : null;
+            var db = context ?? _inMemoryContext;
+            var (showtime, tickets, _) = await SeedScenarioAsync(db, 1);
+            var ticket = tickets[0];
+            var time = DateTimeOffset.UtcNow.AddMinutes(-20);
+            OfflineScanBatchItemDto Scan(string id, string gate, DateTimeOffset at) => new()
+            {
+                OfflineScanId = id,
+                TicketCode = ticket.TicketCode,
+                ShowtimeId = showtime.Id,
+                GateName = gate,
+                ScannedAt = at,
+                QrPayload = _qrService.SignTicket(ticket.TicketCode, showtime.Id)
+            };
+            var early = Scan("scan-a", "Gate A", time.ToOffset(TimeSpan.FromHours(7)));
+            var late = Scan("scan-b", "Gate B", time.AddSeconds(5));
+            var controller = CreateController(db);
+            foreach (var scan in reverse ? new[] { late, early } : new[] { early, late })
+                Assert.IsType<OkObjectResult>(await controller.OfflineSync(new() { Items = new() { scan } }));
+            var orderItem = await db.OrderItems.AsNoTracking().SingleAsync(o => o.Id == ticket.OrderItemId);
+            Assert.Equal("Gate A", orderItem.CheckInGate);
+            Assert.Equal(time, orderItem.CheckInTime);
+            var records = await db.OfflineCheckInRecords.AsNoTracking().ToListAsync();
+            Assert.Single(records, r => !r.IsConflict);
+            var conflict = Assert.Single(records, r => r.IsConflict);
+            Assert.Equal("Gate B", conflict.GateName);
+            Assert.Equal("Gate A", conflict.ExistingCheckInGate);
+            Assert.Equal(time, conflict.ExistingCheckInTime);
+            var replay = Assert.IsType<OkObjectResult>(await controller.OfflineSync(new() { Items = new() { late } }));
+            Assert.Equal(1, Assert.IsType<OfflineSyncBatchResponseDto>(replay.Value).DuplicateCount);
+            Assert.Equal(2, await db.OfflineCheckInRecords.CountAsync());
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task S36_ThreeGatesInOneBatch_RefreshesResponsesAndConflictSnapshots(bool relational)
+        {
+            using var context = relational ? await CreateSharedSqliteContextAsync() : null;
+            var db = context ?? _inMemoryContext;
+            var (showtime, tickets, _) = await SeedScenarioAsync(db, 1);
+            var ticket = tickets[0];
+            var time = DateTimeOffset.UtcNow.AddMinutes(-20);
+            var scans = new[] { ("B", 10), ("A", 5), ("C", 0) }.Select(x => new OfflineScanBatchItemDto
+            {
+                OfflineScanId = "scan-" + x.Item1,
+                GateName = x.Item1,
+                ScannedAt = time.AddSeconds(x.Item2),
+                ShowtimeId = showtime.Id,
+                TicketCode = ticket.TicketCode,
+                QrPayload = _qrService.SignTicket(ticket.TicketCode, showtime.Id)
+            }).ToList();
+            var response = Assert.IsType<OfflineSyncBatchResponseDto>(Assert.IsType<OkObjectResult>(
+                await CreateController(db).OfflineSync(new() { Items = scans })).Value);
+            Assert.Equal(1, response.SyncedCount);
+            Assert.Equal(2, response.ConflictCount);
+            Assert.Equal("synced", response.Results[2].Status);
+            var records = await db.OfflineCheckInRecords.AsNoTracking().ToListAsync();
+            Assert.All(records.Where(r => r.IsConflict), r =>
+            {
+                Assert.Equal("C", r.ExistingCheckInGate); Assert.Equal(time, r.ExistingCheckInTime);
+            });
+            var owner = new EventController(db) { ControllerContext = CreateController(db).ControllerContext };
+            var report = Assert.IsType<EventTicketBooking.Api.DTOs.Common.ApiResponse<object>>(
+                Assert.IsType<OkObjectResult>(await owner.GetCheckInConflicts(showtime.Id, 1, 1)).Value);
+            var json = System.Text.Json.JsonSerializer.SerializeToElement(report.Data);
+            Assert.Equal(1, json.GetProperty("totalTickets").GetInt32());
+            Assert.Equal(2, json.GetProperty("totalConflicts").GetInt32());
+            Assert.Equal(1, json.GetProperty("items").GetArrayLength());
+            Assert.Equal("C", json.GetProperty("items")[0].GetProperty("ValidGate").GetString());
+            var sales = Assert.IsType<EventTicketBooking.Api.DTOs.Common.ApiResponse<ShowtimeSalesReportDto>>(
+                Assert.IsType<OkObjectResult>(await owner.GetSalesByShowtime()).Value);
+            Assert.Equal(1, Assert.Single(sales.Data!.Showtimes).ConflictTicketCount);
+            var stranger = new EventController(db) { ControllerContext = CreateController(db, Guid.NewGuid()).ControllerContext };
+            Assert.Equal(403, Assert.IsType<StatusCodeResult>(await stranger.GetCheckInConflicts(showtime.Id)).StatusCode);
+            var admin = new EventController(db) { ControllerContext = CreateController(db, Guid.NewGuid(), "Admin").ControllerContext };
+            Assert.IsType<OkObjectResult>(await admin.GetCheckInConflicts(showtime.Id));
+            Assert.IsType<BadRequestResult>(await owner.GetCheckInConflicts(showtime.Id, 0));
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task S36_EqualTimes_UsesOrdinalScanId(bool reverse)
+        {
+            var (showtime, tickets, _) = await SeedScenarioAsync(_inMemoryContext, 1);
+            var time = DateTimeOffset.UtcNow.AddMinutes(-10);
+            var scans = new[] { "a", "b" }.Select(id => new OfflineScanBatchItemDto
+            {
+                OfflineScanId = id,
+                GateName = id,
+                ScannedAt = time,
+                ShowtimeId = showtime.Id,
+                TicketCode = tickets[0].TicketCode,
+                QrPayload = _qrService.SignTicket(tickets[0].TicketCode, showtime.Id)
+            }).ToList();
+            if (reverse) scans.Reverse();
+            await CreateController(_inMemoryContext).OfflineSync(new() { Items = scans });
+            Assert.Equal("a", (await _inMemoryContext.OfflineCheckInRecords.SingleAsync(r => !r.IsConflict)).OfflineScanId);
+        }
+
         private async Task<AppDbContext> CreateSharedSqliteContextAsync()
         {
             var options = new DbContextOptionsBuilder<AppDbContext>()
@@ -672,18 +823,20 @@ namespace EventTicketBooking.Tests
             var resA = Assert.IsType<OfflineSyncBatchResponseDto>(okA.Value);
             var resB = Assert.IsType<OfflineSyncBatchResponseDto>(okB.Value);
 
-            // Chính xác 1 request thành công và 1 request trở thành conflict
+            // Each response describes its commit time; a later earlier scan can replace a winner.
             var totalSynced = resA.SyncedCount + resB.SyncedCount;
             var totalConflict = resA.ConflictCount + resB.ConflictCount;
 
-            Assert.Equal(1, totalSynced);
-            Assert.Equal(1, totalConflict);
+            Assert.Equal(2, totalSynced + totalConflict);
 
             // Vé đã checked in
             using var verifyContext = await CreateSharedSqliteContextAsync();
             var orderItem = await verifyContext.OrderItems.FindAsync(ticket.OrderItemId);
             Assert.NotNull(orderItem);
             Assert.True(orderItem.IsCheckedIn);
+            Assert.Equal("Gate A", orderItem.CheckInGate);
+            Assert.Equal(itemGate1.ScannedAt, orderItem.CheckInTime);
+            Assert.Equal(1, await verifyContext.OfflineCheckInRecords.CountAsync(r => !r.IsConflict));
 
             // Có đúng 1 record conflict
             var conflictRecord = await verifyContext.OfflineCheckInRecords.FirstOrDefaultAsync(r => r.IsConflict);

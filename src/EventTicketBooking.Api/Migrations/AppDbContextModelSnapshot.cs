@@ -616,6 +616,9 @@ namespace EventTicketBooking.Api.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(10);
 
+                    b.Property<string>("SeatingMapImageUrl")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("timestamp with time zone");
 

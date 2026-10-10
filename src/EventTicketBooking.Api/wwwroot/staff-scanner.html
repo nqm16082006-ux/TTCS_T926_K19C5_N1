@@ -1577,6 +1577,7 @@
         }
 
         isSyncInProgress = true;
+        const syncSummary = { synced: 0, duplicate: 0, conflict: 0, rejected: 0 };
         const syncBtn = document.getElementById('btnSyncNow');
         if (syncBtn) {
           syncBtn.disabled = true;
@@ -1627,6 +1628,10 @@
 
             const data = await res.json();
             const results = data.results || [];
+            for (const result of results) {
+              if (result?.isAckTerminal === true && batchScanIds.has(result.offlineScanId) && Object.hasOwn(syncSummary, result.status))
+                syncSummary[result.status]++;
+            }
 
             const VALID_ACK_STATUSES = new Set(['synced', 'duplicate', 'conflict', 'rejected']);
 
@@ -1657,7 +1662,7 @@
 
           const finalQueue = getOfflineQueue();
           if (finalQueue.length === 0 && isManual) {
-            alert('Đồng bộ thành công toàn bộ hàng đợi lên máy chủ!');
+            alert(`Đã xử lý hàng đợi: ${syncSummary.synced} lượt hợp lệ, ${syncSummary.duplicate} lượt đã ghi nhận, ${syncSummary.conflict} lượt xung đột, ${syncSummary.rejected} lượt bị từ chối. Kết quả hợp lệ có thể thay đổi khi máy khác đồng bộ lượt quét sớm hơn.`);
           }
         } catch (err) {
           // Lỗi mạng fetch failed, timeout: Giữ nguyên queue

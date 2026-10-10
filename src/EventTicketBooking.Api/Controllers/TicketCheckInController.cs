@@ -26,7 +26,7 @@ namespace EventTicketBooking.Api.Controllers
         private readonly ILogger<TicketCheckInController> _logger;
         private readonly IOrderAuditService _orderAuditService;
 
-        [ActivatorUtilitiesConstructor]
+        [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
         public TicketCheckInController(
             AppDbContext context,
             ILogger<TicketCheckInController> logger,
@@ -666,6 +666,10 @@ namespace EventTicketBooking.Api.Controllers
                 }
 
                 var orderItem = ticketEntity.OrderItem;
+                // ExecuteUpdate bypasses EF tracking. Refresh before deciding whether
+                // this scan is at the same gate as the winner from the previous item.
+                if (_context.Database.IsRelational())
+                    await _context.Entry(orderItem).ReloadAsync();
 
                 // Kiểm tra trạng thái thanh toán
                 if (orderItem.Order.Status != OrderStatus.Paid)
@@ -700,9 +704,9 @@ namespace EventTicketBooking.Api.Controllers
                 }
 
                 // 5. Timestamp Handling
-                var scannedAtDevice = item.ScannedAt;
+                var scannedAtDevice = item.ScannedAt.ToUniversalTime();
                 var serverNow = DateTimeOffset.UtcNow;
-                var effectiveCheckInTime = item.ScannedAt > serverNow.AddMinutes(5) ? serverNow : item.ScannedAt;
+                var effectiveCheckInTime = scannedAtDevice > serverNow.AddMinutes(5) ? serverNow : scannedAtDevice;
 
                 // 6. Ranh giới Check-in: Thành công vs Xung đột
                 var isInMemory = _context.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
@@ -894,6 +898,36 @@ namespace EventTicketBooking.Api.Controllers
                 {
                     // 1. KHÁC CỬA -> S-36 CONFLICT
                     await using var txConflict = isInMemory ? null : await _context.Database.BeginTransactionAsync();
+                    // Acquire the ticket row's write lock before reading the current winner.
+                    // The initial check-in transaction holds the same row lock until its record is saved.
+                    if (!isInMemory)
+                    {
+                        await _context.OrderItems.Where(oi => oi.Id == orderItem.Id)
+                            .ExecuteUpdateAsync(s => s.SetProperty(oi => oi.IsCheckedIn, oi => oi.IsCheckedIn));
+                        orderItem = await _context.OrderItems.AsNoTracking().SingleAsync(oi => oi.Id == orderItem.Id);
+                    }
+                    if (string.Equals(orderItem.CheckInGate, item.GateName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (txConflict != null) await txConflict.RollbackAsync();
+                        var recordedResult = await FindRecordedOfflineResultAsync(item);
+                        if (recordedResult != null)
+                        {
+                            results.Add(recordedResult);
+                            if (recordedResult.Status == "duplicate") duplicateCount++; else rejectedCount++;
+                            continue;
+                        }
+                        results.Add(new OfflineSyncItemResultDto
+                        {
+                            OfflineScanId = item.OfflineScanId,
+                            TicketCode = item.TicketCode,
+                            Status = "rejected",
+                            Reason = "ALREADY_CHECKED_IN_SAME_GATE",
+                            Message = "Vé đã được sử dụng tại cùng cửa.",
+                            IsAckTerminal = true
+                        });
+                        rejectedCount++;
+                        continue;
+                    }
                     var conflictRecord = new OfflineCheckInRecord
                     {
                         Id = Guid.NewGuid(),
@@ -915,6 +949,44 @@ namespace EventTicketBooking.Api.Controllers
 
                     try
                     {
+                        var records = await _context.OfflineCheckInRecords
+                            .Where(r => r.OrderItemId == orderItem.Id).ToListAsync();
+                        if (!isInMemory)
+                            foreach (var record in records) await _context.Entry(record).ReloadAsync();
+                        var previousWinner = records.FirstOrDefault(r => !r.IsConflict && r.Status == "SYNCED"
+                            && string.Equals(r.GateName, orderItem.CheckInGate, StringComparison.OrdinalIgnoreCase));
+                        // An online admission has no offline winner; preserve its existing semantics.
+                        if (previousWinner != null)
+                        {
+                            records.Add(conflictRecord);
+                            var winner = records.OrderBy(r => r.ScannedAtDevice)
+                                .ThenBy(r => r.OfflineScanId, StringComparer.Ordinal).First();
+                            foreach (var record in records)
+                            {
+                                record.IsConflict = record != winner;
+                                record.Status = record.IsConflict ? "CONFLICT" : "SYNCED";
+                                record.ConflictReason = record.IsConflict ? "DIFFERENT_GATE_CONFLICT" : null;
+                                record.ExistingCheckInGate = record.IsConflict ? winner.GateName : null;
+                                record.ExistingCheckInTime = record.IsConflict ? winner.ScannedAtDevice : null;
+                            }
+                            if (winner != previousWinner)
+                            {
+                                var winnerTime = winner.ScannedAtDevice > winner.ReceivedAtServer.AddMinutes(5)
+                                    ? winner.ReceivedAtServer : winner.ScannedAtDevice;
+                                if (isInMemory)
+                                {
+                                    orderItem.CheckInGate = winner.GateName;
+                                    orderItem.CheckInTime = winnerTime;
+                                }
+                                else
+                                {
+                                    await _context.OrderItems.Where(oi => oi.Id == orderItem.Id)
+                                        .ExecuteUpdateAsync(s => s.SetProperty(oi => oi.CheckInGate, winner.GateName)
+                                            .SetProperty(oi => oi.CheckInTime, winnerTime));
+                                    await _context.Entry(ticketEntity.OrderItem).ReloadAsync();
+                                }
+                            }
+                        }
                         await _context.SaveChangesAsync();
                         if (txConflict != null) await txConflict.CommitAsync();
 
@@ -922,20 +994,20 @@ namespace EventTicketBooking.Api.Controllers
                         {
                             OfflineScanId = item.OfflineScanId,
                             TicketCode = item.TicketCode,
-                            Status = "conflict",
-                            Reason = "DIFFERENT_GATE_CONFLICT",
-                            Message = $"Xung đột: Vé đã được sử dụng lúc {orderItem.CheckInTime:HH:mm dd/MM/yyyy} tại cửa {orderItem.CheckInGate}.",
+                            Status = conflictRecord.IsConflict ? "conflict" : "synced",
+                            Reason = conflictRecord.IsConflict ? "DIFFERENT_GATE_CONFLICT" : "EARLIER_SCAN_SELECTED",
+                            Message = conflictRecord.IsConflict ? "Lượt quét xung đột đã được ghi nhận." : "Lượt quét sớm hơn được công nhận; lượt trước chuyển thành xung đột.",
                             IsAckTerminal = true,
                             Gate = item.GateName,
                             CheckInTime = scannedAtDevice
                         });
-                        conflictCount++;
+                        if (conflictRecord.IsConflict) conflictCount++; else syncedCount++;
                         continue;
                     }
                     catch (DbUpdateException ex) when (IsOfflineScanIdUniqueViolation(ex))
                     {
                         if (txConflict != null) await txConflict.RollbackAsync();
-                        _context.Entry(conflictRecord).State = EntityState.Detached;
+                        _context.ChangeTracker.Clear();
 
                         var reloadedRecord = await _context.OfflineCheckInRecords
                             .AsNoTracking()
@@ -980,7 +1052,7 @@ namespace EventTicketBooking.Api.Controllers
                     catch (Exception ex)
                     {
                         if (txConflict != null) await txConflict.RollbackAsync();
-                        _context.Entry(conflictRecord).State = EntityState.Detached;
+                        _context.ChangeTracker.Clear();
                         _logger.LogError(ex, "Lỗi DB bất thường khi ghi nhận conflict cho item {OfflineScanId}. Dừng batch.", item.OfflineScanId);
                         return StatusCode(StatusCodes.Status500InternalServerError, new { Message = "Lỗi cơ sở dữ liệu khi ghi nhận xung đột." });
                     }
@@ -988,6 +1060,13 @@ namespace EventTicketBooking.Api.Controllers
                 else
                 {
                     // 2. CÙNG CỬA -> SAME GATE REJECT (Không tạo conflict record cho S-36, không overwrite OrderItem)
+                    var recordedResult = await FindRecordedOfflineResultAsync(item);
+                    if (recordedResult != null)
+                    {
+                        results.Add(recordedResult);
+                        if (recordedResult.Status == "duplicate") duplicateCount++; else rejectedCount++;
+                        continue;
+                    }
                     results.Add(new OfflineSyncItemResultDto
                     {
                         OfflineScanId = item.OfflineScanId,
@@ -1002,6 +1081,20 @@ namespace EventTicketBooking.Api.Controllers
                 }
             }
 
+            // A later item in this batch may replace an earlier item's winning admission.
+            var resultIds = results.Where(r => r.Status == "synced" || r.Status == "conflict")
+                .Select(r => r.OfflineScanId).ToList();
+            var finalRecords = await _context.OfflineCheckInRecords.AsNoTracking()
+                .Where(r => resultIds.Contains(r.OfflineScanId)).ToDictionaryAsync(r => r.OfflineScanId);
+            foreach (var result in results.Where(r => r.Status == "synced" || r.Status == "conflict"))
+                if (finalRecords.TryGetValue(result.OfflineScanId, out var record))
+                {
+                    result.Status = record.IsConflict ? "conflict" : "synced";
+                    result.Reason = record.IsConflict ? "DIFFERENT_GATE_CONFLICT" : "SUCCESS";
+                    result.Message = record.IsConflict ? "Lượt quét xung đột đã được ghi nhận." : "Lượt quét được công nhận tại thời điểm đồng bộ.";
+                }
+            syncedCount = results.Count(r => r.Status == "synced");
+            conflictCount = results.Count(r => r.Status == "conflict");
             return Ok(new OfflineSyncBatchResponseDto
             {
                 TotalSubmitted = request.Items.Count,
@@ -1011,6 +1104,23 @@ namespace EventTicketBooking.Api.Controllers
                 RejectedCount = rejectedCount,
                 Results = results
             });
+        }
+
+        private async Task<OfflineSyncItemResultDto?> FindRecordedOfflineResultAsync(OfflineScanBatchItemDto item)
+        {
+            var record = await _context.OfflineCheckInRecords.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.OfflineScanId == item.OfflineScanId);
+            if (record == null) return null;
+            var sameOperation = IsSameOfflineOperation(record, item);
+            return new OfflineSyncItemResultDto
+            {
+                OfflineScanId = item.OfflineScanId,
+                TicketCode = item.TicketCode,
+                Status = sameOperation ? "duplicate" : "rejected",
+                Reason = sameOperation ? (record.IsConflict ? "CONFLICT_ALREADY_RECORDED" : "IDEMPOTENT_DUPLICATE") : "IDEMPOTENCY_KEY_REUSE_MISMATCH",
+                Message = sameOperation ? "Lần quét đã được ghi nhận trước đó." : "Mã lần quét đã được dùng cho một lượt khác.",
+                IsAckTerminal = true
+            };
         }
 
         private static bool IsSameOfflineOperation(OfflineCheckInRecord existingRecord, OfflineScanBatchItemDto item)
