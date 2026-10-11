@@ -43,7 +43,27 @@
         </div>
         <div class="flex items-center gap-3">
           <span id="orderStatusBadge" class="px-3 py-1 text-xs font-bold rounded-full"></span>
+          <span id="refundStatusBadge" class="hidden px-3 py-1 text-xs font-bold rounded-full border"></span>
         </div>
+      </div>
+
+      <!-- S-45: Trạng thái & số tiền hoàn tiền (hiển thị khi đơn đã huỷ và có yêu cầu hoàn) -->
+      <div id="refundInfoBox" class="hidden border-b border-slate-100 p-4 bg-emerald-50/60">
+        <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-6">
+          <div class="text-sm">
+            <span class="text-slate-500 font-medium">Tiền hoàn dự kiến/đã nhận:</span>
+            <span id="refundAmountDisplay" class="font-black text-emerald-700"></span>
+          </div>
+          <div id="refundFailureBox" class="hidden text-sm text-rose-700 font-medium"></div>
+        </div>
+      </div>
+
+      <!-- S-45: Ghi chú khi đơn bị huỷ trong luồng thanh toán (không phát sinh hoàn tiền) -->
+      <div id="paymentCancelNote" class="hidden border-b border-slate-100 p-4 bg-slate-50">
+        <p class="text-sm text-slate-500">
+          <i class="fa-solid fa-circle-info text-slate-400 mr-1"></i>
+          Giao dịch thanh toán chưa hoàn tất nên đơn này không phát sinh hoàn tiền.
+        </p>
       </div>
 
       <!-- Expiration Timer Warning -->
@@ -80,6 +100,12 @@
         <button id="btnRepay" class="hidden w-full md:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-sm shadow-indigo-200 transition-all flex items-center justify-center gap-2">
           <span>Thanh toán lại</span>
           <i class="fa-solid fa-arrow-right"></i>
+        </button>
+
+        <!-- S-45: Nút huỷ & hoàn tiền (chỉ hiện khi đơn đủ điều kiện huỷ) -->
+        <button id="btnCancelOrder" class="hidden w-full md:w-auto px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-sm shadow-rose-200 transition-all items-center justify-center gap-2">
+          <span>Huỷ &amp; hoàn tiền</span>
+          <i class="fa-solid fa-rotate-left"></i>
         </button>
       </div>
 
@@ -137,6 +163,40 @@
     </div>
   </main>
 
+  <!-- S-45: Modal xác nhận huỷ & hoàn tiền -->
+  <div id="cancelRefundModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+      <div class="p-5 border-b border-slate-100 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+          <i class="fa-solid fa-rotate-left"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-slate-800">Xác nhận huỷ &amp; hoàn tiền</h3>
+          <p class="text-xs text-slate-500">Chính sách demo (24 giờ / 90%) — chưa được Product duyệt chính thức</p>
+        </div>
+      </div>
+      <div class="p-5 space-y-3 text-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-slate-500">Tổng đã thanh toán:</span>
+          <span id="cancelTotalAmount" class="font-bold text-slate-800"></span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-slate-500">Tỉ lệ hoàn:</span>
+          <span id="cancelRefundPercent" class="font-bold text-slate-800"></span>
+        </div>
+        <div class="flex items-center justify-between p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+          <span class="text-emerald-800 font-semibold">Số tiền bạn sẽ nhận:</span>
+          <span id="cancelRefundAmount" class="font-black text-lg text-emerald-700"></span>
+        </div>
+        <p class="text-xs text-slate-500">Hạn huỷ: <span id="cancelDeadline" class="font-semibold"></span></p>
+      </div>
+      <div class="p-5 pt-0 flex items-center justify-end gap-2">
+        <button onclick="closeCancelRefundModal()" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50">Để sau</button>
+        <button id="btnConfirmCancel" onclick="confirmCancelOrder()" class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold">Xác nhận huỷ &amp; hoàn tiền</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const orderId = urlParams.get('orderId') || urlParams.get('orderCode');
@@ -160,13 +220,17 @@
       document.getElementById('errorMessage').textContent = message;
     }
 
-    function getStatusConfig(status) {
+    function getStatusConfig(status, cancelReason) {
       switch (status) {
         case 'Pending': return { text: 'Chờ thanh toán', css: 'bg-amber-100 text-amber-800 border-amber-200' };
         case 'Paid': return { text: 'Đã thanh toán', css: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
         case 'Completed': return { text: 'Hoàn tất', css: 'bg-blue-100 text-blue-800 border-blue-200' };
         case 'Expired': return { text: 'Đã hết hạn', css: 'bg-slate-100 text-slate-600 border-slate-200' };
-        case 'Cancelled': return { text: 'Đã huỷ', css: 'bg-rose-100 text-rose-800 border-rose-200' };
+        case 'Cancelled':
+          // S-45: phân biệt khách huỷ sau thanh toán (CUSTOMER_REFUND) với huỷ trong luồng thanh toán.
+          // Đơn Cancelled cũ (cancelReason null) được coi là huỷ giao dịch.
+          if (cancelReason === 'CUSTOMER_REFUND') return { text: 'Đã huỷ bởi bạn', css: 'bg-rose-100 text-rose-800 border-rose-200' };
+          return { text: 'Giao dịch bị huỷ', css: 'bg-slate-100 text-slate-600 border-slate-200' };
         default: return { text: status, css: 'bg-slate-100 text-slate-800' };
       }
     }
@@ -190,6 +254,18 @@
 
         renderOrder(result.data);
 
+        // S-45: deep-link ?cancel=1 từ my-orders → tự mở modal huỷ nếu nút huỷ đang hiển thị.
+        if (urlParams.get('cancel') === '1') {
+          urlParams.delete('cancel');
+          window.history.replaceState({}, '', `order-details.html?orderId=${encodeURIComponent(orderId)}`);
+          const btnCancel = document.getElementById('btnCancelOrder');
+          if (btnCancel && !btnCancel.classList.contains('hidden')) {
+            openCancelRefundModal(result.data);
+          } else if (result.data.status !== 'Cancelled') {
+            alert('Đơn hàng này hiện không đủ điều kiện huỷ và hoàn tiền.');
+          }
+        }
+
       } catch (err) {
         console.error(err);
         showError(err.message);
@@ -202,10 +278,17 @@
 
       document.getElementById('orderIdDisplay').textContent = order.id;
 
-      const statusConfig = getStatusConfig(order.status);
+      const statusConfig = getStatusConfig(order.status, order.cancelReason);
       const badge = document.getElementById('orderStatusBadge');
       badge.textContent = statusConfig.text;
       badge.className = `px-3 py-1 text-xs font-bold rounded-full border ${statusConfig.css}`;
+
+      // S-45: ghi chú cho đơn bị huỷ trong luồng thanh toán (không phát sinh hoàn tiền).
+      const paymentCancelNote = document.getElementById('paymentCancelNote');
+      if (paymentCancelNote) {
+        const isPaymentCancelled = order.status === 'Cancelled' && order.cancelReason !== 'CUSTOMER_REFUND';
+        paymentCancelNote.classList.toggle('hidden', !isPaymentCancelled);
+      }
 
       document.getElementById('totalAmountDisplay').textContent = formatCurrency(order.totalAmount);
 
@@ -258,6 +341,23 @@
         if (countdownInterval) clearInterval(countdownInterval);
       }
 
+      // S-45: Hiển thị badge + box trạng thái hoàn tiền khi đơn có yêu cầu hoàn
+      renderRefundInfo(order);
+
+      // S-45: Nút Huỷ & hoàn tiền — chỉ hiện khi đơn đang Paid (eligibility vẫn do server kiểm tra lại)
+      const btnCancelOrder = document.getElementById('btnCancelOrder');
+      if (btnCancelOrder) {
+        if (order.status === 'Paid') {
+          btnCancelOrder.classList.remove('hidden');
+          btnCancelOrder.classList.add('flex');
+          btnCancelOrder.disabled = false;
+          btnCancelOrder.onclick = () => openCancelRefundModal(order);
+        } else {
+          btnCancelOrder.classList.add('hidden');
+          btnCancelOrder.classList.remove('flex');
+        }
+      }
+
       // S-49: Load Audit Logs
       const btnFullAuditLog = document.getElementById('btnFullAuditLog');
       if (btnFullAuditLog) {
@@ -292,6 +392,113 @@
 
       update();
       countdownInterval = setInterval(update, 1000);
+    }
+
+    // ===== S-45: Huỷ vé & hoàn tiền =====
+    let pendingCancelOrderId = null;
+
+    function getRefundStatusDisplay(status) {
+      switch (status) {
+        case 'Succeeded': return { text: 'Đã hoàn tiền', css: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+        case 'Failed': return { text: 'Hoàn tiền thất bại — cần xử lý tiếp', css: 'bg-rose-100 text-rose-800 border-rose-200' };
+        case 'ManualPending': return { text: 'Đang chờ xử lý hoàn tiền thủ công', css: 'bg-amber-100 text-amber-800 border-amber-200' };
+        case 'Requested': return { text: 'Yêu cầu hoàn tiền đang được xử lý', css: 'bg-blue-100 text-blue-800 border-blue-200' };
+        default: return { text: status || '', css: 'bg-slate-100 text-slate-800 border-slate-200' };
+      }
+    }
+
+    function renderRefundInfo(order) {
+      const badge = document.getElementById('refundStatusBadge');
+      const box = document.getElementById('refundInfoBox');
+      const amountEl = document.getElementById('refundAmountDisplay');
+      const failureBox = document.getElementById('refundFailureBox');
+      if (!badge || !box || !amountEl || !failureBox) return;
+
+      if (!order.refundStatus) {
+        badge.classList.add('hidden');
+        box.classList.add('hidden');
+        return;
+      }
+
+      const cfg = getRefundStatusDisplay(order.refundStatus);
+      badge.textContent = cfg.text;
+      badge.className = 'px-3 py-1 text-xs font-bold rounded-full border ' + cfg.css;
+      amountEl.textContent = formatCurrency(order.refundAmount || 0);
+      box.classList.remove('hidden');
+
+      if (order.refundStatus === 'Failed' && order.refundFailureReason) {
+        failureBox.textContent = 'Lý do: ' + order.refundFailureReason;
+        failureBox.classList.remove('hidden');
+      } else {
+        failureBox.classList.add('hidden');
+      }
+    }
+
+    function formatRefundDeadline(isoString) {
+      if (!isoString) return '—';
+      const d = new Date(isoString);
+      return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ngày ' + d.toLocaleDateString('vi-VN');
+    }
+
+    async function openCancelRefundModal(order) {
+      pendingCancelOrderId = order.id;
+      try {
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+        const res = await fetch(`/api/v1/orders/${encodeURIComponent(order.id)}/refund-preview`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await res.json();
+        if (!res.ok) {
+          alert(result.message || 'Không kiểm tra được điều kiện huỷ.');
+          return;
+        }
+        const preview = result.data;
+        if (!preview.eligible) {
+          alert(preview.message || 'Đơn hàng không đủ điều kiện huỷ.');
+          return;
+        }
+        document.getElementById('cancelTotalAmount').textContent = formatCurrency(preview.totalAmount);
+        document.getElementById('cancelRefundPercent').textContent = preview.refundPercent + '%';
+        document.getElementById('cancelRefundAmount').textContent = formatCurrency(preview.estimatedRefundAmount);
+        document.getElementById('cancelDeadline').textContent = formatRefundDeadline(preview.refundDeadline);
+        document.getElementById('cancelRefundModal').classList.remove('hidden');
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Không kiểm tra được điều kiện huỷ.');
+      }
+    }
+
+    function closeCancelRefundModal() {
+      document.getElementById('cancelRefundModal').classList.add('hidden');
+      pendingCancelOrderId = null;
+    }
+
+    async function confirmCancelOrder() {
+      if (!pendingCancelOrderId) return;
+      const btn = document.getElementById('btnConfirmCancel');
+      try {
+        btn.disabled = true;
+        btn.textContent = 'Đang xử lý...';
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+        const res = await fetch(`/api/v1/orders/${encodeURIComponent(pendingCancelOrderId)}/cancel`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await res.json();
+        if (!res.ok) {
+          alert(result.message || 'Huỷ đơn thất bại.');
+          return;
+        }
+        closeCancelRefundModal();
+        alert(result.message || 'Đã huỷ đơn và tạo yêu cầu hoàn tiền.');
+        await loadOrderDetails();
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Huỷ đơn thất bại.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Xác nhận huỷ & hoàn tiền';
+      }
     }
 
     async function handleRepayment(id, btnElement) {
@@ -490,6 +697,10 @@
         case 'ORDER_NEEDS_ATTENTION': return 'Bất thường thanh toán';
         case 'TICKET_CHECKED_IN': return 'Soát vé vào cửa';
         case 'TICKET_READMISSION': return 'Tái nhập cửa';
+        case 'REFUND_REQUESTED': return 'Tạo yêu cầu hoàn tiền';
+        case 'REFUND_SUCCEEDED': return 'Hoàn tiền thành công';
+        case 'REFUND_FAILED': return 'Hoàn tiền thất bại';
+        case 'REFUND_MANUAL_PENDING': return 'Chờ hoàn tiền thủ công';
         default: return act;
       }
     }

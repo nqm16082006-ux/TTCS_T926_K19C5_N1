@@ -33,6 +33,8 @@ namespace EventTicketBooking.Api.Data
         public DbSet<EmailFailureLog> EmailFailureLogs { get; set; } = null!;
         public DbSet<OrderAuditLog> OrderAuditLogs { get; set; } = null!;
         public DbSet<OfflineCheckInRecord> OfflineCheckInRecords { get; set; } = null!;
+        public DbSet<Refund> Refunds { get; set; } = null!;
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -245,6 +247,9 @@ namespace EventTicketBooking.Api.Data
                           v => v.ToString(),
                           v => ParseOrderStatus(v));
 
+                // Story S-45: lý do huỷ đơn (PAYMENT_CANCELLED / CUSTOMER_REFUND)
+                entity.Property(o => o.CancelReason).HasMaxLength(30);
+
                 entity.HasOne(o => o.User)
                       .WithMany()
                       .HasForeignKey(o => o.UserId)
@@ -333,6 +338,30 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(e => e.Attempts).IsRequired().HasDefaultValue(0);
                 entity.Property(e => e.Resolved).HasDefaultValue(false);
                 entity.HasIndex(e => e.OrderId);
+            });
+
+            // Cấu hình bảng refunds (Story S-45)
+            modelBuilder.Entity<Refund>(entity =>
+            {
+                entity.ToTable("refunds");
+                entity.HasKey(r => r.Id);
+
+                entity.Property(r => r.Amount).IsRequired();
+                entity.Property(r => r.Status).IsRequired().HasMaxLength(20);
+                entity.Property(r => r.FailureReason).HasMaxLength(500);
+                entity.Property(r => r.ConfirmedByName).HasMaxLength(200);
+                entity.Property(r => r.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(r => r.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(r => r.Order)
+                      .WithMany(o => o.Refunds)
+                      .HasForeignKey(r => r.OrderId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // Story S-45: mỗi đơn chỉ có tối đa một yêu cầu hoàn tiền (chống bấm lặp)
+                entity.HasIndex(r => r.OrderId)
+                      .IsUnique()
+                      .HasDatabaseName("IX_refunds_OrderId_Unique");
             });
 
             // Cấu hình bảng tickets (Story S-25)

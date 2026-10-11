@@ -325,6 +325,23 @@ namespace EventTicketBooking.Api.Services.Implementations.Payment
             }
         }
 
+        /// <summary>
+        /// Story S-45: theo tài liệu payOS công bố (payos.vn/docs/api, kiểm tra 10/11/2026)
+        /// không có endpoint hoàn tiền và cũng không có môi trường sandbox → SupportsRefund = false.
+        /// Yêu cầu hoàn tiền sẽ được ghi nhận ManualPending để xử lý thủ công.
+        /// </summary>
+        public bool SupportsRefund => false;
+
+        public Task<RefundCreationResult> CreateRefundAsync(RefundCreationRequest request, CancellationToken cancellationToken = default)
+        {
+            _logger.LogInformation(
+                "Yêu cầu hoàn tiền cho OrderCode {OrderCode} không thể thực hiện tự động: payOS không công bố API hoàn tiền.",
+                request?.OrderCode);
+
+            return Task.FromResult(RefundCreationResult.CreateManualRequired(
+                "payOS chưa hỗ trợ API hoàn tiền tự động theo tài liệu công bố. Yêu cầu được ghi nhận chờ xử lý thủ công."));
+        }
+
         private static string ComputeHmacSha256(string data, string secretKey)
         {
             if (string.IsNullOrEmpty(secretKey))
