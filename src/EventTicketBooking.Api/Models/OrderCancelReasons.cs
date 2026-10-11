@@ -12,5 +12,6 @@ namespace EventTicketBooking.Api.Models
     {
         public const string CustomerRefund = "CUSTOMER_REFUND";
         public const string PaymentCancelled = "PAYMENT_CANCELLED";
+        public const string ShowtimeCancelled = "SHOWTIME_CANCELLED";
     }
 }
