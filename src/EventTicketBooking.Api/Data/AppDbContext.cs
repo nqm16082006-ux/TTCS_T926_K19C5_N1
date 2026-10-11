@@ -1,4 +1,4 @@
-﻿using EventTicketBooking.Api.Models;
+using EventTicketBooking.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace EventTicketBooking.Api.Data
@@ -451,6 +451,7 @@ namespace EventTicketBooking.Api.Data
                 "onsale" => ShowtimeStatus.OnSale,
                 "closed" => ShowtimeStatus.Closed,
                 "draft" => ShowtimeStatus.Draft,
+                "cancelled" => ShowtimeStatus.Cancelled,
                 _ => Enum.TryParse<ShowtimeStatus>(value, true, out var result) ? result : ShowtimeStatus.Draft
             };
         }

@@ -4,6 +4,7 @@ namespace EventTicketBooking.Api.Models
     {
         Draft = 1,
         OnSale = 2,
-        Closed = 3
+        Closed = 3,
+        Cancelled = 4
     }
 }
