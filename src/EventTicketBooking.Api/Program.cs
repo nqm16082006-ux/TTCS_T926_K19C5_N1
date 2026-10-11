@@ -164,6 +164,7 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IPaymentSe
 builder.Services.Configure<EventTicketBooking.Api.Options.TicketQrOptions>(builder.Configuration.GetSection(EventTicketBooking.Api.Options.TicketQrOptions.SectionName));
 builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IQrSignatureService, EventTicketBooking.Api.Services.Implementations.QrSignatureService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITicketService, EventTicketBooking.Api.Services.Implementations.TicketService>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ICheckinExportService, EventTicketBooking.Api.Services.Implementations.CheckinExportService>();
 builder.Services.AddHttpClient();
 
 

@@ -259,6 +259,9 @@
         <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="javascript:void(0)" onclick="scrollToSeatSection()">
           <span class="material-symbols-outlined text-[20px]">chair</span>Cấu hình ghế &amp; bảng giá
         </a>
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./export-test.html">
+          <span class="material-symbols-outlined text-[20px]">file_download</span>Xuất danh sách Check-in
+        </a>
       </nav>
     </div>
 
@@ -1319,6 +1322,9 @@
                 <button onclick="openPricingModal('${s.id}')" class="p-2 rounded-lg text-primary hover:bg-surface-container transition-colors" title="Cấu hình bảng giá" type="button">
                   <span class="material-symbols-outlined text-[19px]">settings</span>
                 </button>
+                <a href="./export-test.html?showId=${encodeURIComponent(s.id)}" class="p-2 rounded-lg text-emerald-700 hover:bg-emerald-50 transition-colors inline-flex items-center justify-center" title="Xuất danh sách soát vé CSV (S-62)">
+                  <span class="material-symbols-outlined text-[19px]">file_download</span>
+                </a>
                 <button onclick="openEditShowtimeModal('${s.id}')" class="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" title="Chỉnh sửa thông tin suất" type="button">
                   <span class="material-symbols-outlined text-[19px]">edit</span>
                 </button>

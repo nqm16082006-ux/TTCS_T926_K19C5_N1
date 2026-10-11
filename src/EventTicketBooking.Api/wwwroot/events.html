@@ -254,6 +254,9 @@
         <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./events.html?action=seats" onclick="openFirstEventSeats();return false;" id="nav-cau-hinh-ghe">
           <span class="material-symbols-outlined text-[20px]">chair</span>Cấu hình ghế &amp; bảng giá
         </a>
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./export-test.html" id="nav-xuat-checkin">
+          <span class="material-symbols-outlined text-[20px]">file_download</span>Xuất danh sách Check-in
+        </a>
       </nav>
     </div>
 
@@ -579,6 +582,10 @@
       <span class="material-symbols-outlined text-[18px] text-tertiary">open_in_new</span>
       <span>Trang mua vé công khai</span>
     </a>
+    <button onclick="handleMenuAction('export-csv')" class="w-full flex items-center gap-2 px-3.5 py-2.5 text-emerald-700 hover:bg-emerald-50 transition-colors text-left font-semibold">
+      <span class="material-symbols-outlined text-[18px] text-emerald-600">file_download</span>
+      <span>Xuất danh sách Check-in (CSV)</span>
+    </button>
     <div class="h-px bg-surface-container my-1"></div>
     <button onclick="handleMenuAction('duplicate')" class="w-full flex items-center gap-2 px-3.5 py-2.5 text-on-surface hover:bg-surface-container transition-colors text-left">
       <span class="material-symbols-outlined text-[18px]">content_copy</span> Nhân bản sự kiện
@@ -1214,6 +1221,9 @@
                 <a href="./create-event.html?id=${e.id}" class="p-2 rounded-lg text-outline hover:text-primary hover:bg-surface-container transition-colors inline-flex items-center justify-center" title="Chỉnh sửa sự kiện">
                   <span class="material-symbols-outlined text-[20px]">edit</span>
                 </a>
+                <a href="./export-test.html?showId=${showtimes.length > 0 ? encodeURIComponent(showtimes[0].id) : ''}" class="p-2 rounded-lg text-outline hover:text-emerald-700 hover:bg-emerald-50 transition-colors inline-flex items-center justify-center" title="Xuất danh sách check-in CSV (S-62)">
+                  <span class="material-symbols-outlined text-[20px]">file_download</span>
+                </a>
                 <div class="relative inline-block text-left">
                   <button onclick="toggleRowMenu(event, '${e.id}')" class="p-2 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors" title="Tùy chọn khác" type="button">
                     <span class="material-symbols-outlined text-[20px]">more_vert</span>
@@ -1284,6 +1294,9 @@
                 <span class="material-symbols-outlined text-[16px]">visibility</span>
                 <span>Xem chi tiết (${showtimeCount} suất)</span>
               </a>
+              <a href="./export-test.html?showId=${showtimes.length > 0 ? encodeURIComponent(showtimes[0].id) : ''}" class="h-9 px-3 rounded-lg bg-surface-container hover:bg-emerald-50 hover:text-emerald-700 text-on-surface font-label-md text-label-md flex items-center justify-center transition" title="Xuất danh sách check-in CSV (S-62)">
+                <span class="material-symbols-outlined text-[18px]">file_download</span>
+              </a>
               <a href="./create-event.html?id=${e.id}" class="h-9 px-3 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md flex items-center justify-center transition" title="Chỉnh sửa sự kiện">
                 <span class="material-symbols-outlined text-[18px]">edit</span>
               </a>
@@ -1346,6 +1359,10 @@
 
       if (action === 'detail') {
         window.location.href = `./event-detail.html?id=${activeMenuEventId}`;
+      } else if (action === 'export-csv') {
+        const ev = currentEvents.find(e => e.id === activeMenuEventId);
+        const showId = ev && ev.showtimes && ev.showtimes.length > 0 ? ev.showtimes[0].id : '';
+        window.location.href = `./export-test.html?showId=${encodeURIComponent(showId)}`;
       } else if (action === 'showtimes') {
         window.location.href = `./event-detail.html?id=${activeMenuEventId}`;
       } else if (action === 'seats') {
