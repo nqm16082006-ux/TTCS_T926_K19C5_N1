@@ -67,6 +67,26 @@ docker compose down
 
 ---
 
+## 🌐 Sử Dụng PostgreSQL Cloud Dùng Chung (Khuyên Dùng Cho Cả Nhóm)
+
+Để tất cả thành viên trong nhóm luôn có dữ liệu đồng nhất theo thời gian thực (realtime) mà **không cần chạy Docker Desktop**:
+1. Đăng ký một cơ sở dữ liệu PostgreSQL miễn phí trên **[Neon.tech](https://neon.tech/)** hoặc **[Supabase](https://supabase.com/)**.
+2. Copy chuỗi kết nối (`Connection String`) và dán vào file `.env` trên máy của tất cả thành viên:
+   ```env
+   ConnectionStrings__DefaultConnection=Host=ep-xxx.ap-southeast-1.neon.tech;Database=neondb;Username=neondb_owner;Password=mat_khau_cua_ban;SSL Mode=Require;Trust Server Certificate=true
+   ```
+3. Chạy lệnh migrate khởi tạo cấu trúc bảng lên Cloud (chỉ cần 1 bạn chạy 1 lần):
+   ```powershell
+   dotnet ef database update --project src/EventTicketBooking.Api
+   ```
+4. Bật ứng dụng Backend:
+   ```powershell
+   dotnet run --project src/EventTicketBooking.Api
+   ```
+   *(Hệ thống sẽ tự động kích hoạt `DataSeeder` để nạp sẵn 5 Vai trò, 2 Tài khoản demo Admin/Organizer và các Sự kiện mẫu lên Cloud).*
+
+---
+
 ## 🔄 Quản Lý Migration Database (EF Core)
 
 Dự án sử dụng Entity Framework Core Migrations hỗ trợ thực thi sạch cả **Tiến (Up)** lẫn **Lùi (Down / Rollback)**.

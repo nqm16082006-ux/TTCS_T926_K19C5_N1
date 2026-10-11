@@ -44,7 +44,8 @@ if (string.Equals(selectedDbProvider, "InMemory", StringComparison.OrdinalIgnore
 }
 else
 {
-    if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("POSTGRES_HOST")) || string.IsNullOrEmpty(pgConnection))
+    // Nếu chưa có chuỗi kết nối DefaultConnection thì mới tự ráp từ các biến POSTGRES_HOST, PORT, DB...
+    if (string.IsNullOrWhiteSpace(pgConnection) && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("POSTGRES_HOST")))
     {
         string host = Environment.GetEnvironmentVariable("POSTGRES_HOST") ?? "localhost";
         string port = Environment.GetEnvironmentVariable("POSTGRES_PORT") ?? "5432";
