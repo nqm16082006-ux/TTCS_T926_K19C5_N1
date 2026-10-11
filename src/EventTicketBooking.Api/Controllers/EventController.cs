@@ -7,11 +7,16 @@ using System.Threading.Tasks;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.DTOs.Common;
+using EventTicketBooking.Api.Hubs;
 using EventTicketBooking.Api.Middlewares;
 using EventTicketBooking.Api.Models;
+using EventTicketBooking.Api.Services.Implementations;
+using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace EventTicketBooking.Api.Controllers
 {
@@ -27,10 +32,17 @@ namespace EventTicketBooking.Api.Controllers
     public class EventController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IOrderAuditService _orderAuditService;
+        private readonly IHubContext<SeatStatusHub>? _hubContext;
 
-        public EventController(AppDbContext context)
+        public EventController(
+            AppDbContext context,
+            IOrderAuditService? orderAuditService = null,
+            IHubContext<SeatStatusHub>? hubContext = null)
         {
             _context = context;
+            _orderAuditService = orderAuditService ?? new OrderAuditService(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
+            _hubContext = hubContext;
         }
 
         /// <summary>
@@ -990,6 +1002,8 @@ namespace EventTicketBooking.Api.Controllers
 
             try
             {
+                if (showtime.Status == ShowtimeStatus.Cancelled)
+                    return BadRequest(ApiResponse<object>.FailureResult("Không thể mở bán suất diễn đã bị huỷ."));
                 if (showtime.AvailableSeats <= 0)
                     return BadRequest(ApiResponse<object>.FailureResult("Không thể chuyển sang trạng thái Đang bán vì suất diễn chưa có ghế."));
                 if (showtime.SeatCategories.Count == 0)
@@ -1081,6 +1095,258 @@ namespace EventTicketBooking.Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Story S-47: Huỷ suất diễn, đóng bán và xử lý trạng thái vé (Task 1).
+        /// POST /api/events/{eventId}/showtimes/{showtimeId}/cancel
+        /// </summary>
+        [HttpPost("{eventId:guid}/showtimes/{showtimeId:guid}/cancel")]
+        [RequireRole("Organizer", "Admin")]
+        [ProducesResponseType(typeof(ApiResponse<ShowtimeResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> CancelShowtime(Guid eventId, Guid showtimeId)
+        {
+            var currentUserId = GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return StatusCode(StatusCodes.Status401Unauthorized, ApiResponse<object>.FailureResult("Vui lòng đăng nhập để thực hiện thao tác này."));
+            }
+
+            var ev = await _context.Events
+                .Include(e => e.Showtimes)
+                .FirstOrDefaultAsync(e => e.Id == eventId);
+
+            if (ev == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
+            }
+
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền thao tác trên sự kiện này."));
+            }
+
+            var showtime = ev.Showtimes.FirstOrDefault(s => s.Id == showtimeId);
+            if (showtime == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Suất diễn không tồn tại trong sự kiện này."));
+            }
+
+            if (showtime.Status == ShowtimeStatus.Cancelled)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Suất diễn đã ở trạng thái huỷ."));
+            }
+
+            if (showtime.Status == ShowtimeStatus.Draft)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Không thể huỷ suất diễn đang ở trạng thái Nháp (Draft)."));
+            }
+
+            if (showtime.Status != ShowtimeStatus.OnSale && showtime.Status != ShowtimeStatus.Closed)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult($"Không thể huỷ suất diễn ở trạng thái {showtime.Status}."));
+            }
+
+            var utcNow = DateTime.UtcNow;
+            var endTimeUtc = showtime.EndTime.Kind == DateTimeKind.Utc ? showtime.EndTime : showtime.EndTime.ToUniversalTime();
+            if (endTimeUtc < utcNow)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Không thể huỷ suất diễn đã kết thúc trong quá khứ."));
+            }
+
+            IDbContextTransaction? transaction = null;
+            if (_context.Database.IsRelational())
+            {
+                transaction = await _context.Database.BeginTransactionAsync();
+            }
+            else
+            {
+                try
+                {
+                    transaction = await _context.Database.BeginTransactionAsync();
+                }
+                catch (InvalidOperationException)
+                {
+                    // InMemory DB provider does not support real transactions
+                }
+            }
+
+            try
+            {
+                var now = DateTimeOffset.UtcNow;
+
+                // 1. Khoá dòng suất diễn và các đơn hàng liên quan nếu trên PostgreSQL
+                if (_context.Database.IsNpgsql())
+                {
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "SELECT 1 FROM \"Showtimes\" WHERE \"Id\" = {0} FOR UPDATE", showtimeId);
+
+                    var currentStatus = await _context.Showtimes
+                        .AsNoTracking()
+                        .Where(s => s.Id == showtimeId)
+                        .Select(s => s.Status)
+                        .FirstOrDefaultAsync();
+
+                    if (currentStatus == ShowtimeStatus.Cancelled)
+                    {
+                        if (transaction != null) await transaction.RollbackAsync();
+                        return BadRequest(ApiResponse<object>.FailureResult("Suất diễn đã ở trạng thái huỷ."));
+                    }
+                }
+
+                List<Order> relatedOrders;
+                if (_context.Database.IsNpgsql())
+                {
+                    relatedOrders = await _context.Orders
+                        .FromSqlRaw("SELECT * FROM orders WHERE \"ShowtimeId\" = {0} FOR UPDATE", showtimeId)
+                        .Include(o => o.OrderItems)
+                        .ToListAsync();
+                }
+                else
+                {
+                    relatedOrders = await _context.Orders
+                        .Where(o => o.ShowtimeId == showtimeId)
+                        .Include(o => o.OrderItems)
+                        .ToListAsync();
+                }
+
+                // 2. Chuyển trạng thái suất diễn thành Cancelled
+                showtime.ChangeStatus(ShowtimeStatus.Cancelled);
+
+                var userDisplayName = User.FindFirstValue(ClaimTypes.Name)
+                    ?? User.FindFirst("name")?.Value
+                    ?? (isAdmin ? "Admin" : "Organizer");
+                var actorType = isAdmin ? "ADMIN" : "ORGANIZER";
+
+                var pendingSeatIdsToRelease = new List<Guid>();
+
+                // 3. Xử lý các đơn hàng Pending và Paid
+                foreach (var order in relatedOrders)
+                {
+                    var oldStatus = order.Status.ToString();
+
+                    if (order.Status == OrderStatus.Pending)
+                    {
+                        order.Status = OrderStatus.Cancelled;
+                        order.UpdatedAt = now;
+
+                        if (order.OrderItems != null && order.OrderItems.Any())
+                        {
+                            pendingSeatIdsToRelease.AddRange(order.OrderItems.Select(oi => oi.SeatId));
+                        }
+
+                        _orderAuditService.Record(
+                            order.Id,
+                            "ORDER",
+                            order.Id.ToString(),
+                            "SHOWTIME_CANCELLED",
+                            oldStatus,
+                            OrderStatus.Cancelled.ToString(),
+                            actorType,
+                            userDisplayName,
+                            currentUserId.Value,
+                            "SHOWTIME_CANCELLED_AWAITING_REFUND",
+                            now);
+                    }
+                    else if (order.Status == OrderStatus.Paid)
+                    {
+                        order.Status = OrderStatus.Cancelled;
+                        order.UpdatedAt = now;
+
+                        _orderAuditService.Record(
+                            order.Id,
+                            "ORDER",
+                            order.Id.ToString(),
+                            "SHOWTIME_CANCELLED",
+                            oldStatus,
+                            OrderStatus.Cancelled.ToString(),
+                            actorType,
+                            userDisplayName,
+                            currentUserId.Value,
+                            "SHOWTIME_CANCELLED_AWAITING_REFUND",
+                            now);
+                    }
+                }
+
+                // 4. Giải phóng ghế và giữ chỗ của các đơn Pending
+                pendingSeatIdsToRelease = pendingSeatIdsToRelease.Distinct().ToList();
+                if (pendingSeatIdsToRelease.Any())
+                {
+                    var activeHolds = await _context.SeatHold
+                        .Where(sh => pendingSeatIdsToRelease.Contains(sh.SeatId) && sh.Status == "ACTIVE")
+                        .ToListAsync();
+
+                    foreach (var hold in activeHolds)
+                    {
+                        hold.Status = "EXPIRED";
+                    }
+
+                    var heldSeats = await _context.Seats
+                        .Where(s => pendingSeatIdsToRelease.Contains(s.Id) && s.Status == "HELD")
+                        .ToListAsync();
+
+                    foreach (var seat in heldSeats)
+                    {
+                        seat.Status = "AVAILABLE";
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync();
+                }
+
+                // Bắn thông báo SignalR nếu có client đang theo dõi
+                if (_hubContext != null && pendingSeatIdsToRelease.Any())
+                {
+                    try
+                    {
+                        await _hubContext.Clients.Group(showtimeId.ToString())
+                            .SendAsync("SeatReleased", new { ShowtimeId = showtimeId, SeatIds = pendingSeatIdsToRelease });
+                    }
+                    catch
+                    {
+                        // SignalR fail không làm hỏng kết quả trả về
+                    }
+                }
+
+                var responseDto = new ShowtimeResponseDto
+                {
+                    Id = showtime.Id,
+                    EventId = showtime.EventId,
+                    StartTime = showtime.StartTime,
+                    EndTime = showtime.EndTime,
+                    AvailableSeats = showtime.AvailableSeats,
+                    RemainingTickets = showtime.AvailableSeats,
+                    AvailableTickets = showtime.AvailableSeats,
+                    Status = showtime.Status,
+                    StatusActionMessage = GetShowtimeStatusActionMessage(showtime)
+                };
+
+                return Ok(ApiResponse<ShowtimeResponseDto>.SuccessResult(responseDto, "Huỷ suất diễn thành công."));
+            }
+            catch (Exception)
+            {
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                }
+                throw;
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync();
+                }
+            }
+        }
+
         #region Helper Methods
 
         private static string? GetShowtimeStatusActionMessage(Showtime showtime)
@@ -1102,6 +1368,11 @@ namespace EventTicketBooking.Api.Controllers
             if (showtime.Status == ShowtimeStatus.Closed)
             {
                 return "Suất diễn đã đóng bán.";
+            }
+
+            if (showtime.Status == ShowtimeStatus.Cancelled)
+            {
+                return "Suất diễn đã bị huỷ.";
             }
 
             return null;
