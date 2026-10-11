@@ -1,0 +1,94 @@
+groups:
+  - name: overload_and_system_alerts
+    rules:
+      - alert: Http5xxErrorRateWarning
+        expr: |
+          (
+            (sum(rate(http_requests_received_total{code=~"5.."}[2m])) or vector(0))
+            /
+            sum(rate(http_requests_received_total[2m]))
+          ) * 100 > 2
+          and
+          sum(rate(http_requests_received_total[2m])) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tỉ lệ lỗi HTTP 5xx vượt quá 2%"
+          description: "Tỉ lệ lỗi HTTP 5xx đang là {{ $value | printf \"%.2f\" }}% trên tổng lưu lượng."
+
+      - alert: Http5xxErrorRateCritical
+        expr: |
+          (
+            (sum(rate(http_requests_received_total{code=~"5.."}[1m])) or vector(0))
+            /
+            sum(rate(http_requests_received_total[1m]))
+          ) * 100 > 5
+          and
+          sum(rate(http_requests_received_total[1m])) > 5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tỉ lệ lỗi HTTP 5xx nghiêm trọng (>5%)"
+          description: "Hệ thống đang gặp lỗi 5xx ở mức {{ $value | printf \"%.2f\" }}%."
+
+      - alert: HttpLatencyP95Warning
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[3m])) by (le)) > 1.0
+          and
+          sum(rate(http_requests_received_total[3m])) > 1
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Độ trễ p95 vượt quá 1 giây"
+          description: "Thời gian phản hồi p95 đang ở mức {{ $value | printf \"%.2f\" }}s."
+
+      - alert: HttpLatencyP95Critical
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le)) > 2.5
+          and
+          sum(rate(http_requests_received_total[1m])) > 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Độ trễ p95 nghiêm trọng (>2.5 giây)"
+          description: "Hệ thống phản hồi rất chậm, p95 đạt {{ $value | printf \"%.2f\" }}s."
+
+      - alert: SeatHoldConflictsRateWarning
+        expr: sum(rate(seat_hold_conflicts_total[2m])) * 60 > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tranh chấp giữ ghế tăng cao (>10 conflicts/phút)"
+          description: "Phát hiện {{ $value | printf \"%.1f\" }} xung đột giữ ghế/phút."
+
+      - alert: SeatHoldConflictsRateCritical
+        expr: sum(rate(seat_hold_conflicts_total[1m])) * 60 > 50
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tranh chấp giữ ghế cực cao (>50 conflicts/phút)"
+          description: "Hệ thống ghi nhận {{ $value | printf \"%.1f\" }} xung đột giữ ghế/phút."
+
+      - alert: PaymentWebhooksRejectedWarning
+        expr: sum(increase(payment_webhooks_rejected_total[5m])) > 3
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook thanh toán bị từ chối (>3 lần trong 5 phút)"
+          description: "Có {{ $value }} webhook thanh toán bị từ chối trong 5 phút qua."
+
+      - alert: PaymentWebhooksRejectedCritical
+        expr: sum(increase(payment_webhooks_rejected_total[5m])) > 10
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Webhook thanh toán bị từ chối nghiêm trọng (>10 lần trong 5 phút)"
+          description: "Có {{ $value }} webhook thanh toán bị từ chối trong 5 phút qua."

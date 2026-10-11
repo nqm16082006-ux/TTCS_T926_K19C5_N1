@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
+using EventTicketBooking.Api.Metrics;
 
 namespace EventTicketBooking.Api.Services.Implementations
 {
@@ -27,6 +28,7 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly IConnectionMultiplexer? _redis;
         private readonly ILogger<SeatHoldService> _logger;
         private readonly IHubContext<SeatStatusHub>? _hubContext;
+        private readonly IAppMetrics? _metrics;
 
         public const int DefaultHoldTtlSeconds = 600; // 10 phút
 
@@ -34,12 +36,14 @@ namespace EventTicketBooking.Api.Services.Implementations
             AppDbContext context,
             ILogger<SeatHoldService> logger,
             IHubContext<SeatStatusHub>? hubContext = null,
-            IConnectionMultiplexer? redis = null)
+            IConnectionMultiplexer? redis = null,
+            IAppMetrics? metrics = null)
         {
             _context = context;
             _logger = logger;
             _hubContext = hubContext;
             _redis = redis;
+            _metrics = metrics;
         }
 
         public async Task<HoldSeatsResult> HoldSeatsAsync(
@@ -193,6 +197,8 @@ namespace EventTicketBooking.Api.Services.Implementations
                         _logger.LogWarning("Tranh chấp giữ ghế qua Redis: User {UserId} bị từ chối khi giữ các ghế [{SeatIds}]. Ghế tranh chấp: [{ConflictingSeats}].",
                             userId, string.Join(", ", seatIds), string.Join(", ", redisConflictingSeats));
 
+                        _metrics?.RecordSeatHoldConflict("redis");
+
                         return HoldSeatsResult.ConflictResult("Một hoặc nhiều ghế đã được giữ chỗ bởi người dùng khác.", redisConflictingSeats);
                     }
 
@@ -234,6 +240,8 @@ namespace EventTicketBooking.Api.Services.Implementations
                 {
                     await ReleaseRedisHoldConditionalAsync(redisKeys, userId);
                 }
+
+                _metrics?.RecordSeatHoldConflict("db_active");
 
                 return HoldSeatsResult.ConflictResult("Một hoặc nhiều ghế đã được giữ chỗ bởi người dùng khác.", conflictingSeatsInDb);
             }
@@ -281,6 +289,8 @@ namespace EventTicketBooking.Api.Services.Implementations
                 {
                     activeConflictingSeats = seatIds;
                 }
+
+                _metrics?.RecordSeatHoldConflict("db_constraint");
 
                 return HoldSeatsResult.ConflictResult("Một hoặc nhiều ghế đã được giữ chỗ bởi người dùng khác.", activeConflictingSeats);
             }

@@ -2,6 +2,7 @@ using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using DotNetEnv;
+using Prometheus;
 
 // Nạp file .env ở thư mục gốc hoặc thư mục hiện tại nếu có
 if (File.Exists(".env"))
@@ -139,6 +140,9 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ISeatHoldS
 // Đăng ký dịch vụ Nhật ký thao tác đơn hàng và vé (Story S-49)
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IOrderAuditService, EventTicketBooking.Api.Services.Implementations.OrderAuditService>();
 
+// Đăng ký dịch vụ Giám sát và Cảnh báo (Story S-43)
+builder.Services.AddSingleton<EventTicketBooking.Api.Metrics.IAppMetrics, EventTicketBooking.Api.Metrics.PrometheusAppMetrics>();
+
 // T-44 (S-19): Đọc cấu hình cổng thanh toán từ biến môi trường hoặc appsettings
 var paymentProvider = builder.Configuration["PaymentSettings:Provider"]
                      ?? builder.Configuration["PAYMENT_PROVIDER"]
@@ -272,10 +276,52 @@ if (!string.IsNullOrWhiteSpace(uploadsPath))
 }
 
 app.UseRouting();
+
+// S-43: Bảo vệ endpoint /metrics bằng Bearer token trước khi MapMetrics xử lý
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.Equals("/metrics", StringComparison.OrdinalIgnoreCase))
+    {
+        var configuredToken = EventTicketBooking.Api.Metrics.MetricsTokenResolver.ResolveScrapeToken(app.Configuration);
+
+        if (string.IsNullOrWhiteSpace(configuredToken))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+
+        var authHeader = context.Request.Headers.Authorization.ToString();
+        const string bearerPrefix = "Bearer ";
+        if (!authHeader.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+
+        var providedToken = authHeader[bearerPrefix.Length..].Trim();
+        var providedBytes = System.Text.Encoding.UTF8.GetBytes(providedToken);
+        var configuredBytes = System.Text.Encoding.UTF8.GetBytes(configuredToken);
+
+        if (providedBytes.Length != configuredBytes.Length ||
+            !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(providedBytes, configuredBytes))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+    }
+
+    await next();
+});
+
+// S-43: Thu thập HTTP metrics
+app.UseHttpMetrics();
+
 app.UseAuthorization();
 app.UseMiddleware<EventTicketBooking.Api.Middlewares.RoleAuthorizationMiddleware>();
 app.UseMiddleware<EventTicketBooking.Api.Middlewares.TicketRateLimitMiddleware>();
 app.MapControllers();
+app.MapMetrics("/metrics");
 app.MapHub<EventTicketBooking.Api.Hubs.SeatStatusHub>("/hubs/seat-status");
+app.MapHub<EventTicketBooking.Api.Hubs.SystemAlertHub>("/hubs/system-alerts");
 
 app.Run();

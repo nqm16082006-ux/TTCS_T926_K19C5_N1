@@ -820,9 +820,100 @@
       color: var(--text-muted);
       font-weight: 600;
     }
+
+    /* S-43: Realtime System Alert Bell & Toast */
+    .system-alert-bell {
+      position: relative;
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-main);
+      transition: all 0.2s ease;
+    }
+    .system-alert-bell:hover {
+      background: #e2e8f0;
+    }
+    .system-alert-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 9px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #fff;
+      background: #64748b;
+    }
+    .system-alert-badge.active {
+      background: #ef4444;
+      animation: alertPulse 1.5s infinite;
+    }
+    @keyframes alertPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+    }
+    .system-toast-container {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 400px;
+      pointer-events: none;
+    }
+    .system-toast {
+      pointer-events: auto;
+      padding: 14px 18px;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      font-size: 0.875rem;
+      line-height: 1.45;
+      color: #fff;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .system-toast.warning {
+      background: #d97706;
+      border-left: 6px solid #f59e0b;
+    }
+    .system-toast.critical {
+      background: #dc2626;
+      border-left: 6px solid #991b1b;
+      animation: alertPulse 1.5s infinite;
+    }
+    .system-toast.resolved {
+      background: #059669;
+      border-left: 6px solid #10b981;
+    }
+    .system-toast-header {
+      font-weight: 700;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .system-toast-body {
+      font-size: 0.85rem;
+      opacity: 0.95;
+    }
   </style>
 </head>
 <body>
+
+  <!-- S-43: Toast Container -->
+  <div id="systemToastContainer" class="system-toast-container"></div>
 
   <!-- Navbar -->
   <nav class="navbar">
@@ -837,6 +928,9 @@
       <a href="./public-events.html" class="nav-link">🌐 Đặt vé Public</a>
     </div>
     <div class="user-menu">
+      <button id="systemAlertBellBtn" class="system-alert-bell" title="Cảnh báo hệ thống" type="button">
+        🔔 <span id="systemAlertBadge" class="system-alert-badge">0</span>
+      </button>
       <div class="user-chip">
         <div class="user-avatar" id="navAvatar">A</div>
         <span class="user-name" id="navUsername">Admin</span>
@@ -1074,6 +1168,8 @@
     </div>
   </div>
 
+  <!-- S-43: SignalR Client Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
   <script>
     const API_BASE = window.location.origin;
     let token = localStorage.getItem('access_token');
@@ -1113,6 +1209,7 @@
       }
 
       loadUsers();
+      initSystemAlertSignalR();
     });
 
     async function loadUsers() {
@@ -1461,6 +1558,91 @@
     function logout() {
       localStorage.clear();
       window.location.href = './login.html';
+    }
+
+    // --- S-43: Realtime System Alerts (SignalR Client) ---
+    const activeAlerts = new Map();
+
+    function updateAlertBadge() {
+      const badge = document.getElementById('systemAlertBadge');
+      if (!badge) return;
+      const count = activeAlerts.size;
+      badge.textContent = count;
+      if (count > 0) {
+        badge.classList.add('active');
+      } else {
+        badge.classList.remove('active');
+      }
+    }
+
+    function showSystemToast(alert) {
+      const container = document.getElementById('systemToastContainer');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      const isResolved = alert.status === 'resolved';
+      const severity = (alert.severity || 'warning').toLowerCase();
+      const toastType = isResolved ? 'resolved' : (severity === 'critical' ? 'critical' : 'warning');
+
+      toast.className = `system-toast ${toastType}`;
+
+      let icon = '⚠️';
+      let title = 'CẢNH BÁO HỆ THỐNG';
+      if (isResolved) {
+        icon = '✅';
+        title = 'ĐÃ PHỤC HỒI';
+      } else if (severity === 'critical') {
+        icon = '🚨';
+        title = 'NGUY HIỂM (CRITICAL)';
+      }
+
+      toast.innerHTML = `
+        <div class="system-toast-header">
+          <span>${icon}</span>
+          <span>${title}: ${escapeHtml(alert.alertName || 'Alert')}</span>
+        </div>
+        <div class="system-toast-body">${escapeHtml(alert.summary || '')}</div>
+      `;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(20px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 7000);
+    }
+
+    async function initSystemAlertSignalR() {
+      const authToken = localStorage.getItem('access_token');
+      if (!authToken) return;
+
+      try {
+        const connection = new signalR.HubConnectionBuilder()
+          .withUrl("/hubs/system-alerts", {
+            accessTokenFactory: () => localStorage.getItem('access_token')
+          })
+          .withAutomaticReconnect()
+          .build();
+
+        connection.on("ReceiveSystemAlert", (alert) => {
+          if (!alert || !alert.fingerprint) return;
+
+          if (alert.status === 'resolved') {
+            activeAlerts.delete(alert.fingerprint);
+          } else {
+            activeAlerts.set(alert.fingerprint, alert);
+          }
+
+          updateAlertBadge();
+          showSystemToast(alert);
+        });
+
+        await connection.start();
+        console.log("Connected to SignalR SystemAlertHub");
+      } catch (err) {
+        console.warn("SignalR SystemAlertHub connection error:", err);
+      }
     }
   </script>
 </body>
