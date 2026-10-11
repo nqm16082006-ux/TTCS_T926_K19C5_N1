@@ -34,15 +34,19 @@ namespace EventTicketBooking.Api.Controllers
         private readonly AppDbContext _context;
         private readonly IOrderAuditService _orderAuditService;
         private readonly IHubContext<SeatStatusHub>? _hubContext;
+        private readonly IRefundService _refundService;
 
         public EventController(
             AppDbContext context,
             IOrderAuditService? orderAuditService = null,
-            IHubContext<SeatStatusHub>? hubContext = null)
+            IHubContext<SeatStatusHub>? hubContext = null,
+            IRefundService? refundService = null,
+            IPaymentGateway? paymentGateway = null)
         {
             _context = context;
             _orderAuditService = orderAuditService ?? new OrderAuditService(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
             _hubContext = hubContext;
+            _refundService = refundService ?? new RefundService(context, _orderAuditService, paymentGateway);
         }
 
         /// <summary>
@@ -1222,6 +1226,7 @@ namespace EventTicketBooking.Api.Controllers
                 var actorType = isAdmin ? "ADMIN" : "ORGANIZER";
 
                 var pendingSeatIdsToRelease = new List<Guid>();
+                var paidOrderIdsToRefund = new List<Guid>();
 
                 // 3. Xử lý các đơn hàng Pending và Paid
                 foreach (var order in relatedOrders)
@@ -1231,6 +1236,7 @@ namespace EventTicketBooking.Api.Controllers
                     if (order.Status == OrderStatus.Pending)
                     {
                         order.Status = OrderStatus.Cancelled;
+                        order.CancelReason = OrderCancelReasons.ShowtimeCancelled;
                         order.UpdatedAt = now;
 
                         if (order.OrderItems != null && order.OrderItems.Any())
@@ -1254,7 +1260,9 @@ namespace EventTicketBooking.Api.Controllers
                     else if (order.Status == OrderStatus.Paid)
                     {
                         order.Status = OrderStatus.Cancelled;
+                        order.CancelReason = OrderCancelReasons.ShowtimeCancelled;
                         order.UpdatedAt = now;
+                        paidOrderIdsToRefund.Add(order.Id);
 
                         _orderAuditService.Record(
                             order.Id,
@@ -1299,6 +1307,24 @@ namespace EventTicketBooking.Api.Controllers
                 if (transaction != null)
                 {
                     await transaction.CommitAsync();
+                }
+
+                // 5. Task 2 (Story S-47): Xử lý hoàn tiền cho các đơn hàng đã thanh toán (100% giá trị đơn, gọi ngoài transaction DB)
+                if (paidOrderIdsToRefund.Any())
+                {
+                    try
+                    {
+                        await _refundService.ProcessShowtimeRefundsAsync(
+                            showtimeId,
+                            paidOrderIdsToRefund,
+                            actorType,
+                            userDisplayName,
+                            currentUserId.Value);
+                    }
+                    catch
+                    {
+                        // Lỗi refund của background không làm hỏng kết quả trả về huỷ suất diễn đã commit
+                    }
                 }
 
                 // Bắn thông báo SignalR nếu có client đang theo dõi

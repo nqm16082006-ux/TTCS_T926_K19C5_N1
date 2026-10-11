@@ -34,4 +34,61 @@ namespace EventTicketBooking.Api.DTOs
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
     }
+
+    /// <summary>
+    /// Kết quả thực thi xử lý hoàn tiền của RefundService (Story S-47 & S-45).
+    /// </summary>
+    public class RefundExecutionResult
+    {
+        public Guid OrderId { get; set; }
+        public Guid? RefundId { get; set; }
+        public int Amount { get; set; }
+        public string Status { get; set; } = "Requested";
+        public bool Success { get; set; }
+        public bool Skipped { get; set; }
+        public string? FailureReason { get; set; }
+        public string Message { get; set; } = string.Empty;
+
+        public static RefundExecutionResult CreateSuccess(Guid orderId, Guid refundId, int amount, string message) => new()
+        {
+            OrderId = orderId,
+            RefundId = refundId,
+            Amount = amount,
+            Status = "Succeeded",
+            Success = true,
+            Message = message
+        };
+
+        public static RefundExecutionResult CreateManualPending(Guid orderId, Guid refundId, int amount, string? reason, string message) => new()
+        {
+            OrderId = orderId,
+            RefundId = refundId,
+            Amount = amount,
+            Status = "ManualPending",
+            Success = true,
+            FailureReason = reason,
+            Message = message
+        };
+
+        public static RefundExecutionResult CreateFailed(Guid orderId, Guid? refundId, int amount, string failureReason, string message) => new()
+        {
+            OrderId = orderId,
+            RefundId = refundId,
+            Amount = amount,
+            Status = "Failed",
+            Success = false,
+            FailureReason = failureReason,
+            Message = message
+        };
+
+        public static RefundExecutionResult CreateSkipped(Guid orderId, Guid? refundId, string message) => new()
+        {
+            OrderId = orderId,
+            RefundId = refundId,
+            Status = "Skipped",
+            Skipped = true,
+            Success = true,
+            Message = message
+        };
+    }
 }

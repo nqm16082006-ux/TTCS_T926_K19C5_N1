@@ -437,6 +437,62 @@ namespace EventTicketBooking.Tests
             }
         }
 
+        [Fact]
+        public async Task T46_ProcessPaymentWebhook_ShowtimeCancelledOrder_DoesNotRestoreToPaid()
+        {
+            // Arrange (S-47): Webhook thành công đến muộn cho đơn đã bị huỷ do suất diễn bị huỷ (SHOWTIME_CANCELLED)
+            var dbPath = Path.Combine(Path.GetTempPath(), $"s47_showcancel_{Guid.NewGuid():N}.db");
+            try
+            {
+                using (var setupContext = CreateSqliteDbContext(dbPath))
+                {
+                    await SeedDatabaseAsync(setupContext, status: OrderStatus.Cancelled);
+                    var orderToUpdate = await setupContext.Orders.FirstAsync();
+                    orderToUpdate.CancelReason = OrderCancelReasons.ShowtimeCancelled;
+                    await setupContext.SaveChangesAsync();
+                }
+
+                var fakeGateway = new FakePaymentGateway
+                {
+                    SimulatedTransactionId = "TXN_LATE_SHOWCANCEL_888",
+                    CustomWebhookParseResult = WebhookParseResult.CreateSuccess(
+                        orderCode: 9988776655L,
+                        amount: 300000,
+                        transactionId: "TXN_LATE_SHOWCANCEL_888",
+                        paidAt: DateTimeOffset.UtcNow
+                    )
+                };
+
+                string webhookPayload = "{\"code\":\"00\",\"data\":{\"orderCode\":9988776655,\"amount\":300000,\"reference\":\"TXN_LATE_SHOWCANCEL_888\"}}";
+                string signature = "VALID_SIG_SHOWCANCEL";
+
+                // Act
+                using var context = CreateSqliteDbContext(dbPath);
+                var paymentService = new PaymentService(context, fakeGateway, NullLogger<PaymentService>.Instance, new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
+                bool processed = await paymentService.ProcessPaymentWebhookAsync(webhookPayload, signature);
+
+                // Assert: Webhook trả 200 OK để cổng không retry lặp, nhưng đơn được bỏ qua an toàn và không bị chuyển thành Paid
+                Assert.True(processed);
+
+                using var verifyContext = CreateSqliteDbContext(dbPath);
+                var order = await verifyContext.Orders.FirstOrDefaultAsync();
+                var soldSeatsCount = await verifyContext.Seats.CountAsync(s => s.Status == "SOLD");
+
+                Assert.NotNull(order);
+                Assert.Equal(OrderStatus.Cancelled, order.Status);
+                Assert.Equal(OrderCancelReasons.ShowtimeCancelled, order.CancelReason);
+                Assert.Equal(0, soldSeatsCount);
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                if (File.Exists(dbPath))
+                {
+                    try { File.Delete(dbPath); } catch { }
+                }
+            }
+        }
+
         #endregion
     }
 }
