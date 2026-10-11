@@ -24,6 +24,21 @@ namespace EventTicketBooking.Api.DTOs
         public bool HasFailedPayment { get; set; }
         public bool IsPaymentProcessing { get; set; }
         public List<OrderItemDto> Items { get; set; } = new();
+
+        /// <summary>Story S-45: lý do huỷ đơn (null nếu chưa huỷ).</summary>
+        public string? CancelReason { get; set; }
+
+        /// <summary>Story S-45: trạng thái yêu cầu hoàn tiền (null nếu chưa có yêu cầu).</summary>
+        public string? RefundStatus { get; set; }
+
+        /// <summary>Story S-45: số tiền hoàn (VND).</summary>
+        public int? RefundAmount { get; set; }
+
+        /// <summary>Story S-45: lý do hoàn tiền thất bại.</summary>
+        public string? RefundFailureReason { get; set; }
+
+        /// <summary>Story S-45: thời điểm cập nhật cuối của yêu cầu hoàn tiền.</summary>
+        public DateTimeOffset? RefundUpdatedAt { get; set; }
     }
 
     public class OrderItemDto

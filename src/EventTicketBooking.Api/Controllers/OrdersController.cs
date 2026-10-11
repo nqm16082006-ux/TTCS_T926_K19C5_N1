@@ -6,12 +6,15 @@ using System.Threading.Tasks;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.DTOs.Common;
+using EventTicketBooking.Api.DTOs.Payment;
 using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Middlewares;
+using EventTicketBooking.Api.Options;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace EventTicketBooking.Api.Controllers
 {
@@ -24,13 +27,17 @@ namespace EventTicketBooking.Api.Controllers
         private readonly EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue? _ticketEmailQueue;
         private readonly EventTicketBooking.Api.Services.Interfaces.ITicketService _ticketService;
         private readonly EventTicketBooking.Api.Services.Interfaces.IOrderAuditService _orderAuditService;
+        private readonly EventTicketBooking.Api.Services.Interfaces.IPaymentGateway? _paymentGateway;
+        private readonly RefundPolicyOptions _refundPolicy;
 
         public OrdersController(
             AppDbContext context,
             ILogger<OrdersController> logger,
             EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue? ticketEmailQueue = null,
             EventTicketBooking.Api.Services.Interfaces.ITicketService? ticketService = null,
-            EventTicketBooking.Api.Services.Interfaces.IOrderAuditService? orderAuditService = null)
+            EventTicketBooking.Api.Services.Interfaces.IOrderAuditService? orderAuditService = null,
+            EventTicketBooking.Api.Services.Interfaces.IPaymentGateway? paymentGateway = null,
+            IOptions<RefundPolicyOptions>? refundPolicy = null)
         {
             _context = context;
             _logger = logger;
@@ -38,6 +45,8 @@ namespace EventTicketBooking.Api.Controllers
             _ticketService = ticketService ?? new EventTicketBooking.Api.Services.Implementations.TicketService();
             _orderAuditService = orderAuditService ?? new EventTicketBooking.Api.Services.Implementations.OrderAuditService(
                 context, Microsoft.Extensions.Logging.Abstractions.NullLogger<EventTicketBooking.Api.Services.Implementations.OrderAuditService>.Instance);
+            _paymentGateway = paymentGateway;
+            _refundPolicy = refundPolicy?.Value ?? new RefundPolicyOptions();
         }
 
         /// <summary>
@@ -323,6 +332,7 @@ namespace EventTicketBooking.Api.Controllers
         /// </summary>
         [HttpGet("{orderId:guid}")]
         [RequireRole]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -341,6 +351,7 @@ namespace EventTicketBooking.Api.Controllers
                     .ThenInclude(oi => oi.Seat)
                         .ThenInclude(s => s.SeatCategory)
                 .Include(o => o.PaymentTransaction)
+                .Include(o => o.Refunds)
                 .FirstOrDefaultAsync(o => o.Id == orderId);
 
             if (order == null)
@@ -387,9 +398,341 @@ namespace EventTicketBooking.Api.Controllers
         }
 
         /// <summary>
-        /// S-27 Task 2: Gửi lại email vé điện tử
-        /// POST /api/v1/orders/{orderId}/resend-tickets
+        /// S-45: Xem trước điều kiện huỷ và số tiền hoàn dự kiến trước khi khách xác nhận.
+        /// GET /api/v1/orders/{orderId}/refund-preview
         /// </summary>
+        [HttpGet("{orderId:guid}/refund-preview")]
+        [RequireRole]
+        [ProducesResponseType(typeof(ApiResponse<RefundPreviewDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetRefundPreview(Guid orderId)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+
+            var order = await _context.Orders
+                .AsNoTracking()
+                .Include(o => o.Showtime)
+                .Include(o => o.OrderItems)
+                .Include(o => o.Refunds)
+                .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
+
+            if (order.UserId != userId)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền thao tác trên đơn hàng này."));
+
+            var preview = BuildRefundPreview(order);
+            return Ok(ApiResponse<RefundPreviewDto>.SuccessResult(preview, "Lấy thông tin chính sách huỷ và hoàn tiền thành công."));
+        }
+
+        /// <summary>
+        /// S-45: Khách huỷ đơn đã thanh toán trước hạn và tạo yêu cầu hoàn tiền theo chính sách demo.
+        /// POST /api/v1/orders/{orderId}/cancel
+        /// </summary>
+        [HttpPost("{orderId:guid}/cancel")]
+        [RequireRole]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> CancelOrderAndRefund(Guid orderId)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+
+            // ===== Bước 1: Kiểm tra điều kiện và chuyển trạng thái đơn trong transaction ngắn =====
+            Refund newRefund;
+            Order orderForDto;
+
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? dbTransaction = null;
+            if (_context.Database.IsRelational() && _context.Database.CurrentTransaction == null)
+            {
+                dbTransaction = await _context.Database.BeginTransactionAsync();
+            }
+
+            try
+            {
+                // Khóa dòng đơn hàng trên PostgreSQL để chống đua với webhook/check-in (S-45)
+                IQueryable<Order> orderQuery = _context.Orders
+                    .Include(o => o.Showtime)
+                    .Include(o => o.OrderItems)
+                    .Include(o => o.Refunds)
+                    .Where(o => o.Id == orderId);
+
+                if (_context.Database.IsNpgsql())
+                {
+                    orderQuery = _context.Orders
+                        .FromSqlRaw("SELECT * FROM orders WHERE \"Id\" = {0} FOR UPDATE", orderId)
+                        .Include(o => o.Showtime)
+                        .Include(o => o.OrderItems)
+                        .Include(o => o.Refunds);
+                }
+
+                var order = await orderQuery.FirstOrDefaultAsync();
+
+                if (order == null)
+                    return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
+
+                if (order.UserId != userId)
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền thao tác trên đơn hàng này."));
+
+                // Kiểm tra lại toàn bộ điều kiện tại thời điểm khách xác nhận (S-45 AC)
+                var preview = BuildRefundPreview(order);
+                if (!preview.Eligible)
+                {
+                    return StatusCode(StatusCodes.Status409Conflict, ApiResponse<object>.FailureResult(preview.Message));
+                }
+
+                var now = DateTimeOffset.UtcNow;
+                var oldStatus = order.Status.ToString();
+
+                order.Status = OrderStatus.Cancelled;
+                order.CancelReason = OrderCancelReasons.CustomerRefund;
+                order.UpdatedAt = now;
+
+                newRefund = new Refund
+                {
+                    OrderId = order.Id,
+                    Amount = preview.EstimatedRefundAmount,
+                    Status = "Requested",
+                    CreatedAt = now,
+                    UpdatedAt = now
+                };
+                _context.Refunds.Add(newRefund);
+
+                _orderAuditService.Record(
+                    order.Id,
+                    "ORDER",
+                    order.Id.ToString(),
+                    "ORDER_CANCELLED",
+                    oldStatus,
+                    OrderStatus.Cancelled.ToString(),
+                    "USER",
+                    $"user:{userId}",
+                    userId,
+                    "Khách hàng chủ động huỷ đơn sau khi đã thanh toán (S-45).");
+
+                _orderAuditService.Record(
+                    order.Id,
+                    "REFUND",
+                    newRefund.Id.ToString(),
+                    "REFUND_REQUESTED",
+                    null,
+                    "Requested",
+                    "USER",
+                    $"user:{userId}",
+                    userId,
+                    $"Tạo yêu cầu hoàn tiền {preview.EstimatedRefundAmount} VND theo chính sách demo {preview.RefundPercent}% (chưa Product duyệt).");
+
+                await _context.SaveChangesAsync();
+
+                if (dbTransaction != null)
+                {
+                    await dbTransaction.CommitAsync();
+                }
+
+                orderForDto = order;
+            }
+            finally
+            {
+                if (dbTransaction != null)
+                {
+                    await dbTransaction.DisposeAsync();
+                }
+            }
+
+            // ===== Bước 2: Gọi cổng hoàn tiền NGOÀI transaction (không giữ khóa DB khi chờ mạng) =====
+            RefundCreationResult gatewayResult;
+            bool gatewaySupportsRefund = _paymentGateway != null && _paymentGateway.SupportsRefund;
+
+            if (_paymentGateway == null || !gatewaySupportsRefund)
+            {
+                gatewayResult = RefundCreationResult.CreateManualRequired(
+                    "Cổng thanh toán hiện tại không hỗ trợ hoàn tiền tự động. Yêu cầu được ghi nhận chờ xử lý thủ công.");
+            }
+            else
+            {
+                try
+                {
+                    var paymentTx = await _context.PaymentTransactions
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(pt => pt.OrderId == orderId);
+
+                    gatewayResult = await _paymentGateway.CreateRefundAsync(new RefundCreationRequest
+                    {
+                        OrderId = orderId,
+                        OrderCode = paymentTx?.OrderCode ?? 0,
+                        Amount = newRefund.Amount,
+                        Description = $"Hoan tien don {orderId}"
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi khi gọi cổng hoàn tiền cho đơn hàng {OrderId} (S-45)", orderId);
+                    gatewayResult = RefundCreationResult.CreateFailure(
+                        "Không liên lạc được với cổng thanh toán. Yêu cầu hoàn tiền đang chờ xử lý.");
+                }
+            }
+
+            // ===== Bước 3: Cập nhật trạng thái yêu cầu hoàn tiền =====
+            // Không bao giờ ghi Succeeded nếu cổng không xác nhận thành công.
+            var refundEntity = await _context.Refunds.FirstAsync(r => r.OrderId == orderId);
+            refundEntity.UpdatedAt = DateTimeOffset.UtcNow;
+
+            string refundNewStatus;
+            string auditAction;
+            string responseMessage;
+
+            if (gatewayResult.Success)
+            {
+                refundEntity.Status = "Succeeded";
+                refundNewStatus = "Succeeded";
+                auditAction = "REFUND_SUCCEEDED";
+                responseMessage = $"Đơn hàng đã được huỷ. Hoàn tiền {refundEntity.Amount} VND thành công (mô phỏng qua cổng {(_paymentGateway?.ProviderName ?? "Mock")}).";
+            }
+            else if (!gatewaySupportsRefund || gatewayResult.ManualRequired)
+            {
+                refundEntity.Status = "ManualPending";
+                refundNewStatus = "ManualPending";
+                auditAction = "REFUND_MANUAL_PENDING";
+                refundEntity.FailureReason = gatewayResult.ErrorMessage;
+                responseMessage = "Đơn hàng đã được huỷ. Yêu cầu hoàn tiền đang chờ xử lý thủ công (cổng thanh toán không hỗ trợ hoàn tự động).";
+            }
+            else
+            {
+                refundEntity.Status = "Failed";
+                refundNewStatus = "Failed";
+                auditAction = "REFUND_FAILED";
+                refundEntity.FailureReason = gatewayResult.ErrorMessage ?? "Cổng thanh toán trả về kết quả hoàn tiền thất bại.";
+                responseMessage = "Đơn hàng đã được huỷ nhưng hoàn tiền THẤT BẠI — cần xử lý tiếp. Vui lòng liên hệ hỗ trợ.";
+            }
+
+            _orderAuditService.Record(
+                orderId,
+                "REFUND",
+                refundEntity.Id.ToString(),
+                auditAction,
+                "Requested",
+                refundNewStatus,
+                "SYSTEM",
+                $"gateway:{(_paymentGateway?.ProviderName ?? "none")}",
+                null,
+                refundEntity.FailureReason ?? $"Hoàn tiền {refundEntity.Amount} VND.");
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("S-45: Đơn hàng {OrderId} đã huỷ; yêu cầu hoàn tiền {RefundId} ở trạng thái {Status}.", orderId, refundEntity.Id, refundEntity.Status);
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Message = responseMessage,
+                Data = new
+                {
+                    order = MapToDto(orderForDto),
+                    refund = MapRefundToDto(refundEntity)
+                }
+            });
+        }
+
+        /// <summary>
+        /// S-45: Tính điều kiện huỷ và số tiền hoàn dự kiến (server là nguồn duy nhất quyết định số tiền).
+        /// CHÚ Ý: 24 giờ và 90% là chính sách DEMO chưa Product phê duyệt.
+        /// </summary>
+        private RefundPreviewDto BuildRefundPreview(Order order)
+        {
+            int percent = Math.Clamp(_refundPolicy.RefundPercent, 0, 100);
+            var preview = new RefundPreviewDto
+            {
+                OrderId = order.Id,
+                TotalAmount = order.TotalAmount,
+                EstimatedRefundAmount = (int)Math.Floor(order.TotalAmount * (decimal)percent / 100m),
+                CutoffHours = _refundPolicy.CutoffHours,
+                RefundPercent = percent,
+                ShowtimeStartTime = order.Showtime?.StartTime,
+                Reason = "OK",
+                Message = "Đơn hàng đủ điều kiện huỷ và hoàn tiền."
+            };
+
+            // 1. Đơn đã có yêu cầu hoàn tiền → không tạo trùng (chống bấm lặp)
+            if (order.Refunds != null && order.Refunds.Any())
+            {
+                preview.Eligible = false;
+                preview.Reason = "DUPLICATE_REFUND";
+                preview.Message = "Đơn hàng đã có yêu cầu hoàn tiền trước đó. Không thể huỷ hoặc hoàn tiền thêm.";
+                return preview;
+            }
+
+            // 2. Chỉ đơn đã thanh toán (Paid) được huỷ theo luồng này
+            if (order.Status != OrderStatus.Paid)
+            {
+                preview.Eligible = false;
+                preview.Reason = order.Status == OrderStatus.Cancelled ? "ALREADY_CANCELLED"
+                    : order.Status == OrderStatus.Expired ? "ORDER_EXPIRED"
+                    : "NOT_PAID";
+                preview.Message = preview.Reason switch
+                {
+                    "ALREADY_CANCELLED" => "Đơn hàng đã được huỷ trước đó.",
+                    "ORDER_EXPIRED" => "Đơn hàng đã hết hạn, không thể huỷ theo luồng hoàn tiền.",
+                    _ => $"Đơn hàng không ở trạng thái chờ huỷ (trạng thái hiện tại: {order.Status}). Chỉ đơn đã thanh toán mới được huỷ và hoàn tiền."
+                };
+                return preview;
+            }
+
+            // 3. Không huỷ được nếu bất kỳ vé nào trong đơn đã check-in
+            if (order.OrderItems != null && order.OrderItems.Any(oi => oi.IsCheckedIn))
+            {
+                preview.Eligible = false;
+                preview.Reason = "TICKET_ALREADY_CHECKED_IN";
+                preview.Message = "Đơn hàng có vé đã sử dụng để vào cửa. Không thể huỷ và hoàn tiền.";
+                return preview;
+            }
+
+            // 4. Phải trước hạn chót: giờ chiếu - CutoffHours (chính sách demo)
+            if (order.Showtime == null)
+            {
+                preview.Eligible = false;
+                preview.Reason = "NO_SHOWTIME";
+                preview.Message = "Không tìm thấy thông tin suất chiếu của đơn hàng.";
+                return preview;
+            }
+
+            var startTime = order.Showtime.StartTime.Kind == DateTimeKind.Utc
+                ? order.Showtime.StartTime
+                : DateTime.SpecifyKind(order.Showtime.StartTime, DateTimeKind.Utc);
+            var refundDeadline = new DateTimeOffset(startTime).AddHours(-_refundPolicy.CutoffHours);
+            preview.RefundDeadline = refundDeadline;
+
+            if (DateTimeOffset.UtcNow > refundDeadline)
+            {
+                preview.Eligible = false;
+                preview.Reason = "AFTER_CUTOFF";
+                preview.Message = $"Đã quá hạn huỷ vé. Hạn chót là trước giờ chiếu {_refundPolicy.CutoffHours} giờ (UTC: {refundDeadline:dd/MM/yyyy HH:mm}).";
+                return preview;
+            }
+
+            preview.Eligible = true;
+            return preview;
+        }
+
+        private static RefundDto MapRefundToDto(Refund refund) => new()
+        {
+            Id = refund.Id,
+            OrderId = refund.OrderId,
+            Amount = refund.Amount,
+            Status = refund.Status,
+            FailureReason = refund.FailureReason,
+            CreatedAt = refund.CreatedAt,
+            UpdatedAt = refund.UpdatedAt
+        };
+
         [HttpPost("{orderId:guid}/resend-tickets")]
         [RequireRole]
         public async Task<IActionResult> ResendTickets(Guid orderId)
@@ -594,6 +937,7 @@ namespace EventTicketBooking.Api.Controllers
                     .ThenInclude(oi => oi.Seat)
                         .ThenInclude(s => s.SeatCategory)
                 .Include(o => o.PaymentTransaction)
+                .Include(o => o.Refunds)
                 .ToListAsync();
 
             var orderDtos = orders.Select(MapToDto).ToList();
@@ -616,6 +960,9 @@ namespace EventTicketBooking.Api.Controllers
                 .Select(oi => $"{oi.Seat.Row}{oi.Seat.SeatNumber}")
                 .ToList() ?? new List<string>();
 
+            // Story S-45: hiển thị trạng thái hoàn tiền (bản ghi mới nhất nếu có)
+            var latestRefund = order.Refunds?.OrderByDescending(r => r.UpdatedAt).FirstOrDefault();
+
             return new OrderDto
             {
                 Id = order.Id,
@@ -637,6 +984,11 @@ namespace EventTicketBooking.Api.Controllers
                 HasFailedPayment = order.PaymentTransaction != null &&
                     (order.PaymentTransaction.Status == "FAILED" || order.PaymentTransaction.Status == "CANCELLED"),
                 IsPaymentProcessing = order.PaymentTransaction != null && order.PaymentTransaction.Status == "PENDING",
+                CancelReason = order.CancelReason,
+                RefundStatus = latestRefund?.Status,
+                RefundAmount = latestRefund?.Amount,
+                RefundFailureReason = latestRefund?.FailureReason,
+                RefundUpdatedAt = latestRefund?.UpdatedAt,
                 Items = order.OrderItems?.Select(oi => new OrderItemDto
                 {
                     Id = oi.Id,

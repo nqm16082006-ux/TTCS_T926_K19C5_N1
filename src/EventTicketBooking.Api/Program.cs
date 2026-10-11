@@ -144,6 +144,14 @@ var paymentProvider = builder.Configuration["PaymentSettings:Provider"]
                      ?? builder.Configuration["PAYMENT_PROVIDER"]
                      ?? "Mock";
 
+// Story S-45: chính sách huỷ vé & hoàn tiền (giá trị demo 24 giờ / 90% — chờ Product duyệt)
+builder.Services.Configure<EventTicketBooking.Api.Options.RefundPolicyOptions>(
+    builder.Configuration.GetSection(EventTicketBooking.Api.Options.RefundPolicyOptions.SectionName));
+
+// Story S-45: cấu hình mô phỏng kết quả hoàn tiền của Mock gateway ("Succeeded" hoặc "Failed")
+builder.Services.Configure<EventTicketBooking.Api.Options.MockPaymentOptions>(
+    builder.Configuration.GetSection(EventTicketBooking.Api.Options.MockPaymentOptions.SectionName));
+
 // Nếu môi trường là Production mà cấu hình dùng cổng giả lập (Mock) -> Từ chối khởi động
 if (builder.Environment.IsProduction() && paymentProvider.Equals("Mock", StringComparison.OrdinalIgnoreCase))
 {

@@ -94,6 +94,38 @@ namespace EventTicketBooking.Api.DTOs.Payment
     }
 
     /// <summary>
+    /// Yêu cầu hoàn tiền gửi tới cổng thanh toán (Story S-45).
+    /// </summary>
+    public class RefundCreationRequest
+    {
+        public Guid OrderId { get; set; }
+        public long OrderCode { get; set; }
+        public int Amount { get; set; }
+        public string Description { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Kết quả gọi cổng hoàn tiền (Story S-45).
+    /// ManualRequired = true nghĩa là cổng không hỗ trợ hoàn tự động → cần xử lý thủ công.
+    /// </summary>
+    public class RefundCreationResult
+    {
+        public bool Success { get; set; }
+        public bool ManualRequired { get; set; }
+        public string? RefundReference { get; set; }
+        public string? ErrorMessage { get; set; }
+
+        public static RefundCreationResult CreateSuccess(string? refundReference = null) =>
+            new() { Success = true, RefundReference = refundReference };
+
+        public static RefundCreationResult CreateFailure(string errorMessage) =>
+            new() { Success = false, ErrorMessage = errorMessage };
+
+        public static RefundCreationResult CreateManualRequired(string reason) =>
+            new() { Success = false, ManualRequired = true, ErrorMessage = reason };
+    }
+
+    /// <summary>
     /// DTO chuẩn hóa kết quả thanh toán từ bất kỳ nguồn nào (webhook, return query, gateway direct query) (Task T-42).
     /// </summary>
     public class PaymentResultDto

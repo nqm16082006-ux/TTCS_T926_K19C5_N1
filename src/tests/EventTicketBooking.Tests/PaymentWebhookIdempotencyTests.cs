@@ -381,6 +381,62 @@ namespace EventTicketBooking.Tests
             }
         }
 
+        [Fact]
+        public async Task T46_ProcessPaymentWebhook_PaymentCancelled_MarksPaymentCancelledReason_NoRefund()
+        {
+            // Arrange (S-45): webhook báo huỷ thanh toán cho đơn đang chờ
+            var dbPath = Path.Combine(Path.GetTempPath(), $"s45_paycancel_{Guid.NewGuid():N}.db");
+            try
+            {
+                using (var setupContext = CreateSqliteDbContext(dbPath))
+                {
+                    await SeedDatabaseAsync(setupContext, status: OrderStatus.Pending);
+                }
+
+                var fakeGateway = new FakePaymentGateway
+                {
+                    SimulatedTransactionId = "TXN_PAYMENT_CANCELLED_555",
+                    CustomWebhookParseResult = new WebhookParseResult
+                    {
+                        IsValid = true,
+                        OrderCode = 9988776655L,
+                        Amount = 300000,
+                        Status = PaymentStatus.Cancelled,
+                        TransactionId = "TXN_PAYMENT_CANCELLED_555",
+                        PaidAt = DateTimeOffset.UtcNow
+                    }
+                };
+
+                string webhookPayload = "{\"code\":\"00\",\"data\":{\"orderCode\":9988776655,\"amount\":300000,\"reference\":\"TXN_PAYMENT_CANCELLED_555\"}}";
+                string signature = "VALID_SIG_PAYCANCEL";
+
+                // Act
+                using var context = CreateSqliteDbContext(dbPath);
+                var paymentService = new PaymentService(context, fakeGateway, NullLogger<PaymentService>.Instance, new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
+                bool processed = await paymentService.ProcessPaymentWebhookAsync(webhookPayload, signature);
+
+                // Assert: đơn huỷ với lý do huỷ GIAO DỊCH, không tạo yêu cầu hoàn tiền
+                Assert.True(processed);
+
+                using var verifyContext = CreateSqliteDbContext(dbPath);
+                var order = await verifyContext.Orders.FirstOrDefaultAsync();
+                var refunds = await verifyContext.Refunds.ToListAsync();
+
+                Assert.NotNull(order);
+                Assert.Equal(OrderStatus.Cancelled, order.Status);
+                Assert.Equal(OrderCancelReasons.PaymentCancelled, order.CancelReason);
+                Assert.Empty(refunds);
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                if (File.Exists(dbPath))
+                {
+                    try { File.Delete(dbPath); } catch { }
+                }
+            }
+        }
+
         #endregion
     }
 }
