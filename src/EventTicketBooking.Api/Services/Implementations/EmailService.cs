@@ -176,10 +176,10 @@ public class EmailService : IEmailService
 
     private async Task SendEmailInternalAsync(MimeMessage message, string toEmail)
     {
-        var user = GetSetting("Username", "User", "SmtpUser");
-        var pass = GetSetting("Password", "SmtpPass");
-        var host = GetSetting("Server", "Host", "SmtpHost") ?? "smtp.gmail.com";
-        var senderEmail = GetSetting("SenderEmail", "FromEmail") ?? user;
+        var user = GetSetting("Username", "User", "SmtpUser")?.Trim();
+        var pass = GetSetting("Password", "SmtpPass")?.Trim();
+        var host = (GetSetting("Server", "Host", "SmtpHost") ?? "smtp.gmail.com").Trim();
+        var senderEmail = (GetSetting("SenderEmail", "FromEmail") ?? user)?.Trim();
 
         if (string.IsNullOrWhiteSpace(user) ||
             string.IsNullOrWhiteSpace(pass) ||
@@ -187,6 +187,12 @@ public class EmailService : IEmailService
         {
             _logger.LogWarning("SMTP not fully configured. Simulating email delivery to {Email} with subject '{Subject}' for dev/test environment.", toEmail, message.Subject);
             return;
+        }
+
+        // Tự động chuẩn hóa mật khẩu ứng dụng Gmail (loại bỏ khoảng trắng nếu có)
+        if (host.Contains("gmail.com", StringComparison.OrdinalIgnoreCase))
+        {
+            pass = pass.Replace(" ", "");
         }
 
         try
@@ -198,6 +204,8 @@ public class EmailService : IEmailService
             }
 
             using var client = new SmtpClient();
+            client.CheckCertificateRevocation = false;
+            client.ServerCertificateValidationCallback = (s, c, h, e) => true;
             var socketOptions = port == 465
                 ? SecureSocketOptions.SslOnConnect
                 : SecureSocketOptions.StartTls;
