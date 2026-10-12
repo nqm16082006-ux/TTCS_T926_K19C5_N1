@@ -35,6 +35,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<OfflineCheckInRecord> OfflineCheckInRecords { get; set; } = null!;
         public DbSet<RefundRequest> RefundRequests { get; set; } = null!;
         public DbSet<Refund> Refunds { get; set; } = null!;
+        public DbSet<SystemAlert> SystemAlerts { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -501,6 +502,34 @@ namespace EventTicketBooking.Api.Data
                       .WithMany()
                       .HasForeignKey(x => x.SyncedByUserId)
                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // S-43: Cấu hình bảng SystemAlerts lưu lịch sử cảnh báo hệ thống
+            modelBuilder.Entity<SystemAlert>(entity =>
+            {
+                entity.ToTable("SystemAlerts");
+                entity.HasKey(a => a.Id);
+                entity.Property(a => a.Fingerprint).IsRequired().HasMaxLength(128);
+                entity.Property(a => a.AlertName).IsRequired().HasMaxLength(200);
+                entity.Property(a => a.Severity).IsRequired().HasMaxLength(50);
+                entity.Property(a => a.Summary).IsRequired().HasMaxLength(1000);
+                entity.Property(a => a.Status).IsRequired().HasMaxLength(50);
+                entity.Property(a => a.StartedAt).IsRequired();
+                entity.Property(a => a.ResolvedAt).IsRequired(false);
+                entity.Property(a => a.CreatedAt).IsRequired();
+                entity.Property(a => a.LastUpdatedAt).IsRequired();
+
+                // Partial unique index: Chống duplicate bản ghi cùng Fingerprint đang ở trạng thái 'firing'
+                entity.HasIndex(a => a.Fingerprint)
+                    .IsUnique()
+                    .HasFilter("\"Status\" = 'firing'")
+                    .HasDatabaseName("IX_SystemAlerts_Fingerprint_Firing");
+
+                entity.HasIndex(a => a.Status)
+                    .HasDatabaseName("IX_SystemAlerts_Status");
+
+                entity.HasIndex(a => a.LastUpdatedAt)
+                    .HasDatabaseName("IX_SystemAlerts_LastUpdatedAt");
             });
         }
 

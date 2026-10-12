@@ -70,3 +70,7 @@ artifacts/
 
 *.xlsx
 test_e2e*.ps1
+
+# Monitoring secrets (Story S-43)
+monitoring/secrets/*
+!monitoring/secrets/*.example

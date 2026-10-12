@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Giám Sát Hệ Thống & Cảnh Báo (S-43) - Event Ticket Booking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+  <style>
+    :root {
+      --bg-app: #f8fafc;
+      --bg-surface: #ffffff;
+      --border-color: #e2e8f0;
+      --border-focus: #6366f1;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-light: #eef2ff;
+      --text-heading: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      --shadow-lg: 0 12px 28px -4px rgba(0, 0, 0, 0.08), 0 6px 12px -4px rgba(0, 0, 0, 0.03);
+      --danger-bg: #fef2f2;
+      --danger-border: #fecaca;
+      --danger-text: #dc2626;
+      --success-bg: #ecfdf5;
+      --success-border: #a7f3d0;
+      --success-text: #059669;
+      --warning-bg: #fffbeb;
+      --warning-border: #fde68a;
+      --warning-text: #d97706;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-app);
+      color: var(--text-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Navbar */
+    .navbar {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 14px 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 19px;
+      font-weight: 800;
+      color: var(--text-heading);
+      text-decoration: none;
+      letter-spacing: -0.3px;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--primary) 0%, #3730a3 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 20px;
+      box-shadow: 0 4px 10px rgba(79, 70, 229, 0.25);
+    }
+
+    .brand-badge {
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      color: #b45309;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-link {
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-body);
+      padding: 8px 14px;
+      border-radius: 10px;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-link:hover {
+      background: var(--bg-app);
+      color: var(--primary);
+    }
+
+    .nav-link.active {
+      background: var(--primary-light);
+      color: var(--primary);
+      border: 1px solid #c7d2fe;
+    }
+
+    .user-menu {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-app);
+      padding: 6px 14px 6px 8px;
+      border-radius: 9999px;
+      border: 1px solid var(--border-color);
+    }
+
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .user-name {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text-heading);
+    }
+
+    .btn-logout {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-logout:hover {
+      background: var(--danger-bg);
+      border-color: var(--danger-border);
+      color: var(--danger-text);
+    }
+
+    /* Chuông và Dropdown Alert */
+    .system-alert-bell {
+      position: relative;
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-body);
+      transition: all 0.2s ease;
+    }
+
+    .system-alert-bell:hover {
+      background: #e2e8f0;
+    }
+
+    .system-alert-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 9px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #fff;
+      background: #64748b;
+    }
+
+    .system-alert-badge.active {
+      background: #ef4444;
+      animation: alertPulse 1.5s infinite;
+    }
+
+    @keyframes alertPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+    }
+
+    .system-alert-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      width: 380px;
+      max-width: 90vw;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: dropdownFadeIn 0.2s ease-out;
+    }
+
+    @keyframes dropdownFadeIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .system-alert-dropdown-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f8fafc;
+    }
+
+    .dropdown-header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--text-heading);
+    }
+
+    .dropdown-firing-badge {
+      background: #fee2e2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 9999px;
+    }
+
+    .dropdown-refresh-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 0.95rem;
+      padding: 4px;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+
+    .dropdown-refresh-btn:hover {
+      background: #e2e8f0;
+    }
+
+    .system-alert-dropdown-list {
+      max-height: 380px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .dropdown-alert-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: background 0.15s;
+    }
+
+    .dropdown-alert-item:hover {
+      background: #f8fafc;
+    }
+
+    .dropdown-alert-item.critical {
+      border-left: 4px solid #dc2626;
+    }
+
+    .dropdown-alert-item.warning {
+      border-left: 4px solid #f59e0b;
+    }
+
+    .dropdown-alert-item.resolved {
+      border-left: 4px solid #10b981;
+      opacity: 0.9;
+    }
+
+    .dropdown-alert-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .dropdown-alert-title {
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--text-heading);
+    }
+
+    .dropdown-alert-status-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .dropdown-alert-status-badge.critical {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .dropdown-alert-status-badge.warning {
+      background: #fef3c7;
+      color: #b45309;
+    }
+
+    .dropdown-alert-status-badge.resolved {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .dropdown-alert-summary {
+      font-size: 0.8rem;
+      color: var(--text-body);
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .dropdown-alert-time {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .dropdown-empty-state {
+      padding: 28px 16px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .system-alert-dropdown-footer {
+      padding: 10px 16px;
+      border-top: 1px solid var(--border-color);
+      background: #f8fafc;
+      text-align: center;
+    }
+
+    .dropdown-view-all-link {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--primary);
+      text-decoration: none;
+      display: block;
+    }
+
+    .dropdown-view-all-link:hover {
+      text-decoration: underline;
+    }
+
+    /* Toast Container */
+    .system-toast-container {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 400px;
+      pointer-events: none;
+    }
+
+    .system-toast {
+      pointer-events: auto;
+      padding: 14px 18px;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      font-size: 0.875rem;
+      line-height: 1.45;
+      color: #fff;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .system-toast.warning {
+      background: #d97706;
+      border-left: 6px solid #f59e0b;
+    }
+
+    .system-toast.critical {
+      background: #dc2626;
+      border-left: 6px solid #991b1b;
+      animation: alertPulse 1.5s infinite;
+    }
+
+    .system-toast.resolved {
+      background: #059669;
+      border-left: 6px solid #10b981;
+    }
+
+    .system-toast-header {
+      font-weight: 700;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .system-toast-body {
+      font-size: 0.85rem;
+      opacity: 0.95;
+    }
+
+    /* Main Container */
+    .main-container {
+      flex: 1;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 32px 36px 60px;
+    }
+
+    /* Page Header */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 28px;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .page-title {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--text-heading);
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .page-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    .btn-grafana {
+      background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+      color: #ffffff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35);
+      transition: all 0.2s ease;
+    }
+
+    .btn-grafana:hover {
+      background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(249, 115, 22, 0.45);
+    }
+
+    /* Overview Banner */
+    .overview-banner {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .overview-status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .status-pill.healthy {
+      background: #ecfdf5;
+      color: #059669;
+      border: 1px solid #a7f3d0;
+    }
+
+    .status-pill.firing {
+      background: #fef2f2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+      animation: alertPulse 1.5s infinite;
+    }
+
+    .overview-meta {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* Metrics Architecture Cards */
+    .section-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--text-heading);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .metric-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+    }
+
+    .metric-card:hover {
+      border-color: var(--border-focus);
+      box-shadow: var(--shadow-md);
+    }
+
+    .metric-card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text-heading);
+    }
+
+    .metric-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .metric-icon.indigo { background: #e0e7ff; color: #4338ca; }
+    .metric-icon.red { background: #fee2e2; color: #dc2626; }
+    .metric-icon.amber { background: #fef3c7; color: #d97706; }
+    .metric-icon.purple { background: #f3e8ff; color: #7e22ce; }
+    .metric-icon.rose { background: #ffe4e6; color: #e11d48; }
+
+    .metric-card-desc {
+      font-size: 12.5px;
+      color: var(--text-body);
+      line-height: 1.45;
+    }
+
+    .metric-threshold {
+      margin-top: auto;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border-color);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    /* History Table Section */
+    .history-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .history-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .filter-tabs {
+      display: flex;
+      background: var(--bg-app);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      gap: 4px;
+    }
+
+    .filter-tab {
+      background: transparent;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .filter-tab.active {
+      background: var(--bg-surface);
+      color: var(--primary);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .btn-refresh {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      color: var(--text-body);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-refresh:hover {
+      background: var(--bg-app);
+      border-color: #cbd5e1;
+    }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      padding: 12px 16px;
+      background: #f8fafc;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border-color);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 13px;
+      color: var(--text-body);
+      vertical-align: middle;
+    }
+
+    tbody tr:hover {
+      background: #fafbfd;
+    }
+
+    .alert-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .alert-status-badge.firing {
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+
+    .alert-status-badge.resolved {
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+
+    .severity-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .severity-tag.critical {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+
+    .severity-tag.warning {
+      background: #fffbeb;
+      color: #d97706;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 16px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- S-43: Toast Container -->
+  <div id="systemToastContainer" class="system-toast-container"></div>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <a href="./admin-users.html" class="brand">
+      <div class="brand-icon" style="background: linear-gradient(135deg, #3525cd 0%, #4f46e5 100%);">👑</div>
+      <span>EventPulse</span>
+      <span class="brand-badge">Admin Portal</span>
+    </a>
+    <div class="nav-links">
+      <a href="./events.html" class="nav-link">🎪 Quản lý Sự kiện</a>
+      <a href="./admin-users.html" class="nav-link">👥 Quản lý Người dùng</a>
+      <a href="./admin-monitoring.html" class="nav-link active">📊 Giám sát hệ thống</a>
+      <a href="./public-events.html" class="nav-link">🌐 Đặt vé Public</a>
+    </div>
+    <div class="user-menu">
+      <div class="system-alert-bell-wrapper" style="position: relative;">
+        <button id="systemAlertBellBtn" class="system-alert-bell" title="Cảnh báo hệ thống" type="button" onclick="toggleAlertDropdown(event)">
+          🔔 <span id="systemAlertBadge" class="system-alert-badge">0</span>
+        </button>
+        <!-- Dropdown Popover -->
+        <div id="systemAlertDropdown" class="system-alert-dropdown" style="display: none;">
+          <div class="system-alert-dropdown-header">
+            <div class="dropdown-header-title">
+              <span>🔔 Cảnh báo hệ thống</span>
+              <span id="dropdownFiringBadge" class="dropdown-firing-badge" style="display: none;">0 đang diễn ra</span>
+            </div>
+            <button type="button" class="dropdown-refresh-btn" onclick="fetchSystemAlertsHistory()" title="Làm mới">🔄</button>
+          </div>
+          <div id="systemAlertDropdownList" class="system-alert-dropdown-list">
+            <!-- Alert items rendered here -->
+          </div>
+          <div class="system-alert-dropdown-footer">
+            <a href="./admin-monitoring.html" class="dropdown-view-all-link">📊 Xem tất cả cảnh báo & Giám sát &rarr;</a>
+          </div>
+        </div>
+      </div>
+      <div class="user-chip">
+        <div class="user-avatar" id="navAvatar">A</div>
+        <span class="user-name" id="navUsername">Admin</span>
+      </div>
+      <button class="btn-logout" onclick="logout()">Đăng xuất</button>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="main-container">
+
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">📊 Giám Sát Hệ Thống & Cảnh Báo</h1>
+        <p class="page-subtitle">Theo dõi trạng thái quá tải, tỉ lệ lỗi, độ trễ và toàn bộ lịch sử cảnh báo vận hành hệ thống (Story S-43).</p>
+      </div>
+      <a id="btnOpenGrafana" href="http://localhost:3000/d/s43-system-overview" target="_blank" rel="noopener noreferrer" class="btn-grafana">
+        📈 Mở Grafana chi tiết &rarr;
+      </a>
+    </div>
+
+    <!-- Overview Banner -->
+    <div class="overview-banner">
+      <div class="overview-status-indicator">
+        <div id="systemStatusPill" class="status-pill healthy">
+          <span id="statusPillDot">🟢</span>
+          <span id="statusPillText">Hệ thống đang hoạt động bình thường</span>
+        </div>
+        <span id="firingCountLabel" class="overview-meta">0 cảnh báo đang hoạt động</span>
+      </div>
+      <div class="overview-meta">
+        Nguồn cảnh báo: <strong>Prometheus &rarr; Alertmanager &rarr; Webhook API &rarr; SignalR</strong>
+      </div>
+    </div>
+
+    <!-- 5 Metrics Group Cards -->
+    <h2 class="section-title">🛡️ 5 Nhóm Chỉ Số Giám Sát Cốt Lõi (S-43)</h2>
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-card-header">
+          <div class="metric-icon indigo">🌐</div>
+          <span>1. HTTP Request Rate</span>
+        </div>
+        <p class="metric-card-desc">Theo dõi tổng thông lượng HTTP requests và phân bố mã phản hồi (2xx, 4xx, 5xx, 429 Rate Limiting S-41).</p>
+        <div class="metric-threshold">Mục tiêu: Đánh giá tải lưu lượng & sức chứa</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-card-header">
+          <div class="metric-icon red">💥</div>
+          <span>2. HTTP 5xx Error Rate</span>
+        </div>
+        <p class="metric-card-desc">Tỉ lệ lỗi máy chủ quá tải trên tổng lưu lượng. Ngăn chặn sự cố sập luồng bán vé và giao dịch.</p>
+        <div class="metric-threshold">Ngưỡng: Warning &gt;2% (2m) | Critical &gt;5% (1m)</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-card-header">
+          <div class="metric-icon amber">⏱️</div>
+          <span>3. Latency p95 (Histogram)</span>
+        </div>
+        <p class="metric-card-desc">Độ trễ phân vị 95 của các yêu cầu HTTP. Phát hiện sớm nghẽn mạng hoặc database connection pool cạn kiệt.</p>
+        <div class="metric-threshold">Ngưỡng: Warning &gt;1.0s (3m) | Critical &gt;2.5s (1m)</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-card-header">
+          <div class="metric-icon purple">💺</div>
+          <span>4. Seat Hold Conflicts</span>
+        </div>
+        <p class="metric-card-desc">Tốc độ tranh chấp giữ ghế đồng thời qua Redis hoặc Database concurrency. Phát hiện bot hoặc flash-sale hot.</p>
+        <div class="metric-threshold">Ngưỡng: Warning &gt;10/phút (2m) | Critical &gt;50/phút (1m)</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-card-header">
+          <div class="metric-icon rose">🚫</div>
+          <span>5. Rejected Webhooks</span>
+        </div>
+        <p class="metric-card-desc">Số lần webhook thanh toán (PayOS) bị từ chối do sai chữ ký, dữ liệu trống hoặc bất thường.</p>
+        <div class="metric-threshold">Ngưỡng: Warning &gt;3 lần (5m) | Critical &gt;10 lần (5m)</div>
+      </div>
+    </div>
+
+    <!-- History Table Section -->
+    <div class="history-card">
+      <div class="history-toolbar">
+        <h2 class="section-title" style="margin-bottom: 0;">📜 Lịch Sử Cảnh Báo Hệ Thống</h2>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div class="filter-tabs">
+            <button type="button" class="filter-tab active" onclick="setFilter('all', this)">Tất cả</button>
+            <button type="button" class="filter-tab" onclick="setFilter('firing', this)">Đang cảnh báo (Firing)</button>
+            <button type="button" class="filter-tab" onclick="setFilter('resolved', this)">Đã phục hồi (Resolved)</button>
+          </div>
+          <button type="button" class="btn-refresh" onclick="fetchTableAlerts()">
+            🔄 Làm mới
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Mức độ</th>
+              <th>Trạng thái</th>
+              <th>Tên cảnh báo</th>
+              <th>Nội dung chi tiết</th>
+              <th>Thời điểm bắt đầu</th>
+              <th>Thời điểm phục hồi</th>
+              <th>Cập nhật cuối</th>
+            </tr>
+          </thead>
+          <tbody id="alertsTableBody">
+            <tr>
+              <td colspan="7" class="empty-state">⌛ Đang tải lịch sử cảnh báo...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const GRAFANA_URL = window.GRAFANA_URL || 'http://localhost:3000/d/s43-system-overview';
+    let currentFilter = 'all';
+    let alertsData = [];
+    let isAlertDropdownOpen = false;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        window.location.href = './login.html?returnUrl=' + encodeURIComponent(window.location.pathname);
+        return;
+      }
+
+      const userInfoRaw = localStorage.getItem('user_info');
+      if (userInfoRaw) {
+        try {
+          const user = JSON.parse(userInfoRaw);
+          const name = user.fullName || user.username || user.email;
+          document.getElementById('navUsername').textContent = name;
+          document.getElementById('navAvatar').textContent = name.charAt(0).toUpperCase();
+
+          const roles = (user.roles || []).map(r => (r || '').toLowerCase());
+          if (!roles.includes('admin')) {
+            alert('Bạn không có quyền truy cập trang Giám sát hệ thống (Chỉ dành riêng cho Admin).');
+            window.location.href = './events.html';
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // Thiết lập link Grafana
+      const grafanaBtn = document.getElementById('btnOpenGrafana');
+      if (grafanaBtn) {
+        grafanaBtn.href = GRAFANA_URL;
+      }
+
+      fetchTableAlerts();
+      initSystemAlertSignalR();
+    });
+
+    function setFilter(filter, btn) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      renderTable();
+    }
+
+    async function fetchTableAlerts() {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
+      try {
+        const res = await fetch('/api/system-alerts?limit=50', {
+          headers: {
+            'Authorization': 'Bearer ' + token
+          }
+        });
+
+        if (res.status === 401) {
+          logout();
+          return;
+        }
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            alertsData = json.data;
+            updateOverviewStats();
+            renderTable();
+            renderAlertDropdown();
+          }
+        } else {
+          document.getElementById('alertsTableBody').innerHTML =
+            '<tr><td colspan="7" class="empty-state" style="color: var(--danger-text);">Không thể tải dữ liệu từ máy chủ.</td></tr>';
+        }
+      } catch (err) {
+        document.getElementById('alertsTableBody').innerHTML =
+          '<tr><td colspan="7" class="empty-state" style="color: var(--danger-text);">Lỗi kết nối máy chủ API.</td></tr>';
+      }
+    }
+
+    function updateOverviewStats() {
+      const firingCount = alertsData.filter(a => a.status === 'firing').length;
+
+      // Banner overview
+      const statusPill = document.getElementById('systemStatusPill');
+      const statusPillDot = document.getElementById('statusPillDot');
+      const statusPillText = document.getElementById('statusPillText');
+      const firingCountLabel = document.getElementById('firingCountLabel');
+
+      if (firingCount > 0) {
+        statusPill.className = 'status-pill firing';
+        statusPillDot.textContent = '🚨';
+        statusPillText.textContent = `Hệ thống có ${firingCount} cảnh báo đang diễn ra!`;
+      } else {
+        statusPill.className = 'status-pill healthy';
+        statusPillDot.textContent = '🟢';
+        statusPillText.textContent = 'Hệ thống đang hoạt động bình thường';
+      }
+
+      firingCountLabel.textContent = `${firingCount} cảnh báo đang hoạt động`;
+
+      // Badge chuông
+      const badge = document.getElementById('systemAlertBadge');
+      if (badge) {
+        badge.textContent = firingCount;
+        if (firingCount > 0) badge.classList.add('active');
+        else badge.classList.remove('active');
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('alertsTableBody');
+      if (!tbody) return;
+
+      let filtered = alertsData;
+      if (currentFilter === 'firing') {
+        filtered = alertsData.filter(a => a.status === 'firing');
+      } else if (currentFilter === 'resolved') {
+        filtered = alertsData.filter(a => a.status === 'resolved');
+      }
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Không có bản ghi cảnh báo nào phù hợp bộ lọc.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(alert => {
+        const isResolved = alert.status === 'resolved';
+        const severity = (alert.severity || 'warning').toLowerCase();
+        const sevClass = severity === 'critical' ? 'critical' : 'warning';
+        const sevIcon = severity === 'critical' ? '🚨' : '⚠️';
+        const statusClass = isResolved ? 'resolved' : 'firing';
+        const statusIcon = isResolved ? '✅' : '🔴';
+        const statusLabel = isResolved ? 'Đã phục hồi' : 'Đang diễn ra (Firing)';
+
+        return `
+          <tr>
+            <td>
+              <span class="severity-tag ${sevClass}">${sevIcon} ${escapeHtml(severity)}</span>
+            </td>
+            <td>
+              <span class="alert-status-badge ${statusClass}">${statusIcon} ${statusLabel}</span>
+            </td>
+            <td>
+              <strong style="color: var(--text-heading); font-size: 13.5px;">${escapeHtml(alert.alertName || 'Alert')}</strong>
+            </td>
+            <td style="max-width: 320px; line-height: 1.4;">
+              ${escapeHtml(alert.summary || '-')}
+            </td>
+            <td style="white-space: nowrap; font-size: 12.5px; color: var(--text-muted);">
+              ${formatDateTime(alert.startedAt)}
+            </td>
+            <td style="white-space: nowrap; font-size: 12.5px; color: var(--text-muted);">
+              ${isResolved && alert.resolvedAt ? formatDateTime(alert.resolvedAt) : '-'}
+            </td>
+            <td style="white-space: nowrap; font-size: 12.5px; color: var(--text-muted);">
+              ${formatDateTime(alert.lastUpdatedAt)}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function formatDateTime(isoStr) {
+      if (!isoStr) return '-';
+      try {
+        const d = new Date(isoStr);
+        return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ' +
+               d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      } catch {
+        return isoStr;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function logout() {
+      localStorage.clear();
+      window.location.href = './login.html';
+    }
+
+    // --- Dropdown Chuông Logic ---
+    function renderAlertDropdown() {
+      const listContainer = document.getElementById('systemAlertDropdownList');
+      const firingBadge = document.getElementById('dropdownFiringBadge');
+      if (!listContainer) return;
+
+      const firingCount = alertsData.filter(a => a.status === 'firing').length;
+      if (firingBadge) {
+        if (firingCount > 0) {
+          firingBadge.textContent = `${firingCount} đang diễn ra`;
+          firingBadge.style.display = 'inline-block';
+        } else {
+          firingBadge.style.display = 'none';
+        }
+      }
+
+      if (alertsData.length === 0) {
+        listContainer.innerHTML = '<div class="dropdown-empty-state">Không có cảnh báo hệ thống nào.</div>';
+        return;
+      }
+
+      listContainer.innerHTML = alertsData.slice(0, 20).map(alert => {
+        const isResolved = alert.status === 'resolved';
+        const severity = (alert.severity || 'warning').toLowerCase();
+        const typeClass = isResolved ? 'resolved' : (severity === 'critical' ? 'critical' : 'warning');
+        const icon = isResolved ? '✅' : (severity === 'critical' ? '🚨' : '⚠️');
+        const statusLabel = isResolved ? 'Đã phục hồi' : (severity === 'critical' ? 'CRITICAL' : 'WARNING');
+
+        let timeText = `Bắt đầu: ${formatDateTime(alert.startedAt)}`;
+        if (isResolved && alert.resolvedAt) {
+          timeText += ` • Xong: ${formatDateTime(alert.resolvedAt)}`;
+        }
+
+        return `
+          <div class="dropdown-alert-item ${typeClass}">
+            <div class="dropdown-alert-top">
+              <span class="dropdown-alert-title">${icon} ${escapeHtml(alert.alertName || 'Alert')}</span>
+              <span class="dropdown-alert-status-badge ${typeClass}">${statusLabel}</span>
+            </div>
+            <div class="dropdown-alert-summary">${escapeHtml(alert.summary || '')}</div>
+            <div class="dropdown-alert-time">${timeText}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleAlertDropdown(e) {
+      if (e) e.stopPropagation();
+      const dropdown = document.getElementById('systemAlertDropdown');
+      if (!dropdown) return;
+      isAlertDropdownOpen = !isAlertDropdownOpen;
+      dropdown.style.display = isAlertDropdownOpen ? 'flex' : 'none';
+      if (isAlertDropdownOpen) {
+        renderAlertDropdown();
+      }
+    }
+
+    document.addEventListener('click', (e) => {
+      const wrapper = document.querySelector('.system-alert-bell-wrapper');
+      if (wrapper && !wrapper.contains(e.target)) {
+        const dropdown = document.getElementById('systemAlertDropdown');
+        if (dropdown && isAlertDropdownOpen) {
+          isAlertDropdownOpen = false;
+          dropdown.style.display = 'none';
+        }
+      }
+    });
+
+    async function fetchSystemAlertsHistory() {
+      await fetchTableAlerts();
+    }
+
+    function showSystemToast(alert) {
+      const container = document.getElementById('systemToastContainer');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      const isResolved = alert.status === 'resolved';
+      const severity = (alert.severity || 'warning').toLowerCase();
+      const toastType = isResolved ? 'resolved' : (severity === 'critical' ? 'critical' : 'warning');
+
+      toast.className = `system-toast ${toastType}`;
+
+      let icon = '⚠️';
+      let title = 'CẢNH BÁO HỆ THỐNG';
+      if (isResolved) {
+        icon = '✅';
+        title = 'ĐÃ PHỤC HỒI';
+      } else if (severity === 'critical') {
+        icon = '🚨';
+        title = 'NGUY HIỂM (CRITICAL)';
+      }
+
+      toast.innerHTML = `
+        <div class="system-toast-header">
+          <span>${icon}</span>
+          <span>${title}: ${escapeHtml(alert.alertName || 'Alert')}</span>
+        </div>
+        <div class="system-toast-body">${escapeHtml(alert.summary || '')}</div>
+      `;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(20px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 7000);
+    }
+
+    async function initSystemAlertSignalR() {
+      const authToken = localStorage.getItem('access_token');
+      if (!authToken) return;
+
+      try {
+        const connection = new signalR.HubConnectionBuilder()
+          .withUrl("/hubs/system-alerts", {
+            accessTokenFactory: () => localStorage.getItem('access_token')
+          })
+          .withAutomaticReconnect()
+          .build();
+
+        connection.on("ReceiveSystemAlert", (alert) => {
+          if (!alert || !alert.fingerprint) return;
+
+          const isResolved = alert.status === 'resolved';
+
+          if (isResolved) {
+            const existingFiring = alertsData.find(a => a.fingerprint === alert.fingerprint && a.status === 'firing');
+            if (existingFiring) {
+              existingFiring.status = 'resolved';
+              existingFiring.resolvedAt = alert.resolvedAt || new Date().toISOString();
+              existingFiring.lastUpdatedAt = new Date().toISOString();
+              if (alert.summary) existingFiring.summary = alert.summary;
+            } else {
+              alertsData.unshift({
+                id: 'rt-' + Date.now(),
+                fingerprint: alert.fingerprint,
+                alertName: alert.alertName || 'Alert',
+                severity: alert.severity || 'warning',
+                summary: alert.summary || '',
+                status: 'resolved',
+                startedAt: alert.startedAt || new Date().toISOString(),
+                resolvedAt: alert.resolvedAt || new Date().toISOString(),
+                lastUpdatedAt: new Date().toISOString()
+              });
+            }
+          } else {
+            const existingFiring = alertsData.find(a => a.fingerprint === alert.fingerprint && a.status === 'firing');
+            if (existingFiring) {
+              existingFiring.summary = alert.summary || existingFiring.summary;
+              existingFiring.severity = alert.severity || existingFiring.severity;
+              existingFiring.alertName = alert.alertName || existingFiring.alertName;
+              existingFiring.lastUpdatedAt = new Date().toISOString();
+            } else {
+              alertsData.unshift({
+                id: 'rt-' + Date.now(),
+                fingerprint: alert.fingerprint,
+                alertName: alert.alertName || 'Alert',
+                severity: alert.severity || 'warning',
+                summary: alert.summary || '',
+                status: 'firing',
+                startedAt: alert.startedAt || new Date().toISOString(),
+                resolvedAt: null,
+                lastUpdatedAt: new Date().toISOString()
+              });
+            }
+          }
+
+          updateOverviewStats();
+          renderTable();
+          renderAlertDropdown();
+          showSystemToast(alert);
+        });
+
+        await connection.start();
+        console.log("Connected to SignalR SystemAlertHub");
+      } catch (err) {
+        console.warn("SignalR SystemAlertHub connection error:", err);
+      }
+    }
+  </script>
+</body>
+</html>

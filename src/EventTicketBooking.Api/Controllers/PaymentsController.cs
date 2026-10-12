@@ -24,18 +24,21 @@ namespace EventTicketBooking.Api.Controllers
         private readonly IPaymentGateway _paymentGateway;
         private readonly ILogger<PaymentsController> _logger;
         private readonly EventTicketBooking.Api.Data.AppDbContext _context;
+        private readonly EventTicketBooking.Api.Metrics.IAppMetrics? _metrics;
 
         [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
         public PaymentsController(
             IPaymentService paymentService,
             IPaymentGateway paymentGateway,
             ILogger<PaymentsController> logger,
-            EventTicketBooking.Api.Data.AppDbContext? context = null)
+            EventTicketBooking.Api.Data.AppDbContext? context = null,
+            EventTicketBooking.Api.Metrics.IAppMetrics? metrics = null)
         {
             _paymentService = paymentService;
             _paymentGateway = paymentGateway;
             _logger = logger;
             _context = context!;
+            _metrics = metrics;
         }
 
         public PaymentsController(
@@ -128,6 +131,7 @@ namespace EventTicketBooking.Api.Controllers
 
                 if (string.IsNullOrWhiteSpace(payload))
                 {
+                    _metrics?.RecordWebhookRejected(_paymentGateway?.ProviderName?.ToLowerInvariant() ?? "unknown", "empty_payload");
                     return BadRequest(
                         ApiResponse<object>.FailureResult("Webhook payload rỗng."));
                 }
@@ -171,6 +175,8 @@ namespace EventTicketBooking.Api.Controllers
                         DateTimeOffset.UtcNow,
                         "MissingSignature");
 
+                    _metrics?.RecordWebhookRejected(_paymentGateway?.ProviderName?.ToLowerInvariant() ?? "unknown", "missing_signature");
+
                     return Unauthorized(
                         ApiResponse<object>.FailureResult(
                             "Webhook thiếu chữ ký xác thực."));
@@ -190,6 +196,8 @@ namespace EventTicketBooking.Api.Controllers
                         DateTimeOffset.UtcNow,
                         "InvalidSignature");
 
+                    _metrics?.RecordWebhookRejected(_paymentGateway?.ProviderName?.ToLowerInvariant() ?? "unknown", "invalid_signature");
+
                     return Unauthorized(
                         ApiResponse<object>.FailureResult(
                             "Chữ ký webhook không hợp lệ."));
@@ -203,6 +211,7 @@ namespace EventTicketBooking.Api.Controllers
 
                 if (!isProcessed)
                 {
+                    _metrics?.RecordWebhookRejected(_paymentGateway?.ProviderName?.ToLowerInvariant() ?? "unknown", "invalid_data");
                     return BadRequest(
                         ApiResponse<object>.FailureResult(
                             "Xử lý webhook thất bại."));
