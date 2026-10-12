@@ -37,6 +37,17 @@ namespace EventTicketBooking.Api.Services.Interfaces
         Task<PaymentResultDto?> QueryPaymentStatusAsync(long orderCode, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Thực thi lệnh hoàn tiền qua cổng thanh toán (Jira Story S-48).
+        /// </summary>
+        Task<RefundExecutionResult> ExecuteRefundAsync(RefundExecutionRequest request, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Truy vấn trạng thái hoàn tiền trực tiếp từ cổng thanh toán (Jira Story S-48).
+        /// Phục vụ đối soát idempotency trước khi retry để tránh hoàn tiền trùng lặp.
+        /// </summary>
+        Task<RefundStatusDto?> QueryRefundStatusAsync(string? refundTransactionId, long orderCode, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Cổng hiện tại có hỗ trợ hoàn tiền tự động không (Story S-45).
         /// payOS theo tài liệu công bố không có API hoàn tiền → false.
         /// </summary>

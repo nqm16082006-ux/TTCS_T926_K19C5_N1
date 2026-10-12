@@ -927,6 +927,10 @@ namespace EventTicketBooking.Tests
                 }
                 return Task.FromResult(RefundCreationResult.CreateFailure("Cổng mô phỏng hoàn tiền thất bại cho đơn này."));
             }
+            public Task<EventTicketBooking.Api.DTOs.Payment.RefundExecutionResult> ExecuteRefundAsync(RefundExecutionRequest request, System.Threading.CancellationToken cancellationToken = default) =>
+                Task.FromResult(EventTicketBooking.Api.DTOs.Payment.RefundExecutionResult.CreateFailure("NOT_IMPLEMENTED", "Stub", isRetryable: false));
+            public Task<RefundStatusDto?> QueryRefundStatusAsync(string? refundTransactionId, long orderCode, System.Threading.CancellationToken cancellationToken = default) =>
+                Task.FromResult<RefundStatusDto?>(null);
         }
 
         #endregion

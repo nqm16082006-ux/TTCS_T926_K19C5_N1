@@ -68,15 +68,55 @@ namespace EventTicketBooking.Tests.Mocks
             return Task.FromResult<PaymentResultDto?>(null);
         }
 
+        public bool RefundShouldSucceed { get; set; } = true;
+        public string SimulatedRefundTransactionId { get; set; } = "REF_FAKE_123";
+        public string SimulatedRefundErrorCode { get; set; } = "NETWORK_TIMEOUT";
+        public string SimulatedRefundErrorMessage { get; set; } = "Mô phỏng timeout mạng.";
+        public bool SimulatedRefundIsRetryable { get; set; } = true;
+        public Func<RefundExecutionRequest, Task<RefundExecutionResult>>? CustomRefundHandler { get; set; }
+        public Func<string?, long, Task<RefundStatusDto?>>? CustomQueryRefundHandler { get; set; }
+        public List<RefundExecutionRequest> RecordedRefundRequests { get; } = new();
+
+        public Task<RefundExecutionResult> ExecuteRefundAsync(RefundExecutionRequest request, CancellationToken cancellationToken = default)
+        {
+            RecordedRefundRequests.Add(request);
+
+            if (CustomRefundHandler != null)
+            {
+                return CustomRefundHandler(request);
+            }
+
+            if (RefundShouldSucceed)
+            {
+                return Task.FromResult(RefundExecutionResult.CreateSuccess(SimulatedRefundTransactionId));
+            }
+            else
+            {
+                return Task.FromResult(RefundExecutionResult.CreateFailure(
+                    SimulatedRefundErrorCode,
+                    SimulatedRefundErrorMessage,
+                    SimulatedRefundIsRetryable));
+            }
+        }
+
+        public Task<RefundStatusDto?> QueryRefundStatusAsync(string? refundTransactionId, long orderCode, CancellationToken cancellationToken = default)
+        {
+            if (CustomQueryRefundHandler != null)
+            {
+                return CustomQueryRefundHandler(refundTransactionId, orderCode);
+            }
+
+            return Task.FromResult<RefundStatusDto?>(null);
+        }
+
         // Story S-45: mô phỏng hoàn tiền cho kiểm thử
         public bool SupportsRefund { get; set; } = true;
         public bool ShouldRefundSucceed { get; set; } = true;
-        public string SimulatedRefundErrorMessage { get; set; } = "Hoàn tiền mô phỏng thất bại.";
-        public List<RefundCreationRequest> RecordedRefundRequests { get; } = new();
+        public List<RefundCreationRequest> RecordedCreationRefundRequests { get; } = new();
 
         public Task<RefundCreationResult> CreateRefundAsync(RefundCreationRequest request, CancellationToken cancellationToken = default)
         {
-            RecordedRefundRequests.Add(request);
+            RecordedCreationRefundRequests.Add(request);
 
             if (!SupportsRefund)
                 return Task.FromResult(RefundCreationResult.CreateManualRequired("Gateway không hỗ trợ hoàn tiền tự động."));

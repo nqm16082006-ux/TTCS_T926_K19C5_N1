@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S-48: Kiểm thử Hoàn tiền Tự động & Báo Kế toán - EventPulse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased">
+
+  <!-- Top Sticky Navigation Bar -->
+  <header class="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="flex items-center gap-2 group">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white flex items-center justify-center shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+            <i class="fa-solid fa-arrow-rotate-left text-lg"></i>
+          </div>
+          <div>
+            <span class="text-lg font-extrabold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">EventPulse</span>
+            <span class="text-xs font-semibold text-slate-400 block -mt-1">Testing Console</span>
+          </div>
+        </a>
+        <div class="h-6 w-px bg-slate-200 hidden sm:block"></div>
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 hidden sm:inline-flex">
+          <i class="fa-solid fa-code-branch text-[11px]"></i> Jira Story S-48
+        </span>
+      </div>
+
+      <!-- Auth & Actions -->
+      <div class="flex items-center gap-3">
+        <div id="authStatusBadge" class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200">
+          <span class="w-2 h-2 rounded-full bg-slate-400" id="authDot"></span>
+          <span id="authText">Đang kiểm tra đăng nhập...</span>
+        </div>
+        <button id="btnQuickLogin" onclick="quickLoginAdmin()" class="hidden text-xs font-bold px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition shadow-sm">
+          <i class="fa-solid fa-right-to-bracket mr-1"></i> Đăng nhập Admin
+        </button>
+        <button id="btnRefresh" onclick="loadAllData()" class="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition" title="Làm mới dữ liệu">
+          <i class="fa-solid fa-arrows-rotate" id="refreshIcon"></i>
+        </button>
+        <a href="order-audit-logs.html" class="text-xs font-semibold text-slate-600 hover:text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition hidden md:inline-flex items-center gap-1.5">
+          <i class="fa-solid fa-clipboard-list"></i> Nhật ký kiểm toán
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-6">
+
+    <!-- Hero / Information Card -->
+    <div class="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+      <div class="absolute -right-10 -bottom-10 opacity-10 text-9xl pointer-events-none select-none">
+        <i class="fa-solid fa-rotate"></i>
+      </div>
+      <div class="relative z-10 max-w-3xl">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm text-xs font-semibold text-indigo-200 mb-3 border border-white/10">
+          <i class="fa-solid fa-shield-halved text-amber-400"></i> Quy trình Hoàn tiền & Đối soát Kế toán S-48
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">
+          Bảng Điều Khiển Kiểm Thử Hoàn Tiền Thất Bại & Báo Kế Toán
+        </h1>
+        <p class="text-indigo-200/90 text-sm leading-relaxed mb-4">
+          Hệ thống tự động thử lại tối đa <strong>3 lần</strong> với <strong>exponential backoff</strong> (1 phút, 2 phút, 4 phút). Khi thất bại hoàn toàn hoặc gặp lỗi không thể thử lại (non-retryable như tài khoản đóng băng, PayOS thu hộ), lệnh sẽ tự động chuyển sang <strong>ManualReviewRequired</strong> và gửi email thông báo kèm hướng dẫn đối soát cho Kế toán.
+        </p>
+        <div class="flex flex-wrap items-center gap-4 text-xs font-semibold text-indigo-300">
+          <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Giới hạn 3 lần retry</span>
+          <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Chống hoàn tiền trùng (Idempotency)</span>
+          <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Lease Lock & Phục hồi crash</span>
+          <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Che giấu số thẻ & mật khẩu</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Metrics Row -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tổng lệnh hoàn tiền</p>
+          <h3 id="statTotalRefunds" class="text-2xl font-extrabold text-slate-800 mt-1 font-mono">0</h3>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-receipt"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-amber-600 uppercase tracking-wider">Đang chờ Retry</p>
+          <h3 id="statRetryingRefunds" class="text-2xl font-extrabold text-amber-600 mt-1 font-mono">0</h3>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-rose-600 uppercase tracking-wider">Cần Kế toán xử lý</p>
+          <h3 id="statManualReviewRefunds" class="text-2xl font-extrabold text-rose-600 mt-1 font-mono">0</h3>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Hoàn tiền thành công</p>
+          <h3 id="statSucceededRefunds" class="text-2xl font-extrabold text-emerald-600 mt-1 font-mono">0</h3>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Bar: Test Scenario Generators -->
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div>
+          <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <i class="fa-solid fa-flask-vial text-indigo-600"></i> Bảng Công Cụ Giả Lập Kịch Bản (Scenario Simulator)
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">Tạo nhanh giao dịch và kích hoạt các kịch bản lỗi mạng, lỗi vĩnh viễn hoặc thành công</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="triggerBackgroundWorker()" class="text-xs font-bold px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition flex items-center gap-1.5" title="Chạy job quét các lệnh đã đến lịch retry ngay lập tức mà không cần đợi 30s">
+            <i class="fa-solid fa-bolt text-amber-500"></i> Quét Worker Ngay
+          </button>
+          <button onclick="triggerRetryNotifications()" class="text-xs font-bold px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition flex items-center gap-1.5" title="Thử lại gửi email thông báo cho kế toán">
+            <i class="fa-solid fa-envelope-circle-check text-indigo-500"></i> Gửi lại Email Báo Kế toán
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <!-- Scenario 1: Fail & Retry -->
+        <button onclick="simulateRefund('FailRetry')" class="p-4 rounded-xl border border-amber-200 bg-amber-50/60 hover:bg-amber-100/70 text-left transition flex flex-col justify-between group">
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-xs font-extrabold uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
+                <i class="fa-solid fa-rotate text-amber-600 group-hover:rotate-180 transition-transform duration-500"></i> Kịch bản 1
+              </span>
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">Retryable Error</span>
+            </div>
+            <h3 class="font-bold text-sm text-slate-800">Giả lập Hoàn tiền thất bại (Fail & Retry)</h3>
+            <p class="text-xs text-slate-600 mt-1">
+              Mô phỏng lỗi Timeout cổng (503/Gateway Timeout). Hệ thống ghi nhận thất bại lần 1 và tự động lên lịch thử lại lần 1/3 (RetryCount = 1).
+            </p>
+          </div>
+          <div class="mt-3 text-xs font-bold text-amber-800 flex items-center gap-1">
+            <span>Kích hoạt ngay</span> <i class="fa-solid fa-arrow-right text-[10px]"></i>
+          </div>
+        </button>
+
+        <!-- Scenario 2: Non-retryable / Immediate Manual Review -->
+        <button onclick="simulateRefund('FailPermanent')" class="p-4 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100/70 text-left transition flex flex-col justify-between group">
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-xs font-extrabold uppercase tracking-wider text-rose-800 flex items-center gap-1.5">
+                <i class="fa-solid fa-ban text-rose-600"></i> Kịch bản 2
+              </span>
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-200 text-rose-900">Non-retryable</span>
+            </div>
+            <h3 class="font-bold text-sm text-slate-800">Giả lập Lỗi vĩnh viễn (Báo Kế toán ngay)</h3>
+            <p class="text-xs text-slate-600 mt-1">
+              Mô phỏng tài khoản thụ hưởng đóng băng hoặc lỗi cổng PayOS thu hộ. Dừng retry ngay lập tức, chuyển sang <strong>ManualReviewRequired</strong> và gửi email thông báo kế toán.
+            </p>
+          </div>
+          <div class="mt-3 text-xs font-bold text-rose-800 flex items-center gap-1">
+            <span>Kích hoạt ngay</span> <i class="fa-solid fa-arrow-right text-[10px]"></i>
+          </div>
+        </button>
+
+        <!-- Scenario 3: Normal Success -->
+        <button onclick="simulateRefund('Success')" class="p-4 rounded-xl border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100/70 text-left transition flex flex-col justify-between group">
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                <i class="fa-solid fa-check text-emerald-600"></i> Kịch bản 3
+              </span>
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900">Thành công</span>
+            </div>
+            <h3 class="font-bold text-sm text-slate-800">Giả lập Hoàn tiền thành công (Success)</h3>
+            <p class="text-xs text-slate-600 mt-1">
+              Hoàn tiền thành công ngay từ lần đầu tiên. Trạng thái chuyển thành <strong>Succeeded</strong>, cấp mã giao dịch hoàn tiền, không lên lịch retry.
+            </p>
+          </div>
+          <div class="mt-3 text-xs font-bold text-emerald-800 flex items-center gap-1">
+            <span>Kích hoạt ngay</span> <i class="fa-solid fa-arrow-right text-[10px]"></i>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="border-b border-slate-200">
+      <nav class="flex space-x-6" aria-label="Tabs">
+        <button id="tabBtnAll" onclick="switchTab('all')" class="border-indigo-600 text-indigo-600 py-3 px-1 border-b-2 font-bold text-sm flex items-center gap-2">
+          <i class="fa-solid fa-list-check"></i> Tất cả yêu cầu hoàn tiền
+          <span id="tabBadgeAll" class="ml-1.5 py-0.5 px-2 rounded-full text-xs bg-indigo-100 text-indigo-700 font-mono">0</span>
+        </button>
+        <button id="tabBtnManual" onclick="switchTab('manual')" class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 py-3 px-1 border-b-2 font-bold text-sm flex items-center gap-2">
+          <i class="fa-solid fa-triangle-exclamation text-rose-500"></i> Khu vực Kế toán & Xử lý thủ công
+          <span id="tabBadgeManual" class="ml-1.5 py-0.5 px-2 rounded-full text-xs bg-rose-100 text-rose-700 font-mono">0</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Tab 1: All Refunds Table -->
+    <div id="tabContentAll" class="space-y-4">
+      <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-600">
+            <thead class="bg-slate-50 text-xs uppercase font-bold text-slate-500 border-b border-slate-200">
+              <tr>
+                <th class="px-5 py-3.5">Mã Refund / Đơn</th>
+                <th class="px-5 py-3.5">Số tiền</th>
+                <th class="px-5 py-3.5">Trạng thái</th>
+                <th class="px-5 py-3.5 text-center">Số lần thử & Retry</th>
+                <th class="px-5 py-3.5">Lần thử tiếp theo</th>
+                <th class="px-5 py-3.5">Mã lỗi & Lý do</th>
+                <th class="px-5 py-3.5 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="refundsTableBody" class="divide-y divide-slate-100">
+              <tr>
+                <td colspan="7" class="px-5 py-8 text-center text-slate-400">
+                  <i class="fa-solid fa-spinner fa-spin text-xl mb-2 block"></i> Đang tải dữ liệu hoàn tiền...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Accounting & Manual Review Area -->
+    <div id="tabContentManual" class="hidden space-y-6">
+
+      <!-- Accounting Guide Alert -->
+      <div class="bg-amber-50/80 border border-amber-200 rounded-2xl p-5 flex flex-col sm:flex-row items-start gap-4">
+        <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-xl shrink-0">
+          <i class="fa-solid fa-user-tie"></i>
+        </div>
+        <div class="flex-1 text-sm text-amber-900 space-y-1">
+          <h3 class="font-extrabold text-base text-amber-950">Quy trình Hướng dẫn Dành cho Bộ phận Kế toán</h3>
+          <p>
+            Các khoản hoàn tiền dưới đây đã <strong>hết 3 lần thử lại tự động</strong> hoặc gặp lỗi vĩnh viễn (như tài khoản khách hàng đóng băng / PayOS thu hộ không có API hoàn tiền tự động). Kế toán viên vui lòng thực hiện:
+          </p>
+          <ol class="list-decimal list-inside space-y-0.5 text-xs text-amber-800 pt-1 font-medium">
+            <li>Tra cứu mã đơn hàng và số tiền đối soát trên cổng thanh toán PayOS / Sao kê ngân hàng.</li>
+            <li>Liên hệ khách hàng để xác minh số tài khoản nhận tiền hoàn.</li>
+            <li>Thực hiện lệnh chuyển khoản hoàn tiền thủ công qua Internet Banking doanh nghiệp.</li>
+            <li>Ghi nhận mã tham chiếu chuyển khoản vào nhật ký kiểm toán đơn hàng.</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Manual Review Table -->
+      <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-list-ol text-rose-500"></i> Danh sách lệnh cần xử lý thủ công (ManualReviewRequired)
+          </h3>
+          <span id="manualReviewCountBadge" class="text-xs font-bold px-2.5 py-1 bg-rose-50 text-rose-700 rounded-full border border-rose-200 font-mono">0 đơn</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-600">
+            <thead class="bg-slate-50 text-xs uppercase font-bold text-slate-500 border-b border-slate-200">
+              <tr>
+                <th class="px-5 py-3.5">Mã Refund / Đơn</th>
+                <th class="px-5 py-3.5">Số tiền</th>
+                <th class="px-5 py-3.5">Thời điểm thất bại</th>
+                <th class="px-5 py-3.5">Nguyên nhân từ chối</th>
+                <th class="px-5 py-3.5">Thông báo Kế toán</th>
+                <th class="px-5 py-3.5 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="manualReviewTableBody" class="divide-y divide-slate-100">
+              <tr>
+                <td colspan="6" class="px-5 py-8 text-center text-slate-400">
+                  Chưa có lệnh nào cần kế toán xử lý thủ công.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Email Notification Sample Preview -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <h3 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-envelope-open-text text-indigo-600"></i> Bản Xem Trước Nội Dung Thông Báo Gửi Kế Toán (Email Alert Preview)
+          </h3>
+          <span class="text-xs text-slate-500 font-mono">Idempotent • Dữ liệu đã làm sạch</span>
+        </div>
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono text-slate-700 leading-relaxed overflow-x-auto">
+          <p class="font-bold text-rose-700 text-sm mb-1">[KHẨN CẤP] Cần xử lý hoàn tiền thủ công - Đơn hàng #1092837482 (Refund #ref-a8b29f)</p>
+          <p class="text-slate-500 mb-2">Người nhận: <strong>Ban Kế toán & Tài chính</strong> &lt;accounting@eventpulse.vn&gt;</p>
+          <hr class="my-2 border-slate-200">
+          <p>• Mã hoàn tiền: <span class="text-indigo-600 font-bold">ref_d8e9...</span></p>
+          <p>• Mã đơn hàng: <span class="text-indigo-600 font-bold">#1092837482</span></p>
+          <p>• Số tiền cần hoàn: <span class="text-rose-600 font-bold">500,000 VND</span></p>
+          <p>• Lý do: Đã hết 3 lần thử lại tối đa (GATEWAY_TIMEOUT)</p>
+          <p>• Thông tin nhạy cảm: <span class="text-emerald-700 font-bold">Đã làm sạch số thẻ (****-****-****-****) và ẩn API tokens</span></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Toast / Action Output Box -->
+    <div class="bg-slate-900 text-slate-200 rounded-2xl p-4 font-mono text-xs shadow-md">
+      <div class="flex items-center justify-between mb-2">
+        <span class="font-bold text-indigo-400 flex items-center gap-2">
+          <i class="fa-solid fa-terminal"></i> Console Log & Phản hồi Máy chủ
+        </span>
+        <button onclick="document.getElementById('consoleLog').textContent = 'Sẵn sàng...'" class="text-slate-400 hover:text-white text-[11px]">Xóa log</button>
+      </div>
+      <pre id="consoleLog" class="max-h-32 overflow-y-auto whitespace-pre-wrap text-slate-300">Sẵn sàng thực hiện kiểm thử...</pre>
+    </div>
+
+  </main>
+
+  <!-- Detail Modal -->
+  <div id="detailModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-circle-info text-indigo-600"></i> Chi tiết Lệnh Hoàn Tiền
+        </h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto space-y-3 text-xs" id="modalContent">
+        <!-- Rendered by JS -->
+      </div>
+      <div class="border-t border-slate-100 pt-3 flex justify-end">
+        <button onclick="closeModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 rounded-xl text-xs transition">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+    EventTicketBooking &copy; 2026 • User Story S-48: Retry Failed Refunds and Notify Accounting
+  </footer>
+
+  <!-- Script Logic -->
+  <script>
+    let currentToken = localStorage.getItem('token') || localStorage.getItem('accessToken') || '';
+    let allRefundsData = [];
+    let manualRefundsData = [];
+
+    // Helper logging
+    function logMessage(msg) {
+      const el = document.getElementById('consoleLog');
+      const time = new Date().toLocaleTimeString();
+      el.textContent = `[${time}] ${msg}\n` + el.textContent;
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      checkAuth();
+      loadAllData();
+      // Auto refresh every 10s
+      setInterval(loadAllData, 10000);
+    });
+
+    // Check Auth Status
+    function checkAuth() {
+      const dot = document.getElementById('authDot');
+      const text = document.getElementById('authText');
+      const btn = document.getElementById('btnQuickLogin');
+
+      if (currentToken) {
+        dot.className = "w-2 h-2 rounded-full bg-emerald-500";
+        text.textContent = "Admin đã kết nối";
+        btn.classList.add('hidden');
+      } else {
+        dot.className = "w-2 h-2 rounded-full bg-rose-500";
+        text.textContent = "Chưa xác thực Admin";
+        btn.classList.remove('hidden');
+      }
+    }
+
+    // Quick Login
+    async function quickLoginAdmin() {
+      try {
+        logMessage("Đang đăng nhập nhanh tài khoản Admin...");
+        const res = await fetch('/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: 'admin@eventticket.com',
+            password: 'Admin@123456',
+            acceptCurrentTerms: true
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.accessToken) {
+          currentToken = data.accessToken;
+          localStorage.setItem('accessToken', currentToken);
+          localStorage.setItem('token', currentToken);
+          checkAuth();
+          logMessage("Đăng nhập Admin thành công!");
+          loadAllData();
+        } else {
+          logMessage("Đăng nhập thất bại: " + (data.message || JSON.stringify(data)));
+        }
+      } catch (err) {
+        logMessage("Lỗi kết nối khi đăng nhập: " + err.message);
+      }
+    }
+
+    // Tab Switcher
+    function switchTab(tab) {
+      const btnAll = document.getElementById('tabBtnAll');
+      const btnManual = document.getElementById('tabBtnManual');
+      const contentAll = document.getElementById('tabContentAll');
+      const contentManual = document.getElementById('tabContentManual');
+
+      if (tab === 'all') {
+        btnAll.className = "border-indigo-600 text-indigo-600 py-3 px-1 border-b-2 font-bold text-sm flex items-center gap-2";
+        btnManual.className = "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 py-3 px-1 border-b-2 font-bold text-sm flex items-center gap-2";
+        contentAll.classList.remove('hidden');
+        contentManual.classList.add('hidden');
+      } else {
+        btnManual.className = "border-rose-600 text-rose-600 py-3 px-1 border-b-2 font-bold text-sm flex items-center gap-2";
+        btnAll.className = "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 py-3 px-1 border-b-2 font-bold text-sm flex items-center gap-2";
+        contentManual.classList.remove('hidden');
+        contentAll.classList.add('hidden');
+      }
+    }
+
+    // Fetch All Data
+    async function loadAllData() {
+      if (!currentToken) return;
+
+      const refreshIcon = document.getElementById('refreshIcon');
+      refreshIcon.classList.add('fa-spin');
+
+      try {
+        // 1. Fetch All Refunds
+        const resAll = await fetch('/api/v1/payments/refunds?take=50', {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        if (resAll.ok) {
+          const jsonAll = await resAll.json();
+          allRefundsData = jsonAll.data || [];
+          renderAllRefundsTable(allRefundsData);
+        } else if (resAll.status === 401) {
+          currentToken = '';
+          checkAuth();
+        }
+
+        // 2. Fetch Manual Review Refunds
+        const resManual = await fetch('/api/v1/payments/refunds/manual-review', {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        if (resManual.ok) {
+          const jsonManual = await resManual.json();
+          manualRefundsData = jsonManual.data || [];
+          renderManualReviewTable(manualRefundsData);
+        }
+
+        updateMetrics();
+      } catch (err) {
+        logMessage("Lỗi khi tải dữ liệu: " + err.message);
+      } finally {
+        refreshIcon.classList.remove('fa-spin');
+      }
+    }
+
+    // Update Statistics
+    function updateMetrics() {
+      document.getElementById('statTotalRefunds').textContent = allRefundsData.length;
+      document.getElementById('tabBadgeAll').textContent = allRefundsData.length;
+
+      const retryingCount = allRefundsData.filter(r => r.status === 'RetryScheduled').length;
+      document.getElementById('statRetryingRefunds').textContent = retryingCount;
+
+      const manualCount = manualRefundsData.length;
+      document.getElementById('statManualReviewRefunds').textContent = manualCount;
+      document.getElementById('tabBadgeManual').textContent = manualCount;
+      document.getElementById('manualReviewCountBadge').textContent = `${manualCount} đơn`;
+
+      const succeededCount = allRefundsData.filter(r => r.status === 'Succeeded').length;
+      document.getElementById('statSucceededRefunds').textContent = succeededCount;
+    }
+
+    // Status Badge Helper
+    function getStatusBadge(status) {
+      switch (status) {
+        case 'Succeeded':
+          return `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"><i class="fa-solid fa-check text-[10px]"></i> Succeeded</span>`;
+        case 'RetryScheduled':
+          return `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200"><i class="fa-solid fa-clock-rotate-left text-[10px]"></i> RetryScheduled</span>`;
+        case 'ManualReviewRequired':
+          return `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200"><i class="fa-solid fa-triangle-exclamation text-[10px]"></i> ManualReviewRequired</span>`;
+        case 'Processing':
+          return `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200"><i class="fa-solid fa-circle-notch fa-spin text-[10px]"></i> Processing</span>`;
+        case 'Pending':
+          return `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">Pending</span>`;
+        default:
+          return `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700">${status}</span>`;
+      }
+    }
+
+    // Render All Refunds Table
+    function renderAllRefundsTable(refunds) {
+      const tbody = document.getElementById('refundsTableBody');
+      if (!refunds || refunds.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="px-5 py-8 text-center text-slate-400">Chưa có yêu cầu hoàn tiền nào. Hãy nhấn nút Giả lập kịch bản ở trên để thử nghiệm!</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = refunds.map(r => {
+        const shortId = r.id.substring(0, 8);
+        const amountFormatted = Number(r.amount).toLocaleString('vi-VN') + ' đ';
+        
+        // Next retry formatted
+        let nextRetryHtml = '<span class="text-slate-400">-</span>';
+        if (r.nextRetryAt && r.status === 'RetryScheduled') {
+          const nextDate = new Date(r.nextRetryAt);
+          const diffMs = nextDate - new Date();
+          const diffSec = Math.max(0, Math.round(diffMs / 1000));
+          nextRetryHtml = `<span class="font-mono text-xs text-amber-700 font-semibold" title="${nextDate.toLocaleString()}">${diffSec > 0 ? `Sau ${diffSec}s` : 'Đã đến hạn'}</span>`;
+        }
+
+        // Error display
+        const errText = r.errorMessage 
+          ? `<div class="font-mono text-xs text-rose-600 font-bold">${r.errorCode || 'Lỗi'}</div><div class="text-[11px] text-slate-500 truncate max-w-xs" title="${r.errorMessage}">${r.errorMessage}</div>`
+          : `<span class="text-slate-400 text-xs">Không có lỗi</span>`;
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="px-5 py-3.5">
+              <div class="font-mono font-bold text-indigo-600 text-xs">${shortId}...</div>
+              <div class="font-mono text-[11px] text-slate-400">Order #${r.orderCode}</div>
+            </td>
+            <td class="px-5 py-3.5 font-bold font-mono text-slate-800 text-xs">${amountFormatted}</td>
+            <td class="px-5 py-3.5">${getStatusBadge(r.status)}</td>
+            <td class="px-5 py-3.5 text-center">
+              <span class="inline-block px-2 py-0.5 rounded text-xs font-mono font-bold ${r.retryCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}">
+                ${r.retryCount} / ${r.maxRetries}
+              </span>
+              <div class="text-[10px] text-slate-400">Tổng ${r.attemptCount} lượt</div>
+            </td>
+            <td class="px-5 py-3.5">${nextRetryHtml}</td>
+            <td class="px-5 py-3.5">${errText}</td>
+            <td class="px-5 py-3.5 text-right space-x-1">
+              ${r.status === 'RetryScheduled' || r.status === 'Pending' ? `
+                <button onclick="processRefund('${r.id}')" class="px-2.5 py-1 text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg transition" title="Thử lại ngay">
+                  <i class="fa-solid fa-play mr-1"></i> Thử lại
+                </button>
+              ` : ''}
+              <button onclick="showDetail('${r.id}')" class="px-2.5 py-1 text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition" title="Xem chi tiết">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Render Manual Review Table
+    function renderManualReviewTable(refunds) {
+      const tbody = document.getElementById('manualReviewTableBody');
+      if (!refunds || refunds.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="px-5 py-8 text-center text-slate-400">Hiện tại không có lệnh hoàn tiền nào cần xử lý thủ công.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = refunds.map(r => {
+        const shortId = r.id.substring(0, 8);
+        const amountFormatted = Number(r.amount).toLocaleString('vi-VN') + ' đ';
+        const failedDate = r.failedAt ? new Date(r.failedAt).toLocaleString('vi-VN') : 'Không rõ';
+
+        // Notification status
+        let notifyBadge = r.accountingNotified
+          ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800"><i class="fa-solid fa-check text-[10px]"></i> Đã gửi email</span>`
+          : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800" title="${r.accountingNotificationError || 'Chưa gửi'}"><i class="fa-solid fa-clock text-[10px]"></i> Chưa gửi email</span>`;
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="px-5 py-3.5">
+              <div class="font-mono font-bold text-rose-600 text-xs">${shortId}...</div>
+              <div class="font-mono text-[11px] text-slate-400">Order #${r.orderCode}</div>
+            </td>
+            <td class="px-5 py-3.5 font-bold font-mono text-slate-800 text-xs">${amountFormatted}</td>
+            <td class="px-5 py-3.5 text-xs text-slate-600">${failedDate}</td>
+            <td class="px-5 py-3.5">
+              <div class="font-mono text-xs font-bold text-rose-700">${r.errorCode || 'NON_RETRYABLE'}</div>
+              <div class="text-[11px] text-slate-500 max-w-xs truncate" title="${r.errorMessage}">${r.errorMessage || 'Không có mô tả'}</div>
+            </td>
+            <td class="px-5 py-3.5">${notifyBadge}</td>
+            <td class="px-5 py-3.5 text-right">
+              <button onclick="showDetail('${r.id}')" class="px-2.5 py-1 text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition">
+                <i class="fa-solid fa-magnifying-glass mr-1"></i> Đối soát
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Scenario Trigger: Simulate Refund
+    async function simulateRefund(mode) {
+      if (!currentToken) {
+        alert("Vui lòng đăng nhập Admin trước!");
+        return;
+      }
+
+      logMessage(`Bắt đầu giả lập kịch bản hoàn tiền: ${mode}...`);
+      try {
+        const res = await fetch('/api/v1/payments/refunds/simulate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentToken}`
+          },
+          body: JSON.stringify({
+            mode: mode,
+            amount: 500000,
+            autoProcess: true
+          })
+        });
+
+        const json = await res.json();
+        if (res.ok && json.success) {
+          logMessage(`Giả lập thành công! RefundId: ${json.data.id.substring(0, 8)}, Status: ${json.data.status}, Retry: ${json.data.retryCount}/${json.data.maxRetries}`);
+          await loadAllData();
+        } else {
+          logMessage(`Giả lập thất bại: ${json.message || JSON.stringify(json)}`);
+        }
+      } catch (err) {
+        logMessage(`Lỗi khi gọi API: ${err.message}`);
+      }
+    }
+
+    // Process a specific refund (Manual Trigger)
+    async function processRefund(refundId) {
+      if (!currentToken) return;
+
+      logMessage(`Thực thi xử lý lệnh RefundId: ${refundId.substring(0, 8)}...`);
+      try {
+        const res = await fetch(`/api/v1/payments/refunds/${refundId}/process`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        const json = await res.json();
+        logMessage(`Kết quả: ${json.message || (json.success ? 'Thành công' : 'Thất bại')}`);
+        await loadAllData();
+      } catch (err) {
+        logMessage(`Lỗi thực thi: ${err.message}`);
+      }
+    }
+
+    // Trigger Background Worker
+    async function triggerBackgroundWorker() {
+      if (!currentToken) return;
+
+      logMessage("Đang kích hoạt chu kỳ quét Worker chạy nền...");
+      try {
+        const res = await fetch('/api/v1/payments/refunds/worker/trigger', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        const json = await res.json();
+        if (res.ok) {
+          logMessage(`Worker đã quét xong: ${json.data.processedRefunds} lệnh hoàn tiền, ${json.data.retriedNotifications} email kế toán.`);
+          await loadAllData();
+        } else {
+          logMessage(`Lỗi kích hoạt worker: ${json.message}`);
+        }
+      } catch (err) {
+        logMessage(`Lỗi kích hoạt worker: ${err.message}`);
+      }
+    }
+
+    // Trigger Retry Notifications
+    async function triggerRetryNotifications() {
+      if (!currentToken) return;
+
+      logMessage("Đang thử lại gửi email thông báo cho Kế toán...");
+      await triggerBackgroundWorker();
+    }
+
+    // Show Detail Modal
+    function showDetail(refundId) {
+      const r = allRefundsData.find(x => x.id === refundId) || manualRefundsData.find(x => x.id === refundId);
+      if (!r) return;
+
+      const content = document.getElementById('modalContent');
+      content.innerHTML = `
+        <div class="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <div><span class="text-slate-400">Refund ID:</span> <span class="font-mono font-bold text-slate-800">${r.id}</span></div>
+          <div><span class="text-slate-400">Order ID:</span> <span class="font-mono font-bold text-slate-800">${r.orderId}</span></div>
+          <div><span class="text-slate-400">Mã đơn hàng:</span> <span class="font-mono font-bold text-slate-800">#${r.orderCode}</span></div>
+          <div><span class="text-slate-400">Số tiền:</span> <span class="font-bold text-rose-600 font-mono">${Number(r.amount).toLocaleString('vi-VN')} VND</span></div>
+          <div><span class="text-slate-400">Trạng thái:</span> ${getStatusBadge(r.status)}</div>
+          <div><span class="text-slate-400">Idempotency Key:</span> <span class="font-mono text-slate-700">${r.idempotencyKey}</span></div>
+          <div><span class="text-slate-400">Số lần thử:</span> <span class="font-bold text-slate-800">${r.attemptCount}</span></div>
+          <div><span class="text-slate-400">Số lần retry:</span> <span class="font-bold text-amber-700">${r.retryCount} / ${r.maxRetries}</span></div>
+          <div><span class="text-slate-400">Thời điểm tạo:</span> <span>${new Date(r.createdAt).toLocaleString('vi-VN')}</span></div>
+          <div><span class="text-slate-400">Cập nhật lần cuối:</span> <span>${new Date(r.updatedAt).toLocaleString('vi-VN')}</span></div>
+          <div><span class="text-slate-400">Next Retry:</span> <span class="font-mono text-indigo-600">${r.nextRetryAt ? new Date(r.nextRetryAt).toLocaleString('vi-VN') : 'N/A'}</span></div>
+          <div><span class="text-slate-400">Thông báo kế toán:</span> <span>${r.accountingNotified ? '✅ Đã gửi' : '❌ Chưa gửi'}</span></div>
+        </div>
+
+        <div class="space-y-1">
+          <p class="font-bold text-slate-700">Mã lỗi & Chi tiết từ chối:</p>
+          <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 font-mono">
+            <div>Mã lỗi: <strong>${r.errorCode || 'N/A'}</strong> (Retryable: ${r.isRetryable === true ? 'Có' : (r.isRetryable === false ? 'Không' : 'N/A')})</div>
+            <div class="mt-1">${r.errorMessage || 'Không có mô tả chi tiết'}</div>
+          </div>
+        </div>
+
+        ${r.accountingNotificationError ? `
+          <div class="space-y-1">
+            <p class="font-bold text-amber-700">Lỗi khi gửi thông báo kế toán:</p>
+            <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 font-mono">
+              ${r.accountingNotificationError}
+            </div>
+          </div>
+        ` : ''}
+
+        <div class="space-y-1">
+          <p class="font-bold text-slate-700">Lý do hoàn tiền ban đầu:</p>
+          <div class="p-3 bg-slate-100 rounded-xl text-slate-700 font-mono">
+            ${r.reason || 'N/A'}
+          </div>
+        </div>
+      `;
+
+      document.getElementById('detailModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('detailModal').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>

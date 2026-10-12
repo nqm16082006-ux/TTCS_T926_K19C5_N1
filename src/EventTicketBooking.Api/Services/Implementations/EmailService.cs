@@ -141,6 +141,26 @@ public class EmailService : IEmailService
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<bool> SendAccountingAlertEmailAsync(string toEmail, string subject, string htmlContent)
+    {
+        if (string.IsNullOrWhiteSpace(toEmail))
+        {
+            _logger.LogWarning("Email người nhận của bộ phận kế toán chưa được cấu hình. Bỏ qua gửi email.");
+            return false;
+        }
+
+        var message = CreateMessage(toEmail, "Ban Kế toán & Tài chính");
+        message.Subject = subject;
+        message.Body = new TextPart("html")
+        {
+            Text = htmlContent
+        };
+
+        await SendEmailInternalAsync(message, toEmail);
+        return true;
+    }
+
     private MimeMessage CreateMessage(string toEmail, string toName)
     {
         var senderEmail = GetSetting("SenderEmail", "FromEmail", "Username", "User", "SmtpUser");
