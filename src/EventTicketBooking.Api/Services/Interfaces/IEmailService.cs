@@ -45,5 +45,10 @@ public interface IEmailService
     /// Gửi email tiếp thị / quảng bá sự kiện (chỉ gửi khi người dùng cho phép nhận).
     /// </summary>
     Task<bool> SendMarketingEmailAsync(string toEmail, string toName, string subject, string content);
+
+    /// <summary>
+    /// Gửi email cảnh báo khẩn cấp cho bộ phận Kế toán / Quản trị viên (Story S-48).
+    /// </summary>
+    Task<bool> SendAccountingAlertEmailAsync(string toEmail, string subject, string htmlContent);
 }
 

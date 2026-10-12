@@ -456,6 +456,12 @@ public sealed class RefundCancelS45Tests
 
         public Task<RefundCreationResult> CreateRefundAsync(RefundCreationRequest request, CancellationToken cancellationToken = default) =>
             Task.FromResult(RefundCreationResult.CreateManualRequired("Stub không hỗ trợ hoàn tiền tự động."));
+
+        public Task<EventTicketBooking.Api.DTOs.Payment.RefundExecutionResult> ExecuteRefundAsync(RefundExecutionRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(EventTicketBooking.Api.DTOs.Payment.RefundExecutionResult.CreateFailure("NOT_SUPPORTED", "Stub không hỗ trợ hoàn tiền tự động.", isRetryable: false));
+
+        public Task<RefundStatusDto?> QueryRefundStatusAsync(string? refundTransactionId, long orderCode, CancellationToken cancellationToken = default) =>
+            Task.FromResult<RefundStatusDto?>(null);
     }
 }
 
