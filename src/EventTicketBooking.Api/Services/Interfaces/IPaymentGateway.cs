@@ -35,5 +35,17 @@ namespace EventTicketBooking.Api.Services.Interfaces
         /// Phục vụ đối soát server-side, không tin tưởng dữ liệu client tự gửi lên.
         /// </summary>
         Task<PaymentResultDto?> QueryPaymentStatusAsync(long orderCode, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Cổng hiện tại có hỗ trợ hoàn tiền tự động không (Story S-45).
+        /// payOS theo tài liệu công bố không có API hoàn tiền → false.
+        /// </summary>
+        bool SupportsRefund { get; }
+
+        /// <summary>
+        /// Gửi yêu cầu hoàn tiền tới cổng thanh toán (Story S-45).
+        /// Chỉ gọi khi SupportsRefund = true; kết quả không thành công không được ghi nhận là đã hoàn tiền.
+        /// </summary>
+        Task<RefundCreationResult> CreateRefundAsync(RefundCreationRequest request, CancellationToken cancellationToken = default);
     }
 }

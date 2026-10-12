@@ -259,6 +259,9 @@
         <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="javascript:void(0)" onclick="scrollToSeatSection()">
           <span class="material-symbols-outlined text-[20px]">chair</span>Cấu hình ghế &amp; bảng giá
         </a>
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./export-test.html">
+          <span class="material-symbols-outlined text-[20px]">file_download</span>Xuất danh sách Check-in
+        </a>
       </nav>
     </div>
 
@@ -642,7 +645,7 @@
                   </div>
                   <div class="p-4 rounded-xl bg-surface-container-low border border-outline-variant/30">
                     <div class="font-label-md text-label-md text-on-surface font-semibold mb-1">Quy định vé &amp; Hoàn tiền</div>
-                    <p class="text-body-sm text-on-surface-variant">Vé đã mua không được hoàn hoặc hủy trừ khi có thông báo chính thức từ Ban tổ chức trước 7 ngày.</p>
+                    <p class="text-body-sm text-on-surface-variant">Khách có thể huỷ vé trước giờ chiếu tối thiểu 24 giờ và được hoàn 90% số tiền đã thanh toán. (Giá trị demo 24 giờ / 90% đang chờ Product duyệt; chưa phải chính sách chính thức.)</p>
                   </div>
                 </div>
               </div>
@@ -1319,6 +1322,9 @@
                 <button onclick="openPricingModal('${s.id}')" class="p-2 rounded-lg text-primary hover:bg-surface-container transition-colors" title="Cấu hình bảng giá" type="button">
                   <span class="material-symbols-outlined text-[19px]">settings</span>
                 </button>
+                <a href="./export-test.html?showId=${encodeURIComponent(s.id)}" class="p-2 rounded-lg text-emerald-700 hover:bg-emerald-50 transition-colors inline-flex items-center justify-center" title="Xuất danh sách soát vé CSV (S-62)">
+                  <span class="material-symbols-outlined text-[19px]">file_download</span>
+                </a>
                 <button onclick="openEditShowtimeModal('${s.id}')" class="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" title="Chỉnh sửa thông tin suất" type="button">
                   <span class="material-symbols-outlined text-[19px]">edit</span>
                 </button>

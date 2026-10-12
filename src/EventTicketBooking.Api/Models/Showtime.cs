@@ -62,6 +62,12 @@ namespace EventTicketBooking.Api.Models
                 return;
             }
 
+            if ((Status == ShowtimeStatus.OnSale || Status == ShowtimeStatus.Closed) && newStatus == ShowtimeStatus.Cancelled)
+            {
+                Status = ShowtimeStatus.Cancelled;
+                return;
+            }
+
             throw new InvalidOperationException($"Không thể chuyển trạng thái suất diễn từ {Status} sang {newStatus}.");
         }
     }

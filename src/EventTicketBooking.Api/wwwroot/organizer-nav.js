@@ -88,7 +88,8 @@
       'events': document.getElementById('nav-quan-ly-su-kien'),
       'create': document.getElementById('nav-tao-su-kien'),
       'showtimes': document.getElementById('nav-danh-sach-suat-dien'),
-      'seats': document.getElementById('nav-cau-hinh-ghe')
+      'seats': document.getElementById('nav-cau-hinh-ghe'),
+      'export': document.getElementById('nav-xuat-checkin')
     };
   }
 
@@ -108,6 +109,10 @@
     if (path.includes('create-event') || path.includes('tao-su-kien')) {
       if (navItems.create) {
         navItems.create.className = `flex items-center gap-space-sm px-3 py-2.5 rounded-lg ${ACTIVE_CLASS}`;
+      }
+    } else if (path.includes('export-test') || path.includes('xuat-checkin')) {
+      if (navItems.export) {
+        navItems.export.className = `flex items-center gap-space-sm px-3 py-2.5 rounded-lg ${ACTIVE_CLASS}`;
       }
     } else if (path.includes('overview') || path.includes('tong-quan')) {
       if (navItems.overview) {

@@ -434,7 +434,7 @@
         const card = document.createElement('div');
         card.className = "bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden";
 
-        const statusInfo = getStatusDisplay(order.status);
+        const statusInfo = getStatusDisplay(order.status, order.cancelReason);
         const eventImage = order.eventImageUrl || 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=600&q=80';
         const formattedDate = formatDateTime(order.createdAt);
         const formattedTotal = formatCurrency(order.totalAmount);
@@ -451,6 +451,10 @@
               <span class="material-symbols-outlined text-[18px]">qr_code_2</span>
               <span>Xem vé điện tử (QR)</span>
             </button>
+            <a href="./order-details.html?orderId=${order.id}&cancel=1" class="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
+              <span class="material-symbols-outlined text-[18px]">undo</span>
+              <span>Huỷ &amp; hoàn tiền</span>
+            </a>
             <a href="./order-details.html?orderId=${order.id}" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
               <span class="material-symbols-outlined text-[18px]">receipt</span>
               <span>Chi tiết</span>
@@ -488,6 +492,18 @@
           `;
         }
 
+        // S-45: chip trạng thái hoàn tiền cho đơn đã huỷ có yêu cầu hoàn
+        let refundChip = '';
+        if (order.refundStatus) {
+          const refundInfo = getRefundStatusDisplay(order.refundStatus);
+          refundChip = `
+            <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border ${refundInfo.badgeClass}">
+              <span class="material-symbols-outlined text-[14px]">${refundInfo.icon}</span>
+              <span>${refundInfo.text}${order.refundAmount != null ? ` • ${formatCurrency(order.refundAmount)}` : ''}</span>
+            </div>
+          `;
+        }
+
         // Timer badge nếu đơn Pending
         let pendingTimerNotice = '';
         if (order.status === 'Pending' && order.expiresAt) {
@@ -522,6 +538,7 @@
             
             <div class="flex items-center gap-2">
               ${pendingTimerNotice}
+              ${refundChip}
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${statusInfo.badgeClass}">
                 <span class="material-symbols-outlined text-[14px]">${statusInfo.icon}</span>
                 <span>${statusInfo.text}</span>
@@ -803,8 +820,24 @@
       document.getElementById('ticketModal').classList.add('hidden');
     }
 
+    // S-45: Hiển thị trạng thái yêu cầu hoàn tiền trên thẻ đơn
+    function getRefundStatusDisplay(status) {
+      switch (status) {
+        case 'Succeeded':
+          return { text: 'Đã hoàn tiền', icon: 'price_check', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        case 'Failed':
+          return { text: 'Hoàn tiền thất bại', icon: 'error', badgeClass: 'bg-rose-50 text-rose-700 border-rose-200' };
+        case 'ManualPending':
+          return { text: 'Đang chờ hoàn tiền thủ công', icon: 'hourglass_top', badgeClass: 'bg-amber-50 text-amber-700 border-amber-200' };
+        case 'Requested':
+          return { text: 'Đang xử lý hoàn tiền', icon: 'autorenew', badgeClass: 'bg-blue-50 text-blue-700 border-blue-200' };
+        default:
+          return { text: status || 'Không rõ', icon: 'help', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200' };
+      }
+    }
+
     // Helper functions
-    function getStatusDisplay(status) {
+    function getStatusDisplay(status, cancelReason) {
       switch (status) {
         case 'Paid':
           return { text: 'Đã thanh toán', icon: 'check_circle', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
@@ -813,7 +846,11 @@
         case 'Expired':
           return { text: 'Đã hết hạn', icon: 'timer_off', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200' };
         case 'Cancelled':
-          return { text: 'Đã huỷ', icon: 'cancel', badgeClass: 'bg-rose-50 text-rose-700 border-rose-200' };
+          // S-45: phân biệt khách huỷ sau thanh toán với huỷ trong luồng thanh toán (null = đơn cũ = huỷ giao dịch).
+          if (cancelReason === 'CUSTOMER_REFUND') {
+            return { text: 'Đã huỷ bởi bạn', icon: 'cancel', badgeClass: 'bg-rose-50 text-rose-700 border-rose-200' };
+          }
+          return { text: 'Giao dịch bị huỷ', icon: 'cancel', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200' };
         default:
           return { text: status || 'Không rõ', icon: 'help', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200' };
       }

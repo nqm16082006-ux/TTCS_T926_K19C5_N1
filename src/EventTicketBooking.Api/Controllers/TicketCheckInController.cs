@@ -25,23 +25,76 @@ namespace EventTicketBooking.Api.Controllers
         private readonly IQrSignatureService _qrSignatureService;
         private readonly ILogger<TicketCheckInController> _logger;
         private readonly IOrderAuditService _orderAuditService;
+        private readonly ICheckinExportService _checkinExportService;
 
         [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
         public TicketCheckInController(
             AppDbContext context,
             ILogger<TicketCheckInController> logger,
             IQrSignatureService? qrSignatureService = null,
-            IOrderAuditService? orderAuditService = null)
+            IOrderAuditService? orderAuditService = null,
+            ICheckinExportService? checkinExportService = null)
         {
             _context = context;
             _logger = logger;
             _qrSignatureService = qrSignatureService ?? new QrSignatureService();
             _orderAuditService = orderAuditService ?? new OrderAuditService(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
+            _checkinExportService = checkinExportService ?? new CheckinExportService(context);
         }
 
         public TicketCheckInController(AppDbContext context, IQrSignatureService? qrSignatureService = null)
-            : this(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<TicketCheckInController>.Instance, qrSignatureService, null)
+            : this(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<TicketCheckInController>.Instance, qrSignatureService, null, null)
         {
+        }
+
+        /// <summary>
+        /// Story S-62: Xuất danh sách khách vào cửa theo suất diễn ra tệp CSV chuẩn UTF-8 có BOM.
+        /// Cho phép lọc theo GateName / DoorName / GateId / DoorId và OnlyConflicts.
+        /// Trả về file download với filename: danh-sach-checkin-suat-{showId}.csv.
+        /// </summary>
+        [HttpGet("showtimes/{showId}/export-csv")]
+        [RequireRole("Admin", "Staff", "Organizer")]
+        public async Task<IActionResult> ExportCheckinListCsv(
+            [FromRoute] Guid showId,
+            [FromQuery] string? gateName = null,
+            [FromQuery] string? doorName = null,
+            [FromQuery] string? gateId = null,
+            [FromQuery] string? doorId = null,
+            [FromQuery] bool? onlyConflicts = null,
+            [FromQuery] bool includeNotCheckedIn = false,
+            CancellationToken cancellationToken = default)
+        {
+            if (showId == Guid.Empty)
+            {
+                return BadRequest(new { Message = "Mã suất diễn không hợp lệ." });
+            }
+
+            var query = new ExportCheckinListQuery
+            {
+                ShowId = showId,
+                GateName = gateName,
+                DoorName = doorName,
+                GateId = gateId,
+                DoorId = doorId,
+                OnlyConflicts = onlyConflicts,
+                IncludeNotCheckedIn = includeNotCheckedIn
+            };
+
+            try
+            {
+                var csvBytes = await _checkinExportService.ExportCheckinCsvAsync(query, cancellationToken);
+                var filename = $"danh-sach-checkin-suat-{showId}.csv";
+                return File(csvBytes, "text/csv; charset=utf-8", filename);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi xuất danh sách soát vé cho suất diễn {ShowId}", showId);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { Message = "Đã xảy ra lỗi khi tạo tệp CSV xuất danh sách soát vé." });
+            }
         }
 
         // 1. Lấy suất diễn hôm nay (S-29)
