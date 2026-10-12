@@ -33,6 +33,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<EmailFailureLog> EmailFailureLogs { get; set; } = null!;
         public DbSet<OrderAuditLog> OrderAuditLogs { get; set; } = null!;
         public DbSet<OfflineCheckInRecord> OfflineCheckInRecords { get; set; } = null!;
+        public DbSet<RefundRequest> RefundRequests { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -333,6 +334,39 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(e => e.Attempts).IsRequired().HasDefaultValue(0);
                 entity.Property(e => e.Resolved).HasDefaultValue(false);
                 entity.HasIndex(e => e.OrderId);
+            });
+
+            // Cấu hình bảng refund_requests (Jira Story S-48)
+            modelBuilder.Entity<RefundRequest>(entity =>
+            {
+                entity.ToTable("refund_requests");
+                entity.HasKey(r => r.Id);
+
+                entity.Property(r => r.Amount).IsRequired();
+                entity.Property(r => r.Currency).IsRequired().HasMaxLength(10).HasDefaultValue("VND");
+                entity.Property(r => r.IdempotencyKey).IsRequired().HasMaxLength(100);
+                entity.Property(r => r.Reason).HasMaxLength(500);
+                entity.Property(r => r.Status)
+                      .HasConversion(
+                          v => v.ToString(),
+                          v => Enum.Parse<RefundStatus>(v));
+                entity.Property(r => r.ErrorCode).HasMaxLength(100);
+                entity.Property(r => r.ErrorMessage).HasMaxLength(2000);
+                entity.Property(r => r.TransactionId).HasMaxLength(100);
+                entity.Property(r => r.RefundTransactionId).HasMaxLength(100);
+                entity.Property(r => r.AccountingNotificationError).HasMaxLength(2000);
+                entity.Property(r => r.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(r => r.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(r => r.Order)
+                      .WithMany()
+                      .HasForeignKey(r => r.OrderId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(r => r.OrderId);
+                entity.HasIndex(r => r.IdempotencyKey).IsUnique().HasDatabaseName("IX_refund_requests_IdempotencyKey_Unique");
+                entity.HasIndex(r => r.Status);
+                entity.HasIndex(r => r.NextRetryAt);
             });
 
             // Cấu hình bảng tickets (Story S-25)

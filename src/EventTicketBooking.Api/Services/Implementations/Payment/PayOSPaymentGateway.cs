@@ -325,6 +325,36 @@ namespace EventTicketBooking.Api.Services.Implementations.Payment
             }
         }
 
+        public Task<RefundExecutionResult> ExecuteRefundAsync(RefundExecutionRequest request, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                if (request == null)
+                    return Task.FromResult(RefundExecutionResult.CreateFailure("INVALID_REQUEST", "Yêu cầu hoàn tiền không hợp lệ.", isRetryable: false));
+
+                // Kiến trúc PayOS: Cổng thanh toán PayOS hoạt động theo mô hình Thu hộ qua mã VietQR động.
+                // PayOS không cung cấp API đảo ngược giao dịch hoàn tiền tự động (auto-refund reversal) trực tiếp trên payment link.
+                // Hoàn tiền tự động trên PayOS đòi hỏi thiết lập API Chi hộ (Payout API) riêng với số dư ký quỹ.
+                // Do đó, adapter ghi nhận lỗi có cấu trúc PAYOS_NOT_SUPPORTED (không retry) để hệ thống tự động
+                // chuyển sang luồng Kế toán xử lý thủ công (ManualReviewRequired) và thông báo kế toán.
+                _logger.LogWarning("Cổng PayOS thu hộ không hỗ trợ API hoàn tiền đảo ngược tự động cho OrderCode: {OrderCode}. Chuyển sang luồng đối soát kế toán.", request.OrderCode);
+                return Task.FromResult(RefundExecutionResult.CreateFailure(
+                    "PAYOS_NOT_SUPPORTED",
+                    "Cổng thanh toán PayOS hiện chưa hỗ trợ API hoàn tiền tự động trực tiếp trên link thanh toán. Cần chuyển khoản hoàn tiền thủ công.",
+                    isRetryable: false));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ngoại lệ khi gọi xử lý hoàn tiền PayOS cho OrderCode {OrderCode}", request?.OrderCode);
+                return Task.FromResult(RefundExecutionResult.CreateFailure("SYSTEM_ERROR", ex.Message, isRetryable: true));
+            }
+        }
+
+        public Task<RefundStatusDto?> QueryRefundStatusAsync(string? refundTransactionId, long orderCode, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<RefundStatusDto?>(null);
+        }
+
         private static string ComputeHmacSha256(string data, string secretKey)
         {
             if (string.IsNullOrEmpty(secretKey))

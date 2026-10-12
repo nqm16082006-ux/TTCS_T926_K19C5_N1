@@ -217,6 +217,13 @@ builder.Services.Configure<EventTicketBooking.Api.Options.WaitingRoomOptions>(bu
 builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IWaitingRoomService, EventTicketBooking.Api.Services.Implementations.WaitingRoomService>();
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.WaitingRoomCleanupWorker>();
 
+// S-48: Dịch vụ hoàn tiền, retry tự động và thông báo cho kế toán
+builder.Services.Configure<EventTicketBooking.Api.Options.RefundOptions>(builder.Configuration.GetSection(EventTicketBooking.Api.Options.RefundOptions.SectionName));
+builder.Services.Configure<EventTicketBooking.Api.Options.AccountingOptions>(builder.Configuration.GetSection(EventTicketBooking.Api.Options.AccountingOptions.SectionName));
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IAccountingNotificationService, EventTicketBooking.Api.Services.Implementations.AccountingNotificationService>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IRefundService, EventTicketBooking.Api.Services.Implementations.RefundService>();
+builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.RefundProcessingWorker>();
+
 var app = builder.Build();
 app.UseForwardedHeaders();
 
