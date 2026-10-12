@@ -243,6 +243,10 @@ namespace EventTicketBooking.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -461,6 +465,56 @@ namespace EventTicketBooking.Api.Migrations
                         .HasDatabaseName("IX_payment_transactions_OrderId_Unique");
 
                     b.ToTable("payment_transactions", (string)null);
+                });
+
+            modelBuilder.Entity("EventTicketBooking.Api.Models.Refund", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Amount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ConfirmedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_refunds_OrderId_Unique");
+
+                    b.ToTable("refunds", (string)null);
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.Role", b =>
@@ -889,6 +943,17 @@ namespace EventTicketBooking.Api.Migrations
                     b.Navigation("Order");
                 });
 
+            modelBuilder.Entity("EventTicketBooking.Api.Models.Refund", b =>
+                {
+                    b.HasOne("EventTicketBooking.Api.Models.Order", "Order")
+                        .WithMany("Refunds")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+                });
+
             modelBuilder.Entity("EventTicketBooking.Api.Models.Seat", b =>
                 {
                     b.HasOne("EventTicketBooking.Api.Models.SeatCategory", "SeatCategory")
@@ -1006,6 +1071,8 @@ namespace EventTicketBooking.Api.Migrations
                     b.Navigation("OrderItems");
 
                     b.Navigation("PaymentTransaction");
+
+                    b.Navigation("Refunds");
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.OrderItem", b =>

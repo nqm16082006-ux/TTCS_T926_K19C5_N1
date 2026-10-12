@@ -639,6 +639,7 @@
         case 'ORDER_EXPIRED': return 'Đơn hàng hết hạn thanh toán';
         case 'SEAT_HOLD_EXPIRED': return 'Hết hạn giữ chỗ';
         case 'SEAT_HOLD_RELEASED': return 'Giải phóng giữ chỗ';
+        case 'SEAT_RELEASED': return 'Nhả ghế về kho bán (S-46)';
         case 'ORDER_NEEDS_ATTENTION': return 'Đơn cần xử lý bất thường (Needs Attention)';
         case 'TICKET_CHECKED_IN': return 'Soát vé vào cửa (Check-in)';
         case 'TICKET_READMISSION': return 'Tái nhập cửa (Re-admission)';
@@ -654,6 +655,8 @@
           return { label: 'Vé điện tử', icon: 'fa-solid fa-ticket', badge: 'bg-emerald-50 text-emerald-700 border border-emerald-200' };
         case 'SEAT_HOLD':
           return { label: 'Giữ chỗ', icon: 'fa-solid fa-couch', badge: 'bg-amber-50 text-amber-700 border border-amber-200' };
+        case 'SEAT':
+          return { label: 'Ghế ngồi', icon: 'fa-solid fa-chair', badge: 'bg-sky-50 text-sky-700 border border-sky-200' };
         default:
           return { label: type || 'Thực thể', icon: 'fa-solid fa-cube', badge: 'bg-slate-50 text-slate-700 border border-slate-200' };
       }

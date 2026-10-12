@@ -9,13 +9,17 @@ using EventTicketBooking.Api.Controllers;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.DTOs.Common;
+using EventTicketBooking.Api.DTOs.Payment;
 using EventTicketBooking.Api.Models;
+using EventTicketBooking.Api.Options;
 using EventTicketBooking.Api.Services.Implementations;
+using EventTicketBooking.Api.Services.Implementations.Payment;
 using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -44,9 +48,18 @@ namespace EventTicketBooking.Tests
             _context.Dispose();
         }
 
-        private EventController CreateController(Guid? userId, string role = "Organizer")
+        private EventController CreateController(
+            Guid? userId,
+            string role = "Organizer",
+            IPaymentGateway? paymentGateway = null,
+            IRefundService? refundService = null)
         {
-            var controller = new EventController(_context, new OrderAuditService(_context, NullLogger<OrderAuditService>.Instance));
+            var controller = new EventController(
+                _context,
+                new OrderAuditService(_context, NullLogger<OrderAuditService>.Instance),
+                null,
+                refundService,
+                paymentGateway ?? new DevelopmentMockPaymentGateway(Options.Create(new MockPaymentOptions { RefundOutcome = "Succeeded" })));
 
             var httpContext = new DefaultHttpContext();
             if (userId.HasValue)
@@ -607,5 +620,319 @@ namespace EventTicketBooking.Tests
             Assert.NotNull(dbShowtime2);
             Assert.Equal(ShowtimeStatus.OnSale, dbShowtime2.Status);
         }
+
+        #region S-47 Task 2 Tests: Hoàn tiền khi huỷ suất diễn
+
+        [Fact]
+        public async Task CancelShowtime_PaidOrder_Refunds100PercentTotalAmount_WithMockGatewaySuccess()
+        {
+            // Arrange: Suất diễn có đơn hàng Paid trị giá 500.000 VND
+            var (ev, showtime) = CreateEventAndShowtime(_organizerId, ShowtimeStatus.OnSale);
+            var buyerId = Guid.NewGuid();
+            var paidOrder = new Order
+            {
+                Id = Guid.NewGuid(),
+                UserId = buyerId,
+                ShowtimeId = showtime.Id,
+                Status = OrderStatus.Paid,
+                TotalAmount = 500_000,
+                ExpiresAt = DateTimeOffset.UtcNow.AddHours(2)
+            };
+            _context.Orders.Add(paidOrder);
+            await _context.SaveChangesAsync();
+
+            var controller = CreateController(_organizerId, "Organizer");
+
+            // Act
+            var result = await controller.CancelShowtime(ev.Id, showtime.Id);
+            Assert.IsType<OkObjectResult>(result);
+
+            // Assert: Đơn hàng chuyển sang Cancelled với lý do SHOWTIME_CANCELLED
+            var dbOrder = await _context.Orders.FindAsync(paidOrder.Id);
+            Assert.NotNull(dbOrder);
+            Assert.Equal(OrderStatus.Cancelled, dbOrder.Status);
+            Assert.Equal(OrderCancelReasons.ShowtimeCancelled, dbOrder.CancelReason);
+
+            // Assert: Bản ghi hoàn tiền được tạo và hoàn đúng 100% (500.000 VND, không áp dụng 90% hay cutoff của S-45)
+            var dbRefund = await _context.Refunds.FirstOrDefaultAsync(r => r.OrderId == paidOrder.Id);
+            Assert.NotNull(dbRefund);
+            Assert.Equal(500_000, dbRefund.Amount);
+            Assert.Equal("Succeeded", dbRefund.Status);
+            Assert.Null(dbRefund.FailureReason);
+
+            // Assert: Audit log ghi nhận REFUND_REQUESTED và REFUND_SUCCEEDED
+            var logs = await _context.OrderAuditLogs.Where(l => l.OrderId == paidOrder.Id).ToListAsync();
+            Assert.Contains(logs, l => l.Action == "REFUND_REQUESTED");
+            Assert.Contains(logs, l => l.Action == "REFUND_SUCCEEDED");
+        }
+
+        [Fact]
+        public async Task CancelShowtime_PaidOrder_MockGatewayFailure_RefundMarkedFailed()
+        {
+            // Arrange: Cổng thanh toán giả lập thất bại
+            var (ev, showtime) = CreateEventAndShowtime(_organizerId, ShowtimeStatus.OnSale);
+            var paidOrder = new Order
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                ShowtimeId = showtime.Id,
+                Status = OrderStatus.Paid,
+                TotalAmount = 300_000
+            };
+            _context.Orders.Add(paidOrder);
+            await _context.SaveChangesAsync();
+
+            var failedGateway = new DevelopmentMockPaymentGateway(Options.Create(new MockPaymentOptions { RefundOutcome = "Failed" }));
+            var controller = CreateController(_organizerId, "Organizer", paymentGateway: failedGateway);
+
+            // Act
+            var result = await controller.CancelShowtime(ev.Id, showtime.Id);
+            Assert.IsType<OkObjectResult>(result);
+
+            // Assert: Đơn vẫn bị huỷ nhưng Refund ở trạng thái Failed kèm FailureReason, không ghi nhận Succeeded
+            var dbOrder = await _context.Orders.FindAsync(paidOrder.Id);
+            Assert.NotNull(dbOrder);
+            Assert.Equal(OrderStatus.Cancelled, dbOrder.Status);
+            Assert.Equal(OrderCancelReasons.ShowtimeCancelled, dbOrder.CancelReason);
+
+            var dbRefund = await _context.Refunds.FirstOrDefaultAsync(r => r.OrderId == paidOrder.Id);
+            Assert.NotNull(dbRefund);
+            Assert.Equal(300_000, dbRefund.Amount);
+            Assert.Equal("Failed", dbRefund.Status);
+            Assert.NotNull(dbRefund.FailureReason);
+
+            var logs = await _context.OrderAuditLogs.Where(l => l.OrderId == paidOrder.Id).ToListAsync();
+            Assert.Contains(logs, l => l.Action == "REFUND_FAILED");
+        }
+
+        [Fact]
+        public async Task CancelShowtime_PaidOrder_PayOSGateway_RefundMarkedManualPending()
+        {
+            // Arrange: PayOS không hỗ trợ API hoàn tiền tự động theo tài liệu -> hoàn tiền vào ManualPending
+            var (ev, showtime) = CreateEventAndShowtime(_organizerId, ShowtimeStatus.OnSale);
+            var paidOrder = new Order
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                ShowtimeId = showtime.Id,
+                Status = OrderStatus.Paid,
+                TotalAmount = 450_000
+            };
+            _context.Orders.Add(paidOrder);
+            await _context.SaveChangesAsync();
+
+            var payOsGateway = new PayOSPaymentGateway(new System.Net.Http.HttpClient(), Options.Create(new PayOSOptions()), NullLogger<PayOSPaymentGateway>.Instance);
+            var controller = CreateController(_organizerId, "Organizer", paymentGateway: payOsGateway);
+
+            // Act
+            var result = await controller.CancelShowtime(ev.Id, showtime.Id);
+            Assert.IsType<OkObjectResult>(result);
+
+            // Assert: Refund ở trạng thái ManualPending chờ nhân viên chuyển khoản thủ công
+            var dbRefund = await _context.Refunds.FirstOrDefaultAsync(r => r.OrderId == paidOrder.Id);
+            Assert.NotNull(dbRefund);
+            Assert.Equal(450_000, dbRefund.Amount);
+            Assert.Equal("ManualPending", dbRefund.Status);
+
+            var logs = await _context.OrderAuditLogs.Where(l => l.OrderId == paidOrder.Id).ToListAsync();
+            Assert.Contains(logs, l => l.Action == "REFUND_MANUAL_PENDING");
+        }
+
+        [Fact]
+        public async Task CancelShowtime_OrderAlreadyRefundedByCustomer_DoesNotCreateDuplicateRefund()
+        {
+            // Arrange: Đơn hàng đã được khách chủ động huỷ trước đó theo S-45 (có bản ghi Refund tồn tại)
+            var (ev, showtime) = CreateEventAndShowtime(_organizerId, ShowtimeStatus.OnSale);
+            var existingRefundOrder = new Order
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                ShowtimeId = showtime.Id,
+                Status = OrderStatus.Cancelled,
+                CancelReason = OrderCancelReasons.CustomerRefund,
+                TotalAmount = 200_000
+            };
+            var existingRefund = new Refund
+            {
+                Id = Guid.NewGuid(),
+                OrderId = existingRefundOrder.Id,
+                Amount = 180_000, // 90% theo S-45
+                Status = "Succeeded",
+                CreatedAt = DateTimeOffset.UtcNow.AddHours(-5),
+                UpdatedAt = DateTimeOffset.UtcNow.AddHours(-5)
+            };
+            _context.Orders.Add(existingRefundOrder);
+            _context.Refunds.Add(existingRefund);
+            await _context.SaveChangesAsync();
+
+            var controller = CreateController(_organizerId, "Organizer");
+
+            // Act: Huỷ suất diễn
+            var result = await controller.CancelShowtime(ev.Id, showtime.Id);
+            Assert.IsType<OkObjectResult>(result);
+
+            // Assert: Duy nhất 1 bản ghi Refund tồn tại, không sinh Refund thứ hai (chống vi phạm IX_refunds_OrderId_Unique)
+            var refunds = await _context.Refunds.Where(r => r.OrderId == existingRefundOrder.Id).ToListAsync();
+            Assert.Single(refunds);
+            Assert.Equal(existingRefund.Id, refunds[0].Id);
+            Assert.Equal(180_000, refunds[0].Amount); // Giữ nguyên thông tin cũ của S-45
+        }
+
+        [Fact]
+        public async Task CancelShowtime_CheckedInTicket_RetainsHistoryAndRefunds100Percent()
+        {
+            // Arrange: Khách đã check-in nhưng suất diễn bị huỷ giữa chừng (thiên tai/sự cố kỹ thuật)
+            var (ev, showtime) = CreateEventAndShowtime(_organizerId, ShowtimeStatus.OnSale);
+            var category = showtime.SeatCategories.First();
+            var seat = new Seat { Id = Guid.NewGuid(), ShowtimeId = showtime.Id, SeatCategoryId = category.Id, Row = "F", SeatNumber = 8, Status = "SOLD" };
+            _context.Seats.Add(seat);
+
+            var checkInTime = DateTimeOffset.UtcNow.AddMinutes(-45);
+            var orderItem = new OrderItem
+            {
+                Id = Guid.NewGuid(),
+                SeatId = seat.Id,
+                Price = 600_000,
+                IsCheckedIn = true,
+                CheckInGate = "GATE_MAIN",
+                CheckInTime = checkInTime
+            };
+            var ticket = new Ticket
+            {
+                Id = Guid.NewGuid(),
+                OrderItemId = orderItem.Id,
+                TicketCode = "TCK-CHECKEDIN-S47",
+                CreatedAt = DateTimeOffset.UtcNow.AddHours(-2)
+            };
+            orderItem.Ticket = ticket;
+
+            var order = new Order
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                ShowtimeId = showtime.Id,
+                Status = OrderStatus.Paid,
+                TotalAmount = 600_000,
+                OrderItems = new List<OrderItem> { orderItem }
+            };
+            _context.Orders.Add(order);
+            await _context.SaveChangesAsync();
+
+            var controller = CreateController(_organizerId, "Organizer");
+
+            // Act
+            var result = await controller.CancelShowtime(ev.Id, showtime.Id);
+            Assert.IsType<OkObjectResult>(result);
+
+            // Assert: Lịch sử vé và check-in vẫn bảo toàn trọn vẹn
+            var dbItem = await _context.OrderItems.Include(oi => oi.Ticket).FirstAsync(oi => oi.Id == orderItem.Id);
+            Assert.True(dbItem.IsCheckedIn);
+            Assert.Equal("GATE_MAIN", dbItem.CheckInGate);
+            Assert.Equal(checkInTime, dbItem.CheckInTime);
+            Assert.NotNull(dbItem.Ticket);
+
+            // Assert: Đơn vẫn được hoàn 100% vì lỗi thuộc về phía Ban tổ chức huỷ suất (khác với S-45 từ chối huỷ)
+            var dbRefund = await _context.Refunds.FirstOrDefaultAsync(r => r.OrderId == order.Id);
+            Assert.NotNull(dbRefund);
+            Assert.Equal(600_000, dbRefund.Amount);
+            Assert.Equal("Succeeded", dbRefund.Status);
+        }
+
+        [Fact]
+        public async Task CancelShowtime_MultiplePaidOrders_ProcessedIndependently_OneFailureDoesNotBlockOthers()
+        {
+            // Arrange: Suất diễn có 3 đơn hàng Paid
+            var (ev, showtime) = CreateEventAndShowtime(_organizerId, ShowtimeStatus.OnSale);
+            var order1 = new Order { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), ShowtimeId = showtime.Id, Status = OrderStatus.Paid, TotalAmount = 100_000 };
+            var order2 = new Order { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), ShowtimeId = showtime.Id, Status = OrderStatus.Paid, TotalAmount = 200_000 };
+            var order3 = new Order { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), ShowtimeId = showtime.Id, Status = OrderStatus.Paid, TotalAmount = 300_000 };
+            _context.Orders.AddRange(order1, order2, order3);
+            await _context.SaveChangesAsync();
+
+            // Cổng mô phỏng: Đơn 2 thất bại, Đơn 1 và 3 thành công
+            var selectiveGateway = new CustomMultiOrderPaymentGateway(orderId => orderId != order2.Id);
+            var controller = CreateController(_organizerId, "Organizer", paymentGateway: selectiveGateway);
+
+            // Act
+            var result = await controller.CancelShowtime(ev.Id, showtime.Id);
+            Assert.IsType<OkObjectResult>(result);
+
+            // Assert: Cả 3 đơn đều đã chuyển Cancelled
+            Assert.Equal(OrderStatus.Cancelled, (await _context.Orders.FindAsync(order1.Id))?.Status);
+            Assert.Equal(OrderStatus.Cancelled, (await _context.Orders.FindAsync(order2.Id))?.Status);
+            Assert.Equal(OrderStatus.Cancelled, (await _context.Orders.FindAsync(order3.Id))?.Status);
+
+            // Assert: Đơn 1 thành công, Đơn 2 thất bại, Đơn 3 vẫn thành công (lỗi đơn 2 không chặn đơn 3)
+            var refund1 = await _context.Refunds.FirstOrDefaultAsync(r => r.OrderId == order1.Id);
+            var refund2 = await _context.Refunds.FirstOrDefaultAsync(r => r.OrderId == order2.Id);
+            var refund3 = await _context.Refunds.FirstOrDefaultAsync(r => r.OrderId == order3.Id);
+
+            Assert.NotNull(refund1);
+            Assert.Equal("Succeeded", refund1.Status);
+
+            Assert.NotNull(refund2);
+            Assert.Equal("Failed", refund2.Status);
+
+            Assert.NotNull(refund3);
+            Assert.Equal("Succeeded", refund3.Status);
+        }
+
+        [Fact]
+        public async Task CancelShowtime_CalledRepeatedly_DoesNotDuplicateRefunds()
+        {
+            // Arrange: Suất diễn có 1 đơn Paid
+            var (ev, showtime) = CreateEventAndShowtime(_organizerId, ShowtimeStatus.OnSale);
+            var order = new Order { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), ShowtimeId = showtime.Id, Status = OrderStatus.Paid, TotalAmount = 150_000 };
+            _context.Orders.Add(order);
+            await _context.SaveChangesAsync();
+
+            var controller = CreateController(_organizerId, "Organizer");
+
+            // Act 1: Huỷ suất diễn lần 1 thành công
+            var result1 = await controller.CancelShowtime(ev.Id, showtime.Id);
+            Assert.IsType<OkObjectResult>(result1);
+
+            // Act 2: Cố huỷ lần 2 -> Controller từ chối 400 vì suất đã Cancelled
+            var result2 = await controller.CancelShowtime(ev.Id, showtime.Id);
+            Assert.IsType<BadRequestObjectResult>(result2);
+
+            // Act 3: Giả định retry trực tiếp trên RefundService cho cùng order
+            var refundService = new RefundService(_context, new OrderAuditService(_context, NullLogger<OrderAuditService>.Instance), new DevelopmentMockPaymentGateway(Options.Create(new MockPaymentOptions { RefundOutcome = "Succeeded" })));
+            var retryResults = await refundService.ProcessShowtimeRefundsAsync(showtime.Id, new[] { order.Id }, "ORGANIZER", "TestOrganizer");
+
+            // Assert: Lần gọi retry trả về Skipped, không tạo bản ghi mới
+            Assert.Single(retryResults);
+            Assert.True(retryResults[0].Skipped);
+
+            var refunds = await _context.Refunds.Where(r => r.OrderId == order.Id).ToListAsync();
+            Assert.Single(refunds);
+            Assert.Equal(150_000, refunds[0].Amount);
+        }
+
+        private class CustomMultiOrderPaymentGateway : IPaymentGateway
+        {
+            private readonly Func<Guid, bool> _shouldSucceed;
+            public CustomMultiOrderPaymentGateway(Func<Guid, bool> shouldSucceed) => _shouldSucceed = shouldSucceed;
+            public string ProviderName => "CustomMock";
+            public bool SupportsRefund => true;
+            public Task<PaymentCreationResult> CreatePaymentAsync(PaymentCreationRequest request, System.Threading.CancellationToken cancellationToken = default) => throw new NotImplementedException();
+            public bool VerifyWebhookSignature(string webhookPayload, string signature, string? webhookSecret = null) => true;
+            public WebhookParseResult ParseWebhookData(string webhookPayload) => throw new NotImplementedException();
+            public Task<PaymentResultDto?> QueryPaymentStatusAsync(long orderCode, System.Threading.CancellationToken cancellationToken = default) => Task.FromResult<PaymentResultDto?>(null);
+            public Task<RefundCreationResult> CreateRefundAsync(RefundCreationRequest request, System.Threading.CancellationToken cancellationToken = default)
+            {
+                if (request != null && _shouldSucceed(request.OrderId))
+                {
+                    return Task.FromResult(RefundCreationResult.CreateSuccess($"REFUND-{request.OrderId}"));
+                }
+                return Task.FromResult(RefundCreationResult.CreateFailure("Cổng mô phỏng hoàn tiền thất bại cho đơn này."));
+            }
+            public Task<EventTicketBooking.Api.DTOs.Payment.RefundExecutionResult> ExecuteRefundAsync(RefundExecutionRequest request, System.Threading.CancellationToken cancellationToken = default) =>
+                Task.FromResult(EventTicketBooking.Api.DTOs.Payment.RefundExecutionResult.CreateFailure("NOT_IMPLEMENTED", "Stub", isRetryable: false));
+            public Task<RefundStatusDto?> QueryRefundStatusAsync(string? refundTransactionId, long orderCode, System.Threading.CancellationToken cancellationToken = default) =>
+                Task.FromResult<RefundStatusDto?>(null);
+        }
+
+        #endregion
     }
 }

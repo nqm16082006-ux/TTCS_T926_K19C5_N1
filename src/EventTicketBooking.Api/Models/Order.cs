@@ -24,10 +24,18 @@ namespace EventTicketBooking.Api.Models
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+        /// <summary>
+        /// Lý do huỷ đơn (Story S-45): PAYMENT_CANCELLED (huỷ trong luồng thanh toán)
+        /// hoặc CUSTOMER_REFUND (khách chủ động huỷ sau thanh toán). Null khi chưa huỷ.
+        /// </summary>
+        public string? CancelReason { get; set; }
+
         public User User { get; set; } = null!;
         public Showtime Showtime { get; set; } = null!;
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
         public PaymentTransaction? PaymentTransaction { get; set; }
+        public ICollection<Refund> Refunds { get; set; } = new List<Refund>();
+
 
         public void CalculateTotal()
         {

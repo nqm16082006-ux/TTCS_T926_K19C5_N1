@@ -358,6 +358,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                 {
                     var oldStatus = order.Status.ToString();
                     order.Status = OrderStatus.Cancelled;
+                    order.CancelReason = OrderCancelReasons.PaymentCancelled;
                     order.UpdatedAt = DateTimeOffset.UtcNow;
 
                     var cancelledTx = await _context.PaymentTransactions
@@ -466,6 +467,22 @@ namespace EventTicketBooking.Api.Services.Implementations
                 {
                     if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
                     return PaymentExecutionResult.CreateFailure($"Giao dịch chưa hoàn tất (Trạng thái: {result.Status}).", order.Id, result.OrderCode, order.Status.ToString());
+                }
+
+                // 4.4b (Story S-45 & S-47): Đơn đã huỷ do khách huỷ (CUSTOMER_REFUND) hoặc suất diễn bị huỷ (SHOWTIME_CANCELLED)
+                // không được webhook/thanh toán muộn chuyển lại Paid hoặc NeedsAttention. Bỏ qua an toàn.
+                if (order.Status == OrderStatus.Cancelled &&
+                    (order.CancelReason == OrderCancelReasons.CustomerRefund || order.CancelReason == OrderCancelReasons.ShowtimeCancelled))
+                {
+                    if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
+                    _logger.LogInformation("Bỏ qua kết quả thanh toán muộn cho đơn {OrderId}: đơn đã huỷ do {CancelReason} (S-45/S-47).", order.Id, order.CancelReason);
+                    return PaymentExecutionResult.CreateFailure(
+                        order.CancelReason == OrderCancelReasons.ShowtimeCancelled
+                            ? "Đơn hàng đã được huỷ do suất diễn bị huỷ."
+                            : "Đơn hàng đã được huỷ theo yêu cầu khách hàng.",
+                        order.Id,
+                        result.OrderCode,
+                        OrderStatus.Cancelled.ToString());
                 }
 
                 // 4.5. Re-check đơn hàng đã bị hết hạn hoặc bị hủy chưa (ExpiresAt <= UtcNow)

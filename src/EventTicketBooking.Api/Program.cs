@@ -44,7 +44,8 @@ if (string.Equals(selectedDbProvider, "InMemory", StringComparison.OrdinalIgnore
 }
 else
 {
-    if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("POSTGRES_HOST")) || string.IsNullOrEmpty(pgConnection))
+    // Nếu chưa có chuỗi kết nối DefaultConnection thì mới tự ráp từ các biến POSTGRES_HOST, PORT, DB...
+    if (string.IsNullOrWhiteSpace(pgConnection) && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("POSTGRES_HOST")))
     {
         string host = Environment.GetEnvironmentVariable("POSTGRES_HOST") ?? "localhost";
         string port = Environment.GetEnvironmentVariable("POSTGRES_PORT") ?? "5432";
@@ -144,6 +145,14 @@ var paymentProvider = builder.Configuration["PaymentSettings:Provider"]
                      ?? builder.Configuration["PAYMENT_PROVIDER"]
                      ?? "Mock";
 
+// Story S-45: chính sách huỷ vé & hoàn tiền (giá trị demo 24 giờ / 90% — chờ Product duyệt)
+builder.Services.Configure<EventTicketBooking.Api.Options.RefundPolicyOptions>(
+    builder.Configuration.GetSection(EventTicketBooking.Api.Options.RefundPolicyOptions.SectionName));
+
+// Story S-45: cấu hình mô phỏng kết quả hoàn tiền của Mock gateway ("Succeeded" hoặc "Failed")
+builder.Services.Configure<EventTicketBooking.Api.Options.MockPaymentOptions>(
+    builder.Configuration.GetSection(EventTicketBooking.Api.Options.MockPaymentOptions.SectionName));
+
 // Nếu môi trường là Production mà cấu hình dùng cổng giả lập (Mock) -> Từ chối khởi động
 if (builder.Environment.IsProduction() && paymentProvider.Equals("Mock", StringComparison.OrdinalIgnoreCase))
 {
@@ -159,6 +168,7 @@ else if (paymentProvider.Equals("PayOS", StringComparison.OrdinalIgnoreCase))
 else
     throw new InvalidOperationException("Unsupported payment provider.");
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IPaymentService, EventTicketBooking.Api.Services.Implementations.PaymentService>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IRefundService, EventTicketBooking.Api.Services.Implementations.RefundService>();
 
 // Đăng ký cấu hình và dịch vụ ký số mã QR vé điện tử (Story S-26)
 builder.Services.Configure<EventTicketBooking.Api.Options.TicketQrOptions>(builder.Configuration.GetSection(EventTicketBooking.Api.Options.TicketQrOptions.SectionName));

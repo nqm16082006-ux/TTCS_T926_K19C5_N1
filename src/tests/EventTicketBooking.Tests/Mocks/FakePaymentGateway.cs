@@ -108,5 +108,23 @@ namespace EventTicketBooking.Tests.Mocks
 
             return Task.FromResult<RefundStatusDto?>(null);
         }
+
+        // Story S-45: mô phỏng hoàn tiền cho kiểm thử
+        public bool SupportsRefund { get; set; } = true;
+        public bool ShouldRefundSucceed { get; set; } = true;
+        public List<RefundCreationRequest> RecordedCreationRefundRequests { get; } = new();
+
+        public Task<RefundCreationResult> CreateRefundAsync(RefundCreationRequest request, CancellationToken cancellationToken = default)
+        {
+            RecordedCreationRefundRequests.Add(request);
+
+            if (!SupportsRefund)
+                return Task.FromResult(RefundCreationResult.CreateManualRequired("Gateway không hỗ trợ hoàn tiền tự động."));
+
+            if (ShouldRefundSucceed)
+                return Task.FromResult(RefundCreationResult.CreateSuccess($"FAKE-REFUND-{request.OrderCode}"));
+
+            return Task.FromResult(RefundCreationResult.CreateFailure(SimulatedRefundErrorMessage));
+        }
     }
 }
