@@ -16,6 +16,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using Microsoft.AspNetCore.SignalR;
+using StackExchange.Redis;
+using EventTicketBooking.Api.Hubs;
+using Order = EventTicketBooking.Api.Models.Order;
+
 namespace EventTicketBooking.Api.Controllers
 {
     [ApiController]
@@ -29,6 +34,8 @@ namespace EventTicketBooking.Api.Controllers
         private readonly EventTicketBooking.Api.Services.Interfaces.IOrderAuditService _orderAuditService;
         private readonly EventTicketBooking.Api.Services.Interfaces.IPaymentGateway? _paymentGateway;
         private readonly RefundPolicyOptions _refundPolicy;
+        private readonly IHubContext<SeatStatusHub>? _hubContext;
+        private readonly IConnectionMultiplexer? _redis;
 
         public OrdersController(
             AppDbContext context,
@@ -37,7 +44,9 @@ namespace EventTicketBooking.Api.Controllers
             EventTicketBooking.Api.Services.Interfaces.ITicketService? ticketService = null,
             EventTicketBooking.Api.Services.Interfaces.IOrderAuditService? orderAuditService = null,
             EventTicketBooking.Api.Services.Interfaces.IPaymentGateway? paymentGateway = null,
-            IOptions<RefundPolicyOptions>? refundPolicy = null)
+            IOptions<RefundPolicyOptions>? refundPolicy = null,
+            IHubContext<SeatStatusHub>? hubContext = null,
+            IConnectionMultiplexer? redis = null)
         {
             _context = context;
             _logger = logger;
@@ -47,6 +56,8 @@ namespace EventTicketBooking.Api.Controllers
                 context, Microsoft.Extensions.Logging.Abstractions.NullLogger<EventTicketBooking.Api.Services.Implementations.OrderAuditService>.Instance);
             _paymentGateway = paymentGateway;
             _refundPolicy = refundPolicy?.Value ?? new RefundPolicyOptions();
+            _hubContext = hubContext;
+            _redis = redis;
         }
 
         /// <summary>
@@ -450,6 +461,7 @@ namespace EventTicketBooking.Api.Controllers
             // ===== Bước 1: Kiểm tra điều kiện và chuyển trạng thái đơn trong transaction ngắn =====
             Refund newRefund;
             Order orderForDto;
+            List<Seat> seatsToRelease = new();
 
             Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? dbTransaction = null;
             if (_context.Database.IsRelational() && _context.Database.CurrentTransaction == null)
@@ -531,6 +543,57 @@ namespace EventTicketBooking.Api.Controllers
                     userId,
                     $"Tạo yêu cầu hoàn tiền {preview.EstimatedRefundAmount} VND theo chính sách demo {preview.RefundPercent}% (chưa Product duyệt).");
 
+                // ===== Story S-46: Ghế của vé đã huỷ quay lại kho bán =====
+                var seatIds = order.OrderItems != null
+                    ? order.OrderItems.Select(oi => oi.SeatId).Distinct().ToList()
+                    : new List<Guid>();
+
+                seatsToRelease = await _context.Seats
+                    .Where(s => seatIds.Contains(s.Id))
+                    .ToListAsync();
+
+                foreach (var seat in seatsToRelease)
+                {
+                    var oldSeatStatus = seat.Status;
+                    seat.Status = "AVAILABLE";
+
+                    var seatLabel = $"{seat.Row}{seat.SeatNumber}";
+                    _orderAuditService.Record(
+                        order.Id,
+                        "SEAT",
+                        seat.Id.ToString(),
+                        "SEAT_RELEASED",
+                        oldSeatStatus,
+                        "AVAILABLE",
+                        "USER",
+                        $"user:{userId}",
+                        userId,
+                        $"Ghế {seatLabel} của vé đã huỷ quay lại kho bán (S-46).");
+                }
+
+                // Cập nhật các bản ghi giữ chỗ liên quan sang RELEASED
+                var holdsToRelease = await _context.SeatHold
+                    .Where(sh => seatIds.Contains(sh.SeatId) && (sh.Status == "CONVERTED" || sh.Status == "ACTIVE"))
+                    .ToListAsync();
+
+                foreach (var hold in holdsToRelease)
+                {
+                    var oldHoldStatus = hold.Status;
+                    hold.Status = "RELEASED";
+
+                    _orderAuditService.Record(
+                        order.Id,
+                        "SEAT_HOLD",
+                        hold.SeatId.ToString(),
+                        "SEAT_HOLD_RELEASED",
+                        oldHoldStatus,
+                        "RELEASED",
+                        "USER",
+                        $"user:{userId}",
+                        userId,
+                        "Giải phóng giữ chỗ do vé đã huỷ quay lại kho bán (S-46).");
+                }
+
                 await _context.SaveChangesAsync();
 
                 if (dbTransaction != null)
@@ -545,6 +608,54 @@ namespace EventTicketBooking.Api.Controllers
                 if (dbTransaction != null)
                 {
                     await dbTransaction.DisposeAsync();
+                }
+            }
+
+            // Story S-46: Dọn dẹp cache Redis phân tán nếu có
+            if (_redis != null && _redis.IsConnected && seatsToRelease.Count > 0)
+            {
+                try
+                {
+                    var redisDb = _redis.GetDatabase();
+                    var eventId = orderForDto.Showtime?.EventId;
+                    var keys = new List<RedisKey>();
+                    foreach (var s in seatsToRelease)
+                    {
+                        if (eventId.HasValue)
+                        {
+                            keys.Add((RedisKey)$"seat_hold:{eventId.Value}:{s.Id}");
+                        }
+                        keys.Add((RedisKey)$"seat_hold:{s.Id}");
+                    }
+                    if (keys.Count > 0)
+                    {
+                        await redisDb.KeyDeleteAsync(keys.ToArray());
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Lỗi khi xóa Redis hold keys cho đơn hàng {OrderId} (S-46)", orderId);
+                }
+            }
+
+            // Story S-46: Phát thông báo SignalR SeatReleased để sơ đồ ghế cập nhật thời gian thực
+            if (_hubContext != null && _hubContext.Clients != null && seatsToRelease.Count > 0)
+            {
+                try
+                {
+                    var groupClient = _hubContext.Clients.Group(orderForDto.ShowtimeId.ToString());
+                    if (groupClient != null)
+                    {
+                        await groupClient.SendAsync("SeatReleased", new
+                        {
+                            ShowtimeId = orderForDto.ShowtimeId,
+                            SeatIds = seatsToRelease.Select(s => s.Id).ToList()
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Lỗi khi gửi SignalR SeatReleased cho suất chiếu {ShowtimeId} (S-46)", orderForDto.ShowtimeId);
                 }
             }
 

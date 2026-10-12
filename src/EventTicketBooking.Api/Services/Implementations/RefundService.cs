@@ -11,6 +11,11 @@ using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using Microsoft.AspNetCore.SignalR;
+using StackExchange.Redis;
+using EventTicketBooking.Api.Hubs;
+using Order = EventTicketBooking.Api.Models.Order;
+
 namespace EventTicketBooking.Api.Services.Implementations
 {
     /// <summary>
@@ -24,17 +29,23 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly IOrderAuditService _orderAuditService;
         private readonly IPaymentGateway? _paymentGateway;
         private readonly ILogger<RefundService> _logger;
+        private readonly IHubContext<SeatStatusHub>? _hubContext;
+        private readonly IConnectionMultiplexer? _redis;
 
         public RefundService(
             AppDbContext context,
             IOrderAuditService orderAuditService,
             IPaymentGateway? paymentGateway = null,
-            ILogger<RefundService>? logger = null)
+            ILogger<RefundService>? logger = null,
+            IHubContext<SeatStatusHub>? hubContext = null,
+            IConnectionMultiplexer? redis = null)
         {
             _context = context;
             _orderAuditService = orderAuditService;
             _paymentGateway = paymentGateway;
             _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<RefundService>.Instance;
+            _hubContext = hubContext;
+            _redis = redis;
         }
 
         public async Task<RefundExecutionResult> ProcessOrderRefundAsync(
@@ -49,6 +60,8 @@ namespace EventTicketBooking.Api.Services.Implementations
         {
             // 1. Kiểm tra đơn hàng
             var order = await _context.Orders
+                .Include(o => o.Showtime)
+                .Include(o => o.OrderItems)
                 .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
 
             if (order == null)
@@ -80,6 +93,56 @@ namespace EventTicketBooking.Api.Services.Implementations
             {
                 order.CancelReason = cancelReason;
                 order.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+
+            // ===== Story S-46: Nếu là khách huỷ vé/đơn (không phải huỷ suất S-47), nhả ghế về AVAILABLE =====
+            List<Seat> seatsToRelease = new();
+            if (cancelReason != OrderCancelReasons.ShowtimeCancelled && order.OrderItems != null && order.OrderItems.Any())
+            {
+                var seatIds = order.OrderItems.Select(oi => oi.SeatId).Distinct().ToList();
+                seatsToRelease = await _context.Seats
+                    .Where(s => seatIds.Contains(s.Id) && s.Status == "SOLD")
+                    .ToListAsync(cancellationToken);
+
+                foreach (var seat in seatsToRelease)
+                {
+                    seat.Status = "AVAILABLE";
+                    var seatLabel = $"{seat.Row}{seat.SeatNumber}";
+                    _orderAuditService.Record(
+                        order.Id,
+                        "SEAT",
+                        seat.Id.ToString(),
+                        "SEAT_RELEASED",
+                        "SOLD",
+                        "AVAILABLE",
+                        actorType,
+                        actorName,
+                        actorId,
+                        $"Ghế {seatLabel} của vé đã huỷ quay lại kho bán (S-46).",
+                        DateTimeOffset.UtcNow);
+                }
+
+                var holdsToRelease = await _context.SeatHold
+                    .Where(sh => seatIds.Contains(sh.SeatId) && (sh.Status == "CONVERTED" || sh.Status == "ACTIVE"))
+                    .ToListAsync(cancellationToken);
+
+                foreach (var hold in holdsToRelease)
+                {
+                    var oldHoldStatus = hold.Status;
+                    hold.Status = "RELEASED";
+                    _orderAuditService.Record(
+                        order.Id,
+                        "SEAT_HOLD",
+                        hold.SeatId.ToString(),
+                        "SEAT_HOLD_RELEASED",
+                        oldHoldStatus,
+                        "RELEASED",
+                        actorType,
+                        actorName,
+                        actorId,
+                        "Giải phóng giữ chỗ do vé đã huỷ quay lại kho bán (S-46).",
+                        DateTimeOffset.UtcNow);
+                }
             }
 
             // 3. Pha 1: Tạo bản ghi Refund với trạng thái Requested và lưu vào DB
@@ -120,6 +183,54 @@ namespace EventTicketBooking.Api.Services.Implementations
                     .AsNoTracking()
                     .FirstOrDefaultAsync(r => r.OrderId == orderId, cancellationToken);
                 return RefundExecutionResult.CreateSkipped(orderId, concurrentRefund?.Id, "Đơn hàng đã được tạo hoàn tiền đồng thời bởi tiến trình khác.");
+            }
+
+            // Story S-46: Dọn dẹp cache Redis phân tán nếu có
+            if (_redis != null && _redis.IsConnected && seatsToRelease.Count > 0)
+            {
+                try
+                {
+                    var redisDb = _redis.GetDatabase();
+                    var eventId = order.Showtime?.EventId;
+                    var keys = new List<RedisKey>();
+                    foreach (var s in seatsToRelease)
+                    {
+                        if (eventId.HasValue)
+                        {
+                            keys.Add((RedisKey)$"seat_hold:{eventId.Value}:{s.Id}");
+                        }
+                        keys.Add((RedisKey)$"seat_hold:{s.Id}");
+                    }
+                    if (keys.Count > 0)
+                    {
+                        await redisDb.KeyDeleteAsync(keys.ToArray());
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Lỗi khi xóa Redis hold keys cho đơn hàng {OrderId} (S-46)", orderId);
+                }
+            }
+
+            // Story S-46: Phát thông báo SignalR SeatReleased để sơ đồ ghế cập nhật thời gian thực
+            if (_hubContext != null && _hubContext.Clients != null && seatsToRelease.Count > 0)
+            {
+                try
+                {
+                    var groupClient = _hubContext.Clients.Group(order.ShowtimeId.ToString());
+                    if (groupClient != null)
+                    {
+                        await groupClient.SendAsync("SeatReleased", new
+                        {
+                            ShowtimeId = order.ShowtimeId,
+                            SeatIds = seatsToRelease.Select(s => s.Id).ToList()
+                        }, cancellationToken);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Lỗi khi gửi SignalR SeatReleased cho suất chiếu {ShowtimeId} (S-46)", order.ShowtimeId);
+                }
             }
 
             // 4. Pha 2: Gọi cổng hoàn tiền NGOÀI transaction DB (không giữ lock DB khi chờ mạng)
