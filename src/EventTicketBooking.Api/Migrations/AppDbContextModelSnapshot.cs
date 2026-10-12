@@ -633,6 +633,65 @@ namespace EventTicketBooking.Api.Migrations
                     b.ToTable("Showtimes", (string)null);
                 });
 
+            modelBuilder.Entity("EventTicketBooking.Api.Models.SystemAlert", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AlertName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset>("LastUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Fingerprint")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SystemAlerts_Fingerprint_Firing")
+                        .HasFilter("\"Status\" = 'firing'");
+
+                    b.HasIndex("LastUpdatedAt")
+                        .HasDatabaseName("IX_SystemAlerts_LastUpdatedAt");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_SystemAlerts_Status");
+
+                    b.ToTable("SystemAlerts", (string)null);
+                });
+
             modelBuilder.Entity("EventTicketBooking.Api.Models.Ticket", b =>
                 {
                     b.Property<Guid>("Id")

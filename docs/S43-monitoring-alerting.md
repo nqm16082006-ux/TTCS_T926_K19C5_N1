@@ -105,7 +105,7 @@ docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
 
 Chạy bộ test tự động của S-43:
 ```powershell
-dotnet test src/tests/EventTicketBooking.Tests/EventTicketBooking.Tests.csproj --filter "FullyQualifiedName~MonitoringMetricsTests"
+dotnet test src/tests/EventTicketBooking.Tests/EventTicketBooking.Tests.csproj --filter "FullyQualifiedName~MonitoringMetricsTests|FullyQualifiedName~SystemAlertsWebhookTests"
 ```
 
 Chạy toàn bộ test suite để đảm bảo không hồi quy:
@@ -113,3 +113,34 @@ Chạy toàn bộ test suite để đảm bảo không hồi quy:
 dotnet test EventTicketBooking.sln --no-restore
 dotnet format EventTicketBooking.sln --verify-no-changes
 ```
+
+---
+
+## 7. Lưu trữ Lịch sử Cảnh báo & Deduplication (PostgreSQL SystemAlerts)
+
+- **Bảng `SystemAlerts`**:
+  - Lưu trữ đầy đủ lịch sử từng incident: `Id`, `Fingerprint`, `AlertName`, `Severity`, `Summary`, `Status` (`firing` / `resolved`), `StartedAt`, `ResolvedAt`, `CreatedAt`, `LastUpdatedAt`.
+  - **Index chống trùng lặp Partial Unique Index**:
+    `CREATE UNIQUE INDEX "IX_SystemAlerts_Fingerprint_Firing" ON "SystemAlerts" ("Fingerprint") WHERE "Status" = 'firing';`
+    - Cảnh báo lặp lại cùng fingerprint đang active: Update bản ghi hiện có, không tạo duplicate.
+    - Cảnh báo phục hồi: Chuyển bản ghi sang `Status = 'resolved'`, gán `ResolvedAt`, bảo toàn lịch sử.
+    - Incident mới sau khi incident cũ đã resolved: Tạo bản ghi incident mới độc lập.
+  - **Xử lý Concurrency & Resilience**:
+    - Webhook bắt `DbUpdateException` vi phạm unique index khi xảy ra race condition giữa 2 webhook cùng lúc để tự động reconcile và update.
+    - Nếu DB gặp sự cố không thể khắc phục, webhook ghi log cảnh báo lỗi nhưng vẫn tiếp tục broadcast SignalR tới Admin và trả về HTTP 200 (không làm sập pipeline Alertmanager).
+
+---
+
+## 8. Giao diện Quản trị: Chuông thông báo & Trang Giám sát Hệ thống
+
+- **API Lịch sử dành riêng cho Admin**:
+  - `GET /api/system-alerts?limit=50&status=firing`: Bảo vệ bởi `[RequireRole("Admin")]`.
+  - Trả về danh sách sắp xếp mới nhất (`LastUpdatedAt` descending) định dạng `ApiResponse<List<SystemAlertResponseDto>>`.
+- **Dropdown Chuông Admin (`admin-users.html` & `admin-monitoring.html`)**:
+  - Click icon chuông mở danh sách các cảnh báo gần nhất (Critical: đỏ, Warning: vàng, Resolved: xanh).
+  - Badge chuông chỉ đếm số lượng cảnh báo có `Status == 'firing'`. Khi resolved, badge tự động giảm.
+  - Khi reload trang: Tự động gọi API để khôi phục lịch sử từ DB và badge tương ứng.
+- **Trang Giám sát Hệ thống (`admin-monitoring.html`)**:
+  - Tích hợp 5 nhóm chỉ số cốt lõi S-43 (mô tả cơ chế và ngưỡng cảnh báo).
+  - Bảng lịch sử cảnh báo có bộ lọc (Tất cả / Đang cảnh báo / Đã phục hồi) và đồng bộ realtime qua SignalR.
+  - Nút **"Mở Grafana chi tiết"** mở tab mới tới dashboard Grafana UID `s43-system-overview` (`http://localhost:3000/d/s43-system-overview`).

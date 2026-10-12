@@ -860,6 +860,153 @@
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.15); }
     }
+    .system-alert-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      width: 380px;
+      max-width: 90vw;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: dropdownFadeIn 0.2s ease-out;
+    }
+    @keyframes dropdownFadeIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .system-alert-dropdown-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f8fafc;
+    }
+    .dropdown-header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--text-heading);
+    }
+    .dropdown-firing-badge {
+      background: #fee2e2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 9999px;
+    }
+    .dropdown-refresh-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 0.95rem;
+      padding: 4px;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    .dropdown-refresh-btn:hover {
+      background: #e2e8f0;
+    }
+    .system-alert-dropdown-list {
+      max-height: 380px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .dropdown-alert-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: background 0.15s;
+    }
+    .dropdown-alert-item:hover {
+      background: #f8fafc;
+    }
+    .dropdown-alert-item.critical {
+      border-left: 4px solid #dc2626;
+    }
+    .dropdown-alert-item.warning {
+      border-left: 4px solid #f59e0b;
+    }
+    .dropdown-alert-item.resolved {
+      border-left: 4px solid #10b981;
+      opacity: 0.9;
+    }
+    .dropdown-alert-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .dropdown-alert-title {
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--text-heading);
+    }
+    .dropdown-alert-status-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .dropdown-alert-status-badge.critical {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+    .dropdown-alert-status-badge.warning {
+      background: #fef3c7;
+      color: #b45309;
+    }
+    .dropdown-alert-status-badge.resolved {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .dropdown-alert-summary {
+      font-size: 0.8rem;
+      color: var(--text-body);
+      line-height: 1.35;
+      word-break: break-word;
+    }
+    .dropdown-alert-time {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .dropdown-empty-state {
+      padding: 28px 16px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+    .system-alert-dropdown-footer {
+      padding: 10px 16px;
+      border-top: 1px solid var(--border-color);
+      background: #f8fafc;
+      text-align: center;
+    }
+    .dropdown-view-all-link {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--primary);
+      text-decoration: none;
+      display: block;
+    }
+    .dropdown-view-all-link:hover {
+      text-decoration: underline;
+    }
     .system-toast-container {
       position: fixed;
       top: 24px;
@@ -925,12 +1072,31 @@
     <div class="nav-links">
       <a href="./events.html" class="nav-link">🎪 Quản lý Sự kiện</a>
       <a href="./admin-users.html" class="nav-link active">👥 Quản lý Người dùng</a>
+      <a href="./admin-monitoring.html" class="nav-link">📊 Giám sát hệ thống</a>
       <a href="./public-events.html" class="nav-link">🌐 Đặt vé Public</a>
     </div>
     <div class="user-menu">
-      <button id="systemAlertBellBtn" class="system-alert-bell" title="Cảnh báo hệ thống" type="button">
-        🔔 <span id="systemAlertBadge" class="system-alert-badge">0</span>
-      </button>
+      <div class="system-alert-bell-wrapper" style="position: relative;">
+        <button id="systemAlertBellBtn" class="system-alert-bell" title="Cảnh báo hệ thống" type="button" onclick="toggleAlertDropdown(event)">
+          🔔 <span id="systemAlertBadge" class="system-alert-badge">0</span>
+        </button>
+        <!-- Dropdown Popover -->
+        <div id="systemAlertDropdown" class="system-alert-dropdown" style="display: none;">
+          <div class="system-alert-dropdown-header">
+            <div class="dropdown-header-title">
+              <span>🔔 Cảnh báo hệ thống</span>
+              <span id="dropdownFiringBadge" class="dropdown-firing-badge" style="display: none;">0 đang diễn ra</span>
+            </div>
+            <button type="button" class="dropdown-refresh-btn" onclick="fetchSystemAlertsHistory()" title="Làm mới">🔄</button>
+          </div>
+          <div id="systemAlertDropdownList" class="system-alert-dropdown-list">
+            <!-- Alert items rendered here -->
+          </div>
+          <div class="system-alert-dropdown-footer">
+            <a href="./admin-monitoring.html" class="dropdown-view-all-link">📊 Xem tất cả cảnh báo & Giám sát &rarr;</a>
+          </div>
+        </div>
+      </div>
       <div class="user-chip">
         <div class="user-avatar" id="navAvatar">A</div>
         <span class="user-name" id="navUsername">Admin</span>
@@ -1209,6 +1375,7 @@
       }
 
       loadUsers();
+      fetchSystemAlertsHistory();
       initSystemAlertSignalR();
     });
 
@@ -1560,18 +1727,121 @@
       window.location.href = './login.html';
     }
 
-    // --- S-43: Realtime System Alerts (SignalR Client) ---
-    const activeAlerts = new Map();
+    // --- S-43: Alert State, Dropdown & Realtime System Alerts ---
+    let systemAlertHistory = [];
+    let isAlertDropdownOpen = false;
+
+    function formatAlertTime(isoStr) {
+      if (!isoStr) return '';
+      try {
+        const d = new Date(isoStr);
+        return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ' +
+               d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+      } catch {
+        return isoStr;
+      }
+    }
+
+    function renderAlertDropdown() {
+      const listContainer = document.getElementById('systemAlertDropdownList');
+      const firingBadge = document.getElementById('dropdownFiringBadge');
+      if (!listContainer) return;
+
+      const firingCount = systemAlertHistory.filter(a => a.status === 'firing').length;
+      if (firingBadge) {
+        if (firingCount > 0) {
+          firingBadge.textContent = `${firingCount} đang diễn ra`;
+          firingBadge.style.display = 'inline-block';
+        } else {
+          firingBadge.style.display = 'none';
+        }
+      }
+
+      if (systemAlertHistory.length === 0) {
+        listContainer.innerHTML = '<div class="dropdown-empty-state">Không có cảnh báo hệ thống nào.</div>';
+        return;
+      }
+
+      listContainer.innerHTML = systemAlertHistory.slice(0, 20).map(alert => {
+        const isResolved = alert.status === 'resolved';
+        const severity = (alert.severity || 'warning').toLowerCase();
+        const typeClass = isResolved ? 'resolved' : (severity === 'critical' ? 'critical' : 'warning');
+        const icon = isResolved ? '✅' : (severity === 'critical' ? '🚨' : '⚠️');
+        const statusLabel = isResolved ? 'Đã phục hồi' : (severity === 'critical' ? 'CRITICAL' : 'WARNING');
+
+        let timeText = `Bắt đầu: ${formatAlertTime(alert.startedAt)}`;
+        if (isResolved && alert.resolvedAt) {
+          timeText += ` • Xong: ${formatAlertTime(alert.resolvedAt)}`;
+        }
+
+        return `
+          <div class="dropdown-alert-item ${typeClass}">
+            <div class="dropdown-alert-top">
+              <span class="dropdown-alert-title">${icon} ${escapeHtml(alert.alertName || 'Alert')}</span>
+              <span class="dropdown-alert-status-badge ${typeClass}">${statusLabel}</span>
+            </div>
+            <div class="dropdown-alert-summary">${escapeHtml(alert.summary || '')}</div>
+            <div class="dropdown-alert-time">${timeText}</div>
+          </div>
+        `;
+      }).join('');
+    }
 
     function updateAlertBadge() {
       const badge = document.getElementById('systemAlertBadge');
       if (!badge) return;
-      const count = activeAlerts.size;
+      const count = systemAlertHistory.filter(a => a.status === 'firing').length;
       badge.textContent = count;
       if (count > 0) {
         badge.classList.add('active');
       } else {
         badge.classList.remove('active');
+      }
+    }
+
+    function toggleAlertDropdown(e) {
+      if (e) e.stopPropagation();
+      const dropdown = document.getElementById('systemAlertDropdown');
+      if (!dropdown) return;
+      isAlertDropdownOpen = !isAlertDropdownOpen;
+      dropdown.style.display = isAlertDropdownOpen ? 'flex' : 'none';
+      if (isAlertDropdownOpen) {
+        renderAlertDropdown();
+      }
+    }
+
+    document.addEventListener('click', (e) => {
+      const wrapper = document.querySelector('.system-alert-bell-wrapper');
+      if (wrapper && !wrapper.contains(e.target)) {
+        const dropdown = document.getElementById('systemAlertDropdown');
+        if (dropdown && isAlertDropdownOpen) {
+          isAlertDropdownOpen = false;
+          dropdown.style.display = 'none';
+        }
+      }
+    });
+
+    async function fetchSystemAlertsHistory() {
+      const authToken = localStorage.getItem('access_token');
+      if (!authToken) return;
+
+      try {
+        const res = await fetch('/api/system-alerts?limit=20', {
+          headers: {
+            'Authorization': 'Bearer ' + authToken
+          }
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            systemAlertHistory = json.data;
+            updateAlertBadge();
+            renderAlertDropdown();
+          }
+        }
+      } catch (err) {
+        console.warn('Lỗi tải lịch sử cảnh báo:', err);
       }
     }
 
@@ -1628,13 +1898,52 @@
         connection.on("ReceiveSystemAlert", (alert) => {
           if (!alert || !alert.fingerprint) return;
 
-          if (alert.status === 'resolved') {
-            activeAlerts.delete(alert.fingerprint);
+          const isResolved = alert.status === 'resolved';
+
+          if (isResolved) {
+            const existingFiring = systemAlertHistory.find(a => a.fingerprint === alert.fingerprint && a.status === 'firing');
+            if (existingFiring) {
+              existingFiring.status = 'resolved';
+              existingFiring.resolvedAt = alert.resolvedAt || new Date().toISOString();
+              existingFiring.lastUpdatedAt = new Date().toISOString();
+              if (alert.summary) existingFiring.summary = alert.summary;
+            } else {
+              systemAlertHistory.unshift({
+                id: 'rt-' + Date.now(),
+                fingerprint: alert.fingerprint,
+                alertName: alert.alertName || 'Alert',
+                severity: alert.severity || 'warning',
+                summary: alert.summary || '',
+                status: 'resolved',
+                startedAt: alert.startedAt || new Date().toISOString(),
+                resolvedAt: alert.resolvedAt || new Date().toISOString(),
+                lastUpdatedAt: new Date().toISOString()
+              });
+            }
           } else {
-            activeAlerts.set(alert.fingerprint, alert);
+            const existingFiring = systemAlertHistory.find(a => a.fingerprint === alert.fingerprint && a.status === 'firing');
+            if (existingFiring) {
+              existingFiring.summary = alert.summary || existingFiring.summary;
+              existingFiring.severity = alert.severity || existingFiring.severity;
+              existingFiring.alertName = alert.alertName || existingFiring.alertName;
+              existingFiring.lastUpdatedAt = new Date().toISOString();
+            } else {
+              systemAlertHistory.unshift({
+                id: 'rt-' + Date.now(),
+                fingerprint: alert.fingerprint,
+                alertName: alert.alertName || 'Alert',
+                severity: alert.severity || 'warning',
+                summary: alert.summary || '',
+                status: 'firing',
+                startedAt: alert.startedAt || new Date().toISOString(),
+                resolvedAt: null,
+                lastUpdatedAt: new Date().toISOString()
+              });
+            }
           }
 
           updateAlertBadge();
+          renderAlertDropdown();
           showSystemToast(alert);
         });
 
