@@ -265,4 +265,52 @@ public class AdminUsersS28Tests : IDisposable
         Assert.DoesNotContain("Password", dtoProperties);
         Assert.DoesNotContain("PasswordHash", dtoProperties);
     }
+
+    [Fact]
+    public async Task GetRoleAuditLogs_ReturnsAuditList_WithActorAndTargetInfo()
+    {
+        await SeedRolesAsync("Staff", "Auditor");
+        var admin = await AddUserAsync("admin", "admin@test.com");
+        var target = await AddUserAsync("staff1", "staff1@test.com");
+        var controller = CreateController(admin.Id);
+
+        // Perform role change
+        await controller.UpdateUserRoles(target.Id, new UpdateUserRolesDto
+        {
+            Roles = new List<string> { "Staff" }
+        });
+
+        var actionResult = await controller.GetRoleAuditLogs();
+        var okResult = Assert.IsType<OkObjectResult>(actionResult);
+        var apiResponse = Assert.IsAssignableFrom<EventTicketBooking.Api.DTOs.Common.ApiResponse<List<RoleAuditLogResponseDto>>>(okResult.Value);
+        Assert.True(apiResponse.Success);
+        Assert.NotNull(apiResponse.Data);
+        var item = Assert.Single(apiResponse.Data);
+        Assert.Equal("admin", item.ActorUsername);
+        Assert.Equal(admin.Id, item.ActorUserId);
+        Assert.Equal("staff1", item.TargetUsername);
+        Assert.Equal("staff1@test.com", item.TargetEmail);
+        Assert.Equal("Staff", item.NewRoles);
+    }
+
+    [Fact]
+    public async Task GetRoleAuditLogs_FilteredByTargetUser_ReturnsOnlyTargetLogs()
+    {
+        await SeedRolesAsync("Staff", "Auditor");
+        var admin = await AddUserAsync("admin", "admin@test.com");
+        var target1 = await AddUserAsync("target1", "target1@test.com");
+        var target2 = await AddUserAsync("target2", "target2@test.com");
+        var controller = CreateController(admin.Id);
+
+        await controller.UpdateUserRoles(target1.Id, new UpdateUserRolesDto { Roles = new List<string> { "Staff" } });
+        await controller.UpdateUserRoles(target2.Id, new UpdateUserRolesDto { Roles = new List<string> { "Auditor" } });
+
+        var actionResult = await controller.GetUserRoleAuditLogs(target1.Id);
+        var okResult = Assert.IsType<OkObjectResult>(actionResult);
+        var apiResponse = Assert.IsAssignableFrom<EventTicketBooking.Api.DTOs.Common.ApiResponse<List<RoleAuditLogResponseDto>>>(okResult.Value);
+        var item = Assert.Single(apiResponse.Data);
+        Assert.Equal(target1.Id, item.TargetUserId);
+        Assert.Equal("target1", item.TargetUsername);
+    }
 }
+

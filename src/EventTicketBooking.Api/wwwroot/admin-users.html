@@ -455,6 +455,18 @@
       border: 1px solid #a7f3d0;
     }
 
+    .role-badge.staff {
+      background: #fdf2f8;
+      color: #9d174d;
+      border: 1px solid #fbcfe8;
+    }
+
+    .role-badge.auditor {
+      background: #f0fdf4;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+
     .status-badge {
       display: inline-flex;
       align-items: center;
@@ -1115,7 +1127,12 @@
         <h1 class="page-title">👥 Quản Trị Người Dùng & Phân Quyền</h1>
         <p class="page-subtitle">Xem toàn bộ tài khoản, tạo tài khoản nhân viên, thay đổi vai trò (Staff, Auditor, Organizer, Admin, Customer) và quản lý trạng thái kích hoạt.</p>
       </div>
-      <button class="btn-modal-save" onclick="openCreateModal()" style="height: fit-content;">＋ Tạo tài khoản nhân viên</button>
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <button type="button" class="btn-action" onclick="openAuditLogModal()" style="height: fit-content; padding: 10px 16px; font-weight: 700; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-heading); border-radius: 10px; display: inline-flex; align-items: center; gap: 6px; box-shadow: var(--shadow-sm); cursor: pointer;">
+          📜 Nhật ký phân quyền
+        </button>
+        <button class="btn-modal-save" onclick="openCreateModal()" style="height: fit-content;">＋ Tạo tài khoản nhân viên</button>
+      </div>
     </div>
 
     <!-- Stats -->
@@ -1334,6 +1351,56 @@
     </div>
   </div>
 
+  <!-- Modal Nhật ký phân quyền (S-28 Audit Log) -->
+  <div class="modal-overlay" id="auditLogModal" style="display: none;" onclick="if(event.target === this) closeAuditLogModal()">
+    <div class="modal-box modal-lg" style="max-width: 960px; width: 95%;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">📜 Nhật Ký Thay Đổi Vai Trò (Audit Logs)</h3>
+          <p class="modal-desc" style="margin-top: 4px;" id="auditLogSubtitle">
+            Ghi nhận toàn bộ lịch sử gán và cập nhật quyền kèm danh tính Người thao tác (Actor).
+          </p>
+        </div>
+        <button class="modal-close" onclick="closeAuditLogModal()">✕</button>
+      </div>
+
+      <div class="toolbar-container" style="margin: 14px 0 10px; gap: 10px; padding: 0;">
+        <div class="search-box" style="flex: 1;">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="auditSearchInput" class="search-input" placeholder="Tìm theo người thao tác, tài khoản, vai trò..." oninput="handleAuditSearch()">
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button id="btnClearAuditFilter" class="btn-action" onclick="clearAuditFilter()" style="display: none; padding: 8px 12px; font-size: 12.5px; background: #fff;">✕ Xem tất cả tài khoản</button>
+          <button class="btn-action" onclick="loadAuditLogs(currentAuditTargetUserId)" style="padding: 8px 12px; font-size: 12.5px; background: #fff;">🔄 Làm mới</button>
+        </div>
+      </div>
+
+      <div class="table-container" style="max-height: 480px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 12px;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 5; border-bottom: 1px solid var(--border-color);">
+            <tr>
+              <th style="padding: 12px 16px; text-align: left; font-size: 11.5px;">Thời gian</th>
+              <th style="padding: 12px 16px; text-align: left; font-size: 11.5px;">Người thao tác (Actor)</th>
+              <th style="padding: 12px 16px; text-align: left; font-size: 11.5px;">Tài khoản thay đổi</th>
+              <th style="padding: 12px 16px; text-align: left; font-size: 11.5px;">Vai trò: Cũ ➔ Mới</th>
+              <th style="padding: 12px 16px; text-align: left; font-size: 11.5px;">Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="auditTableBody">
+            <tr>
+              <td colspan="5" class="empty-state">⌛ Đang tải nhật ký kiểm toán...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="modal-actions" style="margin-top: 14px; justify-content: space-between; align-items: center;">
+        <span id="auditLogCount" style="font-size: 12.5px; color: var(--text-muted); font-weight: 600;">Đang hiển thị 0 bản ghi</span>
+        <button type="button" class="btn-modal-cancel" onclick="closeAuditLogModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <!-- S-43: SignalR Client Library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
   <script>
@@ -1487,6 +1554,7 @@
             <td style="color:var(--text-muted); font-size:13px;">${formatDate(u.createdAt)}</td>
             <td style="text-align: right;">
               <div class="actions-cell" style="justify-content: flex-end;">
+                <button class="btn-action" title="Xem lịch sử phân quyền tài khoản này" onclick="openAuditLogModal('${u.id}', '${escapeHtml(u.fullName || u.username)}')">📜 Lịch sử</button>
                 <button class="btn-action" onclick="openRoleModal('${u.id}')">🛡️ Phân quyền</button>
                 ${lockBtn}
                 <button class="btn-action btn-delete" style="color: #ef4444;" onclick="deleteUser('${u.id}')">🗑️ Xóa</button>
@@ -1953,6 +2021,183 @@
         console.warn("SignalR SystemAlertHub connection error:", err);
       }
     }
+
+    // ==========================================
+    // S-28: Role Audit Logs (Nhật ký phân quyền)
+    // ==========================================
+    let roleAuditLogs = [];
+    let currentAuditTargetUserId = null;
+    let currentAuditTargetName = '';
+
+    function openAuditLogModal(targetUserId = null, targetName = '') {
+      currentAuditTargetUserId = targetUserId;
+      currentAuditTargetName = targetName;
+
+      const subtitleEl = document.getElementById('auditLogSubtitle');
+      const clearBtn = document.getElementById('btnClearAuditFilter');
+      const searchInput = document.getElementById('auditSearchInput');
+      if (searchInput) searchInput.value = '';
+
+      if (targetUserId) {
+        subtitleEl.innerHTML = `Đang lọc lịch sử phân quyền cho tài khoản: <strong>${escapeHtml(targetName)}</strong>`;
+        if (clearBtn) clearBtn.style.display = 'inline-block';
+      } else {
+        subtitleEl.textContent = 'Ghi nhận toàn bộ lịch sử gán và cập nhật quyền kèm danh tính Người thao tác (Actor).';
+        if (clearBtn) clearBtn.style.display = 'none';
+      }
+
+      document.getElementById('auditLogModal').style.display = 'flex';
+      loadAuditLogs(targetUserId);
+    }
+
+    function closeAuditLogModal() {
+      document.getElementById('auditLogModal').style.display = 'none';
+    }
+
+    function clearAuditFilter() {
+      currentAuditTargetUserId = null;
+      currentAuditTargetName = '';
+      const subtitleEl = document.getElementById('auditLogSubtitle');
+      subtitleEl.textContent = 'Ghi nhận toàn bộ lịch sử gán và cập nhật quyền kèm danh tính Người thao tác (Actor).';
+      const clearBtn = document.getElementById('btnClearAuditFilter');
+      if (clearBtn) clearBtn.style.display = 'none';
+      const searchInput = document.getElementById('auditSearchInput');
+      if (searchInput) searchInput.value = '';
+      loadAuditLogs(null);
+    }
+
+    async function loadAuditLogs(targetUserId = null) {
+      const tbody = document.getElementById('auditTableBody');
+      const countEl = document.getElementById('auditLogCount');
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-state">⌛ Đang tải nhật ký kiểm toán từ máy chủ...</td></tr>';
+      if (countEl) countEl.textContent = 'Đang tải...';
+
+      try {
+        let url = `${API_BASE}/api/admin/users/audit-logs`;
+        if (targetUserId) {
+          url += `?targetUserId=${encodeURIComponent(targetUserId)}`;
+        }
+
+        const res = await fetch(url, {
+          headers: {
+            'Authorization': 'Bearer ' + token
+          }
+        });
+
+        if (res.status === 401) {
+          logout();
+          return;
+        }
+
+        if (res.status === 403) {
+          tbody.innerHTML = '<tr><td colspan="5" class="empty-state" style="color:var(--danger-text);">⛔ Bạn không có quyền xem nhật ký kiểm toán.</td></tr>';
+          return;
+        }
+
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          roleAuditLogs = json.data;
+          renderAuditTable(roleAuditLogs);
+        } else {
+          tbody.innerHTML = `<tr><td colspan="5" class="empty-state" style="color:var(--danger-text);">❌ ${escapeHtml(json.message || 'Không thể lấy dữ liệu nhật ký.')}</td></tr>`;
+        }
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state" style="color:var(--danger-text);">❌ Lỗi kết nối tới máy chủ khi tải nhật ký kiểm toán.</td></tr>';
+      }
+    }
+
+    function renderAuditTable(logs) {
+      const tbody = document.getElementById('auditTableBody');
+      const countEl = document.getElementById('auditLogCount');
+      if (countEl) countEl.textContent = `Đang hiển thị ${logs.length} bản ghi`;
+
+      if (!logs || logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Không có bản ghi nhật ký phân quyền nào.</td></tr>';
+        return;
+      }
+
+      function formatRolePills(roleStr) {
+        if (!roleStr || !roleStr.trim()) {
+          return '<span style="color:var(--text-muted); font-size:12px; font-style:italic;">(Trống / Chưa có)</span>';
+        }
+        return roleStr.split(',').map(r => r.trim()).filter(Boolean).map(r => {
+          const rLower = r.toLowerCase();
+          return `<span class="role-badge ${rLower}">${escapeHtml(r)}</span>`;
+        }).join('');
+      }
+
+      tbody.innerHTML = logs.map(l => {
+        const oldPills = formatRolePills(l.oldRoles || l.OldRoles);
+        const newPills = formatRolePills(l.newRoles || l.NewRoles);
+        const createdAtVal = l.createdAt || l.CreatedAt;
+        const actor = l.actorUsername || l.ActorUsername || 'Admin';
+        const targetUser = l.targetUsername || l.TargetUsername || 'N/A';
+        const targetEmail = l.targetEmail || l.TargetEmail || '';
+        const actionName = l.action || l.Action || 'ROLE_CHANGED';
+
+        return `
+          <tr>
+            <td style="color:var(--text-muted); font-size:12.5px; white-space:nowrap;">
+              ${formatDate(createdAtVal)}
+            </td>
+            <td>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg, #4f46e5, #3730a3); color:#fff; font-size:11px; font-weight:800;">
+                  ${actor.charAt(0).toUpperCase()}
+                </span>
+                <div>
+                  <strong style="color:var(--text-heading); font-size:13px;">${escapeHtml(actor)}</strong>
+                  <div style="font-size:10.5px; color:var(--primary); font-weight:700;">Người thao tác</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div>
+                <strong style="color:var(--text-heading); font-size:13px;">${escapeHtml(targetUser)}</strong>
+                <div style="font-size:11.5px; color:var(--text-muted);">${escapeHtml(targetEmail)}</div>
+              </div>
+            </td>
+            <td>
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <div style="display:inline-flex; flex-wrap:wrap; align-items:center;">${oldPills}</div>
+                <span style="color:var(--text-muted); font-weight:800; font-size:13px;">➔</span>
+                <div style="display:inline-flex; flex-wrap:wrap; align-items:center;">${newPills}</div>
+              </div>
+            </td>
+            <td>
+              <span class="brand-badge" style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; font-size:10.5px; padding:3px 8px;">
+                ${escapeHtml(actionName)}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function handleAuditSearch() {
+      const q = (document.getElementById('auditSearchInput')?.value || '').trim().toLowerCase();
+      if (!q) {
+        renderAuditTable(roleAuditLogs);
+        return;
+      }
+      const filtered = roleAuditLogs.filter(l => {
+        const actor = (l.actorUsername || l.ActorUsername || '').toLowerCase();
+        const targetUser = (l.targetUsername || l.TargetUsername || '').toLowerCase();
+        const targetEmail = (l.targetEmail || l.TargetEmail || '').toLowerCase();
+        const oldRoles = (l.oldRoles || l.OldRoles || '').toLowerCase();
+        const newRoles = (l.newRoles || l.NewRoles || '').toLowerCase();
+        const action = (l.action || l.Action || '').toLowerCase();
+
+        return actor.includes(q)
+            || targetUser.includes(q)
+            || targetEmail.includes(q)
+            || oldRoles.includes(q)
+            || newRoles.includes(q)
+            || action.includes(q);
+      });
+      renderAuditTable(filtered);
+    }
   </script>
+
 </body>
 </html>

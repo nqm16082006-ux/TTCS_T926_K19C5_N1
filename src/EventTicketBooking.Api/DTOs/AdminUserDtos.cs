@@ -37,4 +37,22 @@ namespace EventTicketBooking.Api.DTOs
         public string? FullName { get; set; }
         public List<string> Roles { get; set; } = new List<string>();
     }
+
+    /// <summary>
+    /// Bản ghi nhật ký kiểm toán thay đổi vai trò trả về cho Admin (S-28).
+    /// </summary>
+    public class RoleAuditLogResponseDto
+    {
+        public Guid Id { get; set; }
+        public Guid ActorUserId { get; set; }
+        public string ActorUsername { get; set; } = string.Empty;
+        public Guid TargetUserId { get; set; }
+        public string TargetUsername { get; set; } = string.Empty;
+        public string TargetEmail { get; set; } = string.Empty;
+        public string OldRoles { get; set; } = string.Empty;
+        public string NewRoles { get; set; } = string.Empty;
+        public string Action { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+    }
 }
+

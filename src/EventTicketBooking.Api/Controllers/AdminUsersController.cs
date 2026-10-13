@@ -401,6 +401,74 @@ namespace EventTicketBooking.Api.Controllers
             return Ok(ApiResponse<object>.SuccessResult(null, "Đã xóa tài khoản người dùng thành công."));
         }
 
+        /// <summary>
+        /// Lấy toàn bộ danh sách nhật ký thay đổi vai trò người dùng (Audit Logs) cho Admin (S-28).
+        /// GET /api/admin/users/audit-logs?targetUserId=...&search=...
+        /// </summary>
+        [HttpGet("audit-logs")]
+        [ProducesResponseType(typeof(ApiResponse<List<RoleAuditLogResponseDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetRoleAuditLogs([FromQuery] Guid? targetUserId = null, [FromQuery] string? search = null)
+        {
+            var query = _context.AuditLogs.AsNoTracking();
+
+            if (targetUserId.HasValue)
+            {
+                query = query.Where(l => l.TargetUserId == targetUserId.Value);
+            }
+
+            var logs = await query
+                .OrderByDescending(l => l.CreatedAt)
+                .Take(200)
+                .ToListAsync();
+
+            var targetIds = logs.Select(l => l.TargetUserId).Distinct().ToList();
+            var targetUsers = await _context.Users
+                .AsNoTracking()
+                .Where(u => targetIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => new { u.Username, u.Email });
+
+            var result = logs.Select(l =>
+            {
+                targetUsers.TryGetValue(l.TargetUserId, out var targetUser);
+                return new RoleAuditLogResponseDto
+                {
+                    Id = l.Id,
+                    ActorUserId = l.ActorUserId,
+                    ActorUsername = string.IsNullOrEmpty(l.ActorUsername) ? "Admin" : l.ActorUsername,
+                    TargetUserId = l.TargetUserId,
+                    TargetUsername = targetUser?.Username ?? "N/A",
+                    TargetEmail = targetUser?.Email ?? "N/A",
+                    OldRoles = l.OldRoles,
+                    NewRoles = l.NewRoles,
+                    Action = l.Action,
+                    CreatedAt = l.CreatedAt
+                };
+            }).ToList();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim().ToLower();
+                result = result.Where(r => r.ActorUsername.ToLower().Contains(s)
+                                        || r.TargetUsername.ToLower().Contains(s)
+                                        || r.TargetEmail.ToLower().Contains(s)
+                                        || r.NewRoles.ToLower().Contains(s)
+                                        || r.OldRoles.ToLower().Contains(s)).ToList();
+            }
+
+            return Ok(ApiResponse<List<RoleAuditLogResponseDto>>.SuccessResult(result, "Lấy danh sách nhật ký phân quyền thành công."));
+        }
+
+        /// <summary>
+        /// Lấy nhật ký thay đổi vai trò của một người dùng cụ thể.
+        /// GET /api/admin/users/{id:guid}/audit-logs
+        /// </summary>
+        [HttpGet("{id:guid}/audit-logs")]
+        [ProducesResponseType(typeof(ApiResponse<List<RoleAuditLogResponseDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetUserRoleAuditLogs(Guid id)
+        {
+            return await GetRoleAuditLogs(targetUserId: id, search: null);
+        }
+
         private Guid? GetCurrentUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
