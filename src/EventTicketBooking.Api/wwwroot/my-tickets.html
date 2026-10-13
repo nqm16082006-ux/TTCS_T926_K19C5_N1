@@ -257,7 +257,7 @@
           page++;
         } while (page <= totalPages);
 
-        // 2) Đơn Paid -> lấy vé (S-25). Đơn Cancelled/Expired -> vé đã huỷ (hiển thị mờ, không QR).
+        // 2) Đơn Paid -> lấy vé (S-25). Chỉ đơn Cancelled do mong muốn hoàn tiền của người dùng (S-45) -> vé đã huỷ (hiển thị mờ, không QR).
         const validTickets = [];
         const cancelledTickets = [];
         const now = Date.now();
@@ -285,11 +285,13 @@
                 price: t.price, startMs, isUpcoming
               });
             }
-          } else if (order.status === 'Cancelled' || order.status === 'Expired') {
+          } else if (order.status === 'Cancelled' && (order.cancelReason === 'CUSTOMER_REFUND' || order.cancelReason === 'CustomerRefund' || order.refundStatus)) {
+            // S-38 & S-45: Cơ chế làm mờ và không hiện QR chỉ làm đối với vé đã bị hủy do mong muốn hoàn tiền của người dùng
             const seats = (order.seatNames && order.seatNames.length) ? order.seatNames.join(', ')
               : (order.items ? order.items.map(i => i.seatName).filter(Boolean).join(', ') : 'Chưa định vị');
             cancelledTickets.push({
               kind: 'cancelled', orderId: order.id, orderStatus: order.status,
+              cancelReason: order.cancelReason,
               eventTitle: order.eventTitle, eventLocation: order.eventLocation,
               eventImageUrl: order.eventImageUrl, showtimeStartTime: order.showtimeStartTime,
               seatName: seats,
@@ -411,7 +413,7 @@
               <span class="material-symbols-outlined text-[14px]">${t.orderStatus === 'Cancelled' ? 'cancel' : 'timer_off'}</span>
               ${t.orderStatus === 'Cancelled' ? 'Vé đã bị huỷ' : 'Đơn đã hết hạn'}
             </div>
-            <p class="text-xs text-slate-400 mt-4">Vé này không còn hiệu lực và không thể sử dụng để vào cổng. Mã QR không được cung cấp.</p>
+            <p class="text-xs text-slate-400 mt-4">Vé này đã bị huỷ do mong muốn hoàn tiền của người dùng và không còn hiệu lực để vào cổng. Mã QR không được cung cấp.</p>
             <div class="mt-4 grid grid-cols-2 gap-2 text-xs text-left">
               <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100"><span class="text-slate-400 block text-[10px]">Vị trí ghế:</span><span class="font-bold text-slate-700">${escapeHtml(t.seatName || 'Chưa định vị')}</span></div>
               <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100"><span class="text-slate-400 block text-[10px]">Hạng vé:</span><span class="font-bold text-slate-700">${escapeHtml(t.categoryName || 'Tiêu chuẩn')}</span></div>
