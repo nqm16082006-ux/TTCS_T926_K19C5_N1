@@ -233,15 +233,15 @@ namespace EventTicketBooking.Tests
             Assert.False(executionResult.Success);
             Assert.Contains("không khớp", executionResult.Message);
 
-            // Order KHÔNG chuyển sang Paid
+            // Story S-18 (AC4 & Task T-42): Đơn chuyển sang NeedsAttention để đối soát, KHÔNG có vé
             var updatedOrder = await _context.Orders.FindAsync(order.Id);
             Assert.NotNull(updatedOrder);
-            Assert.Equal(OrderStatus.Pending, updatedOrder.Status);
+            Assert.Equal(OrderStatus.NeedsAttention, updatedOrder.Status);
 
-            // PaymentTransaction KHÔNG chuyển sang PAID
+            // PaymentTransaction chuyển sang NEEDS_ATTENTION
             var updatedTx = await _context.PaymentTransactions.FirstOrDefaultAsync(pt => pt.OrderId == order.Id);
             Assert.NotNull(updatedTx);
-            Assert.Equal("PENDING", updatedTx.Status);
+            Assert.Equal("NEEDS_ATTENTION", updatedTx.Status);
 
             // Ghế KHÔNG chuyển sang SOLD
             var updatedSeats = await _context.Seats.Where(s => seats.Select(x => x.Id).Contains(s.Id)).ToListAsync();
@@ -250,6 +250,10 @@ namespace EventTicketBooking.Tests
             // Giữ chỗ KHÔNG chuyển sang CONVERTED
             var updatedHolds = await _context.SeatHold.Where(h => holds.Select(x => x.Id).Contains(h.Id)).ToListAsync();
             Assert.All(updatedHolds, h => Assert.Equal("ACTIVE", h.Status));
+
+            // KHÔNG xuất vé nào cho đơn lệch tiền
+            var ticketsCount = await _context.Tickets.CountAsync(t => order.OrderItems.Select(oi => oi.Id).Contains(t.OrderItemId));
+            Assert.Equal(0, ticketsCount);
         }
 
         #endregion
@@ -557,7 +561,7 @@ namespace EventTicketBooking.Tests
 
             var updatedOrder = await _context.Orders.FindAsync(order.Id);
             Assert.NotNull(updatedOrder);
-            Assert.Equal(OrderStatus.Pending, updatedOrder.Status);
+            Assert.Equal(OrderStatus.NeedsAttention, updatedOrder.Status);
         }
 
         [Fact]

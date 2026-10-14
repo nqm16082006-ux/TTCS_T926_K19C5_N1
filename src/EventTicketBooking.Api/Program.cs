@@ -4,14 +4,17 @@ using Microsoft.EntityFrameworkCore;
 using DotNetEnv;
 using Prometheus;
 
-// Nạp file .env ở thư mục gốc hoặc thư mục hiện tại nếu có
-if (File.Exists(".env"))
+// Nạp file .env ở thư mục hiện tại hoặc các thư mục cha
+var envSearchDir = new DirectoryInfo(Directory.GetCurrentDirectory());
+while (envSearchDir != null)
 {
-    Env.Load(".env");
-}
-else if (File.Exists("../../.env"))
-{
-    Env.Load("../../.env");
+    var envCandidate = Path.Combine(envSearchDir.FullName, ".env");
+    if (File.Exists(envCandidate))
+    {
+        Env.Load(envCandidate);
+        break;
+    }
+    envSearchDir = envSearchDir.Parent;
 }
 
 // Cho phép Npgsql xử lý DateTime linh hoạt (cả Local và UTC)

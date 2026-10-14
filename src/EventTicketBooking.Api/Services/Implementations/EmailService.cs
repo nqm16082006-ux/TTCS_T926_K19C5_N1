@@ -209,10 +209,10 @@ public class EmailService : IEmailService
             return;
         }
 
-        // Tự động chuẩn hóa mật khẩu ứng dụng Gmail (loại bỏ khoảng trắng nếu có)
+        // Tự động chuẩn hóa mật khẩu ứng dụng Gmail (loại bỏ khoảng trắng, dấu gạch ngang nếu có)
         if (host.Contains("gmail.com", StringComparison.OrdinalIgnoreCase))
         {
-            pass = pass.Replace(" ", "");
+            pass = pass.Replace(" ", "").Replace("-", "").Trim();
         }
 
         try
