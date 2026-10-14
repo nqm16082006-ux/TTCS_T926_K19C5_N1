@@ -33,6 +33,7 @@ namespace EventTicketBooking.Api.Controllers
         private readonly EventTicketBooking.Api.Services.Interfaces.ITicketService _ticketService;
         private readonly EventTicketBooking.Api.Services.Interfaces.IOrderAuditService _orderAuditService;
         private readonly EventTicketBooking.Api.Services.Interfaces.IPaymentGateway? _paymentGateway;
+        private readonly EventTicketBooking.Api.Services.Interfaces.IRefundService? _refundService;
         private readonly RefundPolicyOptions _refundPolicy;
         private readonly IHubContext<SeatStatusHub>? _hubContext;
         private readonly IConnectionMultiplexer? _redis;
@@ -46,7 +47,8 @@ namespace EventTicketBooking.Api.Controllers
             EventTicketBooking.Api.Services.Interfaces.IPaymentGateway? paymentGateway = null,
             IOptions<RefundPolicyOptions>? refundPolicy = null,
             IHubContext<SeatStatusHub>? hubContext = null,
-            IConnectionMultiplexer? redis = null)
+            IConnectionMultiplexer? redis = null,
+            EventTicketBooking.Api.Services.Interfaces.IRefundService? refundService = null)
         {
             _context = context;
             _logger = logger;
@@ -58,6 +60,8 @@ namespace EventTicketBooking.Api.Controllers
             _refundPolicy = refundPolicy?.Value ?? new RefundPolicyOptions();
             _hubContext = hubContext;
             _redis = redis;
+            _refundService = refundService ?? new EventTicketBooking.Api.Services.Implementations.RefundService(
+                context, _orderAuditService, paymentGateway, Microsoft.Extensions.Logging.Abstractions.NullLogger<EventTicketBooking.Api.Services.Implementations.RefundService>.Instance, hubContext, redis);
         }
 
         /// <summary>
@@ -442,7 +446,8 @@ namespace EventTicketBooking.Api.Controllers
         }
 
         /// <summary>
-        /// S-45: Khách huỷ đơn đã thanh toán trước hạn và tạo yêu cầu hoàn tiền theo chính sách demo.
+        /// S-45 & S-48: Khách huỷ đơn đã thanh toán trước hạn và tạo yêu cầu hoàn tiền.
+        /// Hỗ trợ cờ simulateFailure để mô phỏng hoàn tiền thất bại và chuyển tiếp kế toán (Story S-48).
         /// POST /api/v1/orders/{orderId}/cancel
         /// </summary>
         [HttpPost("{orderId:guid}/cancel")]
@@ -452,11 +457,59 @@ namespace EventTicketBooking.Api.Controllers
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
-        public async Task<IActionResult> CancelOrderAndRefund(Guid orderId)
+        public async Task<IActionResult> CancelOrderAndRefund(
+            Guid orderId,
+            [FromQuery] bool simulateFailure = false,
+            [FromBody] CancelOrderRequestDto? body = null)
         {
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
             if (!Guid.TryParse(userIdStr, out var userId))
                 return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+
+            var userDisplayName = User.Identity?.Name ?? User.FindFirst("name")?.Value ?? User.FindFirst(ClaimTypes.Name)?.Value ?? User.FindFirst("email")?.Value ?? userId.ToString();
+
+            bool isSimulateFailure = simulateFailure || (body?.SimulateFailure == true);
+
+            // Xử lý kịch bản giả lập lỗi hoàn tiền Story S-48
+            if (isSimulateFailure && _refundService != null)
+            {
+                var simResult = await _refundService.SimulateRefundFailureForOrderAsync(
+                    orderId,
+                    "USER",
+                    userDisplayName,
+                    userId,
+                    HttpContext.RequestAborted);
+
+                if (!simResult.Success && simResult.Message == "Không tìm thấy đơn hàng.")
+                {
+                    return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
+                }
+
+                var updatedOrder = await _context.Orders
+                    .AsNoTracking()
+                    .Include(o => o.Showtime)
+                        .ThenInclude(s => s.Event)
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Seat)
+                    .Include(o => o.Refunds)
+                    .Include(o => o.PaymentTransaction)
+                    .FirstOrDefaultAsync(o => o.Id == orderId);
+
+                var simRefundEntity = await _context.Refunds.FirstOrDefaultAsync(r => r.OrderId == orderId);
+
+                return Ok(new ApiResponse<object>
+                {
+                    Success = true,
+                    Message = simResult.Message,
+                    Data = new
+                    {
+                        order = updatedOrder != null ? MapToDto(updatedOrder) : null,
+                        refund = simRefundEntity != null ? MapRefundToDto(simRefundEntity) : null,
+                        retryCount = simResult.RetryCount,
+                        isManualReview = simResult.IsManualReview
+                    }
+                });
+            }
 
             // ===== Bước 1: Kiểm tra điều kiện và chuyển trạng thái đơn trong transaction ngắn =====
             Refund newRefund;
@@ -692,8 +745,7 @@ namespace EventTicketBooking.Api.Controllers
                 }
             }
 
-            // ===== Bước 3: Cập nhật trạng thái yêu cầu hoàn tiền =====
-            // Không bao giờ ghi Succeeded nếu cổng không xác nhận thành công.
+            // ===== Bước 3: Cập nhật trạng thái yêu cầu hoàn tiền và đồng bộ cơ chế Retry/Kế toán (Story S-48) =====
             var refundEntity = await _context.Refunds.FirstAsync(r => r.OrderId == orderId);
             refundEntity.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -701,28 +753,131 @@ namespace EventTicketBooking.Api.Controllers
             string auditAction;
             string responseMessage;
 
+            var refundReq = await _context.RefundRequests.FirstOrDefaultAsync(r => r.OrderId == orderId);
+            long paymentOrderCode = orderForDto.PaymentTransaction?.OrderCode ??
+                Math.Abs(BitConverter.ToInt64(orderId.ToByteArray(), 0) % 9000000000L) + 1000000000L;
+
             if (gatewayResult.Success)
             {
                 refundEntity.Status = "Succeeded";
                 refundNewStatus = "Succeeded";
                 auditAction = "REFUND_SUCCEEDED";
                 responseMessage = $"Đơn hàng đã được huỷ. Hoàn tiền {refundEntity.Amount} VND thành công (mô phỏng qua cổng {(_paymentGateway?.ProviderName ?? "Mock")}).";
-            }
-            else if (!gatewaySupportsRefund || gatewayResult.ManualRequired)
-            {
-                refundEntity.Status = "ManualPending";
-                refundNewStatus = "ManualPending";
-                auditAction = "REFUND_MANUAL_PENDING";
-                refundEntity.FailureReason = gatewayResult.ErrorMessage;
-                responseMessage = "Đơn hàng đã được huỷ. Yêu cầu hoàn tiền đang chờ xử lý thủ công (cổng thanh toán không hỗ trợ hoàn tự động).";
+
+                if (refundReq == null)
+                {
+                    refundReq = new RefundRequest
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = orderId,
+                        OrderCode = paymentOrderCode,
+                        TransactionId = orderForDto.PaymentTransaction?.TransactionId,
+                        RefundTransactionId = gatewayResult.RefundReference ?? $"REF_{paymentOrderCode}",
+                        Amount = refundEntity.Amount,
+                        Currency = "VND",
+                        Reason = "CustomerCancelAndRefund",
+                        Status = RefundStatus.Succeeded,
+                        AttemptCount = 1,
+                        RetryCount = 0,
+                        CreatedAt = DateTimeOffset.UtcNow,
+                        UpdatedAt = DateTimeOffset.UtcNow
+                    };
+                    _context.RefundRequests.Add(refundReq);
+                }
+                else
+                {
+                    refundReq.Status = RefundStatus.Succeeded;
+                    refundReq.RefundTransactionId = gatewayResult.RefundReference ?? refundReq.RefundTransactionId;
+                    refundReq.UpdatedAt = DateTimeOffset.UtcNow;
+                }
             }
             else
             {
-                refundEntity.Status = "Failed";
-                refundNewStatus = "Failed";
-                auditAction = "REFUND_FAILED";
-                refundEntity.FailureReason = gatewayResult.ErrorMessage ?? "Cổng thanh toán trả về kết quả hoàn tiền thất bại.";
-                responseMessage = "Đơn hàng đã được huỷ nhưng hoàn tiền THẤT BẠI — cần xử lý tiếp. Vui lòng liên hệ hỗ trợ.";
+                bool isRetryable = gatewayResult.IsRetryable && gatewaySupportsRefund && !gatewayResult.ManualRequired;
+
+                if (refundReq == null)
+                {
+                    refundReq = new RefundRequest
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = orderId,
+                        OrderCode = paymentOrderCode,
+                        TransactionId = orderForDto.PaymentTransaction?.TransactionId,
+                        Amount = refundEntity.Amount,
+                        Currency = "VND",
+                        Reason = "CustomerCancelAndRefund",
+                        Status = RefundStatus.Pending,
+                        AttemptCount = 1,
+                        RetryCount = 1,
+                        MaxRetries = 3,
+                        ErrorCode = gatewayResult.ErrorCode ?? "GATEWAY_ERROR",
+                        ErrorMessage = gatewayResult.ErrorMessage ?? "Cổng thanh toán từ chối hoàn tiền.",
+                        IsRetryable = isRetryable,
+                        CreatedAt = DateTimeOffset.UtcNow,
+                        UpdatedAt = DateTimeOffset.UtcNow
+                    };
+                    _context.RefundRequests.Add(refundReq);
+                }
+                else
+                {
+                    refundReq.AttemptCount++;
+                    refundReq.RetryCount++;
+                    refundReq.ErrorCode = gatewayResult.ErrorCode ?? "GATEWAY_ERROR";
+                    refundReq.ErrorMessage = gatewayResult.ErrorMessage ?? "Cổng thanh toán từ chối hoàn tiền.";
+                    refundReq.IsRetryable = isRetryable;
+                    refundReq.UpdatedAt = DateTimeOffset.UtcNow;
+                }
+
+                if (!gatewaySupportsRefund || gatewayResult.ManualRequired)
+                {
+                    refundReq.Status = RefundStatus.ManualReviewRequired;
+                    refundReq.NextRetryAt = null;
+
+                    refundEntity.Status = "ManualPending";
+                    refundNewStatus = "ManualPending";
+                    auditAction = "REFUND_MANUAL_PENDING";
+                    refundEntity.FailureReason = gatewayResult.ErrorMessage ?? "Cổng thanh toán không hỗ trợ hoàn tự động - Chờ xử lý thủ công.";
+                    responseMessage = "Đơn hàng đã được huỷ. Yêu cầu hoàn tiền đang chờ xử lý thủ công (cổng thanh toán không hỗ trợ hoàn tự động).";
+
+                    var accountingNotifService = HttpContext?.RequestServices?.GetService<EventTicketBooking.Api.Services.Interfaces.IAccountingNotificationService>();
+                    if (accountingNotifService != null)
+                    {
+                        await accountingNotifService.NotifyFailedRefundAsync(refundReq);
+                    }
+                }
+                else if (isRetryable && refundReq.RetryCount < 3)
+                {
+                    // Lần 1 hoặc 2 thất bại: Lên lịch retry với khoảng cách (1 phút cho lần 1)
+                    var delay = TimeSpan.FromMinutes(1);
+                    refundReq.Status = RefundStatus.RetryScheduled;
+                    refundReq.NextRetryAt = DateTimeOffset.UtcNow.Add(delay);
+
+                    refundEntity.Status = "Failed";
+                    refundNewStatus = "Failed";
+                    auditAction = "REFUND_RETRY_SCHEDULED";
+                    refundEntity.FailureReason = $"Hoàn tiền thất bại lần {refundReq.RetryCount}/3 ({refundReq.ErrorMessage}). Hệ thống tự động thử lại vào {refundReq.NextRetryAt:HH:mm:ss}.";
+                    responseMessage = $"Đơn hàng đã được huỷ nhưng hoàn tiền THẤT BẠI tạm thời ({refundReq.ErrorMessage}), hệ thống đã lên lịch tự động thử lại lần {refundReq.RetryCount}/3.";
+                }
+                else
+                {
+                    // Thất bại đủ 3 lần hoặc lỗi vĩnh viễn: Tự động chuyển danh sách chờ xử lý kế toán
+                    refundReq.Status = RefundStatus.ManualReviewRequired;
+                    refundReq.NextRetryAt = null;
+
+                    refundEntity.Status = "RequiresManualReview";
+                    refundNewStatus = "RequiresManualReview";
+                    auditAction = "REFUND_MANUAL_REVIEW_REQUIRED";
+                    refundEntity.FailureReason = isRetryable
+                        ? "Hoàn tiền thất bại 3 lần - Đã chuyển thông tin cho kế toán xử lý thủ công"
+                        : $"Lỗi không thể thử lại ({refundReq.ErrorCode}: {refundReq.ErrorMessage}) - Đã chuyển cho kế toán xử lý thủ công";
+                    responseMessage = "Đơn hàng đã được huỷ nhưng hoàn tiền THẤT BẠI 3 lần. Yêu cầu hoàn tiền đã tự động được chuyển sang danh sách chờ xử lý của kế toán.";
+
+                    var accountingNotifService = HttpContext?.RequestServices?.GetService<EventTicketBooking.Api.Services.Interfaces.IAccountingNotificationService>();
+                    if (accountingNotifService != null)
+                    {
+                        await accountingNotifService.NotifyFailedRefundAsync(refundReq);
+                    }
+                }
             }
 
             _orderAuditService.Record(
@@ -833,16 +988,31 @@ namespace EventTicketBooking.Api.Controllers
             return preview;
         }
 
-        private static RefundDto MapRefundToDto(Refund refund) => new()
+        private RefundDto MapRefundToDto(Refund refund)
         {
-            Id = refund.Id,
-            OrderId = refund.OrderId,
-            Amount = refund.Amount,
-            Status = refund.Status,
-            FailureReason = refund.FailureReason,
-            CreatedAt = refund.CreatedAt,
-            UpdatedAt = refund.UpdatedAt
-        };
+            var refundReq = _context.RefundRequests.AsNoTracking().FirstOrDefault(r => r.OrderId == refund.OrderId);
+            return new()
+            {
+                Id = refund.Id,
+                OrderId = refund.OrderId,
+                Amount = refund.Amount,
+                Status = refund.Status,
+                FailureReason = refund.FailureReason,
+                CreatedAt = refund.CreatedAt,
+                UpdatedAt = refund.UpdatedAt,
+                RetryCount = refundReq?.RetryCount ?? 0
+            };
+        }
+
+        /// <summary>
+        /// S-48: API mô phỏng hoàn tiền thất bại từ Payment Gateway phục vụ kiểm thử UI.
+        /// </summary>
+        [HttpPost("{orderId:guid}/mock-refund-failure")]
+        [RequireRole]
+        public async Task<IActionResult> MockRefundFailure(Guid orderId)
+        {
+            return await CancelOrderAndRefund(orderId, simulateFailure: true, body: null);
+        }
 
         [HttpPost("{orderId:guid}/resend-tickets")]
         [RequireRole]
@@ -1071,8 +1241,24 @@ namespace EventTicketBooking.Api.Controllers
                 .Select(oi => $"{oi.Seat.Row}{oi.Seat.SeatNumber}")
                 .ToList() ?? new List<string>();
 
-            // Story S-45: hiển thị trạng thái hoàn tiền (bản ghi mới nhất nếu có)
+            // Story S-45 & S-48: hiển thị trạng thái hoàn tiền (bản ghi mới nhất nếu có)
             var latestRefund = order.Refunds?.OrderByDescending(r => r.UpdatedAt).FirstOrDefault();
+            var refundReq = _context.RefundRequests.AsNoTracking().FirstOrDefault(r => r.OrderId == order.Id);
+
+            var refundStatus = latestRefund?.Status ?? (refundReq != null ? refundReq.Status.ToString() : null);
+            var failureReason = latestRefund?.FailureReason ?? refundReq?.ErrorMessage;
+            int retryCount = refundReq?.RetryCount ?? 0;
+
+            if (refundReq != null && (refundReq.Status == RefundStatus.ManualReviewRequired || refundReq.RetryCount >= 3))
+            {
+                refundStatus = "RequiresManualReview";
+                failureReason = "Hoàn tiền thất bại 3 lần - Đã chuyển thông tin cho kế toán xử lý thủ công";
+            }
+            else if (latestRefund != null && (latestRefund.Status == "RequiresManualReview" || latestRefund.Status == "ManualReviewRequired"))
+            {
+                refundStatus = "RequiresManualReview";
+                failureReason = latestRefund.FailureReason ?? "Hoàn tiền thất bại 3 lần - Đã chuyển thông tin cho kế toán xử lý thủ công";
+            }
 
             return new OrderDto
             {
@@ -1096,10 +1282,11 @@ namespace EventTicketBooking.Api.Controllers
                     (order.PaymentTransaction.Status == "FAILED" || order.PaymentTransaction.Status == "CANCELLED"),
                 IsPaymentProcessing = order.PaymentTransaction != null && order.PaymentTransaction.Status == "PENDING",
                 CancelReason = order.CancelReason,
-                RefundStatus = latestRefund?.Status,
-                RefundAmount = latestRefund?.Amount,
-                RefundFailureReason = latestRefund?.FailureReason,
-                RefundUpdatedAt = latestRefund?.UpdatedAt,
+                RefundStatus = refundStatus,
+                RefundAmount = latestRefund?.Amount ?? refundReq?.Amount,
+                RefundFailureReason = failureReason,
+                RefundUpdatedAt = latestRefund?.UpdatedAt ?? refundReq?.UpdatedAt,
+                RefundRetryCount = retryCount,
                 Items = order.OrderItems?.Select(oi => new OrderItemDto
                 {
                     Id = oi.Id,
@@ -1110,6 +1297,14 @@ namespace EventTicketBooking.Api.Controllers
                 }).ToList() ?? new List<OrderItemDto>()
             };
         }
+    }
+
+    /// <summary>
+    /// DTO yêu cầu huỷ đơn hàng kèm cờ giả lập lỗi (Story S-48).
+    /// </summary>
+    public class CancelOrderRequestDto
+    {
+        public bool SimulateFailure { get; set; }
     }
 }
 

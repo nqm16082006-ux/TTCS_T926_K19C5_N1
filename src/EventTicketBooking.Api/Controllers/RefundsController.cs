@@ -19,20 +19,25 @@ namespace EventTicketBooking.Api.Controllers
     /// </summary>
     [ApiController]
     [Route("api/v1/payments/refunds")]
-    [RequireRole("Admin")]
+    [RequireRole("Admin", "Accounting")]
     public class RefundsController : ControllerBase
     {
         private readonly IRefundService _refundService;
         private readonly AppDbContext _context;
+        private readonly IOrderAuditService _orderAuditService;
 
-        public RefundsController(IRefundService refundService, AppDbContext context)
+        public RefundsController(
+            IRefundService refundService,
+            AppDbContext context,
+            IOrderAuditService orderAuditService)
         {
             _refundService = refundService;
             _context = context;
+            _orderAuditService = orderAuditService;
         }
 
         /// <summary>
-        /// Lấy danh sách tất cả các yêu cầu hoàn tiền gần nhất.
+        /// Lấy danh sách tất cả các yêu cầu hoàn tiền gần nhất kèm lịch sử các lần thử.
         /// </summary>
         [HttpGet]
         [ProducesResponseType(typeof(ApiResponse<List<RefundDetailDto>>), StatusCodes.Status200OK)]
@@ -41,8 +46,16 @@ namespace EventTicketBooking.Api.Controllers
         public async Task<IActionResult> GetAllRefunds([FromQuery] int take = 50)
         {
             var refunds = await _refundService.GetAllRefundsAsync(take, HttpContext.RequestAborted);
+            var dtos = new List<RefundDetailDto>();
+            foreach (var r in refunds)
+            {
+                var dto = MapToDto(r);
+                dto.AttemptHistory = await GetAttemptHistoryAsync(r.OrderId);
+                dtos.Add(dto);
+            }
+
             return Ok(ApiResponse<List<RefundDetailDto>>.SuccessResult(
-                refunds.Select(MapToDto).ToList(),
+                dtos,
                 "Lấy danh sách yêu cầu hoàn tiền thành công."));
         }
 
@@ -207,13 +220,16 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy lệnh hoàn tiền."));
             }
 
+            var dto = MapToDto(refund);
+            dto.AttemptHistory = await GetAttemptHistoryAsync(refund.OrderId);
+
             return Ok(ApiResponse<RefundDetailDto>.SuccessResult(
-                MapToDto(refund),
+                dto,
                 "Lấy thông tin lệnh hoàn tiền thành công."));
         }
 
         /// <summary>
-        /// Lấy danh sách các lệnh hoàn tiền cần Kế toán xử lý thủ công (ManualReviewRequired).
+        /// Lấy danh sách các lệnh hoàn tiền cần Kế toán xử lý thủ công kèm lịch sử các lần thử (ManualReviewRequired).
         /// </summary>
         [HttpGet("manual-review")]
         [ProducesResponseType(typeof(ApiResponse<List<RefundDetailDto>>), StatusCodes.Status200OK)]
@@ -222,11 +238,162 @@ namespace EventTicketBooking.Api.Controllers
         public async Task<IActionResult> GetManualReviewList()
         {
             var refunds = await _refundService.GetRefundsForManualReviewAsync(HttpContext.RequestAborted);
-            var dtos = refunds.Select(MapToDto).ToList();
+            var dtos = new List<RefundDetailDto>();
+            foreach (var r in refunds)
+            {
+                var dto = MapToDto(r);
+                dto.AttemptHistory = await GetAttemptHistoryAsync(r.OrderId);
+                dtos.Add(dto);
+            }
 
             return Ok(ApiResponse<List<RefundDetailDto>>.SuccessResult(
                 dtos,
                 "Danh sách các lệnh hoàn tiền cần kế toán xử lý thủ công."));
+        }
+
+        /// <summary>
+        /// Kế toán tiếp nhận xử lý hồ sơ hoàn tiền thủ công (chuyển sang AccountingProcessing).
+        /// </summary>
+        [HttpPost("{refundId:guid}/assign-accounting")]
+        [ProducesResponseType(typeof(ApiResponse<RefundDetailDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> AssignAccounting(Guid refundId)
+        {
+            var cancellationToken = HttpContext?.RequestAborted ?? default;
+            var refund = await _refundService.GetRefundByIdAsync(refundId, cancellationToken);
+            if (refund == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy lệnh hoàn tiền."));
+            }
+
+            if (refund.Status != RefundStatus.ManualReviewRequired)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult($"Không thể tiếp nhận lệnh ở trạng thái '{refund.Status}'. Chỉ tiếp nhận lệnh chờ xử lý (ManualReviewRequired)."));
+            }
+
+            var actorName = User?.Identity?.Name ?? "Accounting";
+            refund.Status = RefundStatus.AccountingProcessing;
+            refund.UpdatedAt = DateTimeOffset.UtcNow;
+
+            var refundEntity = await _context.Refunds.FirstOrDefaultAsync(r => r.OrderId == refund.OrderId);
+            if (refundEntity != null)
+            {
+                refundEntity.Status = "AccountingProcessing";
+                refundEntity.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+
+            _orderAuditService.Record(
+                refund.OrderId,
+                "REFUND",
+                refund.Id.ToString(),
+                "ACCOUNTING_PROCESSING",
+                RefundStatus.ManualReviewRequired.ToString(),
+                RefundStatus.AccountingProcessing.ToString(),
+                "ACCOUNTING",
+                actorName,
+                null,
+                $"Kế toán ({actorName}) đã tiếp nhận hồ sơ để xử lý hoàn tiền thủ công.");
+
+            await _context.SaveChangesAsync();
+
+            var dto = MapToDto(refund);
+            dto.AttemptHistory = await GetAttemptHistoryAsync(refund.OrderId);
+            return Ok(ApiResponse<RefundDetailDto>.SuccessResult(dto, "Kế toán đã tiếp nhận xử lý hồ sơ hoàn tiền."));
+        }
+
+        /// <summary>
+        /// Kế toán hoàn tất xử lý hoàn tiền thủ công cho khách hàng (chống hoàn tiền trùng lặp).
+        /// </summary>
+        [HttpPost("{refundId:guid}/resolve-accounting")]
+        [ProducesResponseType(typeof(ApiResponse<RefundDetailDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ResolveAccounting(Guid refundId, [FromBody] ResolveAccountingRefundDto? dto)
+        {
+            var cancellationToken = HttpContext?.RequestAborted ?? default;
+            var refund = await _refundService.GetRefundByIdAsync(refundId, cancellationToken);
+            if (refund == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy lệnh hoàn tiền."));
+            }
+
+            if (refund.Status == RefundStatus.Succeeded || refund.Status == RefundStatus.AccountingResolved)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult("Lệnh hoàn tiền này đã thành công hoặc đã được kế toán xử lý trước đó. Không được phép hoàn tiền trùng lặp!"));
+            }
+
+            if (refund.Status != RefundStatus.ManualReviewRequired && refund.Status != RefundStatus.AccountingProcessing)
+            {
+                return BadRequest(ApiResponse<object>.FailureResult($"Chỉ có thể xử lý thủ công các lệnh ở trạng thái chờ duyệt (hiện tại: '{refund.Status}')."));
+            }
+
+            var actorName = User?.Identity?.Name ?? "Accounting";
+            var manualTx = string.IsNullOrWhiteSpace(dto?.ManualTransactionCode)
+                ? $"MANUAL_BANK_{DateTimeOffset.UtcNow:yyyyMMddHHmmss}"
+                : dto.ManualTransactionCode.Trim();
+
+            var oldStatus = refund.Status.ToString();
+            refund.Status = RefundStatus.AccountingResolved;
+            refund.RefundTransactionId = manualTx;
+            refund.UpdatedAt = DateTimeOffset.UtcNow;
+
+            var refundEntity = await _context.Refunds.FirstOrDefaultAsync(r => r.OrderId == refund.OrderId);
+            if (refundEntity != null)
+            {
+                refundEntity.Status = "Succeeded";
+                refundEntity.ConfirmedByName = actorName;
+                refundEntity.ConfirmedAt = DateTimeOffset.UtcNow;
+                refundEntity.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+
+            _orderAuditService.Record(
+                refund.OrderId,
+                "REFUND",
+                refund.Id.ToString(),
+                "ACCOUNTING_RESOLVED",
+                oldStatus,
+                RefundStatus.AccountingResolved.ToString(),
+                "ACCOUNTING",
+                actorName,
+                null,
+                $"Kế toán ({actorName}) đã hoàn tất xử lý hoàn tiền thủ công. Mã GD/tham chiếu: {manualTx}. Ghi chú: {dto?.Notes ?? "Không có"}");
+
+            await _context.SaveChangesAsync();
+
+            var resultDto = MapToDto(refund);
+            resultDto.AttemptHistory = await GetAttemptHistoryAsync(refund.OrderId);
+            return Ok(ApiResponse<RefundDetailDto>.SuccessResult(resultDto, $"Kế toán đã hoàn tất xử lý hoàn tiền thủ công cho đơn hàng #{refund.OrderCode}."));
+        }
+
+        private async Task<List<RefundAttemptHistoryDto>> GetAttemptHistoryAsync(Guid orderId)
+        {
+            var logs = await _context.OrderAuditLogs
+                .AsNoTracking()
+                .Where(l => l.OrderId == orderId && (l.EntityType == "REFUND" || l.Action.StartsWith("REFUND_") || l.Action.StartsWith("ACCOUNTING_")))
+                .OrderBy(l => l.Timestamp)
+                .ToListAsync();
+
+            var history = new List<RefundAttemptHistoryDto>();
+            int attemptIdx = 1;
+            foreach (var log in logs)
+            {
+                bool isAttempt = log.Action == "REFUND_RETRY_SCHEDULED" || log.Action == "REFUND_FAILED" || log.Action == "REFUND_SUCCEEDED" || log.Action == "REFUND_MANUAL_REVIEW_REQUIRED";
+                history.Add(new RefundAttemptHistoryDto
+                {
+                    AttemptNumber = isAttempt ? attemptIdx++ : attemptIdx,
+                    Action = log.Action,
+                    Status = log.NewStatus ?? log.Action,
+                    ErrorCode = null,
+                    Notes = log.Note,
+                    Timestamp = log.Timestamp
+                });
+            }
+            return history;
         }
 
         /// <summary>
