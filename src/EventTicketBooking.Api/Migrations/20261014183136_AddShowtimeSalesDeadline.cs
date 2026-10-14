@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore.Migrations;
 #nullable disable
 namespace EventTicketBooking.Api.Migrations;
+
 public partial class AddShowtimeSalesDeadline : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
