@@ -126,6 +126,7 @@ namespace EventTicketBooking.Api.Controllers
                 .Select(s => new
                 {
                     s.Id,
+                    s.Name,
                     EventTitle = s.Event.Title,
                     s.StartTime,
                     s.EndTime
@@ -231,7 +232,7 @@ namespace EventTicketBooking.Api.Controllers
                 {
                     var showtimeInfo = await _context.Showtimes.Include(s => s.Event).FirstOrDefaultAsync(s => s.Id == qrShowtimeId.Value);
                     var message = showtimeInfo != null
-                        ? $"Vé thuộc suất diễn {showtimeInfo.Event.Title} lúc {showtimeInfo.StartTime:HH:mm dd/MM/yyyy}"
+                        ? WrongShowtimeMessage(showtimeInfo)
                         : "Vé thuộc suất diễn khác";
 
                     _logger.LogWarning("Từ chối check-in: {ReasonCode}. Mã QR: {TicketCode}, Cổng: {GateName}, Suất diễn chọn: {SelectedShowtimeId}, Suất diễn thực tế: {TicketShowtimeId}",
@@ -326,7 +327,7 @@ namespace EventTicketBooking.Api.Controllers
             {
                 var showtimeInfo = await _context.Showtimes.Include(s => s.Event).FirstOrDefaultAsync(s => s.Id == ticket.Order.ShowtimeId);
                 var message = showtimeInfo != null
-                    ? $"Vé thuộc suất diễn {showtimeInfo.Event.Title} lúc {showtimeInfo.StartTime:HH:mm dd/MM/yyyy}"
+                    ? WrongShowtimeMessage(showtimeInfo)
                     : "Vé thuộc suất diễn khác";
 
                 _logger.LogWarning("Từ chối check-in: {ReasonCode}. Mã vé: {TicketCode}, Cổng: {GateName}, Suất diễn chọn: {SelectedShowtimeId}, Suất diễn thực tế: {TicketShowtimeId}",
@@ -1201,6 +1202,14 @@ namespace EventTicketBooking.Api.Controllers
             }
 
             return false;
+        }
+
+        internal static string WrongShowtimeMessage(Showtime showtime)
+        {
+            var zone = TimeZoneInfo.FindSystemTimeZoneById(OperatingSystem.IsWindows() ? "SE Asia Standard Time" : "Asia/Ho_Chi_Minh");
+            var time = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(showtime.StartTime, DateTimeKind.Utc), zone);
+            var name = string.IsNullOrWhiteSpace(showtime.Name) ? showtime.Event.Title : $"{showtime.Event.Title} — {showtime.Name}";
+            return $"Vé thuộc suất diễn {name} lúc {time:HH:mm dd/MM/yyyy} (giờ Việt Nam). Vui lòng chọn đúng suất diễn của vé.";
         }
 
         private IActionResult AlreadyCheckedIn(OrderItem ticket)

@@ -5,6 +5,8 @@ namespace EventTicketBooking.Api.DTOs
 {
     public class PublicShowtimeDto
     {
+        public string? Name { get; set; }
+        public DateTime? SalesEndTime { get; set; }
         public string? SeatingMapImageUrl { get; set; }
         public Guid Id { get; set; }
 

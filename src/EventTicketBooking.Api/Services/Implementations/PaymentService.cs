@@ -81,6 +81,8 @@ namespace EventTicketBooking.Api.Services.Implementations
                 return PaymentCreationResult.CreateFailure($"Đơn hàng không ở trạng thái chờ thanh toán (Trạng thái: {order.Status}).");
             }
 
+            if (await _context.Showtimes.AnyAsync(s => s.Id == order.ShowtimeId && s.EndTime <= DateTime.UtcNow, cancellationToken))
+                return PaymentCreationResult.CreateFailure("Suất diễn đã kết thúc, không thể thanh toán.");
             if (order.ExpiresAt <= DateTimeOffset.UtcNow)
             {
                 var cleanup = new ExpiredOrderCleanupService(_context,

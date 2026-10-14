@@ -587,9 +587,6 @@
       <span>Xuất danh sách Check-in (CSV)</span>
     </button>
     <div class="h-px bg-surface-container my-1"></div>
-    <button onclick="handleMenuAction('duplicate')" class="w-full flex items-center gap-2 px-3.5 py-2.5 text-on-surface hover:bg-surface-container transition-colors text-left">
-      <span class="material-symbols-outlined text-[18px]">content_copy</span> Nhân bản sự kiện
-    </button>
     <button onclick="handleMenuAction('delete')" class="w-full flex items-center gap-2 px-3.5 py-2.5 text-error hover:bg-error-container hover:text-on-error-container transition-colors text-left">
       <span class="material-symbols-outlined text-[18px]">delete</span>
       <span>Xóa sự kiện</span>
@@ -1089,9 +1086,9 @@
 
         // Seat progress / status
         let seatProgressHtml = '';
-        const totalSeats = e.totalSeats || 0;
+        const totalSeats = showtimes.reduce((sum, s) => sum + Number(s.actualSeatCount ?? 0), 0);
         const firstShowtime = showtimes[0];
-        const hasSeats = firstShowtime && (firstShowtime.availableSeats > 0 || (firstShowtime.seatCategories && firstShowtime.seatCategories.length > 0));
+        const hasSeats = totalSeats > 0;
 
         if (!hasSeats) {
           seatProgressHtml = `
@@ -1102,10 +1099,9 @@
           `;
         } else {
           // Available seats & Sold seats
-          const avail = firstShowtime ? firstShowtime.availableSeats : totalSeats;
+          const avail = Math.max(0, totalSeats - showtimes.reduce((sum, s) => sum + Number(s.soldSeatCount || 0), 0));
           const sold = Math.max(0, totalSeats - avail);
           let pct = totalSeats > 0 ? Math.round((sold / totalSeats) * 100) : 0;
-          if (status === 'active' && pct === 0) pct = 65; // realistic demo fill for live concerts
           const isHighSales = pct >= 90;
           const barColor = isHighSales ? 'bg-error' : (pct >= 50 ? 'bg-secondary' : 'bg-primary');
 
@@ -1243,12 +1239,11 @@
         const imageInfo = getEventImage(e, index);
         const showtimes = e.showtimes || [];
         const showtimeCount = showtimes.length;
-        const totalSeats = e.totalSeats || 0;
+        const totalSeats = showtimes.reduce((sum, s) => sum + Number(s.actualSeatCount ?? 0), 0);
         const firstShowtime = showtimes[0];
-        const avail = firstShowtime ? firstShowtime.availableSeats : totalSeats;
+        const avail = Math.max(0, totalSeats - showtimes.reduce((sum, s) => sum + Number(s.soldSeatCount || 0), 0));
         const sold = Math.max(0, totalSeats - avail);
         let pct = totalSeats > 0 ? Math.round((sold / totalSeats) * 100) : 0;
-        if (status === 'active' && pct === 0) pct = 65;
 
         return `
           <div class="rounded-xl bg-surface-container-lowest shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden border border-outline-variant/30 group">
@@ -1369,27 +1364,10 @@
         window.location.href = `./event-detail.html?id=${activeMenuEventId}`;
       } else if (action === 'edit') {
         window.location.href = `./create-event.html?id=${activeMenuEventId}`;
-      } else if (action === 'duplicate') {
-        duplicateEvent(activeMenuEventId);
+
       } else if (action === 'delete') {
         confirmDeleteEvent(activeMenuEventId);
       }
-    }
-
-    let duplicateInProgress = false;
-    async function duplicateEvent(eventId) {
-      if (duplicateInProgress) return;
-      duplicateInProgress = true;
-      try {
-        const response = await fetch(`${API_BASE}/api/events/${eventId}/duplicate`, {
-          method: 'POST', headers: { Authorization: 'Bearer ' + token }
-        });
-        const result = await response.json();
-        if (!response.ok || !result.data) throw new Error(result.message || 'Không thể nhân bản sự kiện.');
-        window.location.href = `./event-detail.html?id=${result.data.id}`;
-      } catch (error) {
-        alert(error.message || 'Không thể kết nối máy chủ.');
-      } finally { duplicateInProgress = false; }
     }
 
     document.addEventListener('click', (e) => {

@@ -63,6 +63,28 @@ namespace EventTicketBooking.Tests
         }
 
         #region TEST 1: Create payment với Order hợp lệ
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Payment_AfterSaleCloses_AllowsExistingOrderOnlyBeforeShowEnd(bool ended)
+        {
+            var order = CreateTestOrder();
+            var show = new Showtime { Id = _defaultShowtimeId, AvailableSeats = 1,
+                StartTime = DateTime.UtcNow.AddHours(-2),
+                EndTime = ended ? DateTime.UtcNow.AddMinutes(-1) : DateTime.UtcNow.AddHours(1),
+                SalesEndTime = DateTime.UtcNow.AddMinutes(-1) };
+            show.ChangeStatus(ShowtimeStatus.OnSale);
+            show.ChangeStatus(ShowtimeStatus.Closed);
+            _context.Showtimes.Add(show);
+            await _context.SaveChangesAsync();
+            var gateway = new FakePaymentGateway { ShouldSucceed = true };
+            var service = new PaymentService(_context, gateway, NullLogger<PaymentService>.Instance,
+                new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
+            var result = await service.CreatePaymentForOrderAsync(order.Id, _defaultUserId);
+            Assert.Equal(!ended, result.Success);
+            if (ended) Assert.Empty(gateway.RecordedCreationRequests);
+        }
+
         [Fact]
         public async Task Test1_CreatePayment_ValidOrder_ReturnsSuccessAndPaymentUrl()
         {

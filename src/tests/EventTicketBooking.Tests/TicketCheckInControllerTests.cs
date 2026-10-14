@@ -218,6 +218,12 @@ namespace EventTicketBooking.Tests
             var orderId = Guid.NewGuid();
             var actualShowtimeId = Guid.NewGuid();
             var wrongShowtimeId = Guid.NewGuid(); // Quét sai suất
+            var ev = new Event { Title = "Sự kiện kiểm thử", Location = "Hà Nội" };
+            var actualShowtime = new Showtime { Id = actualShowtimeId, Event = ev, EventId = ev.Id,
+                Name = "Đêm Chung kết", StartTime = new DateTime(2026, 10, 14, 18, 0, 0, DateTimeKind.Utc),
+                EndTime = new DateTime(2026, 10, 15, 20, 0, 0, DateTimeKind.Utc) };
+            _context.Events.Add(ev);
+            _context.Showtimes.Add(actualShowtime);
             var seatId = Guid.NewGuid();
 
             var order = new Order { Id = orderId, ShowtimeId = actualShowtimeId, Status = OrderStatus.Paid };
@@ -239,7 +245,9 @@ namespace EventTicketBooking.Tests
             var message = badRequestResult.Value?.GetType().GetProperty("Message")?.GetValue(badRequestResult.Value)?.ToString();
             var reasonProp = badRequestResult.Value?.GetType().GetProperty("Reason")?.GetValue(badRequestResult.Value)?.ToString();
             Assert.Equal("WRONG_SHOWTIME", reasonProp);
-            Assert.Contains("Vé thuộc suất diễn khác", message);
+            Assert.Contains("01:00 15/10/2026", message);
+            Assert.Contains("Đêm Chung kết", message);
+            Assert.Contains("giờ Việt Nam", message);
         }
 
         [Fact]

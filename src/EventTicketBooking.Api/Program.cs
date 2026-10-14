@@ -240,6 +240,7 @@ builder.Services.Configure<EventTicketBooking.Api.Options.AccountingOptions>(bui
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IAccountingNotificationService, EventTicketBooking.Api.Services.Implementations.AccountingNotificationService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IRefundService, EventTicketBooking.Api.Services.Implementations.RefundService>();
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.RefundProcessingWorker>();
+builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.ShowtimeSaleExpiryWorker>();
 
 var app = builder.Build();
 app.UseForwardedHeaders();

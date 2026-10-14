@@ -1,0 +1,13 @@
+.event-rich-description { line-height: 1.85; color: #514960; overflow-wrap: anywhere; }
+.event-rich-description p { margin: 0 0 12px; }
+.event-rich-description .event-description-heading, .event-rich-description h2, .event-rich-description h3, .event-rich-description h4 { color: #3525cd; font-weight: 700; font-size: 17px; margin: 24px 0 10px; line-height: 1.5; }
+.event-rich-description ul, .event-rich-description ol { padding-left: 24px; margin: 8px 0 16px; }
+.event-rich-description ul { list-style: disc; }
+.event-rich-description ol { list-style: decimal; }
+.event-rich-description li { padding-left: 3px; margin: 5px 0; }
+.event-rich-description > :first-child { margin-top: 0; }
+.event-rich-description > :last-child { margin-bottom: 0; }
+.event-rich-description a { color: #6d28d9; text-decoration: underline; }
+.event-rich-description blockquote { border-left: 3px solid #c4b5fd; padding-left: 16px; margin: 16px 0; }
+.event-description-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.event-description-tags span { padding: 4px 10px; border-radius: 8px; background: #f3efff; color: #6d28d9; font-size: 12px; }

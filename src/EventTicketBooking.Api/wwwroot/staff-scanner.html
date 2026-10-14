@@ -666,6 +666,7 @@
       font-weight: 700;
     }
   </style>
+<link rel="stylesheet" href="./scanner-readmission.css">
 </head>
 <body>
   <!-- Header / Navbar -->
@@ -1716,7 +1717,7 @@
             const endTime = new Date(show.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
             const option = document.createElement('option');
             option.value = show.id;
-            option.textContent = `${show.eventTitle} (${startTime} - ${endTime})`;
+            option.textContent = `${show.eventTitle}${show.name ? ' — ' + show.name : ''} (${startTime} - ${endTime})`;
             select.appendChild(option);
           });
 
@@ -1813,6 +1814,7 @@
             document.getElementById('ticketInput').value = '';
           } else {
             showErrorResult(data.message || 'Mã vé không hợp lệ hoặc bị từ chối.');
+            if (data.reason === 'ALREADY_CHECKED_IN') attachReadmissionAction(resultDiv, bodyPayload, token);
           }
         } catch (networkError) {
           clearTimeout(pendingTimeout);
@@ -2049,5 +2051,6 @@
       }
     }
   </script>
+<script src="./scanner-readmission.js"></script>
 </body>
 </html>
