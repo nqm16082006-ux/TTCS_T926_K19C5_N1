@@ -373,6 +373,13 @@ namespace EventTicketBooking.Tests
             var forbiddenResult = await controller.CreatePayment(order.Id) as ObjectResult;
             Assert.NotNull(forbiddenResult);
             Assert.Equal(StatusCodes.Status403Forbidden, forbiddenResult.StatusCode);
+
+            // 4. Task T-41: Đơn hết hạn thì trả HTTP 409 Conflict
+            var expiredOrder = CreateTestOrder(totalAmount: 200000, expiryMinutes: -10);
+            controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(identity);
+            var conflictResult = await controller.CreatePayment(expiredOrder.Id) as ObjectResult;
+            Assert.NotNull(conflictResult);
+            Assert.Equal(StatusCodes.Status409Conflict, conflictResult.StatusCode);
         }
         #endregion
     }
