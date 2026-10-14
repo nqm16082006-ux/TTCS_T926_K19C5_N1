@@ -219,9 +219,15 @@ namespace EventTicketBooking.Tests
             var actualShowtimeId = Guid.NewGuid();
             var wrongShowtimeId = Guid.NewGuid(); // Quét sai suất
             var ev = new Event { Title = "Sự kiện kiểm thử", Location = "Hà Nội" };
-            var actualShowtime = new Showtime { Id = actualShowtimeId, Event = ev, EventId = ev.Id,
-                Name = "Đêm Chung kết", StartTime = new DateTime(2026, 10, 14, 18, 0, 0, DateTimeKind.Utc),
-                EndTime = new DateTime(2026, 10, 15, 20, 0, 0, DateTimeKind.Utc) };
+            var actualShowtime = new Showtime
+            {
+                Id = actualShowtimeId,
+                Event = ev,
+                EventId = ev.Id,
+                Name = "Đêm Chung kết",
+                StartTime = new DateTime(2026, 10, 14, 18, 0, 0, DateTimeKind.Utc),
+                EndTime = new DateTime(2026, 10, 15, 20, 0, 0, DateTimeKind.Utc)
+            };
             _context.Events.Add(ev);
             _context.Showtimes.Add(actualShowtime);
             var seatId = Guid.NewGuid();

@@ -43,8 +43,9 @@ public class ShowtimeSalesDeadlineTests
         var held = await new SeatHoldService(db, NullLogger<SeatHoldService>.Instance).HoldSeatsAsync(show.Id, new List<Guid> { Guid.NewGuid() }, user);
         Assert.Equal(EventTicketBooking.Api.Services.Interfaces.HoldSeatsResultStatus.InvalidRequest, held.Status);
         Assert.Contains("hết thời gian bán vé", held.Message);
-        var orders = new OrdersController(db, NullLogger<OrdersController>.Instance) {
-            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(new [] { new Claim(ClaimTypes.NameIdentifier, user.ToString()) }, "test")) } }
+        var orders = new OrdersController(db, NullLogger<OrdersController>.Instance)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, user.ToString()) }, "test")) } }
         };
         var result = Assert.IsType<ConflictObjectResult>(await orders.CreateOrderFromHolds(show.Id));
         Assert.Contains("hết thời gian bán vé", Assert.IsType<ApiResponse<object>>(result.Value).Message);

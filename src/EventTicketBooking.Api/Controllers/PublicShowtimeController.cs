@@ -354,7 +354,7 @@ namespace EventTicketBooking.Api.Controllers
             {
                 Name = showtime.Name,
                 SalesEndTime = showtime.SalesEndTime ?? showtime.StartTime,
-                    Id = showtime.Id,
+                Id = showtime.Id,
                 SeatingMapImageUrl = showtime.SeatingMapImageUrl,
                 EventId = showtime.EventId,
                 EventTitle = showtime.Event?.Title ?? string.Empty,

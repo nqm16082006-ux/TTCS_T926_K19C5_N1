@@ -1059,8 +1059,8 @@ namespace EventTicketBooking.Api.Controllers
                 var responseDto = new ShowtimeResponseDto
                 {
                     Name = showtime.Name,
-                SalesEndTime = showtime.SalesEndTime,
-                Id = showtime.Id,
+                    SalesEndTime = showtime.SalesEndTime,
+                    Id = showtime.Id,
                     EventId = showtime.EventId,
                     StartTime = showtime.StartTime,
                     EndTime = showtime.EndTime,
@@ -1124,8 +1124,8 @@ namespace EventTicketBooking.Api.Controllers
                 var responseDto = new ShowtimeResponseDto
                 {
                     Name = showtime.Name,
-                SalesEndTime = showtime.SalesEndTime,
-                Id = showtime.Id,
+                    SalesEndTime = showtime.SalesEndTime,
+                    Id = showtime.Id,
                     EventId = showtime.EventId,
                     StartTime = showtime.StartTime,
                     EndTime = showtime.EndTime,
@@ -1386,8 +1386,8 @@ namespace EventTicketBooking.Api.Controllers
                 var responseDto = new ShowtimeResponseDto
                 {
                     Name = showtime.Name,
-                SalesEndTime = showtime.SalesEndTime,
-                Id = showtime.Id,
+                    SalesEndTime = showtime.SalesEndTime,
+                    Id = showtime.Id,
                     EventId = showtime.EventId,
                     StartTime = showtime.StartTime,
                     EndTime = showtime.EndTime,
@@ -1496,8 +1496,8 @@ namespace EventTicketBooking.Api.Controllers
                 Showtimes = ev.Showtimes?.Select(s => new ShowtimeResponseDto
                 {
                     Name = s.Name,
-                SalesEndTime = s.SalesEndTime,
-                Id = s.Id,
+                    SalesEndTime = s.SalesEndTime,
+                    Id = s.Id,
                     SeatingMapImageUrl = s.SeatingMapImageUrl,
                     EventId = s.EventId,
                     StartTime = s.StartTime,

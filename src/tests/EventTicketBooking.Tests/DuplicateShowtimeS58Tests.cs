@@ -100,14 +100,18 @@ public class DuplicateShowtimeS58Tests
         Assert.Equal(201, Assert.IsType<ObjectResult>(await Controller(db, Guid.NewGuid(), "Admin").DuplicateShowtime(ev.Id, source.Id, request)).StatusCode);
         var named = Assert.IsType<ObjectResult>(await controller.CreateShowtime(ev.Id, new CreateShowtimeDto
         {
-            Name = "  Đêm Chung khảo  ", StartTime = source.StartTime.AddDays(10),
-            EndTime = source.EndTime.AddDays(10), AvailableSeats = 2
+            Name = "  Đêm Chung khảo  ",
+            StartTime = source.StartTime.AddDays(10),
+            EndTime = source.EndTime.AddDays(10),
+            AvailableSeats = 2
         }));
         var namedDto = Assert.IsType<ApiResponse<ShowtimeResponseDto>>(named.Value).Data!;
         Assert.Equal("Đêm Chung khảo", namedDto.Name);
         var edited = Assert.IsType<OkObjectResult>(await controller.UpdateShowtime(ev.Id, namedDto.Id, new UpdateShowtimeDto
         {
-            Name = "Đêm Chung kết", StartTime = namedDto.StartTime, EndTime = namedDto.EndTime
+            Name = "Đêm Chung kết",
+            StartTime = namedDto.StartTime,
+            EndTime = namedDto.EndTime
         }));
         Assert.Equal("Đêm Chung kết", Assert.IsType<ApiResponse<ShowtimeResponseDto>>(edited.Value).Data!.Name);
         Assert.Equal("Đêm Chung kết", (await db.Showtimes.AsNoTracking().SingleAsync(s => s.Id == namedDto.Id)).Name);

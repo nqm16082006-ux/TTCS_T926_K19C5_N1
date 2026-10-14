@@ -69,10 +69,14 @@ namespace EventTicketBooking.Tests
         public async Task Payment_AfterSaleCloses_AllowsExistingOrderOnlyBeforeShowEnd(bool ended)
         {
             var order = CreateTestOrder();
-            var show = new Showtime { Id = _defaultShowtimeId, AvailableSeats = 1,
+            var show = new Showtime
+            {
+                Id = _defaultShowtimeId,
+                AvailableSeats = 1,
                 StartTime = DateTime.UtcNow.AddHours(-2),
                 EndTime = ended ? DateTime.UtcNow.AddMinutes(-1) : DateTime.UtcNow.AddHours(1),
-                SalesEndTime = DateTime.UtcNow.AddMinutes(-1) };
+                SalesEndTime = DateTime.UtcNow.AddMinutes(-1)
+            };
             show.ChangeStatus(ShowtimeStatus.OnSale);
             show.ChangeStatus(ShowtimeStatus.Closed);
             _context.Showtimes.Add(show);
