@@ -139,6 +139,34 @@ namespace EventTicketBooking.Tests
             Assert.Empty(shows);
         }
 
+        [Fact]
+        public async Task GetTodayShows_ReturnsMultiDayShowtime_WhenShowStartedYesterdayAndEndsTodayOrLater()
+        {
+            // Arrange: Suất diễn thiết lập từ hôm qua (ngày 15) đến ngày mai (ngày 17)
+            // Hôm nay (ngày 16) vẫn phải hiển thị suất này
+            var ev = new Event { Id = Guid.NewGuid(), Title = "Multi-day Festival", Location = "Stadium" };
+            var showtime = new Showtime
+            {
+                Id = Guid.NewGuid(),
+                EventId = ev.Id,
+                Event = ev,
+                StartTime = DateTime.UtcNow.AddDays(-1), // Bắt đầu từ hôm qua
+                EndTime = DateTime.UtcNow.AddHours(5)   // Kết thúc vào hôm nay / ngày mai
+            };
+
+            _context.Events.Add(ev);
+            _context.Showtimes.Add(showtime);
+            await _context.SaveChangesAsync();
+
+            // Act
+            var result = await _controller.GetTodayShows();
+
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result);
+            var shows = Assert.IsAssignableFrom<IEnumerable<object>>(okResult.Value);
+            Assert.Single(shows);
+        }
+
         // ==========================================
         // ScanTicket Tests
         // ==========================================

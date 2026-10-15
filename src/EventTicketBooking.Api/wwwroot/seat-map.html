@@ -1623,7 +1623,7 @@
         console.warn("Thời gian giữ ghế không hợp lệ; không tạo bộ đếm.");
         return;
       }
-      if (expiresAtMs <= serverTimeMs) {
+      if (expiresAtMs - serverTimeMs < 1000) {
         if (expireIfElapsed) handleHoldExpired();
         return;
       }
