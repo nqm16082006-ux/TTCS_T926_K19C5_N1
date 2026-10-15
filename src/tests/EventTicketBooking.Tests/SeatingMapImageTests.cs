@@ -21,7 +21,8 @@ public class SeatingMapImageTests
         var owner = Guid.NewGuid();
         db.Users.Add(new User { Id = owner, Username = "organizer", Email = "organizer@test.local", PasswordHash = "test", FullName = "Organizer" });
         var ev = new Event { Id = Guid.NewGuid(), OwnerId = owner, Title = "Test", Location = "Test" };
-        var showtime = new Showtime { Id = Guid.NewGuid(), EventId = ev.Id, Event = ev };
+        var showtime = new Showtime { Id = Guid.NewGuid(), EventId = ev.Id, Event = ev, AvailableSeats = 1, StartTime = DateTime.UtcNow.AddHours(1), EndTime = DateTime.UtcNow.AddHours(3) };
+        showtime.ChangeStatus(ShowtimeStatus.OnSale);
         db.Showtimes.Add(showtime); await db.SaveChangesAsync();
         EventController Controller(Guid user, string role = "Organizer") => new(db)
         {

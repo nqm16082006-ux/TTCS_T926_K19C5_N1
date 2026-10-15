@@ -22,14 +22,14 @@ function fixture() {
   const elements = { btnPrimaryAction: button, bookingRateLimitNotice: notice, bookingRateLimitMessage: message };
   const calls = [];
   const context = vm.createContext({
-    console, Number, Math, Map, Set, Array, JSON, Date: { now: () => now, parse: Date.parse },
+    console, Number, Math, Map, Set, Array, JSON, URLSearchParams, Date: { now: () => now, parse: Date.parse },
     document: { getElementById: id => elements[id] || null },
     setInterval: callback => { interval = callback; return 1; }, clearInterval: () => { interval = null; },
     getValidToken: () => 'token',
-    sessionStorage: { removeItem: () => { throw new Error('Must preserve saved holds'); } },
+    sessionStorage: { getItem: () => null, removeItem: () => { throw new Error('Must preserve saved holds'); } },
     loadSeats: () => { throw new Error('Must not reload seats on 429'); },
     alert: () => { throw new Error('Must use inline notice'); },
-    window: { location: { href: 'seat-map.html' } },
+    window: { location: { href: 'seat-map.html', search: '' } },
     fetch: async url => { calls.push(url); return { status: 429, ok: false,
       headers: { get: () => null }, json: async () => ({ code: 'RATE_LIMITED', retryAfterSeconds: 30 }) }; }
   });

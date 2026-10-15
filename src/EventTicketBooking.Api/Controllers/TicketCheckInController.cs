@@ -186,15 +186,19 @@ namespace EventTicketBooking.Api.Controllers
             var todayVnStartUtc = TimeZoneInfo.ConvertTimeToUtc(nowVn.Date, vnTimeZone);
             var tomorrowVnStartUtc = todayVnStartUtc.AddDays(1);
 
-            // Lọc các suất diễn bắt đầu trong ngày hôm nay VÀ chưa kết thúc ở thời điểm hiện tại
+            // Giao thoa khoảng thời gian [StartTime, EndTime] với ngày hôm nay [todayVnStartUtc, tomorrowVnStartUtc]:
+            // 1. Suất diễn bắt đầu trước khi hết ngày hôm nay (StartTime < tomorrowVnStartUtc)
+            // 2. Suất diễn chưa kết thúc trước khi ngày hôm nay bắt đầu (EndTime >= todayVnStartUtc)
+            // => Đảm bảo bất kể suất diễn kéo dài 1 ngày, 2 ngày, hay N ngày thì mọi ngày trong khoảng đó đều hiển thị
             var shows = await _context.Showtimes
                 .Include(s => s.Event)
-                .Where(s => s.StartTime >= todayVnStartUtc
-                         && s.StartTime < tomorrowVnStartUtc
-                         && s.EndTime >= nowUtc)
+                .Where(s => s.StartTime < tomorrowVnStartUtc
+                         && s.EndTime >= todayVnStartUtc)
+                .OrderBy(s => s.StartTime)
                 .Select(s => new
                 {
                     s.Id,
+                    s.Name,
                     EventTitle = s.Event.Title,
                     s.StartTime,
                     s.EndTime
@@ -300,7 +304,7 @@ namespace EventTicketBooking.Api.Controllers
                 {
                     var showtimeInfo = await _context.Showtimes.Include(s => s.Event).FirstOrDefaultAsync(s => s.Id == qrShowtimeId.Value);
                     var message = showtimeInfo != null
-                        ? $"Vé thuộc suất diễn {showtimeInfo.Event.Title} lúc {showtimeInfo.StartTime:HH:mm dd/MM/yyyy}"
+                        ? WrongShowtimeMessage(showtimeInfo)
                         : "Vé thuộc suất diễn khác";
 
                     _logger.LogWarning("Từ chối check-in: {ReasonCode}. Mã QR: {TicketCode}, Cổng: {GateName}, Suất diễn chọn: {SelectedShowtimeId}, Suất diễn thực tế: {TicketShowtimeId}",
@@ -395,7 +399,7 @@ namespace EventTicketBooking.Api.Controllers
             {
                 var showtimeInfo = await _context.Showtimes.Include(s => s.Event).FirstOrDefaultAsync(s => s.Id == ticket.Order.ShowtimeId);
                 var message = showtimeInfo != null
-                    ? $"Vé thuộc suất diễn {showtimeInfo.Event.Title} lúc {showtimeInfo.StartTime:HH:mm dd/MM/yyyy}"
+                    ? WrongShowtimeMessage(showtimeInfo)
                     : "Vé thuộc suất diễn khác";
 
                 _logger.LogWarning("Từ chối check-in: {ReasonCode}. Mã vé: {TicketCode}, Cổng: {GateName}, Suất diễn chọn: {SelectedShowtimeId}, Suất diễn thực tế: {TicketShowtimeId}",
@@ -1304,6 +1308,14 @@ namespace EventTicketBooking.Api.Controllers
             }
 
             return false;
+        }
+
+        internal static string WrongShowtimeMessage(Showtime showtime)
+        {
+            var zone = TimeZoneInfo.FindSystemTimeZoneById(OperatingSystem.IsWindows() ? "SE Asia Standard Time" : "Asia/Ho_Chi_Minh");
+            var time = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(showtime.StartTime, DateTimeKind.Utc), zone);
+            var name = string.IsNullOrWhiteSpace(showtime.Name) ? showtime.Event.Title : $"{showtime.Event.Title} — {showtime.Name}";
+            return $"Vé thuộc suất diễn {name} lúc {time:HH:mm dd/MM/yyyy} (giờ Việt Nam). Vui lòng chọn đúng suất diễn của vé.";
         }
 
         private IActionResult AlreadyCheckedIn(OrderItem ticket)

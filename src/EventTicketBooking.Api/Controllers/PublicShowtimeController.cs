@@ -49,6 +49,59 @@ namespace EventTicketBooking.Api.Controllers
         /// Truy vấn danh sách Suất chiếu đang mở bán (Status = OnSale).
         /// GET /api/public/showtimes?cursor={cursor}&limit={limit}
         /// </summary>
+        [HttpGet("events")]
+        public async Task<IActionResult> GetOnSaleEvents(string? cursor = null, int limit = 50)
+        {
+            limit = Math.Clamp(limit, 1, 50);
+            var cacheKey = $"public:events:v1:{cursor}:{limit}";
+            try
+            {
+                var cached = await _cache.GetStringAsync(cacheKey);
+                if (cached != null)
+                {
+                    var value = JsonSerializer.Deserialize<ApiResponse<CursorPagedResultDto<PublicEventSummaryDto>>>(cached, JsonOptions);
+                    if (value?.Data != null && value.Data.Items.All(e => e.SalesEndTime > DateTime.UtcNow)) return Ok(value);
+                }
+            }
+            catch (Exception ex) { _logger.LogWarning(ex, "Không đọc được cache danh sách sự kiện."); }
+            var now = DateTime.UtcNow;
+            var query = _context.Events.AsNoTracking()
+                .Where(e => e.Showtimes.Any(s => s.Status == ShowtimeStatus.OnSale && s.EndTime > now && (s.SalesEndTime ?? s.StartTime) > now))
+                .Select(e => new PublicEventSummaryDto
+                {
+                    EventId = e.Id,
+                    SalesEndTime = e.Showtimes.Where(s => s.Status == ShowtimeStatus.OnSale && s.EndTime > now && (s.SalesEndTime ?? s.StartTime) > now).Min(s => s.SalesEndTime ?? s.StartTime),
+                    EventTitle = e.Title,
+                    ImageUrl = e.ImageUrl,
+                    EventLocation = e.Location,
+                    OrganizerName = e.Owner.FullName ?? e.Owner.Username,
+                    StartTime = e.Showtimes.Where(s => s.Status == ShowtimeStatus.OnSale && s.EndTime > now && (s.SalesEndTime ?? s.StartTime) > now).Min(s => s.StartTime),
+                    ShowtimeCount = e.Showtimes.Count(s => s.Status == ShowtimeStatus.OnSale && s.EndTime > now && (s.SalesEndTime ?? s.StartTime) > now),
+                    MinPrice = e.Showtimes.Where(s => s.Status == ShowtimeStatus.OnSale && s.EndTime > now && (s.SalesEndTime ?? s.StartTime) > now)
+                        .SelectMany(s => s.SeatCategories).Min(c => c.Price) ?? 0
+                });
+            if (!string.IsNullOrEmpty(cursor))
+            {
+                if (!TryDecodeCursor(cursor, out var time, out var id)) return BadRequest();
+                query = query.Where(e => e.StartTime > time || e.StartTime == time && e.EventId > id);
+            }
+            var rows = await query.OrderBy(e => e.StartTime).ThenBy(e => e.EventId).Take(limit + 1).ToListAsync();
+            var items = rows.Take(limit).ToList();
+            // Aggregate timestamps can lose DateTime.Kind with some providers.
+            // Stored showtime timestamps are UTC; preserve that in JSON and cursors.
+            foreach (var item in items) item.StartTime = DateTime.SpecifyKind(item.StartTime, DateTimeKind.Utc);
+            var hasMore = rows.Count > limit;
+            var response = ApiResponse<CursorPagedResultDto<PublicEventSummaryDto>>.SuccessResult(new()
+            {
+                Items = items,
+                HasMore = hasMore,
+                NextCursor = hasMore ? EncodeCursor(items[^1].StartTime, items[^1].EventId) : null
+            });
+            try { await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(response, JsonOptions), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30) }); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Không ghi được cache danh sách sự kiện."); }
+            return Ok(response);
+        }
+
         [HttpGet("showtimes")]
         [ProducesResponseType(typeof(ApiResponse<CursorPagedResultDto<PublicShowtimeDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetOnSaleShowtimes(
@@ -68,7 +121,7 @@ namespace EventTicketBooking.Api.Controllers
                 if (!string.IsNullOrEmpty(cachedData))
                 {
                     var cachedResponse = JsonSerializer.Deserialize<ApiResponse<CursorPagedResultDto<PublicShowtimeDto>>>(cachedData, JsonOptions);
-                    if (cachedResponse != null)
+                    if (cachedResponse?.Data != null && cachedResponse.Data.Items.All(s => (s.SalesEndTime ?? s.StartTime) > DateTime.UtcNow && s.EndTime > DateTime.UtcNow))
                     {
                         return Ok(cachedResponse);
                     }
@@ -86,7 +139,7 @@ namespace EventTicketBooking.Api.Controllers
                 .AsNoTracking()
                 .Include(s => s.Event)
                 .Include(s => s.SeatCategories)
-                .Where(s => s.Status == ShowtimeStatus.OnSale);
+                .Where(s => s.Status == ShowtimeStatus.OnSale && s.EndTime > now && (s.SalesEndTime ?? s.StartTime) > now);
 
             // Cursor Filter: StartTime > cursorStartTime || (StartTime == cursorStartTime && Id > cursorId)
             if (!string.IsNullOrWhiteSpace(cursor) && TryDecodeCursor(cursor, out DateTime cursorStartTime, out Guid cursorId))
@@ -116,6 +169,8 @@ namespace EventTicketBooking.Api.Controllers
 
                 return new PublicShowtimeDto
                 {
+                    Name = s.Name,
+                    SalesEndTime = s.SalesEndTime ?? s.StartTime,
                     Id = s.Id,
                     SeatingMapImageUrl = s.SeatingMapImageUrl,
                     EventId = s.EventId,
@@ -207,9 +262,12 @@ namespace EventTicketBooking.Api.Controllers
                 .Where(s => eventShowtimeIds.Contains(s.ShowtimeId)).GroupBy(s => s.ShowtimeId)
                 .Select(g => new { Id = g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Id, g => g.Count);
             var showtimesList = ev.Showtimes
+                .Where(s => s.Status == ShowtimeStatus.OnSale && s.EndTime > DateTime.UtcNow && (s.SalesEndTime ?? s.StartTime) > DateTime.UtcNow)
                 .OrderBy(s => s.StartTime)
                 .Select(s => new PublicShowtimeDto
                 {
+                    Name = s.Name,
+                    SalesEndTime = s.SalesEndTime ?? s.StartTime,
                     Id = s.Id,
                     SeatingMapImageUrl = s.SeatingMapImageUrl,
                     EventId = s.EventId,
@@ -294,6 +352,8 @@ namespace EventTicketBooking.Api.Controllers
             var remainingSeats = await GetRemainingSeatsAsync(new List<Showtime> { showtime });
             var dto = new PublicShowtimeDto
             {
+                Name = showtime.Name,
+                SalesEndTime = showtime.SalesEndTime ?? showtime.StartTime,
                 Id = showtime.Id,
                 SeatingMapImageUrl = showtime.SeatingMapImageUrl,
                 EventId = showtime.EventId,
@@ -309,7 +369,7 @@ namespace EventTicketBooking.Api.Controllers
                 RemainingTickets = remainingSeats[showtime.Id],
                 AvailableTickets = remainingSeats[showtime.Id],
                 RemainingSeats = remainingSeats[showtime.Id],
-                Status = showtime.Status.ToString(),
+                Status = showtime.Status == ShowtimeStatus.OnSale && showtime.IsSaleExpired(DateTime.UtcNow) ? ShowtimeStatus.Closed.ToString() : showtime.Status.ToString(),
                 MinPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? (showtime.SeatCategories.Min(sc => sc.Price) ?? 0) : 0m,
                 MaxPrice = showtime.SeatCategories != null && showtime.SeatCategories.Any() ? (showtime.SeatCategories.Max(sc => sc.Price) ?? 0) : 0m,
                 MaxTicketsPerUser = showtime.MaxTicketsPerUser > 0 ? showtime.MaxTicketsPerUser : (showtime.Event != null && showtime.Event.MaxTicketsPerUser > 0 ? showtime.Event.MaxTicketsPerUser : 10)
