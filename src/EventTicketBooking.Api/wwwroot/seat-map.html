@@ -597,6 +597,25 @@
         });
       });
 
+      // Story S-44: Cập nhật ghế sang SOLD ngay khi có người thanh toán thành công
+      seatHubConnection.on("SeatSold", (data) => {
+        if (!data || !data.seatIds) return;
+        data.seatIds.forEach(id => {
+          const seat = seatMap.get(id);
+          if (seat) seat.status = 'SOLD';
+          // Xoá khỏi giỏ nếu đang chọn hoặc đang giữ (ghế đã bị mua bởi người khác)
+          if (selectedSeatIds.has(id)) {
+            selectedSeatIds.delete(id);
+            showConflictToast(`Ghế ${seat ? seat.row + String(seat.seatNumber).padStart(2, '0') : id} vừa được người khác mua thành công.`);
+          }
+          if (myHeldSeatIds.has(id)) {
+            myHeldSeatIds.delete(id);
+          }
+          updateSeatButtonState(id);
+        });
+        updateCartPanel();
+      });
+
       try {
         await seatHubConnection.start();
         console.log("Connected to SignalR SeatStatusHub");

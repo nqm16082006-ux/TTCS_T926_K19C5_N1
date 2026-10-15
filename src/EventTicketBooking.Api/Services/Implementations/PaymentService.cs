@@ -755,6 +755,27 @@ namespace EventTicketBooking.Api.Services.Implementations
                     await dbTransaction.CommitAsync(cancellationToken);
                 }
 
+                // Story S-44: Broadcast realtime ghế vừa bán thành công để các client cập nhật sơ đồ ngay lập tức
+                if (_hubContext != null && _hubContext.Clients != null)
+                {
+                    try
+                    {
+                        var grouped = seats.GroupBy(s => s.ShowtimeId);
+                        foreach (var g in grouped)
+                        {
+                            var client = _hubContext.Clients.Group(g.Key.ToString());
+                            if (client != null)
+                            {
+                                await client.SendAsync("SeatSold", new { ShowtimeId = g.Key, SeatIds = g.Select(x => x.Id).ToList() }, cancellationToken);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Lỗi khi gửi SignalR SeatSold cho đơn hàng {OrderId}.", order.Id);
+                    }
+                }
+
                 // Gửi email vé cho khách hàng (không làm chặn luồng thanh toán)
                 try
                 {
