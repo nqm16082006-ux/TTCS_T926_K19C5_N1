@@ -19,7 +19,7 @@ namespace EventTicketBooking.Api.Controllers
     /// </summary>
     [ApiController]
     [Route("api/v1/payments/refunds")]
-    [RequireRole("Admin", "Accounting")]
+    [RequireRole("Admin", "Auditor", "Accounting")]
     public class RefundsController : ControllerBase
     {
         private readonly IRefundService _refundService;
