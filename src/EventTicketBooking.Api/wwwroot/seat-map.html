@@ -619,9 +619,22 @@
       try {
         await seatHubConnection.start();
         console.log("Connected to SignalR SeatStatusHub");
+        // Gia nhập group của suất chiếu để nhận các broadcast SeatHeld/SeatReleased/SeatSold
+        await seatHubConnection.invoke("JoinShowtimeGroup", showtimeId);
+        console.log(`Joined showtime group: ${showtimeId}`);
       } catch (err) {
         console.error("SignalR Connection Error: ", err);
       }
+
+      // Tự động rejoin group khi SignalR reconnect
+      seatHubConnection.onreconnected(async () => {
+        console.log("SignalR reconnected. Rejoining showtime group...");
+        try {
+          await seatHubConnection.invoke("JoinShowtimeGroup", showtimeId);
+        } catch (err) {
+          console.error("Lỗi rejoin group sau reconnect:", err);
+        }
+      });
     }
 
     let allSeats = [];
