@@ -4,14 +4,17 @@ using Microsoft.EntityFrameworkCore;
 using DotNetEnv;
 using Prometheus;
 
-// Nạp file .env ở thư mục gốc hoặc thư mục hiện tại nếu có
-if (File.Exists(".env"))
+// Nạp file .env ở thư mục hiện tại hoặc các thư mục cha
+var envSearchDir = new DirectoryInfo(Directory.GetCurrentDirectory());
+while (envSearchDir != null)
 {
-    Env.Load(".env");
-}
-else if (File.Exists("../../.env"))
-{
-    Env.Load("../../.env");
+    var envCandidate = Path.Combine(envSearchDir.FullName, ".env");
+    if (File.Exists(envCandidate))
+    {
+        Env.Load(envCandidate);
+        break;
+    }
+    envSearchDir = envSearchDir.Parent;
 }
 
 // Cho phép Npgsql xử lý DateTime linh hoạt (cả Local và UTC)
@@ -179,6 +182,7 @@ builder.Services.Configure<EventTicketBooking.Api.Options.TicketQrOptions>(build
 builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IQrSignatureService, EventTicketBooking.Api.Services.Implementations.QrSignatureService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITicketService, EventTicketBooking.Api.Services.Implementations.TicketService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ICheckinExportService, EventTicketBooking.Api.Services.Implementations.CheckinExportService>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ICheckinStatisticsService, EventTicketBooking.Api.Services.Implementations.CheckinStatisticsService>();
 builder.Services.AddHttpClient();
 
 
@@ -341,5 +345,6 @@ app.MapControllers();
 app.MapMetrics("/metrics");
 app.MapHub<EventTicketBooking.Api.Hubs.SeatStatusHub>("/hubs/seat-status");
 app.MapHub<EventTicketBooking.Api.Hubs.SystemAlertHub>("/hubs/system-alerts");
+app.MapHub<EventTicketBooking.Api.Hubs.CheckinLiveHub>("/hubs/checkin-live");
 
 app.Run();
