@@ -177,9 +177,13 @@ namespace EventTicketBooking.Api.Services.Implementations
                 }
             }
 
-            // Kiểm tra trạng thái hoạt động (kích hoạt / đóng tài khoản)
+            // Kiểm tra trạng thái hoạt động (kích hoạt / đóng tài khoản / ẩn danh)
             if (!user.IsActive)
             {
+                if (user.IsAnonymized)
+                {
+                    return AuthResult.Locked("Tài khoản này đã bị xoá và ẩn danh dữ liệu cá nhân theo yêu cầu bảo vệ quyền riêng tư (Nghị định 13/2023/NĐ-CP). Bạn không thể đăng nhập lại.");
+                }
                 if (string.IsNullOrEmpty(user.VerificationCode))
                 {
                     return AuthResult.Locked("Tài khoản của bạn đã bị khóa bởi Quản trị viên. Vui lòng liên hệ Admin để được hỗ trợ.");

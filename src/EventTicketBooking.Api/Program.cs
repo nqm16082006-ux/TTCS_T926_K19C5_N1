@@ -144,6 +144,9 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ISeatHoldS
 // Đăng ký dịch vụ Nhật ký thao tác đơn hàng và vé (Story S-49)
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IOrderAuditService, EventTicketBooking.Api.Services.Implementations.OrderAuditService>();
 
+// Đăng ký dịch vụ Xoá và Ẩn danh dữ liệu cá nhân (Story S-53)
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IDataDeletionService, EventTicketBooking.Api.Services.Implementations.DataDeletionService>();
+
 // Đăng ký dịch vụ Giám sát và Cảnh báo (Story S-43)
 builder.Services.AddSingleton<EventTicketBooking.Api.Metrics.IAppMetrics, EventTicketBooking.Api.Metrics.PrometheusAppMetrics>();
 
