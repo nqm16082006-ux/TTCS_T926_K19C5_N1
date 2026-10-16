@@ -84,20 +84,11 @@ namespace EventTicketBooking.Api.Middlewares
             // 4. Kiểm tra xác thực (User Authentication)
             if (context.User?.Identity == null || !context.User.Identity.IsAuthenticated)
             {
-                // Hỗ trợ đọc Bearer token từ Authorization header hoặc query param (hỗ trợ tải file direct link)
+                // Hỗ trợ đọc Bearer token từ Authorization header nếu pipeline chưa chạy qua JWT bearer middleware
                 var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
-                string? token = null;
                 if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
                 {
-                    token = authHeader.Substring("Bearer ".Length).Trim();
-                }
-                else if (!string.IsNullOrEmpty(context.Request.Query["token"]))
-                {
-                    token = context.Request.Query["token"].ToString().Trim();
-                }
-
-                if (!string.IsNullOrEmpty(token))
-                {
+                    var token = authHeader.Substring("Bearer ".Length).Trim();
                     try
                     {
                         var handler = new JwtSecurityTokenHandler();
@@ -137,6 +128,7 @@ namespace EventTicketBooking.Api.Middlewares
             if (user == null || !user.IsActive)
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "application/json";
                 await context.Response.WriteAsJsonAsync(new
                 {
                     statusCode = StatusCodes.Status401Unauthorized,
