@@ -244,6 +244,10 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IRefundSer
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.RefundProcessingWorker>();
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.ShowtimeSaleExpiryWorker>();
 
+// Story S-61: Dịch vụ & Job nền nhắc người mua trước 24 giờ diễn qua email và cập nhật khi đổi giờ
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IShowtimeReminderService, EventTicketBooking.Api.Services.Implementations.ShowtimeReminderService>();
+builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.ShowtimeReminderWorker>();
+
 var app = builder.Build();
 app.UseForwardedHeaders();
 
@@ -287,7 +291,20 @@ if (app.Environment.IsDevelopment())
 
 // Bật phục vụ static files cho wwwroot (login.html)
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (ctx.File.Name.EndsWith(".html", StringComparison.OrdinalIgnoreCase) ||
+            ctx.File.Name.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.CacheControl] = "no-cache, no-store, must-revalidate, max-age=0";
+            ctx.Context.Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.Pragma] = "no-cache";
+            ctx.Context.Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.Expires] = "0";
+            ctx.Context.Response.Headers["Clear-Site-Data"] = "\"cache\"";
+        }
+    }
+});
 var uploadsPath = builder.Configuration["Uploads:Path"];
 if (!string.IsNullOrWhiteSpace(uploadsPath))
 {

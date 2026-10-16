@@ -145,10 +145,12 @@
       <!-- Logo Header -->
       <div class="h-16 px-space-md flex items-center justify-between bg-surface-container-low">
         <a href="./public-events.html" class="flex items-center gap-space-sm">
-          <img alt="EventPulse Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WTV6ECUtEUhk0z2OhrYrHSztCKcv9GeCNfmcT273KDmrGfvnfNjO-uFn7ATWOsV48K8VSD8RgaP6nA7UlHLZRqTI0Wp1hsKNBB2hCGvimywycHDhMKaCFgxRaIhinj6vXjrz4KX-RWUcFVmjpPY8KdEXLAiptD9n7k51M75Sc6w1aBY7AIYj55cuIhMogpGjtAb-tv4r8Mg5sBZlRk4SsC6WzXyCEM8aHQAZ3bI3WnX8ogB38-mTpVIKT9">
+          <div class="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center shadow-sm shrink-0">
+            <span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+          </div>
           <div class="flex flex-col">
-            <span class="font-headline-sm text-headline-sm text-primary leading-tight">EventPulse</span>
-            <span class="font-label-sm text-label-sm text-secondary tracking-wider uppercase">Ban Tổ Chức</span>
+            <span class="font-headline-sm text-headline-sm text-primary leading-tight font-extrabold">EventPulse</span>
+            <span class="font-label-sm text-label-sm text-secondary tracking-wider uppercase font-semibold">Ban Tổ Chức</span>
           </div>
         </a>
       </div>
@@ -574,10 +576,10 @@
 
     // Curated high quality posters
     const POSTERS = [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCwgfSQKNAE5_AwoH7VdGLGQyDLytRQ1WgIpeNwcfEJrpZNNWrU_ZqE8nnwRTIKIpSGWMu2D6TjqsLZwtWEGFq9z55HU37WXIzEOOUWmyGAHLNQjGf2O0PBdCZNYDpoiYyTKXB__S5RBsA80ZvxGhkkeJXZRUyBCtuisrXe03l0g6o77NacpQ7Oa77kM5dxW1RwU-psLPACrDSo-YUByJwkNz5-lzuisC1gcoOm7eWHr8Di3eJLmd7HOw',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuAZ7__2YI8x3FM5Dvf7jpAW66PsIHCc_tHdSNnMgxXw1vihOd__UyD1m1Tp9v1RiBXt3cw-kipHzj0MtBrLukCh4hh8D3H8Gs_2MYpjUpTeEG5_pq2cU8laWIiYOOhKFQgaqzK0w7oQvD3rC6FscijtE7nLPUtyiIzB_QgsewqN6qS9XzZXbwBC6I3riGJkL1iXXHagO--jglP9sAKyLkKt1m5EoIylVnNTEVLR4F7FMNoVK_pASHpbtQ',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuB-m9mA07LTMJEHflwQxPY_isfKMParlI_Y3g02JpQbezNHE4dcKwPE_Gz7huey4MHkZSSYs1l1nnc4E7LJ2lzdEqVviycJqz2tuwgH13n81Yjcs0KEQIaVC5ceKmnNOH4v_8EKNC6SDJNSi1yTUG5dwnf1_sawQ67tcMdgXRQmJcD4hkFC0o-Ut3jdAvD7g5Uhp1U7zKiCU8CyeHwB8Kq5jTkJHLBlv5iQkEduk3TplW2E1gENBUUBTQ',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuClJ-h-GCO1jM12PfT6Kv744le1l0tHcVvqeJs2gZIwWUC_o1nDHhMpfZ9KGldXiLxzcQ4S-eufMNQFT5UwNQrcaOttMPmPS9r3xFe1pqsucjZr0eknF4V3hZYGgU7Z2AQQmuSgPRC598XUzjZfxpyEJSpgGLjYXFblOi6o_7j-0vJjf5KWuSBtmM-jIXsx7iS85_GRsa_TXamHPNZR3_wqEvNW_VH6LAV_fDoQUhv8HDcnne4KvdcIUg'
+      'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=600&q=80',
+      'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=600&q=80',
+      'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=600&q=80',
+      'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&q=80'
     ];
 
     let showtimeSalesRequestInFlight = false;
@@ -812,7 +814,7 @@
             <td class="px-space-lg py-4">
               <div class="flex items-center gap-space-md">
                 <div class="w-14 h-14 rounded-lg overflow-hidden shrink-0 shadow-sm relative">
-                  <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" src="${escapeHtml(poster)}" alt="${escapeHtml(e.title)}">
+                  <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" src="${escapeHtml(poster)}" alt="${escapeHtml(e.title)}" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&q=80';">
                   <span class="absolute bottom-1 right-1 px-1 rounded bg-black/70 text-white font-code-mono text-[9px]">${hasOnSale ? 'LIVE' : 'DRAFT'}</span>
                 </div>
                 <div class="flex flex-col min-w-0">

@@ -251,6 +251,9 @@ namespace EventTicketBooking.Api.Data
                 // Story S-45: lý do huỷ đơn (PAYMENT_CANCELLED / CUSTOMER_REFUND)
                 entity.Property(o => o.CancelReason).HasMaxLength(30);
 
+                // Story S-61: thời điểm gửi email nhắc nhở 24h trước giờ diễn
+                entity.Property(o => o.ReminderSentAt);
+
                 entity.HasOne(o => o.User)
                       .WithMany()
                       .HasForeignKey(o => o.UserId)

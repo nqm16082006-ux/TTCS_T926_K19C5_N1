@@ -50,5 +50,33 @@ public interface IEmailService
     /// Gửi email cảnh báo khẩn cấp cho bộ phận Kế toán / Quản trị viên (Story S-48).
     /// </summary>
     Task<bool> SendAccountingAlertEmailAsync(string toEmail, string subject, string htmlContent);
+
+    /// <summary>
+    /// Gửi email nhắc nhở trước 24 giờ kèm vé và chỉ dẫn địa điểm (Story S-61).
+    /// </summary>
+    Task<bool> SendShowtimeReminderEmailAsync(
+        string toEmail,
+        string toName,
+        string eventTitle,
+        string location,
+        string showtime,
+        System.Collections.Generic.IEnumerable<string> seatNames,
+        System.Collections.Generic.IEnumerable<string>? ticketCodes = null,
+        string? orderId = null,
+        string? directions = null);
+
+    /// <summary>
+    /// Gửi email cập nhật khi đổi giờ diễn tới người mua vé (Story S-61).
+    /// </summary>
+    Task<bool> SendShowtimeRescheduledEmailAsync(
+        string toEmail,
+        string toName,
+        string eventTitle,
+        string location,
+        string oldShowtime,
+        string newShowtime,
+        System.Collections.Generic.IEnumerable<string> seatNames,
+        string? orderId = null,
+        string? directions = null);
 }
 
