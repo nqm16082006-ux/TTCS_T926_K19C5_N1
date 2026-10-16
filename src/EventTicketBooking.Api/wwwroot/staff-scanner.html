@@ -666,6 +666,7 @@
       font-weight: 700;
     }
   </style>
+<link rel="stylesheet" href="./scanner-readmission.css">
 </head>
 <body>
   <!-- Header / Navbar -->
@@ -731,7 +732,7 @@
               <span id="networkStatusText">Trực tuyến (Online)</span>
             </div>
             <span id="offlineBannerNotice" style="display: none; font-size: 0.85rem; font-weight: 700; color: #c2410c;">
-              ⚡ Soát vé bằng bộ nhớ ngoại tuyến (S-34)
+              ⚡ Soát vé bằng bộ nhớ ngoại tuyếnh
             </span>
           </div>
 
@@ -748,11 +749,11 @@
           <!-- Trạng thái dữ liệu đã tải của suất diễn (S-33) -->
           <div style="font-size: 0.88rem;">
             <div style="font-weight: 700; color: #1e293b; margin-bottom: 2px;">
-              📁 Danh sách vé đã tải (S-33):
+              📁 Danh sách vé đã tải:
               <span id="manifestStatusText" style="font-weight: 700; color: #d97706;"><span id="syncMetadataText">Chưa tải danh sách</span></span>
             </div>
             <div id="manifestSubText" style="font-size: 0.8rem; color: #64748b;">
-              Tải trước để máy kiểm tra vé và chữ ký số khi mất mạng (AC1, AC4)
+              Tải trước để máy kiểm tra vé và chữ ký số khi mất mạng
             </div>
           </div>
 
@@ -1712,11 +1713,23 @@
           }
           
           data.forEach(show => {
-            const startTime = new Date(show.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-            const endTime = new Date(show.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            const start = new Date(show.startTime);
+            const end = new Date(show.endTime);
+            const startTimeStr = start.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            const endTimeStr = end.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            
+            // Nếu suất diễn kéo dài nhiều ngày (ngày bắt đầu khác ngày kết thúc)
+            const isDifferentDay = start.toDateString() !== end.toDateString();
+            let timeDisplay = `${startTimeStr} - ${endTimeStr}`;
+            if (isDifferentDay) {
+              const startDateStr = start.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+              const endDateStr = end.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+              timeDisplay = `${startDateStr} ${startTimeStr} - ${endDateStr} ${endTimeStr}`;
+            }
+
             const option = document.createElement('option');
             option.value = show.id;
-            option.textContent = `${show.eventTitle} (${startTime} - ${endTime})`;
+            option.textContent = `${show.eventTitle}${show.name ? ' — ' + show.name : ''} (${timeDisplay})`;
             select.appendChild(option);
           });
 
@@ -1813,6 +1826,7 @@
             document.getElementById('ticketInput').value = '';
           } else {
             showErrorResult(data.message || 'Mã vé không hợp lệ hoặc bị từ chối.');
+            if (data.reason === 'ALREADY_CHECKED_IN') attachReadmissionAction(resultDiv, bodyPayload, token);
           }
         } catch (networkError) {
           clearTimeout(pendingTimeout);
@@ -2049,5 +2063,6 @@
       }
     }
   </script>
+<script src="./scanner-readmission.js"></script>
 </body>
 </html>

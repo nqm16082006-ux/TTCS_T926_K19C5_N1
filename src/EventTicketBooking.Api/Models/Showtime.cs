@@ -8,11 +8,16 @@ namespace EventTicketBooking.Api.Models
     {
         public Guid Id { get; set; } = Guid.NewGuid();
 
+        [System.ComponentModel.DataAnnotations.MaxLength(200)]
+        public string? Name { get; set; }
+
         public Guid EventId { get; set; }
 
         public DateTime StartTime { get; set; }
 
         public DateTime EndTime { get; set; }
+        public DateTime? SalesEndTime { get; set; }
+        public bool IsSaleExpired(DateTime now) => now >= (SalesEndTime ?? StartTime) || now >= EndTime;
 
         public int AvailableSeats { get; set; }
         public string? SeatingMapImageUrl { get; set; }
