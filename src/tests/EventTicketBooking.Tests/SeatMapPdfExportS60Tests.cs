@@ -296,8 +296,8 @@ namespace EventTicketBooking.Tests
             for (int r = 0; r < rows; r++)
             {
                 // Đặt tên hàng: A..Z, sau đó AA..AZ
-                string rowName = r < 26 
-                    ? ((char)('A' + r)).ToString() 
+                string rowName = r < 26
+                    ? ((char)('A' + r)).ToString()
                     : $"A{(char)('A' + (r - 26))}";
 
                 for (int c = 1; c <= cols; c++)
