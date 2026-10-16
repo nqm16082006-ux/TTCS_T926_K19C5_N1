@@ -181,6 +181,8 @@ builder.Services.Configure<EventTicketBooking.Api.Options.TicketQrOptions>(build
 builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IQrSignatureService, EventTicketBooking.Api.Services.Implementations.QrSignatureService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITicketService, EventTicketBooking.Api.Services.Implementations.TicketService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ICheckinExportService, EventTicketBooking.Api.Services.Implementations.CheckinExportService>();
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ISeatMapPdfExportService, EventTicketBooking.Api.Services.Implementations.SeatMapPdfExportService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ICheckinStatisticsService, EventTicketBooking.Api.Services.Implementations.CheckinStatisticsService>();
 builder.Services.AddHttpClient();
 

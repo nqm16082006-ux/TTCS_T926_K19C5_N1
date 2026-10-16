@@ -1259,8 +1259,8 @@
                 <details class="st-more"><summary><span class="material-symbols-outlined" aria-hidden="true">more_horiz</span>Thao tác khác</summary>
                   <div class="st-more-menu">
                     <button type="button" onclick="openEditShowtimeModal('${s.id}')"><span class="material-symbols-outlined" aria-hidden="true">edit_calendar</span>Chỉnh sửa suất diễn</button>
-                    ${isDraft ? `<button type="button" onclick="openSeatImportModal('${s.id}', ${hasSeats})"><span class="material-symbols-outlined" aria-hidden="true">upload_file</span>${hasSeats ? 'Nạp lại sơ đồ JSON' : 'Nạp sơ đồ JSON'}</button>` : ''}
-                    <a href="./export-test.html?showId=${encodeURIComponent(s.id)}"><span class="material-symbols-outlined" aria-hidden="true">file_download</span>Xuất danh sách soát vé</a>
+                    <a href="./export-test.html?showId=${encodeURIComponent(s.id)}"><span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>Xuất sơ đồ ghế (PDF S-60)</a>
+                    <a href="./export-test.html?showId=${encodeURIComponent(s.id)}"><span class="material-symbols-outlined" aria-hidden="true">file_download</span>Xuất danh sách soát vé (CSV)</a>
                     <button type="button" class="st-danger" onclick="confirmDeleteShowtime('${s.id}')"><span class="material-symbols-outlined" aria-hidden="true">delete</span>Hủy / xóa suất diễn</button>
                   </div>
                 </details>
