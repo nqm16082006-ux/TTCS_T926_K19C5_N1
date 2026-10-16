@@ -19,7 +19,7 @@ namespace EventTicketBooking.Api.Controllers
     /// </summary>
     [ApiController]
     [Route("api/v1/payments/refunds")]
-    [RequireRole("Admin", "Auditor", "Accounting")]
+    [RequireRole("Admin", "Auditor")]
     public class RefundsController : ControllerBase
     {
         private readonly IRefundService _refundService;
@@ -274,7 +274,7 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(ApiResponse<object>.FailureResult($"Không thể tiếp nhận lệnh ở trạng thái '{refund.Status}'. Chỉ tiếp nhận lệnh chờ xử lý (ManualReviewRequired)."));
             }
 
-            var actorName = User?.Identity?.Name ?? "Accounting";
+            var actorName = User?.Identity?.Name ?? "Auditor";
             refund.Status = RefundStatus.AccountingProcessing;
             refund.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -332,7 +332,7 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(ApiResponse<object>.FailureResult($"Chỉ có thể xử lý thủ công các lệnh ở trạng thái chờ duyệt (hiện tại: '{refund.Status}')."));
             }
 
-            var actorName = User?.Identity?.Name ?? "Accounting";
+            var actorName = User?.Identity?.Name ?? "Auditor";
             var manualTx = string.IsNullOrWhiteSpace(dto?.ManualTransactionCode)
                 ? $"MANUAL_BANK_{DateTimeOffset.UtcNow:yyyyMMddHHmmss}"
                 : dto.ManualTransactionCode.Trim();

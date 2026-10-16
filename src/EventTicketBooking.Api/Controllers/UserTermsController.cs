@@ -8,6 +8,7 @@ using EventTicketBooking.Api.Middlewares;
 using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Services;
 using EventTicketBooking.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -37,6 +38,7 @@ namespace EventTicketBooking.Api.Controllers
         /// Lấy thông tin Điều khoản dịch vụ và Chính sách riêng tư hiện hành (Công khai).
         /// </summary>
         [HttpGet("policy")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(TermsPolicyInfoDto), StatusCodes.Status200OK)]
         public IActionResult GetCurrentPolicy()
         {

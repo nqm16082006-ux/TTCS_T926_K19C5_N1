@@ -53,21 +53,23 @@ public class AuditHttpFlowTests
         var customer = new User { Username = "customer", Email = "customer@audit.test", PasswordHash = "hash", IsActive = true };
         var stranger = new User { Username = "stranger", Email = "stranger@audit.test", PasswordHash = "hash", IsActive = true };
         var organizerRole = new Role { Name = "Organizer" };
+        var customerRole = new Role { Name = "Customer" };
         owner.UserRoles.Add(new UserRole { UserId = owner.Id, RoleId = organizerRole.Id, Role = organizerRole });
         stranger.UserRoles.Add(new UserRole { UserId = stranger.Id, RoleId = organizerRole.Id, Role = organizerRole });
+        customer.UserRoles.Add(new UserRole { UserId = customer.Id, RoleId = customerRole.Id, Role = customerRole });
         var ev = new Event { OwnerId = owner.Id, Title = "Audit concert", Location = "Venue", TotalSeats = 1 };
         var show = new Showtime { EventId = ev.Id, StartTime = DateTime.UtcNow.AddDays(1), EndTime = DateTime.UtcNow.AddDays(1).AddHours(1), AvailableSeats = 1 };
         using (var scope = app.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await db.Database.EnsureCreatedAsync();
-            db.AddRange(owner, customer, stranger, ev, show);
+            db.AddRange(owner, customer, stranger, ev, show, organizerRole, customerRole);
             await db.SaveChangesAsync();
         }
         await app.StartAsync();
         using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
         var tokenService = new TokenService(builder.Configuration);
-        void Authenticate(User user) => client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenService.GenerateAccessToken(user, Array.Empty<string>()));
+        void Authenticate(User user) => client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenService.GenerateAccessToken(user, user.UserRoles.Select(ur => ur.Role.Name)));
         async Task<HttpResponseMessage> Import(string content, string action = "import")
         {
             using var form = new MultipartFormDataContent();

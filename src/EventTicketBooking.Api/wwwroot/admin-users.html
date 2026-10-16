@@ -346,8 +346,9 @@
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: 16px;
-      overflow: hidden;
+      overflow-x: auto;
       box-shadow: var(--shadow-sm);
+      position: relative;
     }
 
     table {
@@ -362,12 +363,93 @@
     }
 
     th {
-      padding: 14px 20px;
+      padding: 12px 14px;
       font-size: 12px;
       font-weight: 700;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 12px 14px;
+      font-size: 13.5px;
+      vertical-align: middle;
+    }
+
+    /* Column Sizing and Core Visibility */
+    .col-user {
+      min-width: 170px;
+    }
+
+    .col-email {
+      min-width: 170px;
+      max-width: 230px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .col-role {
+      min-width: 120px;
+      white-space: nowrap;
+    }
+
+    .col-status {
+      min-width: 110px;
+      white-space: nowrap;
+    }
+
+    .col-events {
+      min-width: 85px;
+      white-space: nowrap;
+    }
+
+    .col-date {
+      min-width: 95px;
+      white-space: nowrap;
+    }
+
+    .col-actions {
+      min-width: 290px;
+      white-space: nowrap;
+    }
+
+    /* Sticky Action Column on screens > 768px */
+    @media (min-width: 769px) {
+      th.col-actions,
+      td.col-actions {
+        position: sticky;
+        right: 0;
+        z-index: 5;
+        background: #f8fafc;
+        box-shadow: -4px 0 8px rgba(0, 0, 0, 0.04);
+      }
+      tbody td.col-actions {
+        background: var(--bg-surface);
+      }
+      tbody tr:hover td.col-actions {
+        background: #f8fafc;
+      }
+    }
+
+    /* Laptop Responsive: Hide optional columns (Sự kiện & Ngày tạo) on <= 1380px (e.g. 1366x768)
+       guaranteeing that the 5 core columns (Người dùng, Email, Vai trò, Trạng thái, Thao tác)
+       have full space and are NEVER hidden or overlapped! */
+    @media (max-width: 1380px) {
+      .col-optional {
+        display: none !important;
+      }
+    }
+
+    /* Mobile Responsive <= 768px: disable sticky right so user can scroll full table naturally */
+    @media (max-width: 768px) {
+      th.col-actions,
+      td.col-actions {
+        position: static !important;
+        box-shadow: none !important;
+      }
     }
 
     tbody tr {
@@ -381,12 +463,6 @@
 
     tbody tr:last-child {
       border-bottom: none;
-    }
-
-    td {
-      padding: 16px 20px;
-      font-size: 14px;
-      vertical-align: middle;
     }
 
     .user-profile {
@@ -501,12 +577,13 @@
     .actions-cell {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 5px;
+      flex-wrap: nowrap;
     }
 
     .btn-action {
-      padding: 7px 12px;
-      font-size: 12px;
+      padding: 5px 9px;
+      font-size: 11.5px;
       font-weight: 700;
       border-radius: 8px;
       border: 1px solid var(--border-color);
@@ -516,13 +593,40 @@
       transition: all 0.2s ease;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
+      white-space: nowrap;
     }
 
     .btn-action:hover {
       background: var(--primary-light);
       border-color: #c7d2fe;
       color: var(--primary);
+    }
+
+    .btn-action.btn-change-role {
+      background: #eef2ff;
+      border-color: #c7d2fe;
+      color: var(--primary);
+      font-weight: 800;
+      box-shadow: 0 1px 3px rgba(79, 70, 229, 0.12);
+    }
+
+    .btn-action.btn-change-role:hover {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+    }
+
+    .btn-action.btn-secondary-action {
+      background: #ffffff;
+      color: var(--text-muted);
+    }
+
+    .btn-action.btn-secondary-action:hover {
+      background: #f1f5f9;
+      color: var(--text-heading);
+      border-color: #cbd5e1;
     }
 
     .btn-action.btn-lock {
@@ -726,6 +830,14 @@
       border-color: #a5b4fc;
     }
 
+    .role-option.disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      background: #f8fafc;
+      border-color: var(--border-color);
+    }
+
+    .role-option input[type="radio"],
     .role-option input[type="checkbox"] {
       margin-top: 2px;
       width: 16px;
@@ -1195,13 +1307,13 @@
       <table>
         <thead>
           <tr>
-            <th>Người dùng</th>
-            <th>Email</th>
-            <th>Vai trò (Roles)</th>
-            <th>Trạng thái</th>
-            <th>Sự kiện</th>
-            <th>Ngày tạo</th>
-            <th style="text-align: right;">Hành động</th>
+            <th class="col-user">Người dùng</th>
+            <th class="col-email">Email</th>
+            <th class="col-role">Vai trò</th>
+            <th class="col-status">Trạng thái</th>
+            <th class="col-events col-optional">Sự kiện</th>
+            <th class="col-date col-optional">Ngày tạo</th>
+            <th class="col-actions" style="text-align: right;">Thao tác</th>
           </tr>
         </thead>
         <tbody id="userTableBody">
@@ -1218,61 +1330,67 @@
   <div class="modal-overlay" id="roleModal" onclick="if(event.target === this) closeRoleModal()">
     <div class="modal-box">
       <div class="modal-header">
-        <h3 class="modal-title">🛡️ Phân quyền người dùng</h3>
+        <h3 class="modal-title">🔄 Đổi vai trò người dùng</h3>
         <button class="modal-close" onclick="closeRoleModal()">✕</button>
       </div>
       <p class="modal-desc">
-        Đang chỉnh sửa quyền cho: <strong id="modalTargetUser" style="color: var(--text-heading);">user@example.com</strong>
+        Đang đổi vai trò cho: <strong id="modalTargetUser" style="color: var(--text-heading);">user@example.com</strong>
       </p>
 
       <form id="roleForm" class="modal-form" onsubmit="handleSaveRoles(event)">
         <input type="hidden" id="modalUserId">
 
+        <div id="roleDataErrorAlert" style="display: none; margin-bottom: 12px; padding: 10px 14px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; color: #ef4444; font-size: 13px; font-weight: 600;"></div>
+
+        <div id="selfAdminWarning" style="display: none; margin-bottom: 12px; padding: 10px 14px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; color: #b45309; font-size: 13px; font-weight: 600;">
+          ⚠️ Đây là tài khoản Admin của bạn. Theo quy tắc an toàn hệ thống, bạn không thể tự gỡ quyền Admin của chính mình.
+        </div>
+
         <div class="modal-body" style="display: flex; flex-direction: column; gap: 8px;">
-          <label class="role-option" id="optCustomer">
-            <input type="checkbox" name="roles" value="Customer" id="chkCustomer">
+          <label class="role-option" id="optAdmin">
+            <input type="radio" name="roles" value="Admin" id="chkAdmin">
             <div class="role-option-info">
-              <span class="role-option-title">Customer</span>
-              <span class="role-option-desc">Khách hàng tiêu chuẩn: đặt vé, giữ ghế và thanh toán.</span>
-            </div>
-          </label>
-
-          <label class="role-option" id="optStaff">
-            <input type="checkbox" name="roles" value="Staff" id="chkStaff">
-            <div class="role-option-info">
-              <span class="role-option-title">Staff</span>
-              <span class="role-option-desc">Nhân viên soát vé: vận hành sự kiện và kiểm tra vé.</span>
-            </div>
-          </label>
-
-          <label class="role-option" id="optAuditor">
-            <input type="checkbox" name="roles" value="Auditor" id="chkAuditor">
-            <div class="role-option-info">
-              <span class="role-option-title">Auditor</span>
-              <span class="role-option-desc">Kế toán / kiểm toán: theo dõi doanh thu và đối soát.</span>
+              <span class="role-option-title">Admin</span>
+              <span class="role-option-desc">Quản trị viên tối cao: toàn quyền quản lý hệ thống, sự kiện và tài khoản.</span>
             </div>
           </label>
 
           <label class="role-option" id="optOrganizer">
-            <input type="checkbox" name="roles" value="Organizer" id="chkOrganizer">
+            <input type="radio" name="roles" value="Organizer" id="chkOrganizer">
             <div class="role-option-info">
               <span class="role-option-title">Organizer</span>
               <span class="role-option-desc">Ban tổ chức: tạo sự kiện, thiết lập sơ đồ ghế và mở bán suất diễn.</span>
             </div>
           </label>
 
-          <label class="role-option" id="optAdmin">
-            <input type="checkbox" name="roles" value="Admin" id="chkAdmin">
+          <label class="role-option" id="optStaff">
+            <input type="radio" name="roles" value="Staff" id="chkStaff">
             <div class="role-option-info">
-              <span class="role-option-title">Admin</span>
-              <span class="role-option-desc">Quản trị viên tối cao: toàn quyền quản lý hệ thống, sự kiện và tài khoản.</span>
+              <span class="role-option-title">Staff</span>
+              <span class="role-option-desc">Nhân viên soát vé: vận hành sự kiện và kiểm tra vé.</span>
+            </div>
+          </label>
+
+          <label class="role-option" id="optCustomer">
+            <input type="radio" name="roles" value="Customer" id="chkCustomer">
+            <div class="role-option-info">
+              <span class="role-option-title">Customer</span>
+              <span class="role-option-desc">Khách hàng tiêu chuẩn: đặt vé, giữ ghế và thanh toán.</span>
+            </div>
+          </label>
+
+          <label class="role-option" id="optAuditor">
+            <input type="radio" name="roles" value="Auditor" id="chkAuditor">
+            <div class="role-option-info">
+              <span class="role-option-title">Auditor</span>
+              <span class="role-option-desc">Kế toán / kiểm toán: theo dõi doanh thu và đối soát.</span>
             </div>
           </label>
         </div>
 
         <div class="modal-actions">
           <button type="button" class="btn-modal-cancel" onclick="closeRoleModal()">Hủy</button>
-          <button type="submit" class="btn-modal-save" id="btnSaveRole">Lưu phân quyền</button>
+          <button type="submit" class="btn-modal-save" id="btnSaveRole">Lưu thay đổi</button>
         </div>
       </form>
     </div>
@@ -1313,28 +1431,28 @@
 
           <div class="roles-grid">
             <label class="role-option" id="optCreateStaff">
-              <input type="checkbox" name="createRoles" value="Staff" id="chkCreateStaff">
+              <input type="radio" name="createRoles" value="Staff" id="chkCreateStaff">
               <div class="role-option-info">
                 <span class="role-option-title">Staff</span>
                 <span class="role-option-desc">Nhân viên soát vé.</span>
               </div>
             </label>
             <label class="role-option" id="optCreateAuditor">
-              <input type="checkbox" name="createRoles" value="Auditor" id="chkCreateAuditor">
+              <input type="radio" name="createRoles" value="Auditor" id="chkCreateAuditor">
               <div class="role-option-info">
                 <span class="role-option-title">Auditor</span>
                 <span class="role-option-desc">Kế toán.</span>
               </div>
             </label>
             <label class="role-option" id="optCreateOrganizer">
-              <input type="checkbox" name="createRoles" value="Organizer" id="chkCreateOrganizer">
+              <input type="radio" name="createRoles" value="Organizer" id="chkCreateOrganizer">
               <div class="role-option-info">
                 <span class="role-option-title">Organizer</span>
                 <span class="role-option-desc">Ban tổ chức.</span>
               </div>
             </label>
             <label class="role-option" id="optCreateAdmin">
-              <input type="checkbox" name="createRoles" value="Admin" id="chkCreateAdmin">
+              <input type="radio" name="createRoles" value="Admin" id="chkCreateAdmin">
               <div class="role-option-info">
                 <span class="role-option-title">Admin</span>
                 <span class="role-option-desc">Quản trị viên.</span>
@@ -1407,6 +1525,7 @@
     const API_BASE = window.location.origin;
     let token = localStorage.getItem('access_token');
     let allUsers = [];
+    let currentAdminUserId = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       // Kiểm tra đăng nhập
@@ -1419,6 +1538,7 @@
       if (userInfoRaw) {
         try {
           const user = JSON.parse(userInfoRaw);
+          if (user && user.id) currentAdminUserId = user.id;
           const name = user.fullName || user.username || user.email;
           document.getElementById('navUsername').textContent = name;
           document.getElementById('navAvatar').textContent = name.charAt(0).toUpperCase();
@@ -1523,41 +1643,46 @@
 
       tbody.innerHTML = users.map(u => {
         const avatarLetter = (u.fullName || u.username || u.email).charAt(0).toUpperCase();
-        const roleBadges = u.roles.map(r => {
-          const rLower = r.toLowerCase();
-          return `<span class="role-badge ${rLower}">${escapeHtml(r)}</span>`;
-        }).join('');
+        let roleBadges = '';
+        if (!u.roles || !Array.isArray(u.roles) || u.roles.length === 0) {
+          roleBadges = '<span class="role-badge" style="background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">⚠️ Chưa có vai trò</span>';
+        } else if (u.roles.length > 1) {
+          roleBadges = `<span class="role-badge" style="background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">⚠️ Lỗi: ${u.roles.length} vai trò</span>`;
+        } else {
+          const r = u.roles[0];
+          roleBadges = `<span class="role-badge ${r.toLowerCase()}">${escapeHtml(r)}</span>`;
+        }
 
         const statusHtml = u.isActive
           ? `<span class="status-badge active"><span class="status-dot"></span> Hoạt động</span>`
           : `<span class="status-badge inactive"><span class="status-dot"></span> Đã khóa</span>`;
 
         const lockBtn = u.isActive
-          ? `<button class="btn-action btn-lock" onclick="toggleUserStatus('${u.id}', false)">🔒 Khóa</button>`
-          : `<button class="btn-action btn-unlock" onclick="toggleUserStatus('${u.id}', true)">🔓 Mở khóa</button>`;
+          ? `<button class="btn-action btn-secondary-action btn-lock" title="Khóa tài khoản" onclick="toggleUserStatus('${u.id}', false)">🔒 Khóa</button>`
+          : `<button class="btn-action btn-secondary-action btn-unlock" title="Mở khóa tài khoản" onclick="toggleUserStatus('${u.id}', true)">🔓 Mở</button>`;
 
         return `
           <tr>
-            <td>
+            <td class="col-user">
               <div class="user-profile">
                 <div class="user-profile-avatar">${avatarLetter}</div>
                 <div class="user-profile-info">
-                  <span class="user-profile-name">${escapeHtml(u.fullName || u.username)}</span>
+                  <span class="user-profile-name" title="${escapeHtml(u.fullName || u.username)}">${escapeHtml(u.fullName || u.username)}</span>
                   <span class="user-profile-username">@${escapeHtml(u.username)}</span>
                 </div>
               </div>
             </td>
-            <td><strong>${escapeHtml(u.email)}</strong></td>
-            <td>${roleBadges || '<span style="color:var(--text-muted); font-size:12px;">Chưa có</span>'}</td>
-            <td>${statusHtml}</td>
-            <td><span style="font-weight:700; color:var(--primary);">${u.totalEvents}</span> sự kiện</td>
-            <td style="color:var(--text-muted); font-size:13px;">${formatDate(u.createdAt)}</td>
-            <td style="text-align: right;">
+            <td class="col-email" title="${escapeHtml(u.email)}"><strong>${escapeHtml(u.email)}</strong></td>
+            <td class="col-role">${roleBadges || '<span style="color:var(--text-muted); font-size:12px;">Chưa có</span>'}</td>
+            <td class="col-status">${statusHtml}</td>
+            <td class="col-events col-optional"><span style="font-weight:700; color:var(--primary);">${u.totalEvents}</span> sự kiện</td>
+            <td class="col-date col-optional" style="color:var(--text-muted); font-size:13px;">${formatDate(u.createdAt)}</td>
+            <td class="col-actions" style="text-align: right;">
               <div class="actions-cell" style="justify-content: flex-end;">
-                <button class="btn-action" title="Xem lịch sử phân quyền tài khoản này" onclick="openAuditLogModal('${u.id}', '${escapeHtml(u.fullName || u.username)}')">📜 Lịch sử</button>
-                <button class="btn-action" onclick="openRoleModal('${u.id}')">🛡️ Phân quyền</button>
+                <button class="btn-action btn-change-role" title="Đổi vai trò cho tài khoản này" onclick="openRoleModal('${u.id}')">🔄 Đổi vai trò</button>
+                <button class="btn-action btn-secondary-action" title="Xem lịch sử phân quyền tài khoản này" onclick="openAuditLogModal('${u.id}', '${escapeHtml(u.fullName || u.username)}')">📜 Lịch sử</button>
                 ${lockBtn}
-                <button class="btn-action btn-delete" style="color: #ef4444;" onclick="deleteUser('${u.id}')">🗑️ Xóa</button>
+                <button class="btn-action btn-secondary-action btn-delete" style="color: #ef4444;" title="Xóa tài khoản" onclick="deleteUser('${u.id}')">🗑️ Xóa</button>
               </div>
             </td>
           </tr>
@@ -1565,7 +1690,7 @@
       }).join('');
     }
 
-    // Modal Phân quyền
+    // Modal Đổi vai trò người dùng
     function openRoleModal(userId) {
       const user = allUsers.find(u => u.id === userId);
       if (!user) return;
@@ -1573,15 +1698,52 @@
       document.getElementById('modalUserId').value = user.id;
       document.getElementById('modalTargetUser').textContent = `${user.fullName || user.username} (${user.email})`;
 
-      const roles = user.roles.map(r => r.toLowerCase());
-      document.getElementById('chkCustomer').checked = roles.includes('customer');
-      document.getElementById('chkOrganizer').checked = roles.includes('organizer');
-      document.getElementById('chkStaff').checked = roles.includes('staff');
-      document.getElementById('chkAuditor').checked = roles.includes('auditor');
-      document.getElementById('chkAdmin').checked = roles.includes('admin');
+      const errAlert = document.getElementById('roleDataErrorAlert');
+      const selfWarning = document.getElementById('selfAdminWarning');
+      const btnSave = document.getElementById('btnSaveRole');
+
+      // Uncheck all radios first and reset disabled status
+      const roleRadioIds = ['chkAdmin', 'chkOrganizer', 'chkStaff', 'chkCustomer', 'chkAuditor'];
+      roleRadioIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.checked = false;
+          el.disabled = false;
+        }
+      });
+
+      // Self-Admin safety check: Nếu đang chỉnh chính tài khoản Admin hiện tại
+      const isSelf = currentAdminUserId && (user.id === currentAdminUserId);
+      if (isSelf) {
+        if (selfWarning) selfWarning.style.display = 'block';
+        // Vô hiệu hóa các role khác Admin để tránh tự hạ quyền ngoài ý muốn
+        ['chkOrganizer', 'chkStaff', 'chkCustomer', 'chkAuditor'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.disabled = true;
+        });
+      } else {
+        if (selfWarning) selfWarning.style.display = 'none';
+      }
+
+      // Single-role validation (roles.length === 1)
+      if (!user.roles || !Array.isArray(user.roles) || user.roles.length !== 1) {
+        errAlert.style.display = 'block';
+        errAlert.textContent = `⚠️ Lỗi dữ liệu phân quyền: Tài khoản đang có ${user.roles ? user.roles.length : 0} vai trò. Không được tự động chọn. Vui lòng chọn đúng 1 vai trò hợp lệ trước khi lưu.`;
+        btnSave.disabled = true;
+      } else {
+        errAlert.style.display = 'none';
+        errAlert.textContent = '';
+        btnSave.disabled = false;
+
+        const role = user.roles[0].toLowerCase();
+        if (role === 'admin') document.getElementById('chkAdmin').checked = true;
+        else if (role === 'organizer') document.getElementById('chkOrganizer').checked = true;
+        else if (role === 'staff') document.getElementById('chkStaff').checked = true;
+        else if (role === 'customer') document.getElementById('chkCustomer').checked = true;
+        else if (role === 'auditor') document.getElementById('chkAuditor').checked = true;
+      }
 
       updateRoleOptionStyles();
-
       document.getElementById('roleModal').style.display = 'flex';
     }
 
@@ -1590,29 +1752,37 @@
     }
 
     function updateRoleOptionStyles() {
-      // Áp dụng chung cho mọi modal phân quyền (role modal & create modal).
       document.querySelectorAll('.role-option').forEach(opt => {
-        const chk = opt.querySelector('input[type="checkbox"]');
-        if (!chk) return;
-        if (chk.checked) opt.classList.add('checked');
+        const input = opt.querySelector('input[type="radio"], input[type="checkbox"]');
+        if (!input) return;
+        if (input.checked) opt.classList.add('checked');
         else opt.classList.remove('checked');
+        if (input.disabled) opt.classList.add('disabled');
+        else opt.classList.remove('disabled');
       });
     }
 
-    document.querySelectorAll('.role-option input[type="checkbox"]').forEach(chk => {
-      chk.addEventListener('change', updateRoleOptionStyles);
+    document.querySelectorAll('.role-option input').forEach(input => {
+      input.addEventListener('change', () => {
+        updateRoleOptionStyles();
+        if (input.name === 'roles') {
+          const btnSave = document.getElementById('btnSaveRole');
+          if (btnSave) btnSave.disabled = false;
+        }
+      });
     });
 
     async function handleSaveRoles(e) {
       e.preventDefault();
       const userId = document.getElementById('modalUserId').value;
-      const chkBoxes = document.querySelectorAll('input[name="roles"]:checked');
-      const selectedRoles = Array.from(chkBoxes).map(c => c.value);
+      const selectedRadio = document.querySelector('input[name="roles"]:checked');
 
-      if (selectedRoles.length === 0) {
-        alert('Người dùng phải có ít nhất 1 vai trò.');
+      if (!selectedRadio) {
+        showAlert('Vui lòng chọn đúng 1 vai trò duy nhất cho người dùng.', 'danger');
         return;
       }
+
+      const selectedRoles = [selectedRadio.value];
 
       const btnSave = document.getElementById('btnSaveRole');
       btnSave.disabled = true;
@@ -1629,18 +1799,43 @@
         });
 
         const json = await res.json().catch(() => ({}));
-        if (res.ok) {
+
+        if (res.status === 200) {
           closeRoleModal();
-          showAlert('Đã cập nhật phân quyền thành công!', 'success');
-          loadUsers();
+
+          // Cập nhật local state allUsers (in-place)
+          const targetIndex = allUsers.findIndex(u => u.id === userId);
+          if (targetIndex !== -1) {
+            allUsers[targetIndex].roles = selectedRoles;
+          }
+
+          // Cập nhật thống kê role cards
+          updateStats(allUsers);
+
+          // Cập nhật DOM bảng người dùng
+          renderTable(filterUsers(allUsers));
+
+          // Toast thành công & banner
+          const userDisplayName = allUsers[targetIndex]?.email || userId;
+          showToast('Đổi vai trò thành công', `Đã đổi vai trò của "${userDisplayName}" thành "${selectedRadio.value}".`, 'resolved');
+          showAlert(`Đã cập nhật vai trò thành công cho tài khoản "${userDisplayName}"!`, 'success');
+        } else if (res.status === 400) {
+          showAlert('Lỗi: ' + (json.message || 'Dữ liệu phân quyền không hợp lệ.'), 'danger');
+        } else if (res.status === 401) {
+          alert('Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.');
+          logout();
+        } else if (res.status === 403) {
+          showAlert('Bạn không có quyền thực hiện thao tác này (Chỉ dành riêng cho Admin).', 'danger');
+        } else if (res.status === 409) {
+          showAlert('Dữ liệu người dùng đã bị thay đổi bởi phiên khác. Vui lòng làm mới trang.', 'danger');
         } else {
-          alert('Lỗi: ' + (json.message || 'Không thể cập nhật phân quyền.'));
+          showAlert('Lỗi hệ thống khi đổi vai trò. Vui lòng thử lại.', 'danger');
         }
       } catch (err) {
-        alert('Lỗi kết nối máy chủ API.');
+        showAlert('Lỗi kết nối máy chủ API.', 'danger');
       } finally {
         btnSave.disabled = false;
-        btnSave.textContent = 'Lưu phân quyền';
+        btnSave.textContent = 'Lưu thay đổi';
       }
     }
 
@@ -1648,7 +1843,8 @@
     function openCreateModal() {
       document.getElementById('createUserForm').reset();
       ['chkCreateStaff', 'chkCreateAuditor', 'chkCreateOrganizer', 'chkCreateAdmin'].forEach(id => {
-        document.getElementById(id).checked = false;
+        const el = document.getElementById(id);
+        if (el) el.checked = false;
       });
       updateRoleOptionStyles();
       document.getElementById('createModal').style.display = 'flex';
@@ -1661,13 +1857,14 @@
     async function handleCreateUser(e) {
       e.preventDefault();
 
-      const selectedRoles = Array.from(document.querySelectorAll('input[name="createRoles"]:checked'))
-        .map(c => c.value);
+      const selectedRadio = document.querySelector('input[name="createRoles"]:checked');
 
-      if (selectedRoles.length === 0) {
-        alert('Bạn phải chọn ít nhất 1 vai trò cho nhân viên.');
+      if (!selectedRadio) {
+        alert('Bạn phải chọn đúng 1 vai trò duy nhất cho nhân viên.');
         return;
       }
+
+      const selectedRoles = [selectedRadio.value];
 
       const payload = {
         username: document.getElementById('createUsername').value.trim(),
@@ -1773,6 +1970,27 @@
       banner.textContent = msg;
       banner.style.display = 'block';
       setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    }
+
+    function showToast(title, body, type = 'resolved') {
+      const container = document.getElementById('systemToastContainer');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = `system-toast ${type}`;
+      const icon = type === 'resolved' ? '✅' : type === 'warning' ? '⚠️' : '🚨';
+      toast.innerHTML = `
+        <div class="system-toast-header">
+          <span>${icon}</span>
+          <span>${escapeHtml(title)}</span>
+        </div>
+        <div class="system-toast-body">${escapeHtml(body)}</div>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-8px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
     }
 
     function formatDate(iso) {

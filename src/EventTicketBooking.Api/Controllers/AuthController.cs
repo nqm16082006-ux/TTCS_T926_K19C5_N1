@@ -10,6 +10,7 @@ using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -60,10 +61,13 @@ namespace EventTicketBooking.Api.Controllers
         /// API Đăng nhập bằng Email và Mật khẩu.
         /// </summary>
         [HttpPost("login")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(LoginResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status423Locked)]
+        [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
         {
             if (!ModelState.IsValid)
@@ -71,11 +75,30 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(ModelState);
             }
 
-            var result = await _authService.LoginAsync(request);
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var result = await _authService.LoginAsync(request, clientIp);
 
             if (result.Success && result.Data != null)
             {
                 return Ok(result.Data);
+            }
+
+            if (result.StatusCode == StatusCodes.Status503ServiceUnavailable || result.IsServiceUnavailable)
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+                {
+                    statusCode = StatusCodes.Status503ServiceUnavailable,
+                    message = result.Message
+                });
+            }
+
+            if (result.StatusCode == StatusCodes.Status403Forbidden)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    statusCode = StatusCodes.Status403Forbidden,
+                    message = result.Message
+                });
             }
 
             if (result.IsLocked)
@@ -112,6 +135,7 @@ namespace EventTicketBooking.Api.Controllers
         /// Bước 1: API Đăng ký tài khoản mới qua Email & Mật khẩu -> Gửi mã xác nhận OTP 6 số về email.
         /// </summary>
         [HttpPost("register")]
+        [AllowAnonymous]
         public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
         {
             if (!ModelState.IsValid)
@@ -246,6 +270,7 @@ namespace EventTicketBooking.Api.Controllers
         /// Bước 2: API Xác thực mã OTP 6 số để hoàn tất đăng ký tài khoản.
         /// </summary>
         [HttpPost("verify-otp")]
+        [AllowAnonymous]
         public async Task<IActionResult> VerifyOtp([FromBody] VerifyEmailDto request)
         {
             if (!ModelState.IsValid)
@@ -316,9 +341,10 @@ namespace EventTicketBooking.Api.Controllers
                 .Select(ur => ur.Role!.Name)
                 .ToList();
 
-            if (roles.Count == 0)
+            if (roles.Count != 1 || !SystemRoles.IsValid(roles[0]))
             {
-                roles.Add("Customer");
+                _logger.LogError("Tài khoản {Email} có {Count} vai trò hoặc vai trò không hợp lệ khi xác thực OTP. Fail-closed.", user.Email, roles.Count);
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "Dữ liệu phân quyền của tài khoản không hợp lệ. Vui lòng liên hệ Quản trị viên." });
             }
 
             // Tự động tạo Access Token và đăng nhập ngay
@@ -346,6 +372,7 @@ namespace EventTicketBooking.Api.Controllers
         /// API Gửi lại mã xác nhận OTP (Resend OTP).
         /// </summary>
         [HttpPost("resend-otp")]
+        [AllowAnonymous]
         public async Task<IActionResult> ResendOtp([FromBody] ResendOtpDto request)
         {
             if (!ModelState.IsValid)
@@ -403,6 +430,7 @@ namespace EventTicketBooking.Api.Controllers
         /// Xác thực ID Token từ Google Identity Services và đăng nhập / đăng ký tự động.
         /// </summary>
         [HttpPost("google")]
+        [AllowAnonymous]
         public async Task<IActionResult> GoogleAuth([FromBody] GoogleAuthRequestDto request)
         {
             if (string.IsNullOrWhiteSpace(request?.Credential))
@@ -630,9 +658,10 @@ namespace EventTicketBooking.Api.Controllers
                     .Select(ur => ur.Role!.Name)
                     .ToList();
 
-                if (roles.Count == 0)
+                if (roles.Count != 1 || !SystemRoles.IsValid(roles[0]))
                 {
-                    roles.Add("Customer");
+                    _logger.LogError("Tài khoản {Email} có {Count} vai trò hoặc vai trò không hợp lệ khi đăng nhập Google. Fail-closed.", user.Email, roles.Count);
+                    return StatusCode(StatusCodes.Status403Forbidden, new { message = "Dữ liệu phân quyền của tài khoản không hợp lệ. Vui lòng liên hệ Quản trị viên." });
                 }
 
                 var accessToken = _tokenService.GenerateAccessToken(user, roles);
@@ -666,6 +695,7 @@ namespace EventTicketBooking.Api.Controllers
         /// Kích hoạt tài khoản, gửi email chào mừng thành công và tự động đăng nhập.
         /// </summary>
         [HttpGet("verify-email")]
+        [AllowAnonymous]
         public async Task<IActionResult> VerifyEmail([FromQuery] string email, [FromQuery] string token)
         {
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
@@ -688,7 +718,6 @@ namespace EventTicketBooking.Api.Controllers
                 .Where(ur => ur.Role != null)
                 .Select(ur => ur.Role!.Name)
                 .ToList();
-            if (roles.Count == 0) roles.Add("Customer");
 
             if (user.IsActive)
             {
@@ -715,6 +744,12 @@ namespace EventTicketBooking.Api.Controllers
                 user.VerificationCodeExpiresAt.Value < DateTime.UtcNow)
             {
                 return BadRequest(new { message = "Liên kết xác nhận không hợp lệ hoặc đã hết hạn (24 giờ). Vui lòng yêu cầu gửi lại email mới." });
+            }
+
+            if (roles.Count != 1 || !SystemRoles.IsValid(roles[0]))
+            {
+                _logger.LogError("Tài khoản {Email} có {Count} vai trò hoặc vai trò không hợp lệ khi xác nhận email. Fail-closed.", user.Email, roles.Count);
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "Dữ liệu phân quyền của tài khoản không hợp lệ. Vui lòng liên hệ Quản trị viên." });
             }
 
             // Kích hoạt tài khoản thành công
@@ -772,6 +807,7 @@ namespace EventTicketBooking.Api.Controllers
         /// API Gửi lại email chứa nút xác nhận kích hoạt tài khoản.
         /// </summary>
         [HttpPost("resend-confirmation-link")]
+        [AllowAnonymous]
         public async Task<IActionResult> ResendConfirmationLink([FromBody] ResendOtpDto request)
         {
             if (string.IsNullOrWhiteSpace(request?.Email))

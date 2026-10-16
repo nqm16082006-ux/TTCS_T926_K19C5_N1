@@ -93,40 +93,39 @@ builder.Services.AddScoped<SeatImportService>();
 // Chuỗi kết nối Redis (đọc từ biến môi trường hoặc configuration)
 string? redisConnection = Environment.GetEnvironmentVariable("ConnectionStrings__Redis")
                           ?? builder.Configuration.GetConnectionString("Redis")
-                          ?? "localhost:6379";
+                          ?? "127.0.0.1:6379";
 
-bool isRedisAvailable = false;
-StackExchange.Redis.IConnectionMultiplexer? redisMultiplexer = null;
+StackExchange.Redis.ConfigurationOptions redisOptions;
 try
 {
-    var redisOptions = StackExchange.Redis.ConfigurationOptions.Parse(redisConnection);
-    redisOptions.ConnectTimeout = 800;
-    redisOptions.SyncTimeout = 800;
-    redisOptions.AbortOnConnectFail = false;
-    redisMultiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(redisOptions);
-    isRedisAvailable = redisMultiplexer.IsConnected;
+    redisOptions = StackExchange.Redis.ConfigurationOptions.Parse(redisConnection);
 }
-catch
+catch (Exception ex)
 {
-    isRedisAvailable = false;
+    Console.WriteLine($"[FATAL] Cú pháp chuỗi kết nối Redis không hợp lệ: '{redisConnection}'. Lỗi: {ex.Message}");
+    throw;
 }
 
-if (isRedisAvailable && redisMultiplexer != null)
+redisOptions.AbortOnConnectFail = false;
+redisOptions.ConnectTimeout = 5000;
+redisOptions.SyncTimeout = 5000;
+redisOptions.ConnectRetry = 5;
+
+// Khởi tạo ConnectionMultiplexer duy nhất với AbortOnConnectFail = false.
+// StackExchange.Redis sẽ tự động reconnect trong background khi Redis online trở lại.
+StackExchange.Redis.IConnectionMultiplexer redisMultiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(redisOptions);
+
+// Đăng ký instance ConnectionMultiplexer thật làm Singleton trong DI (TUYỆT ĐỐI KHÔNG đăng ký null).
+builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(redisMultiplexer);
+
+// Cấu hình IDistributedCache sử dụng Redis cho caching nghiệp vụ chung.
+// LƯU Ý BẢO MẬT: AuthService và S-02 Login Lockout / Anti-Bruteforce trực tiếp sử dụng
+// IConnectionMultiplexer (Fail-Closed). Tuyệt đối không fallback sang in-memory cache cho Auth.
+builder.Services.AddStackExchangeRedisCache(options =>
 {
-    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(redisMultiplexer);
-    builder.Services.AddStackExchangeRedisCache(options =>
-    {
-        options.Configuration = redisConnection;
-        options.InstanceName = "EventTicket_";
-    });
-}
-else
-{
-    redisMultiplexer?.Dispose();
-    Console.WriteLine("[INFO] Redis không kết nối được. Tự động sử dụng Memory Cache.");
-    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp => null!);
-    builder.Services.AddDistributedMemoryCache();
-}
+    options.Configuration = redisConnection;
+    options.InstanceName = "EventTicket_";
+});
 
 // Đăng ký dịch vụ băm mật khẩu Argon2id (TTKN-20)
 builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IPasswordHasher, EventTicketBooking.Api.Services.Implementations.Argon2PasswordHasher>();

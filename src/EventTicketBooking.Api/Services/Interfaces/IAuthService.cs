@@ -10,9 +10,9 @@ namespace EventTicketBooking.Api.Services.Interfaces
     public interface IAuthService
     {
         /// <summary>
-        /// Xử lý đăng nhập bằng email và mật khẩu.
+        /// Xử lý đăng nhập bằng email và mật khẩu (hỗ trợ kiểm tra chống brute-force theo account và client IP).
         /// </summary>
-        Task<AuthResult> LoginAsync(LoginRequestDto request);
+        Task<AuthResult> LoginAsync(LoginRequestDto request, string? clientIp = null);
 
         /// <summary>
         /// Tạo và lưu mã xác thực email.

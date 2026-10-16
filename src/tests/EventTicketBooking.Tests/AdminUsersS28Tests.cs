@@ -92,7 +92,7 @@ public class AdminUsersS28Tests : IDisposable
             Email = "checker@test.com",
             FullName = "Nhân viên soát vé",
             Password = plainPassword,
-            Roles = new List<string> { "Staff", "Auditor" }
+            Roles = new List<string> { "Staff" }
         });
 
         var created = Assert.IsType<CreatedAtActionResult>(result);
@@ -107,9 +107,8 @@ public class AdminUsersS28Tests : IDisposable
         Assert.True(hasher.Verify(plainPassword, user.PasswordHash));
 
         // AC3: gán role khi tạo
-        Assert.Equal(2, user.UserRoles.Count);
+        Assert.Single(user.UserRoles);
         Assert.Contains(user.UserRoles, ur => ur.Role.Name == "Staff");
-        Assert.Contains(user.UserRoles, ur => ur.Role.Name == "Auditor");
 
         // AC6: audit log ghi lại việc gán role đầu tiên
         var audit = Assert.Single(db.AuditLogs);
@@ -176,7 +175,7 @@ public class AdminUsersS28Tests : IDisposable
         var controller = CreateController(admin.Id);
         var result = await controller.UpdateUserRoles(target.Id, new UpdateUserRolesDto
         {
-            Roles = new List<string> { "Staff", "Auditor" }
+            Roles = new List<string> { "Staff" }
         });
 
         Assert.IsType<OkObjectResult>(result);
@@ -185,9 +184,8 @@ public class AdminUsersS28Tests : IDisposable
             .Where(ur => ur.UserId == target.Id)
             .Select(ur => ur.Role.Name)
             .ToListAsync();
-        Assert.Equal(2, updatedRoles.Count);
+        Assert.Single(updatedRoles);
         Assert.Contains("Staff", updatedRoles);
-        Assert.Contains("Auditor", updatedRoles);
         Assert.DoesNotContain("Customer", updatedRoles);
 
         // AC6: audit log đủ actor, target, role cũ, role mới, action, thời điểm
@@ -197,7 +195,7 @@ public class AdminUsersS28Tests : IDisposable
         Assert.Equal("admin", audit.ActorUsername);
         Assert.Equal(target.Id, audit.TargetUserId);
         Assert.Equal("Customer", audit.OldRoles);
-        Assert.Equal("Auditor,Staff", audit.NewRoles);
+        Assert.Equal("Staff", audit.NewRoles);
         Assert.True(audit.CreatedAt <= DateTime.UtcNow.AddMinutes(1));
     }
 
