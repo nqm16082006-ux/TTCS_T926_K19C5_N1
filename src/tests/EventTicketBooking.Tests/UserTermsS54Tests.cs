@@ -75,7 +75,7 @@ namespace EventTicketBooking.Tests
             var configMock = new Mock<IConfiguration>();
             var httpClientFactoryMock = new Mock<IHttpClientFactory>();
             return new AuthController(
-                new AuthService(_db, _passwordHasher, _tokenServiceMock.Object, NullLogger<AuthService>.Instance),
+                new AuthService(_db, _passwordHasher, _tokenServiceMock.Object, NullLogger<AuthService>.Instance, EventTicketBooking.Tests.Mocks.MockRedisHelper.CreateMockRedis()),
                 _db,
                 _passwordHasher,
                 _emailServiceMock.Object,
@@ -126,6 +126,15 @@ namespace EventTicketBooking.Tests
                 UpdatedAt = DateTime.UtcNow.AddDays(-1)
             };
             _db.Users.Add(user);
+
+            var customerRole = _db.Roles.First(r => r.Name == "Customer");
+            _db.UserRoles.Add(new UserRole
+            {
+                UserId = user.Id,
+                RoleId = customerRole.Id,
+                Role = customerRole
+            });
+
             await _db.SaveChangesAsync();
             return user;
         }
@@ -186,7 +195,7 @@ namespace EventTicketBooking.Tests
         {
             // Arrange
             var user = await SeedActiveUserAsync("matched_terms@example.com", termsVersion: TermsPolicy.CurrentVersion);
-            var authService = new AuthService(_db, _passwordHasher, _tokenServiceMock.Object, NullLogger<AuthService>.Instance);
+            var authService = new AuthService(_db, _passwordHasher, _tokenServiceMock.Object, NullLogger<AuthService>.Instance, EventTicketBooking.Tests.Mocks.MockRedisHelper.CreateMockRedis());
 
             // Act
             var result = await authService.LoginAsync(new LoginRequestDto
@@ -212,7 +221,7 @@ namespace EventTicketBooking.Tests
             // Hệ thống nâng cấp phiên bản chính sách lên v1.1
             TermsPolicy.CurrentVersion = "v1.1";
 
-            var authService = new AuthService(_db, _passwordHasher, _tokenServiceMock.Object, NullLogger<AuthService>.Instance);
+            var authService = new AuthService(_db, _passwordHasher, _tokenServiceMock.Object, NullLogger<AuthService>.Instance, EventTicketBooking.Tests.Mocks.MockRedisHelper.CreateMockRedis());
 
             // Act: Đăng nhập bình thường mà chưa gửi AcceptCurrentTerms = true
             var result = await authService.LoginAsync(new LoginRequestDto
@@ -239,7 +248,7 @@ namespace EventTicketBooking.Tests
             TermsPolicy.CurrentVersion = "v1.1";
             var beforeUpdate = DateTime.UtcNow.AddSeconds(-1);
 
-            var authService = new AuthService(_db, _passwordHasher, _tokenServiceMock.Object, NullLogger<AuthService>.Instance);
+            var authService = new AuthService(_db, _passwordHasher, _tokenServiceMock.Object, NullLogger<AuthService>.Instance, EventTicketBooking.Tests.Mocks.MockRedisHelper.CreateMockRedis());
 
             // Act: Đăng nhập kèm chấp thuận phiên bản mới
             var result = await authService.LoginAsync(new LoginRequestDto
