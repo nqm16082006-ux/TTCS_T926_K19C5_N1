@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.Hubs;
 using EventTicketBooking.Api.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -40,6 +41,7 @@ public class SystemAlertsWebhookController : ControllerBase
     }
 
     [HttpPost("webhook")]
+    [AllowAnonymous]
     public async Task<IActionResult> HandleAlertmanagerWebhook(
         [FromBody] AlertmanagerWebhookPayload? payload,
         CancellationToken cancellationToken)

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.DTOs.Common;
 using EventTicketBooking.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,6 +26,7 @@ namespace EventTicketBooking.Api.Controllers
         /// Thiết bị quét vé lưu khoá công khai này để soát vé ngoại tuyến mà không cần kết nối máy chủ.
         /// </summary>
         [HttpGet("qr-public-keys")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<QrPublicKeysResponseDto>), StatusCodes.Status200OK)]
         public IActionResult GetQrPublicKeys()
         {
@@ -44,6 +46,7 @@ namespace EventTicketBooking.Api.Controllers
         /// S-26: API xác thực chữ ký mã QR vé điện tử (AC1, AC2, AC3).
         /// </summary>
         [HttpPost("verify-qr")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<QrVerificationResult>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<QrVerificationResult>), StatusCodes.Status400BadRequest)]
         public IActionResult VerifyTicketQr([FromBody] QrVerificationRequestDto request)

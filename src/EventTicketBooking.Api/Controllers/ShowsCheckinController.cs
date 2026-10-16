@@ -3,9 +3,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.Middlewares;
+using EventTicketBooking.Api.Services;
 using EventTicketBooking.Api.Services.Interfaces;
 
 namespace EventTicketBooking.Api.Controllers
@@ -48,6 +50,34 @@ namespace EventTicketBooking.Api.Controllers
             if (showId == Guid.Empty)
             {
                 return BadRequest(new { Message = "Mã suất diễn không hợp lệ." });
+            }
+
+            // Story S-02: Kiểm tra Event Ownership cho vai trò Organizer
+            if (User.IsInRole("Organizer") && !User.IsInRole("Admin"))
+            {
+                var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                                  ?? User.FindFirst("id")?.Value
+                                  ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+
+                if (!Guid.TryParse(userIdClaim, out var currentUserId))
+                {
+                    return Unauthorized(new { Message = "Vui lòng đăng nhập để tiếp tục." });
+                }
+
+                var db = HttpContext.RequestServices.GetRequiredService<EventTicketBooking.Api.Data.AppDbContext>();
+                var showtime = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
+                    db.Showtimes.Include(s => s.Event), s => s.Id == showId, cancellationToken);
+
+                if (showtime == null)
+                {
+                    return NotFound(new { Message = $"Không tìm thấy suất diễn với ID {showId}." });
+                }
+
+                if (showtime.Event == null || showtime.Event.OwnerId != currentUserId)
+                {
+                    SecurityAuditLogger.LogOwnershipDenied(HttpContext, "ShowsCheckinExport", showId.ToString());
+                    return StatusCode(StatusCodes.Status403Forbidden, new { Message = "Bạn không có quyền xuất dữ liệu soát vé của sự kiện này." });
+                }
             }
 
             var query = new ExportCheckinListQuery

@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Middlewares;
+using EventTicketBooking.Api.Services;
 using EventTicketBooking.Api.Services.Interfaces;
 using EventTicketBooking.Api.Services.Implementations;
 using EventTicketBooking.Api.DTOs;
@@ -67,6 +68,33 @@ namespace EventTicketBooking.Api.Controllers
             if (showId == Guid.Empty)
             {
                 return BadRequest(new { Message = "Mã suất diễn không hợp lệ." });
+            }
+
+            // Story S-02: Kiểm tra Event Ownership cho vai trò Organizer
+            if (User.IsInRole("Organizer") && !User.IsInRole("Admin"))
+            {
+                var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                                  ?? User.FindFirst("id")?.Value
+                                  ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+
+                if (!Guid.TryParse(userIdClaim, out var currentUserId))
+                {
+                    return Unauthorized(new { Message = "Vui lòng đăng nhập để tiếp tục." });
+                }
+
+                var showtime = await _context.Showtimes.Include(s => s.Event)
+                    .FirstOrDefaultAsync(s => s.Id == showId, cancellationToken);
+
+                if (showtime == null)
+                {
+                    return NotFound(new { Message = $"Không tìm thấy suất diễn với ID {showId}." });
+                }
+
+                if (showtime.Event == null || showtime.Event.OwnerId != currentUserId)
+                {
+                    SecurityAuditLogger.LogOwnershipDenied(HttpContext, "TicketCheckInExport", showId.ToString());
+                    return StatusCode(StatusCodes.Status403Forbidden, new { Message = "Bạn không có quyền xuất dữ liệu soát vé của sự kiện này." });
+                }
             }
 
             var query = new ExportCheckinListQuery

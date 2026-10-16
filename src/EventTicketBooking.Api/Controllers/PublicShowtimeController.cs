@@ -9,6 +9,7 @@ using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.DTOs.Common;
 using EventTicketBooking.Api.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -50,6 +51,7 @@ namespace EventTicketBooking.Api.Controllers
         /// GET /api/public/showtimes?cursor={cursor}&limit={limit}
         /// </summary>
         [HttpGet("showtimes")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<CursorPagedResultDto<PublicShowtimeDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetOnSaleShowtimes(
             [FromQuery] string? cursor = null,
@@ -180,6 +182,7 @@ namespace EventTicketBooking.Api.Controllers
         /// GET /api/public/events/{id}
         /// </summary>
         [HttpGet("events/{id:guid}")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<PublicEventDetailDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetPublicEventDetail(Guid id)
@@ -267,6 +270,7 @@ namespace EventTicketBooking.Api.Controllers
         /// </summary>
         [HttpGet("events/{eventId:guid}/showtimes/{showtimeId:guid}")]
         [HttpGet("showtimes/{showtimeId:guid}")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<PublicShowtimeDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetPublicShowtimeDetail(Guid? eventId, Guid showtimeId)
@@ -419,6 +423,7 @@ namespace EventTicketBooking.Api.Controllers
         /// T-19: Truy vấn toàn bộ ghế của suất diễn kèm trạng thái (trống, giữ chỗ, đã bán) trong 1 query.
         /// </summary>
         [HttpGet("showtimes/{showtimeId:guid}/seats")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<List<SeatStatusDto>>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetShowtimeSeats(Guid showtimeId)

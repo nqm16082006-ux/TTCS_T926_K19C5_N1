@@ -19,6 +19,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.SignalR;
 using StackExchange.Redis;
 using EventTicketBooking.Api.Hubs;
+using EventTicketBooking.Api.Services;
 using Order = EventTicketBooking.Api.Models.Order;
 
 namespace EventTicketBooking.Api.Controllers
@@ -375,7 +376,10 @@ namespace EventTicketBooking.Api.Controllers
             // T-39: Chỉ chủ đơn hoặc Admin mở được
             var isAdmin = User.IsInRole("Admin") || User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && c.Value == "Admin");
             if (!isAdmin && order.UserId != userId)
+            {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "Order", orderId.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền truy cập đơn hàng này."));
+            }
 
             return Ok(ApiResponse<OrderDto>.SuccessResult(MapToDto(order), "Lấy thông tin đơn hàng thành công."));
         }
@@ -404,7 +408,10 @@ namespace EventTicketBooking.Api.Controllers
 
             var isAdmin = User.IsInRole("Admin") || User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && c.Value == "Admin");
             if (!isAdmin && order.UserId != userId)
+            {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "Order", orderId.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền truy cập đơn hàng này."));
+            }
 
             Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
             Response.Headers["Pragma"] = "no-cache";
@@ -439,7 +446,10 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
 
             if (order.UserId != userId)
+            {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "OrderRefundPreview", orderId.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền thao tác trên đơn hàng này."));
+            }
 
             var preview = BuildRefundPreview(order);
             return Ok(ApiResponse<RefundPreviewDto>.SuccessResult(preview, "Lấy thông tin chính sách huỷ và hoàn tiền thành công."));
@@ -546,7 +556,10 @@ namespace EventTicketBooking.Api.Controllers
                     return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
 
                 if (order.UserId != userId)
+                {
+                    SecurityAuditLogger.LogOwnershipDenied(HttpContext, "OrderCancel", orderId.ToString());
                     return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền thao tác trên đơn hàng này."));
+                }
 
                 // Kiểm tra lại toàn bộ điều kiện tại thời điểm khách xác nhận (S-45 AC)
                 var preview = BuildRefundPreview(order);
@@ -1031,7 +1044,10 @@ namespace EventTicketBooking.Api.Controllers
                 return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
 
             if (order.UserId != userId)
+            {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "OrderResendTicket", orderId.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền gửi lại vé cho đơn hàng này."));
+            }
 
             if (order.Status != OrderStatus.Paid)
                 return BadRequest(ApiResponse<object>.FailureResult("Chỉ có thể gửi lại vé cho đơn hàng đã thanh toán."));
@@ -1077,7 +1093,10 @@ namespace EventTicketBooking.Api.Controllers
 
             var isAdmin = User.IsInRole("Admin") || User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && c.Value == "Admin");
             if (!isAdmin && order.UserId != userId)
+            {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "OrderTickets", orderId.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền truy cập vé của đơn hàng này."));
+            }
 
             // AC3: Giả sử đơn chưa trả, khi mở trang vé bằng đường dẫn, thì không có vé nào.
             if (order.Status != OrderStatus.Paid)
@@ -1134,7 +1153,10 @@ namespace EventTicketBooking.Api.Controllers
                 || User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && (c.Value == "Admin" || c.Value == "Auditor" || c.Value == "Staff" || c.Value == "Organizer"));
 
             if (!isPrivileged && order.UserId != userId)
+            {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "OrderAuditLogs", orderId.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền truy cập nhật ký của đơn hàng này."));
+            }
 
             var logs = await _orderAuditService.GetLogsByOrderIdAsync(orderId, entityType, HttpContext.RequestAborted);
             return Ok(ApiResponse<List<OrderAuditLogDto>>.SuccessResult(logs, "Lấy nhật ký thao tác đơn hàng thành công."));

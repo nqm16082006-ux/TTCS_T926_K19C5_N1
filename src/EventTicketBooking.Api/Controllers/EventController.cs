@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using EventTicketBooking.Api.Services;
 
 namespace EventTicketBooking.Api.Controllers
 {
@@ -254,6 +255,7 @@ namespace EventTicketBooking.Api.Controllers
             var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
             if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "Event", id.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền truy cập sự kiện này."));
             }
 
@@ -292,6 +294,7 @@ namespace EventTicketBooking.Api.Controllers
             var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
             if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "Event", id.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền chỉnh sửa sự kiện này."));
             }
 
@@ -366,6 +369,7 @@ namespace EventTicketBooking.Api.Controllers
             var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
             if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "Event", id.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền xóa sự kiện này."));
             }
 
@@ -409,6 +413,7 @@ namespace EventTicketBooking.Api.Controllers
             var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
             if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "Event", id.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền truy cập suất diễn của sự kiện này."));
             }
 
@@ -477,6 +482,7 @@ namespace EventTicketBooking.Api.Controllers
             var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
             if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "Event", id.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền thao tác trên sự kiện này."));
             }
 
@@ -554,6 +560,7 @@ namespace EventTicketBooking.Api.Controllers
             var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
             if (!isAdmin && ev.OwnerId != currentUserId.Value)
             {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "Event", eventId.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền thao tác trên sự kiện này."));
             }
 
@@ -612,7 +619,10 @@ namespace EventTicketBooking.Api.Controllers
                 .SingleOrDefaultAsync(s => s.Id == showtimeId && s.EventId == eventId);
             if (showtime == null) return NotFound();
             if (showtime.Event.OwnerId != userId.Value && !await IsCurrentUserAdminAsync(userId.Value))
+            {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "Showtime", showtimeId.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden);
+            }
             var url = dto.ImageUrl?.Trim();
             if (!string.IsNullOrEmpty(url) && (url.Length > 2048 ||
                 !(url.StartsWith("/uploads/events/", StringComparison.Ordinal) && !url.Contains('\\') && !url.Contains("..") && !url.Contains('?') && !url.Contains('#') ||
@@ -634,7 +644,10 @@ namespace EventTicketBooking.Api.Controllers
                 .SingleOrDefaultAsync(s => s.Id == showtimeId);
             if (showtime == null) return NotFound();
             if (showtime.Event.OwnerId != userId.Value && !await IsCurrentUserAdminAsync(userId.Value))
+            {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "Showtime", showtimeId.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden);
+            }
             var query = _context.OfflineCheckInRecords.AsNoTracking()
                 .Where(r => r.ShowtimeId == showtimeId && r.IsConflict);
             var totalConflicts = await query.CountAsync();
