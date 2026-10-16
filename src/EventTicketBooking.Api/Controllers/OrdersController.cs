@@ -106,6 +106,8 @@ namespace EventTicketBooking.Api.Controllers
             var showtime = await _context.Showtimes.Include(s => s.Event).FirstOrDefaultAsync(s => s.Id == showtimeId);
             if (showtime == null)
                 return (false, "Không tìm thấy suất diễn.", null, StatusCodes.Status404NotFound);
+            if (showtime.IsSaleExpired(DateTime.UtcNow))
+                return (false, "Suất diễn đã hết thời gian bán vé.", null, StatusCodes.Status409Conflict);
             if (showtime.Status != ShowtimeStatus.OnSale)
                 return (false, "Suất diễn không đang mở bán.", null, StatusCodes.Status409Conflict);
 
@@ -180,7 +182,8 @@ namespace EventTicketBooking.Api.Controllers
                 var orderItems = new List<OrderItem>();
 
                 // Gia hạn giữ chỗ bằng thời hạn thanh toán (giả sử 15 phút - E-05)
-                var paymentExpiry = now.AddMinutes(15);
+                var showEnd = new DateTimeOffset(DateTime.SpecifyKind(showtime.EndTime, DateTimeKind.Utc));
+                var paymentExpiry = now.AddMinutes(15) < showEnd ? now.AddMinutes(15) : showEnd;
 
                 foreach (var hold in holds)
                 {
