@@ -29,6 +29,7 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>? _hubContext;
         private readonly IEmailService? _emailService;
         private readonly Microsoft.Extensions.Options.IOptions<EventTicketBooking.Api.Options.AccountingOptions>? _accountingOptions;
+        private readonly IDiscountCodeService _discountCodeService;
 
         public PaymentService(
             AppDbContext context,
@@ -40,7 +41,8 @@ namespace EventTicketBooking.Api.Services.Implementations
             Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>? hubContext = null,
             IOrderAuditService? orderAuditService = null,
             IEmailService? emailService = null,
-            Microsoft.Extensions.Options.IOptions<EventTicketBooking.Api.Options.AccountingOptions>? accountingOptions = null)
+            Microsoft.Extensions.Options.IOptions<EventTicketBooking.Api.Options.AccountingOptions>? accountingOptions = null,
+            IDiscountCodeService? discountCodeService = null)
         {
             _context = context;
             _paymentGateway = paymentGateway;
@@ -52,6 +54,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             _orderAuditService = orderAuditService ?? new OrderAuditService(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
             _emailService = emailService;
             _accountingOptions = accountingOptions;
+            _discountCodeService = discountCodeService ?? new DiscountCodeService(context);
         }
 
         public async Task<PaymentCreationResult> CreatePaymentForOrderAsync(Guid orderId, Guid userId, CancellationToken cancellationToken = default)
@@ -368,6 +371,12 @@ namespace EventTicketBooking.Api.Services.Implementations
                     order.Status = OrderStatus.Cancelled;
                     order.CancelReason = OrderCancelReasons.PaymentCancelled;
                     order.UpdatedAt = DateTimeOffset.UtcNow;
+
+                    // Story S-56: Giải phóng lượt sử dụng mã giảm giá của đơn chờ bị huỷ thanh toán
+                    if (order.DiscountCodeId.HasValue)
+                    {
+                        await _discountCodeService.ReleaseDiscountReservationAsync(order, cancellationToken);
+                    }
 
                     var cancelledTx = await _context.PaymentTransactions
                         .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);

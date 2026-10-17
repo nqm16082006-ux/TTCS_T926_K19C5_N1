@@ -18,7 +18,7 @@ namespace EventTicketBooking.Api.Services.Implementations
     {
         private readonly AppDbContext _context;
         private readonly ILogger<DiscountCodeService> _logger;
-        private static readonly object _inMemoryLock = new();
+        private static readonly System.Threading.SemaphoreSlim _inMemorySemaphore = new(1, 1);
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, int> _inMemoryUsedCounts = new();
 
         public DiscountCodeService(AppDbContext context, ILogger<DiscountCodeService>? logger = null)
@@ -105,8 +105,16 @@ namespace EventTicketBooking.Api.Services.Implementations
                 UpdatedAt = DateTimeOffset.UtcNow
             };
 
-            _context.DiscountCodes.Add(discount);
-            await _context.SaveChangesAsync();
+            try
+            {
+                _context.DiscountCodes.Add(discount);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogWarning(ex, "Mã giảm giá {Code} cho sự kiện {EventId} bị trùng lặp do race condition.", normalizedCode, eventId);
+                return (false, "Mã giảm giá đã tồn tại cho sự kiện này.", null, StatusCodes.Status409Conflict);
+            }
 
             if (!_context.Database.IsRelational())
             {
@@ -176,96 +184,7 @@ namespace EventTicketBooking.Api.Services.Implementations
 
             var normalizedCode = code.Trim().ToUpperInvariant();
 
-            var order = await _context.Orders
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Seat)
-                        .ThenInclude(s => s.SeatCategory)
-                .Include(o => o.Showtime)
-                    .ThenInclude(s => s.Event)
-                .Include(o => o.User)
-                .Include(o => o.DiscountCode)
-                .FirstOrDefaultAsync(o => o.Id == orderId);
-
-            if (order == null)
-            {
-                return (false, "Không tìm thấy đơn hàng.", null, StatusCodes.Status404NotFound);
-            }
-
-            if (order.UserId != currentUserId)
-            {
-                return (false, "Bạn không có quyền thao tác trên đơn hàng này.", null, StatusCodes.Status403Forbidden);
-            }
-
-            if (order.Status != OrderStatus.Pending)
-            {
-                return (false, "Đơn hàng không ở trạng thái chờ thanh toán.", null, StatusCodes.Status400BadRequest);
-            }
-
-            if (order.ExpiresAt <= DateTimeOffset.UtcNow)
-            {
-                return (false, "Đơn hàng đã hết hạn thanh toán.", null, StatusCodes.Status400BadRequest);
-            }
-
-            var discount = await _context.DiscountCodes
-                .FirstOrDefaultAsync(d => d.EventId == order.Showtime.EventId && d.Code.ToUpper() == normalizedCode);
-
-            if (discount == null)
-            {
-                var existsOtherEvent = await _context.DiscountCodes
-                    .AnyAsync(d => d.Code.ToUpper() == normalizedCode);
-
-                if (existsOtherEvent)
-                {
-                    return (false, "Mã giảm giá không thuộc sự kiện này.", null, StatusCodes.Status400BadRequest);
-                }
-
-                return (false, "Mã giảm giá không tồn tại.", null, StatusCodes.Status404NotFound);
-            }
-
-            if (!discount.IsActive)
-            {
-                return (false, "Mã giảm giá không còn hoạt động.", null, StatusCodes.Status400BadRequest);
-            }
-
-            if (discount.ExpiresAt <= DateTimeOffset.UtcNow)
-            {
-                return (false, "Mã giảm giá đã hết hạn.", null, StatusCodes.Status400BadRequest);
-            }
-
-            // 1. Idempotency: nếu đơn hàng đã áp dụng chính mã này -> trả về thành công không tăng UsedCount
-            if (order.DiscountCodeId == discount.Id)
-            {
-                return (true, "Mã giảm giá đã được áp dụng cho đơn hàng.", MapOrderToDto(order), StatusCodes.Status200OK);
-            }
-
-            // 2. Reject stacking: nếu đơn hàng đã áp dụng mã khác -> từ chối
-            if (order.DiscountCodeId.HasValue && order.DiscountCodeId.Value != discount.Id)
-            {
-                return (false, "Đơn hàng đã có mã giảm giá khác, không thể áp dụng nhiều mã.", null, StatusCodes.Status400BadRequest);
-            }
-
-            // 3. Tính toán số tiền giảm
-            int originalAmount = order.OriginalAmount > 0
-                ? order.OriginalAmount
-                : (order.OrderItems?.Sum(oi => oi.Price) ?? order.TotalAmount);
-
-            int discountAmount = 0;
-            if (discount.DiscountType == DiscountType.Percent)
-            {
-                discountAmount = (int)Math.Floor((long)originalAmount * discount.DiscountValue / 100.0);
-            }
-            else
-            {
-                discountAmount = discount.DiscountValue;
-            }
-
-            discountAmount = Math.Min(discountAmount, originalAmount);
-            int finalTotal = Math.Max(0, originalAmount - discountAmount);
-
-            // 4. Atomic concurrency guarantee
-            var now = DateTimeOffset.UtcNow;
             Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
-
             if (_context.Database.IsRelational())
             {
                 transaction = await _context.Database.BeginTransactionAsync();
@@ -273,20 +192,166 @@ namespace EventTicketBooking.Api.Services.Implementations
 
             try
             {
-                int affectedRows = 0;
+                IQueryable<Order> orderQuery = _context.Orders
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Seat)
+                            .ThenInclude(s => s.SeatCategory)
+                    .Include(o => o.Showtime)
+                        .ThenInclude(s => s.Event)
+                    .Include(o => o.User)
+                    .Include(o => o.DiscountCode);
+
+                if (_context.Database.IsNpgsql())
+                {
+                    // Khóa dòng đơn hàng trên PostgreSQL (FOR UPDATE) để chống race condition khi 2 request cùng apply trên 1 order
+                    orderQuery = _context.Orders
+                        .FromSqlRaw("SELECT * FROM orders WHERE \"Id\" = {0} FOR UPDATE", orderId)
+                        .Include(o => o.OrderItems)
+                            .ThenInclude(oi => oi.Seat)
+                                .ThenInclude(s => s.SeatCategory)
+                        .Include(o => o.Showtime)
+                            .ThenInclude(s => s.Event)
+                        .Include(o => o.User)
+                        .Include(o => o.DiscountCode);
+                }
+
+                var order = await orderQuery.FirstOrDefaultAsync(o => o.Id == orderId);
+
+                if (order == null)
+                {
+                    if (transaction != null) await transaction.RollbackAsync();
+                    return (false, "Không tìm thấy đơn hàng.", null, StatusCodes.Status404NotFound);
+                }
+
+                if (order.UserId != currentUserId)
+                {
+                    if (transaction != null) await transaction.RollbackAsync();
+                    return (false, "Bạn không có quyền thao tác trên đơn hàng này.", null, StatusCodes.Status403Forbidden);
+                }
+
+                if (order.Status != OrderStatus.Pending)
+                {
+                    if (transaction != null) await transaction.RollbackAsync();
+                    return (false, "Đơn hàng không ở trạng thái chờ thanh toán.", null, StatusCodes.Status400BadRequest);
+                }
+
+                if (order.ExpiresAt <= DateTimeOffset.UtcNow)
+                {
+                    if (transaction != null) await transaction.RollbackAsync();
+                    return (false, "Đơn hàng đã hết hạn thanh toán.", null, StatusCodes.Status400BadRequest);
+                }
+
+                var discount = await _context.DiscountCodes
+                    .FirstOrDefaultAsync(d => d.EventId == order.Showtime.EventId && d.Code.ToUpper() == normalizedCode);
+
+                if (discount == null)
+                {
+                    if (transaction != null) await transaction.RollbackAsync();
+                    var existsOtherEvent = await _context.DiscountCodes
+                        .AnyAsync(d => d.Code.ToUpper() == normalizedCode);
+
+                    if (existsOtherEvent)
+                    {
+                        return (false, "Mã giảm giá không thuộc sự kiện này.", null, StatusCodes.Status400BadRequest);
+                    }
+
+                    return (false, "Mã giảm giá không tồn tại.", null, StatusCodes.Status404NotFound);
+                }
+
+                if (!discount.IsActive)
+                {
+                    if (transaction != null) await transaction.RollbackAsync();
+                    return (false, "Mã giảm giá không còn hoạt động.", null, StatusCodes.Status400BadRequest);
+                }
+
+                if (discount.ExpiresAt <= DateTimeOffset.UtcNow)
+                {
+                    if (transaction != null) await transaction.RollbackAsync();
+                    return (false, "Mã giảm giá đã hết hạn.", null, StatusCodes.Status400BadRequest);
+                }
+
+                // 1. Idempotency: nếu đơn hàng đã áp dụng chính mã này -> trả về thành công không tăng UsedCount
+                if (order.DiscountCodeId == discount.Id)
+                {
+                    if (transaction != null) await transaction.CommitAsync();
+                    return (true, "Mã giảm giá đã được áp dụng cho đơn hàng.", MapOrderToDto(order), StatusCodes.Status200OK);
+                }
+
+                // 2. Reject stacking: nếu đơn hàng đã áp dụng mã khác -> từ chối
+                if (order.DiscountCodeId.HasValue && order.DiscountCodeId.Value != discount.Id)
+                {
+                    if (transaction != null) await transaction.RollbackAsync();
+                    return (false, "Đơn hàng đã có mã giảm giá khác, không thể áp dụng nhiều mã.", null, StatusCodes.Status400BadRequest);
+                }
+
+                // 3. Tính toán số tiền giảm - Integer Arithmetic (Story S-56)
+                int originalAmount = order.OriginalAmount > 0
+                    ? order.OriginalAmount
+                    : (order.OrderItems?.Sum(oi => oi.Price) ?? order.TotalAmount);
+
+                int discountAmount = 0;
+                if (discount.DiscountType == DiscountType.Percent)
+                {
+                    discountAmount = (int)(((long)originalAmount * discount.DiscountValue) / 100);
+                }
+                else
+                {
+                    discountAmount = discount.DiscountValue;
+                }
+
+                discountAmount = Math.Min(discountAmount, originalAmount);
+                int finalTotal = Math.Max(0, originalAmount - discountAmount);
+
+                // 4. Atomic concurrency guarantee
+                var now = DateTimeOffset.UtcNow;
 
                 if (_context.Database.IsRelational())
                 {
-                    affectedRows = await _context.Database.ExecuteSqlRawAsync(
+                    int affectedRows = await _context.Database.ExecuteSqlRawAsync(
                         @"UPDATE ""DiscountCodes""
                           SET ""UsedCount"" = ""UsedCount"" + 1, ""UpdatedAt"" = {0}
                           WHERE ""Id"" = {1} AND ""IsActive"" = TRUE AND ""ExpiresAt"" > {0} AND ""UsedCount"" < ""UsageLimit""",
                         now, discount.Id);
+
+                    if (affectedRows == 0)
+                    {
+                        if (transaction != null) await transaction.RollbackAsync();
+                        return (false, "Mã giảm giá đã hết lượt sử dụng hoặc đã hết hạn.", null, StatusCodes.Status400BadRequest);
+                    }
+
+                    // Gắn mã vào Order và snapshot
+                    order.DiscountCodeId = discount.Id;
+                    order.DiscountCodeSnapshot = $"{discount.Code}|{discount.DiscountType}|{discount.DiscountValue}|{discountAmount}";
+                    order.OriginalAmount = originalAmount;
+                    order.DiscountAmount = discountAmount;
+                    order.TotalAmount = finalTotal;
+                    order.UpdatedAt = now;
+
+                    await _context.SaveChangesAsync();
+
+                    if (transaction != null)
+                    {
+                        await transaction.CommitAsync();
+                    }
                 }
                 else
                 {
-                    lock (_inMemoryLock)
+                    await _inMemorySemaphore.WaitAsync();
+                    try
                     {
+                        // Tải lại trạng thái mới nhất của đơn hàng từ store để chống race trên cùng 1 order giữa các DbContexts
+                        await _context.Entry(order).ReloadAsync();
+
+                        // Kiểm tra lại sau khi vào semaphore (chống race trên cùng 1 order trong test InMemory)
+                        if (order.DiscountCodeId == discount.Id)
+                        {
+                            return (true, "Mã giảm giá đã được áp dụng cho đơn hàng.", MapOrderToDto(order), StatusCodes.Status200OK);
+                        }
+                        if (order.DiscountCodeId.HasValue && order.DiscountCodeId.Value != discount.Id)
+                        {
+                            return (false, "Đơn hàng đã có mã giảm giá khác, không thể áp dụng nhiều mã.", null, StatusCodes.Status400BadRequest);
+                        }
+
                         int currentCount = _inMemoryUsedCounts.GetOrAdd(discount.Id, discount.UsedCount);
                         if (discount.IsActive && discount.ExpiresAt > now && currentCount < discount.UsageLimit)
                         {
@@ -294,35 +359,29 @@ namespace EventTicketBooking.Api.Services.Implementations
                             _inMemoryUsedCounts[discount.Id] = currentCount;
                             discount.UsedCount = currentCount;
                             discount.UpdatedAt = now;
-                            affectedRows = 1;
+
+                            order.DiscountCodeId = discount.Id;
+                            order.DiscountCodeSnapshot = $"{discount.Code}|{discount.DiscountType}|{discount.DiscountValue}|{discountAmount}";
+                            order.OriginalAmount = originalAmount;
+                            order.DiscountAmount = discountAmount;
+                            order.TotalAmount = finalTotal;
+                            order.UpdatedAt = now;
+
+                            await _context.SaveChangesAsync();
                         }
                         else
                         {
-                            affectedRows = 0;
+                            return (false, "Mã giảm giá đã hết lượt sử dụng hoặc đã hết hạn.", null, StatusCodes.Status400BadRequest);
                         }
+                    }
+                    finally
+                    {
+                        _inMemorySemaphore.Release();
                     }
                 }
 
-                if (affectedRows == 0)
-                {
-                    if (transaction != null) await transaction.RollbackAsync();
-                    return (false, "Mã giảm giá đã hết lượt sử dụng hoặc đã hết hạn.", null, StatusCodes.Status400BadRequest);
-                }
-
-                // Gắn mã vào Order và snapshot
-                order.DiscountCodeId = discount.Id;
-                order.DiscountCodeSnapshot = $"{discount.Code}|{discount.DiscountType}|{discount.DiscountValue}|{discountAmount}";
-                order.OriginalAmount = originalAmount;
-                order.DiscountAmount = discountAmount;
-                order.TotalAmount = finalTotal;
-                order.UpdatedAt = now;
-
-                await _context.SaveChangesAsync();
-
-                if (transaction != null)
-                {
-                    await transaction.CommitAsync();
-                }
+                order.DiscountCode = discount;
+                return (true, "Áp dụng mã giảm giá thành công.", MapOrderToDto(order), StatusCodes.Status200OK);
             }
             catch (Exception ex)
             {
@@ -330,7 +389,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                 {
                     await transaction.RollbackAsync();
                 }
-                _logger.LogError(ex, "Lỗi xảy ra khi áp dụng mã giảm giá {Code} cho đơn hàng {OrderId}", discount.Code, orderId);
+                _logger.LogError(ex, "Lỗi xảy ra khi áp dụng mã giảm giá {Code} cho đơn hàng {OrderId}", normalizedCode, orderId);
                 throw;
             }
             finally
@@ -340,9 +399,6 @@ namespace EventTicketBooking.Api.Services.Implementations
                     await transaction.DisposeAsync();
                 }
             }
-
-            order.DiscountCode = discount;
-            return (true, "Áp dụng mã giảm giá thành công.", MapOrderToDto(order), StatusCodes.Status200OK);
         }
 
         public async Task<bool> ReleaseDiscountReservationAsync(Order order, CancellationToken cancellationToken = default)
@@ -372,35 +428,73 @@ namespace EventTicketBooking.Api.Services.Implementations
             }
             order.UpdatedAt = now;
 
-            if (_context.Database.IsRelational())
+            bool shouldManageTransaction = _context.Database.IsRelational() && _context.Database.CurrentTransaction == null;
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
+
+            if (shouldManageTransaction)
             {
-                await _context.Database.ExecuteSqlRawAsync(
-                    @"UPDATE ""DiscountCodes""
-                      SET ""UsedCount"" = ""UsedCount"" - 1, ""UpdatedAt"" = {0}
-                      WHERE ""Id"" = {1} AND ""UsedCount"" > 0",
-                    now, codeId);
-            }
-            else
-            {
-                lock (_inMemoryLock)
-                {
-                    int currentCount = _inMemoryUsedCounts.GetOrAdd(codeId, 1);
-                    if (currentCount > 0)
-                    {
-                        currentCount--;
-                        _inMemoryUsedCounts[codeId] = currentCount;
-                    }
-                    var code = _context.DiscountCodes.Find(codeId);
-                    if (code != null)
-                    {
-                        code.UsedCount = currentCount;
-                        code.UpdatedAt = now;
-                    }
-                }
+                transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
             }
 
-            await _context.SaveChangesAsync(cancellationToken);
-            return true;
+            try
+            {
+                if (_context.Database.IsRelational())
+                {
+                    await _context.Database.ExecuteSqlRawAsync(
+                        @"UPDATE ""DiscountCodes""
+                          SET ""UsedCount"" = ""UsedCount"" - 1, ""UpdatedAt"" = {0}
+                          WHERE ""Id"" = {1} AND ""UsedCount"" > 0",
+                        new object[] { now, codeId },
+                        cancellationToken);
+                }
+                else
+                {
+                    await _inMemorySemaphore.WaitAsync(cancellationToken);
+                    try
+                    {
+                        int currentCount = _inMemoryUsedCounts.GetOrAdd(codeId, 1);
+                        if (currentCount > 0)
+                        {
+                            currentCount--;
+                            _inMemoryUsedCounts[codeId] = currentCount;
+                        }
+                        var code = await _context.DiscountCodes.FindAsync(new object[] { codeId }, cancellationToken);
+                        if (code != null)
+                        {
+                            code.UsedCount = currentCount;
+                            code.UpdatedAt = now;
+                        }
+                    }
+                    finally
+                    {
+                        _inMemorySemaphore.Release();
+                    }
+                }
+
+                await _context.SaveChangesAsync(cancellationToken);
+
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                }
+
+                return true;
+            }
+            catch
+            {
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                }
+                throw;
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync();
+                }
+            }
         }
 
         public async Task<bool> ReleaseDiscountReservationAsync(Guid orderId, CancellationToken cancellationToken = default)

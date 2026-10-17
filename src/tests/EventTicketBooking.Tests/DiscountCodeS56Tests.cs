@@ -894,6 +894,500 @@ namespace EventTicketBooking.Tests
             }
         }
 
+        // Test S56-01: Payment Cancelled webhook/handler releases discount reservation exactly once
+        [Fact]
+        public async Task Test18_PaymentCancelled_ReleasesDiscountReservationExactlyOnce()
+        {
+            using var context = CreateInMemoryContext();
+            var (customer, ev, showtime, order) = await SeedOrderScenarioAsync(context, price: 500000);
+            var discountService = new DiscountCodeService(context);
+
+            var createReq = new CreateDiscountCodeRequest
+            {
+                Code = "PAYCANCEL10",
+                DiscountType = DiscountType.Percent,
+                DiscountValue = 10,
+                UsageLimit = 5,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+            };
+            await discountService.CreateDiscountCodeAsync(ev.Id, createReq, ev.OwnerId);
+            await discountService.ApplyDiscountCodeAsync(order.Id, "PAYCANCEL10", customer.Id);
+
+            var codeEntity = await context.DiscountCodes.FirstAsync(d => d.Code == "PAYCANCEL10");
+            Assert.Equal(1, codeEntity.UsedCount);
+
+            var mockGateway = new Mock<IPaymentGateway>();
+            mockGateway.Setup(g => g.ProviderName).Returns("Mock");
+            var paymentService = new PaymentService(
+                context,
+                mockGateway.Object,
+                NullLogger<PaymentService>.Instance,
+                new Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object,
+                discountCodeService: discountService);
+
+            // Customer cancels payment at the gateway
+            var cancelResult = new PaymentResultDto
+            {
+                Status = PaymentStatus.Cancelled,
+                OrderId = order.Id.ToString()
+            };
+
+            // First cancellation call
+            var execResult = await paymentService.HandlePaymentResultAsync(cancelResult);
+            Assert.False(execResult.Success);
+
+            // Verify order is Cancelled, DiscountCodeId is cleared, and UsedCount decremented to 0
+            var reloadedOrder = await context.Orders.FindAsync(order.Id);
+            Assert.Equal(OrderStatus.Cancelled, reloadedOrder!.Status);
+            Assert.Null(reloadedOrder.DiscountCodeId);
+
+            codeEntity = await context.DiscountCodes.FirstAsync(d => d.Code == "PAYCANCEL10");
+            Assert.Equal(0, codeEntity.UsedCount);
+
+            // Re-run cancellation (duplicate webhook retry) -> idempotent, UsedCount stays 0 and never becomes negative
+            var secondExecResult = await paymentService.HandlePaymentResultAsync(cancelResult);
+            codeEntity = await context.DiscountCodes.FirstAsync(d => d.Code == "PAYCANCEL10");
+            Assert.Equal(0, codeEntity.UsedCount);
+        }
+
+        // Test S56-08: Integer arithmetic calculations on edge cases
+        [Fact]
+        public async Task Test19_MoneyCalculation_IntegerMath_EdgeCases()
+        {
+            // Case 1: 99 VND @ 10% -> 99 * 10 / 100 = 9 VND discount, total = 90 VND
+            using (var context1 = CreateInMemoryContext())
+            {
+                var (customer, ev, _, order) = await SeedOrderScenarioAsync(context1, price: 99);
+                var service = new DiscountCodeService(context1);
+                var req = new CreateDiscountCodeRequest
+                {
+                    Code = "INTMATH10",
+                    DiscountType = DiscountType.Percent,
+                    DiscountValue = 10,
+                    UsageLimit = 10,
+                    ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+                };
+                await service.CreateDiscountCodeAsync(ev.Id, req, ev.OwnerId);
+                var (success, _, updatedOrder, _) = await service.ApplyDiscountCodeAsync(order.Id, "INTMATH10", customer.Id);
+                Assert.True(success);
+                Assert.Equal(99, updatedOrder!.OriginalAmount);
+                Assert.Equal(9, updatedOrder.DiscountAmount);
+                Assert.Equal(90, updatedOrder.TotalAmount);
+            }
+
+            // Case 2: 101 VND @ 10% -> 101 * 10 / 100 = 10 VND discount, total = 91 VND
+            using (var context2 = CreateInMemoryContext())
+            {
+                var (customer, ev, _, order) = await SeedOrderScenarioAsync(context2, price: 101);
+                var service = new DiscountCodeService(context2);
+                var req = new CreateDiscountCodeRequest
+                {
+                    Code = "INTMATH10",
+                    DiscountType = DiscountType.Percent,
+                    DiscountValue = 10,
+                    UsageLimit = 10,
+                    ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+                };
+                await service.CreateDiscountCodeAsync(ev.Id, req, ev.OwnerId);
+                var (success, _, updatedOrder, _) = await service.ApplyDiscountCodeAsync(order.Id, "INTMATH10", customer.Id);
+                Assert.True(success);
+                Assert.Equal(101, updatedOrder!.OriginalAmount);
+                Assert.Equal(10, updatedOrder.DiscountAmount);
+                Assert.Equal(91, updatedOrder.TotalAmount);
+            }
+
+            // Case 3: 1 VND @ 100% -> 1 * 100 / 100 = 1 VND discount, total = 0 VND
+            using (var context3 = CreateInMemoryContext())
+            {
+                var (customer, ev, _, order) = await SeedOrderScenarioAsync(context3, price: 1);
+                var service = new DiscountCodeService(context3);
+                var req = new CreateDiscountCodeRequest
+                {
+                    Code = "INTMATH100",
+                    DiscountType = DiscountType.Percent,
+                    DiscountValue = 100,
+                    UsageLimit = 10,
+                    ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+                };
+                await service.CreateDiscountCodeAsync(ev.Id, req, ev.OwnerId);
+                var (success, _, updatedOrder, _) = await service.ApplyDiscountCodeAsync(order.Id, "INTMATH100", customer.Id);
+                Assert.True(success);
+                Assert.Equal(1, updatedOrder!.OriginalAmount);
+                Assert.Equal(1, updatedOrder.DiscountAmount);
+                Assert.Equal(0, updatedOrder.TotalAmount);
+            }
+        }
+
+        // Test Section 19: Input validation edge cases
+        [Fact]
+        public async Task Test20_ValidationEdgeCases_Rejected()
+        {
+            using var context = CreateInMemoryContext();
+            var (_, ev, _, _) = await SeedOrderScenarioAsync(context);
+            var service = new DiscountCodeService(context);
+
+            // Percent 0 -> reject
+            var resP0 = await service.CreateDiscountCodeAsync(ev.Id, new CreateDiscountCodeRequest
+            {
+                Code = "P0",
+                DiscountType = DiscountType.Percent,
+                DiscountValue = 0,
+                UsageLimit = 10,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+            }, ev.OwnerId);
+            Assert.False(resP0.Success);
+            Assert.Equal(StatusCodes.Status400BadRequest, resP0.StatusCode);
+
+            // Percent -5 -> reject
+            var resPNeg = await service.CreateDiscountCodeAsync(ev.Id, new CreateDiscountCodeRequest
+            {
+                Code = "PNEG",
+                DiscountType = DiscountType.Percent,
+                DiscountValue = -5,
+                UsageLimit = 10,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+            }, ev.OwnerId);
+            Assert.False(resPNeg.Success);
+            Assert.Equal(StatusCodes.Status400BadRequest, resPNeg.StatusCode);
+
+            // Percent 101 -> reject
+            var resP101 = await service.CreateDiscountCodeAsync(ev.Id, new CreateDiscountCodeRequest
+            {
+                Code = "P101",
+                DiscountType = DiscountType.Percent,
+                DiscountValue = 101,
+                UsageLimit = 10,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+            }, ev.OwnerId);
+            Assert.False(resP101.Success);
+            Assert.Equal(StatusCodes.Status400BadRequest, resP101.StatusCode);
+
+            // Fixed 0 -> reject
+            var resF0 = await service.CreateDiscountCodeAsync(ev.Id, new CreateDiscountCodeRequest
+            {
+                Code = "F0",
+                DiscountType = DiscountType.FixedAmount,
+                DiscountValue = 0,
+                UsageLimit = 10,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+            }, ev.OwnerId);
+            Assert.False(resF0.Success);
+            Assert.Equal(StatusCodes.Status400BadRequest, resF0.StatusCode);
+
+            // Fixed -1000 -> reject
+            var resFNeg = await service.CreateDiscountCodeAsync(ev.Id, new CreateDiscountCodeRequest
+            {
+                Code = "FNEG",
+                DiscountType = DiscountType.FixedAmount,
+                DiscountValue = -1000,
+                UsageLimit = 10,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+            }, ev.OwnerId);
+            Assert.False(resFNeg.Success);
+            Assert.Equal(StatusCodes.Status400BadRequest, resFNeg.StatusCode);
+
+            // UsageLimit 0 -> reject
+            var resL0 = await service.CreateDiscountCodeAsync(ev.Id, new CreateDiscountCodeRequest
+            {
+                Code = "L0",
+                DiscountType = DiscountType.Percent,
+                DiscountValue = 10,
+                UsageLimit = 0,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+            }, ev.OwnerId);
+            Assert.False(resL0.Success);
+            Assert.Equal(StatusCodes.Status400BadRequest, resL0.StatusCode);
+
+            // UsageLimit -1 -> reject
+            var resLNeg = await service.CreateDiscountCodeAsync(ev.Id, new CreateDiscountCodeRequest
+            {
+                Code = "LNEG",
+                DiscountType = DiscountType.Percent,
+                DiscountValue = 10,
+                UsageLimit = -1,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+            }, ev.OwnerId);
+            Assert.False(resLNeg.Success);
+            Assert.Equal(StatusCodes.Status400BadRequest, resLNeg.StatusCode);
+
+            // ExpiresAt in the past -> reject
+            var resPast = await service.CreateDiscountCodeAsync(ev.Id, new CreateDiscountCodeRequest
+            {
+                Code = "PAST",
+                DiscountType = DiscountType.Percent,
+                DiscountValue = 10,
+                UsageLimit = 10,
+                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-10)
+            }, ev.OwnerId);
+            Assert.False(resPast.Success);
+            Assert.Equal(StatusCodes.Status400BadRequest, resPast.StatusCode);
+        }
+
+        // Test S56-02: Same-order concurrent apply of the same coupon on PostgreSQL
+        [Fact]
+        public async Task Test21_PostgreSql_SameOrder_SameCoupon_ConcurrentApply_ConsumesExactlyOneUsage()
+        {
+            var host = Environment.GetEnvironmentVariable("POSTGRES_HOST") ?? "127.0.0.1";
+            var port = Environment.GetEnvironmentVariable("POSTGRES_PORT") ?? "5432";
+            var user = Environment.GetEnvironmentVariable("POSTGRES_USER") ?? "postgres";
+            var pass = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD") ?? "postgres_password_123";
+            var connStr = $"Host={host};Port={port};Database=event_ticket_s56_test;Username={user};Password={pass};Timeout=3";
+
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseNpgsql(connStr)
+                .Options;
+
+            try
+            {
+                using var testConn = new AppDbContext(options);
+                if (!await testConn.Database.CanConnectAsync())
+                {
+                    return;
+                }
+                await testConn.Database.EnsureCreatedAsync();
+            }
+            catch
+            {
+                return;
+            }
+
+            Guid orderId;
+            Guid customerId;
+            Guid discountCodeId;
+            var codeStr = $"PGSAME_{Guid.NewGuid():N}"[..15].ToUpperInvariant();
+
+            using (var seedContext = new AppDbContext(options))
+            {
+                var organizer = new User { Id = Guid.NewGuid(), Username = $"org_{Guid.NewGuid():N}", Email = $"org_{Guid.NewGuid():N}@example.com", PasswordHash = "h" };
+                var customer = new User { Id = Guid.NewGuid(), Username = $"cust_{Guid.NewGuid():N}", Email = $"cust_{Guid.NewGuid():N}@example.com", PasswordHash = "h" };
+                customerId = customer.Id;
+                seedContext.Users.AddRange(organizer, customer);
+
+                var ev = new Event { Id = Guid.NewGuid(), Title = "PG Event", Location = "Hanoi", TotalSeats = 100, OwnerId = organizer.Id };
+                seedContext.Events.Add(ev);
+
+                var showtime = new Showtime { Id = Guid.NewGuid(), EventId = ev.Id, StartTime = DateTime.UtcNow.AddDays(1), EndTime = DateTime.UtcNow.AddDays(1).AddHours(2), AvailableSeats = 100 };
+                seedContext.Showtimes.Add(showtime);
+
+                var order = new Order { Id = Guid.NewGuid(), UserId = customer.Id, ShowtimeId = showtime.Id, Status = OrderStatus.Pending, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15), OriginalAmount = 500000, TotalAmount = 500000 };
+                orderId = order.Id;
+                seedContext.Orders.Add(order);
+
+                var code = new DiscountCode
+                {
+                    Id = Guid.NewGuid(),
+                    EventId = ev.Id,
+                    Code = codeStr,
+                    DiscountType = DiscountType.Percent,
+                    DiscountValue = 10,
+                    UsageLimit = 10,
+                    UsedCount = 0,
+                    ExpiresAt = DateTimeOffset.UtcNow.AddDays(1),
+                    IsActive = true,
+                    CreatedByUserId = organizer.Id
+                };
+                discountCodeId = code.Id;
+                seedContext.DiscountCodes.Add(code);
+                await seedContext.SaveChangesAsync();
+            }
+
+            // Launch 2 parallel requests on the exact same order with the same code
+            var task1 = Task.Run(async () =>
+            {
+                using var c1 = new AppDbContext(options);
+                var s1 = new DiscountCodeService(c1);
+                return await s1.ApplyDiscountCodeAsync(orderId, codeStr, customerId);
+            });
+
+            var task2 = Task.Run(async () =>
+            {
+                using var c2 = new AppDbContext(options);
+                var s2 = new DiscountCodeService(c2);
+                return await s2.ApplyDiscountCodeAsync(orderId, codeStr, customerId);
+            });
+
+            var results = await Task.WhenAll(task1, task2);
+
+            // Both should succeed (one performs reservation, one is idempotent success)
+            Assert.True(results[0].Success);
+            Assert.True(results[1].Success);
+
+            // But UsedCount MUST BE EXACTLY 1!
+            using var verifyContext = new AppDbContext(options);
+            var finalCode = await verifyContext.DiscountCodes.FindAsync(discountCodeId);
+            Assert.Equal(1, finalCode!.UsedCount);
+
+            var finalOrder = await verifyContext.Orders.FindAsync(orderId);
+            Assert.Equal(discountCodeId, finalOrder!.DiscountCodeId);
+        }
+
+        // Test S56-02: Same-order concurrent apply of 2 different coupons on PostgreSQL
+        [Fact]
+        public async Task Test22_PostgreSql_SameOrder_TwoDifferentCoupons_ConcurrentApply_ConsumesOnlyWinner()
+        {
+            var host = Environment.GetEnvironmentVariable("POSTGRES_HOST") ?? "127.0.0.1";
+            var port = Environment.GetEnvironmentVariable("POSTGRES_PORT") ?? "5432";
+            var user = Environment.GetEnvironmentVariable("POSTGRES_USER") ?? "postgres";
+            var pass = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD") ?? "postgres_password_123";
+            var connStr = $"Host={host};Port={port};Database=event_ticket_s56_test;Username={user};Password={pass};Timeout=3";
+
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseNpgsql(connStr)
+                .Options;
+
+            try
+            {
+                using var testConn = new AppDbContext(options);
+                if (!await testConn.Database.CanConnectAsync())
+                {
+                    return;
+                }
+                await testConn.Database.EnsureCreatedAsync();
+            }
+            catch
+            {
+                return;
+            }
+
+            Guid orderId;
+            Guid customerId;
+            Guid codeAId;
+            Guid codeBId;
+            var codeAStr = $"PGA_{Guid.NewGuid():N}"[..15].ToUpperInvariant();
+            var codeBStr = $"PGB_{Guid.NewGuid():N}"[..15].ToUpperInvariant();
+
+            using (var seedContext = new AppDbContext(options))
+            {
+                var organizer = new User { Id = Guid.NewGuid(), Username = $"org_{Guid.NewGuid():N}", Email = $"org_{Guid.NewGuid():N}@example.com", PasswordHash = "h" };
+                var customer = new User { Id = Guid.NewGuid(), Username = $"cust_{Guid.NewGuid():N}", Email = $"cust_{Guid.NewGuid():N}@example.com", PasswordHash = "h" };
+                customerId = customer.Id;
+                seedContext.Users.AddRange(organizer, customer);
+
+                var ev = new Event { Id = Guid.NewGuid(), Title = "PG Event", Location = "Hanoi", TotalSeats = 100, OwnerId = organizer.Id };
+                seedContext.Events.Add(ev);
+
+                var showtime = new Showtime { Id = Guid.NewGuid(), EventId = ev.Id, StartTime = DateTime.UtcNow.AddDays(1), EndTime = DateTime.UtcNow.AddDays(1).AddHours(2), AvailableSeats = 100 };
+                seedContext.Showtimes.Add(showtime);
+
+                var order = new Order { Id = Guid.NewGuid(), UserId = customer.Id, ShowtimeId = showtime.Id, Status = OrderStatus.Pending, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15), OriginalAmount = 500000, TotalAmount = 500000 };
+                orderId = order.Id;
+                seedContext.Orders.Add(order);
+
+                var codeA = new DiscountCode { Id = Guid.NewGuid(), EventId = ev.Id, Code = codeAStr, DiscountType = DiscountType.Percent, DiscountValue = 10, UsageLimit = 10, UsedCount = 0, ExpiresAt = DateTimeOffset.UtcNow.AddDays(1), IsActive = true, CreatedByUserId = organizer.Id };
+                var codeB = new DiscountCode { Id = Guid.NewGuid(), EventId = ev.Id, Code = codeBStr, DiscountType = DiscountType.Percent, DiscountValue = 20, UsageLimit = 10, UsedCount = 0, ExpiresAt = DateTimeOffset.UtcNow.AddDays(1), IsActive = true, CreatedByUserId = organizer.Id };
+                codeAId = codeA.Id;
+                codeBId = codeB.Id;
+                seedContext.DiscountCodes.AddRange(codeA, codeB);
+                await seedContext.SaveChangesAsync();
+            }
+
+            // Launch 2 parallel requests with 2 different codes on the exact same order
+            var task1 = Task.Run(async () =>
+            {
+                using var c1 = new AppDbContext(options);
+                var s1 = new DiscountCodeService(c1);
+                return await s1.ApplyDiscountCodeAsync(orderId, codeAStr, customerId);
+            });
+
+            var task2 = Task.Run(async () =>
+            {
+                using var c2 = new AppDbContext(options);
+                var s2 = new DiscountCodeService(c2);
+                return await s2.ApplyDiscountCodeAsync(orderId, codeBStr, customerId);
+            });
+
+            var results = await Task.WhenAll(task1, task2);
+
+            // Exactly 1 must succeed, 1 must be rejected with stacking error
+            int successCount = results.Count(r => r.Success);
+            int failCount = results.Count(r => !r.Success);
+            Assert.Equal(1, successCount);
+            Assert.Equal(1, failCount);
+
+            // Total used count of codeA + codeB MUST equal exactly 1 (no phantom consumption)
+            using var verifyContext = new AppDbContext(options);
+            var finalCodeA = await verifyContext.DiscountCodes.FindAsync(codeAId);
+            var finalCodeB = await verifyContext.DiscountCodes.FindAsync(codeBId);
+            Assert.Equal(1, finalCodeA!.UsedCount + finalCodeB!.UsedCount);
+
+            var finalOrder = await verifyContext.Orders.FindAsync(orderId);
+            Assert.True(finalOrder!.DiscountCodeId == codeAId || finalOrder.DiscountCodeId == codeBId);
+        }
+
+        // Test S56-02: Same-order concurrent apply in InMemory mode
+        [Fact]
+        public async Task Test23_InMemory_SameOrder_ConcurrentApply_ConsumesExactlyOneUsage()
+        {
+            var dbName = Guid.NewGuid().ToString();
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseInMemoryDatabase(databaseName: dbName)
+                .ConfigureWarnings(x => x.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning))
+                .Options;
+
+            Guid orderId;
+            Guid customerId;
+            Guid discountCodeId;
+
+            using (var seedContext = new AppDbContext(options))
+            {
+                var organizer = new User { Id = Guid.NewGuid(), Username = "org_mem", Email = "org_mem@example.com", PasswordHash = "h" };
+                var customer = new User { Id = Guid.NewGuid(), Username = "cust_mem", Email = "cust_mem@example.com", PasswordHash = "h" };
+                customerId = customer.Id;
+                seedContext.Users.AddRange(organizer, customer);
+
+                var ev = new Event { Id = Guid.NewGuid(), Title = "Mem Event", Location = "Hanoi", TotalSeats = 100, OwnerId = organizer.Id };
+                seedContext.Events.Add(ev);
+
+                var showtime = new Showtime { Id = Guid.NewGuid(), EventId = ev.Id, StartTime = DateTime.UtcNow.AddDays(1), EndTime = DateTime.UtcNow.AddDays(1).AddHours(2), AvailableSeats = 100 };
+                seedContext.Showtimes.Add(showtime);
+
+                var order = new Order { Id = Guid.NewGuid(), UserId = customer.Id, ShowtimeId = showtime.Id, Status = OrderStatus.Pending, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15), OriginalAmount = 500000, TotalAmount = 500000 };
+                orderId = order.Id;
+                seedContext.Orders.Add(order);
+
+                var code = new DiscountCode
+                {
+                    Id = Guid.NewGuid(),
+                    EventId = ev.Id,
+                    Code = "MEMSAME10",
+                    DiscountType = DiscountType.Percent,
+                    DiscountValue = 10,
+                    UsageLimit = 10,
+                    UsedCount = 0,
+                    ExpiresAt = DateTimeOffset.UtcNow.AddDays(1),
+                    IsActive = true,
+                    CreatedByUserId = organizer.Id
+                };
+                discountCodeId = code.Id;
+                seedContext.DiscountCodes.Add(code);
+                await seedContext.SaveChangesAsync();
+            }
+
+            // Launch 2 parallel tasks on the same order with the same code
+            var task1 = Task.Run(async () =>
+            {
+                using var c1 = new AppDbContext(options);
+                var s1 = new DiscountCodeService(c1);
+                return await s1.ApplyDiscountCodeAsync(orderId, "MEMSAME10", customerId);
+            });
+
+            var task2 = Task.Run(async () =>
+            {
+                using var c2 = new AppDbContext(options);
+                var s2 = new DiscountCodeService(c2);
+                return await s2.ApplyDiscountCodeAsync(orderId, "MEMSAME10", customerId);
+            });
+
+            var results = await Task.WhenAll(task1, task2);
+
+            Assert.True(results[0].Success);
+            Assert.True(results[1].Success);
+
+            using var verifyContext = new AppDbContext(options);
+            var finalCode = await verifyContext.DiscountCodes.FindAsync(discountCodeId);
+            Assert.Equal(1, finalCode!.UsedCount);
+        }
+
         #endregion
     }
 }
