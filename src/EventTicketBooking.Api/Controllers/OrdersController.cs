@@ -1245,21 +1245,32 @@ namespace EventTicketBooking.Api.Controllers
             var showtimeId = order.ShowtimeId;
             var tickets = order.OrderItems
                 .Where(oi => oi.Ticket != null)
-                .Select(oi => new TicketDto
+                .Select(oi =>
                 {
-                    Id = oi.Ticket!.Id,
-                    OrderItemId = oi.Id,
-                    TicketCode = oi.Ticket.TicketCode,
-                    QrPayload = _ticketService.GenerateQrPayload(oi.Ticket.TicketCode, showtimeId),
-                    EventTitle = order.Showtime?.Event?.Title,
-                    EventLocation = order.Showtime?.Event?.Location,
-                    ShowtimeStartTime = order.Showtime?.StartTime,
-                    ShowtimeEndTime = order.Showtime?.EndTime,
-                    CategoryName = oi.Seat?.SeatCategory?.Name,
-                    SeatRow = oi.Seat?.Row,
-                    SeatNumber = oi.Seat?.SeatNumber ?? 0,
-                    Price = oi.Price,
-                    CreatedAt = oi.Ticket.CreatedAt
+                    var isTransferredAway = oi.Ticket!.CurrentUserId != null && oi.Ticket.CurrentUserId != order.UserId;
+                    return new TicketDto
+                    {
+                        Id = oi.Ticket.Id,
+                        OrderItemId = oi.Id,
+                        OrderId = order.Id,
+                        ShowtimeId = showtimeId,
+                        TicketCode = isTransferredAway ? "ĐÃ CHUYỂN NHƯỢNG" : oi.Ticket.TicketCode,
+                        QrPayload = isTransferredAway ? "" : _ticketService.GenerateQrPayload(oi.Ticket.TicketCode, showtimeId),
+                        EventTitle = order.Showtime?.Event?.Title,
+                        EventLocation = order.Showtime?.Event?.Location,
+                        EventImageUrl = order.Showtime?.Event?.ImageUrl,
+                        ShowtimeStartTime = order.Showtime?.StartTime,
+                        ShowtimeEndTime = order.Showtime?.EndTime,
+                        CategoryName = oi.Seat?.SeatCategory?.Name,
+                        SeatRow = oi.Seat?.Row,
+                        SeatNumber = oi.Seat?.SeatNumber ?? 0,
+                        Price = oi.Price,
+                        CreatedAt = oi.Ticket.CreatedAt,
+                        IsCheckedIn = oi.IsCheckedIn,
+                        IsTransferred = isTransferredAway,
+                        TransferCount = oi.Ticket.TransferCount,
+                        CanTransfer = !isTransferredAway && !oi.IsCheckedIn && oi.Ticket.TransferCount < 1
+                    };
                 })
                 .ToList();
 
@@ -1452,7 +1463,7 @@ namespace EventTicketBooking.Api.Controllers
                 RefundNextRetryAt = isStaffOrAdmin ? refundReq?.NextRetryAt : null,
                 RefundErrorCode = isStaffOrAdmin ? refundReq?.ErrorCode : null,
                 RefundErrorMessage = isStaffOrAdmin ? refundReq?.ErrorMessage : null,
-
+                ReminderSentAt = order.ReminderSentAt,
                 Items = order.OrderItems?.Select(oi => new OrderItemDto
                 {
                     Id = oi.Id,

@@ -16,6 +16,7 @@ namespace EventTicketBooking.Api.Controllers
 {
     [ApiController]
     [Route("api/showtimes/{showtimeId:guid}/waiting-room")]
+    [AllowAnonymous]
     public class WaitingRoomController : ControllerBase
     {
         private readonly IWaitingRoomService _waitingRoomService;

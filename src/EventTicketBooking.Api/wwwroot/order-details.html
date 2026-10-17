@@ -98,6 +98,51 @@
         </div>
       </div>
 
+      <!-- S-61: Thông tin Sự kiện, Suất diễn & Chỉ dẫn địa điểm -->
+      <div id="eventInfoCard" class="hidden p-6 border-b border-slate-100 bg-gradient-to-r from-indigo-50/40 via-white to-slate-50/60">
+        <div class="space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-700 tracking-wide uppercase">Sự kiện & Suất diễn</span>
+            <span id="reminderStatusBadge" class="hidden px-2.5 py-0.5 rounded-full text-[11px] font-semibold"></span>
+          </div>
+          <h2 id="eventTitleDisplay" class="text-xl font-bold text-slate-800"></h2>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-sm text-slate-600">
+            <div class="flex items-start gap-2.5">
+              <i class="fa-regular fa-calendar-days text-indigo-600 mt-1"></i>
+              <div>
+                <p class="text-xs text-slate-400 font-semibold uppercase">Thời gian diễn</p>
+                <p id="showtimeTimeDisplay" class="font-bold text-slate-700"></p>
+              </div>
+            </div>
+            <div class="flex items-start gap-2.5">
+              <i class="fa-solid fa-location-dot text-rose-500 mt-1"></i>
+              <div>
+                <p class="text-xs text-slate-400 font-semibold uppercase">Địa điểm tổ chức</p>
+                <p id="eventLocationDisplay" class="font-bold text-slate-700"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chỉ dẫn vào cửa & Check-in -->
+          <div class="mt-3 p-3.5 bg-white border border-indigo-100 rounded-xl text-xs text-slate-600 space-y-1.5">
+            <div class="font-bold text-indigo-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-map-location-dot text-indigo-600"></i>
+              <span>Chỉ dẫn địa điểm & Check-in trước giờ diễn:</span>
+            </div>
+            <ul class="list-disc list-inside space-y-1 text-slate-600 pl-1">
+              <li>Vui lòng có mặt tại địa điểm trước giờ diễn ít nhất <strong>30 - 45 phút</strong> để hoàn tất thủ tục soát vé.</li>
+              <li>Chuẩn bị sẵn mã đơn hàng hoặc vé điện tử (QR) đã được gửi qua email để xuất trình tại quầy check-in.</li>
+              <li>Trường hợp có thay đổi giờ diễn, hệ thống sẽ tự động gửi email cập nhật tới hộp thư của bạn.</li>
+            </ul>
+            <div id="reminderSentNote" class="hidden pt-1.5 border-t border-slate-100 text-emerald-700 font-semibold flex items-center gap-1.5">
+              <i class="fa-solid fa-envelope-circle-check text-emerald-600"></i>
+              <span id="reminderSentText"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Items List -->
       <div class="p-6">
         <h3 class="text-base font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">Danh sách vé</h3>
@@ -473,6 +518,53 @@
       }
 
       document.getElementById('totalAmountDisplay').textContent = formatCurrency(order.totalAmount);
+
+      // S-61: Render thông tin Sự kiện, Suất diễn, Địa điểm và Trạng thái email nhắc nhở
+      const eventCard = document.getElementById('eventInfoCard');
+      if (order.eventTitle || order.showtimeStartTime) {
+        eventCard.classList.remove('hidden');
+        document.getElementById('eventTitleDisplay').textContent = order.eventTitle || 'Sự kiện';
+        
+        let timeStr = 'Chưa xác định';
+        if (order.showtimeStartTime) {
+          const start = new Date(order.showtimeStartTime);
+          const startFormatted = start.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
+          if (order.showtimeEndTime) {
+            const end = new Date(order.showtimeEndTime);
+            const endFormatted = end.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            timeStr = `${startFormatted} - ${endFormatted}`;
+          } else {
+            timeStr = startFormatted;
+          }
+        }
+        document.getElementById('showtimeTimeDisplay').textContent = timeStr;
+        document.getElementById('eventLocationDisplay').textContent = order.eventLocation || 'Xem chi tiết trên vé hoặc liên hệ BTC';
+
+        // S-61 Reminder status
+        const reminderBadge = document.getElementById('reminderStatusBadge');
+        const reminderSentNote = document.getElementById('reminderSentNote');
+        const reminderSentText = document.getElementById('reminderSentText');
+        
+        if (order.reminderSentAt) {
+          const sentDate = new Date(order.reminderSentAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
+          reminderBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 flex items-center gap-1';
+          reminderBadge.innerHTML = '<i class="fa-solid fa-check"></i> Đã gửi email nhắc 24h';
+          reminderBadge.classList.remove('hidden');
+
+          reminderSentNote.classList.remove('hidden');
+          reminderSentText.textContent = `Email nhắc nhở 24h kèm mã vé & chỉ dẫn địa điểm đã được gửi tới ${order.customerEmail || 'hộp thư của bạn'} lúc ${sentDate}.`;
+        } else if (order.status === 'Paid') {
+          reminderBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1';
+          reminderBadge.innerHTML = '<i class="fa-regular fa-bell"></i> Sẽ gửi email nhắc 24h trước suất';
+          reminderBadge.classList.remove('hidden');
+          reminderSentNote.classList.add('hidden');
+        } else {
+          reminderBadge.classList.add('hidden');
+          reminderSentNote.classList.add('hidden');
+        }
+      } else {
+        eventCard.classList.add('hidden');
+      }
 
       const itemsList = document.getElementById('orderItemsList');
       itemsList.innerHTML = '';

@@ -71,6 +71,9 @@ namespace EventTicketBooking.Api.DTOs
         /// <summary>Story S-48: thông điệp lỗi chi tiết từ cổng thanh toán - chỉ dành cho Auditor/Admin.</summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? RefundErrorMessage { get; set; }
+
+        /// <summary>Story S-61: thời điểm đã gửi email nhắc nhở 24h trước giờ diễn.</summary>
+        public DateTimeOffset? ReminderSentAt { get; set; }
     }
 
     public class OrderItemDto

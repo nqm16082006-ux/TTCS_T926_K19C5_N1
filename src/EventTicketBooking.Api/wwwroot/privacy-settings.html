@@ -75,9 +75,10 @@
       </div>
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5 flex-wrap">
             <span>Quản lý Điều khoản &amp; Quyền riêng tư</span>
             <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700">S-54</span>
+            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-rose-100 text-rose-700">S-53: Xoá dữ liệu</span>
           </h1>
           <p class="text-sm text-slate-500 mt-1">Minh bạch thông tin chấp thuận chính sách, phiên bản điều khoản và quyền thu hồi nhận email tiếp thị (Nghị định 13/2023/NĐ-CP).</p>
         </div>
@@ -230,6 +231,70 @@
           </div>
         </div>
 
+        <!-- Card 4: Customer Data Deletion Request (Core S-53 AC) -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs" id="cardDataDeletion">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                <span class="material-symbols-outlined text-[22px]">person_remove</span>
+              </div>
+              <div>
+                <h3 class="text-base font-bold text-slate-900">Quyền yêu cầu xoá dữ liệu cá nhân</h3>
+                <p class="text-xs text-slate-500">Thực hiện quyền yêu cầu xoá dữ liệu theo Nghị định 13/2023/NĐ-CP</p>
+              </div>
+            </div>
+            <span id="deletionStatusBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600">Đang kiểm tra...</span>
+          </div>
+
+          <div class="mt-5 space-y-4 text-xs text-slate-600 leading-relaxed">
+            <!-- Regulatory Notice -->
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+              <div class="flex items-center gap-2 font-bold text-slate-800 text-xs">
+                <span class="material-symbols-outlined text-[18px] text-indigo-600">gavel</span>
+                <span>Quy trình xử lý &amp; Ràng buộc pháp lý (AC &amp; NFR):</span>
+              </div>
+              <ul class="list-disc list-inside space-y-1 text-slate-600 text-[11px]">
+                <li><strong>Phê duyệt bởi người có thẩm quyền:</strong> Yêu cầu của bạn sẽ được người có thẩm quyền (Quản trị viên / DPO) rà soát phạm vi dữ liệu trước khi thực thi.</li>
+                <li><strong>Ẩn danh hoá dữ liệu cá nhân:</strong> Sau khi duyệt, họ tên, email, tên người dùng sẽ bị thay bằng giá trị ẩn danh trong mọi bảng; tài khoản không đăng nhập được nữa.</li>
+                <li><strong>Bảo toàn sổ kế toán:</strong> Theo Luật Kế toán, toàn bộ đơn hàng, chứng từ thanh toán và số liệu doanh thu vẫn được giữ nguyên vẹn để phục vụ báo cáo và đối soát tài chính.</li>
+              </ul>
+            </div>
+
+            <!-- Current Deletion Request Status Display -->
+            <div id="deletionStatusContainer" class="p-4 rounded-xl border border-slate-200 bg-slate-50 transition-all">
+              <div class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-[20px] shrink-0 text-slate-500" id="deletionStatusIcon">info</span>
+                <div class="flex-1">
+                  <div class="font-bold text-slate-800" id="deletionStatusTitle">Đang kiểm tra trạng thái...</div>
+                  <div class="text-[11px] text-slate-500 mt-0.5 leading-relaxed" id="deletionStatusDesc">Vui lòng chờ tải thông tin từ máy chủ...</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Deletion Form (Hidden if already anonymized or pending) -->
+            <div id="deletionFormContainer" class="space-y-3 pt-2">
+              <div>
+                <label for="deletionReasonInput" class="block font-bold text-slate-800 mb-1">
+                  Lý do yêu cầu xoá dữ liệu (Tuỳ chọn):
+                </label>
+                <textarea id="deletionReasonInput" rows="3" placeholder="Nhập lý do hoặc yêu cầu cụ thể (ví dụ: Tôi không còn nhu cầu mua vé và muốn thực hiện quyền xoá dữ liệu cá nhân theo Nghị định 13/2023/NĐ-CP)..." class="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 focus:bg-white transition resize-none"></textarea>
+              </div>
+
+              <div class="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50/70 border border-amber-200/80">
+                <input id="chkConfirmDeletion" type="checkbox" class="mt-0.5 rounded text-rose-600 focus:ring-rose-500 cursor-pointer">
+                <label for="chkConfirmDeletion" class="text-[11px] text-amber-900 cursor-pointer font-medium leading-snug">
+                  Tôi đã đọc và hiểu rõ rằng sau khi yêu cầu được duyệt, tài khoản sẽ <strong>bị khóa vĩnh viễn không thể đăng nhập lại</strong>, mọi thông tin định danh cá nhân sẽ được ẩn danh, nhưng các giao dịch thanh toán và đơn hàng đã phát sinh vẫn được bảo toàn cho mục đích kế toán.
+                </label>
+              </div>
+
+              <button onclick="submitDataDeletionRequest()" id="btnSubmitDeletion" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm transition active:scale-95 inline-flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">delete_forever</span>
+                <span>Gửi yêu cầu xoá dữ liệu cá nhân</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- Right Column: Policy Full Text & Admin Demo Controls (1 col) -->
@@ -296,6 +361,29 @@
           </div>
         </div>
 
+        <!-- Admin DPO Deletion Review Card (S-53 AC & NFR) -->
+        <div id="adminDeletionPanel" class="hidden bg-white rounded-2xl border border-rose-200 p-6 shadow-xs">
+          <div class="flex items-center justify-between pb-3 border-b border-rose-100 mb-3">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-[20px] text-rose-600">admin_panel_settings</span>
+              <h3 class="text-sm font-bold text-slate-900">Duyệt xoá dữ liệu (S-53)</h3>
+            </div>
+            <span id="adminPendingCountBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">0 chờ</span>
+          </div>
+          <p class="text-xs text-slate-500 mb-3 leading-relaxed">
+            Danh sách yêu cầu xoá dữ liệu cá nhân từ khách hàng theo NĐ 13/2023/NĐ-CP cần người có thẩm quyền phê duyệt.
+          </p>
+
+          <div id="adminDeletionList" class="space-y-3 max-h-96 overflow-y-auto pr-1 text-xs">
+            <div class="text-center py-4 text-slate-400">Đang tải danh sách yêu cầu...</div>
+          </div>
+          
+          <button onclick="loadAdminDeletionRequests()" class="mt-3 w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center justify-center gap-1.5">
+            <span class="material-symbols-outlined text-[16px]">refresh</span>
+            <span>Làm mới danh sách</span>
+          </button>
+        </div>
+
       </div>
 
     </div>
@@ -304,7 +392,7 @@
 
   <!-- Footer -->
   <footer class="bg-white border-t border-slate-200 mt-12 py-6 text-center text-xs text-slate-400">
-    <p>&copy; 2026 EventPulse System. S-54: Người dùng đồng ý điều khoản và chính sách riêng tư, thu hồi được.</p>
+    <p>&copy; 2026 EventPulse System. S-54: Điều khoản và chính sách riêng tư | S-53: Khách yêu cầu xoá dữ liệu cá nhân của mình.</p>
   </footer>
 
   <!-- Scripts -->
@@ -314,6 +402,8 @@
     document.addEventListener('DOMContentLoaded', () => {
       initAuthNav();
       loadTermsStatus();
+      loadDeletionStatus();
+      checkAndInitAdmin();
     });
 
     function initAuthNav() {
@@ -632,6 +722,287 @@
       if (!isoString) return '--/--/----';
       const d = new Date(isoString);
       return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')} ngày ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} (UTC+7)`;
+    }
+
+    // ==========================================
+    // STORY S-53: QUẢN LÝ XOÁ DỮ LIỆU CÁ NHÂN
+    // ==========================================
+
+    let currentDeletionData = null;
+
+    async function loadDeletionStatus() {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
+      const badge = document.getElementById('deletionStatusBadge');
+      const container = document.getElementById('deletionStatusContainer');
+      const icon = document.getElementById('deletionStatusIcon');
+      const title = document.getElementById('deletionStatusTitle');
+      const desc = document.getElementById('deletionStatusDesc');
+      const formContainer = document.getElementById('deletionFormContainer');
+
+      try {
+        const res = await fetch('/api/v1/user/privacy/data-deletion/status', {
+          headers: {
+            'Authorization': 'Bearer ' + token
+          }
+        });
+
+        if (!res.ok) {
+          badge.textContent = "Không thể tải";
+          badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-500";
+          return;
+        }
+
+        const data = await res.json();
+        currentDeletionData = data;
+
+        if (data.isAnonymized) {
+          badge.textContent = "Đã ẩn danh dữ liệu";
+          badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700";
+          container.className = "p-4 rounded-xl border border-purple-200 bg-purple-50 text-purple-900";
+          icon.textContent = "check_circle";
+          icon.className = "material-symbols-outlined text-[20px] shrink-0 text-purple-600";
+          title.textContent = "Tài khoản của bạn đã được ẩn danh dữ liệu cá nhân hoàn tất";
+          desc.textContent = `Dữ liệu họ tên, email, số điện thoại đã được thay thế an toàn bằng giá trị ẩn danh theo Nghị định 13/2023/NĐ-CP lúc ${formatDateTime(data.anonymizedAt)}. Tài khoản này không thể đăng nhập lại nữa.`;
+          formContainer.classList.add('hidden');
+          return;
+        }
+
+        if (data.hasPendingRequest && data.latestRequest) {
+          badge.textContent = "Chờ duyệt (Pending)";
+          badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 animate-pulse";
+          container.className = "p-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-900";
+          icon.textContent = "hourglass_top";
+          icon.className = "material-symbols-outlined text-[20px] shrink-0 text-amber-600";
+          title.textContent = "Yêu cầu xoá dữ liệu cá nhân đang được xử lý";
+          desc.innerHTML = `Bạn đã gửi yêu cầu vào lúc <strong>${formatDateTime(data.latestRequest.createdAt)}</strong>.<br>Lý do ghi nhận: <em>"${data.latestRequest.reason || 'Không có ghi chú'}"</em>.<br>Người có thẩm quyền đang tiến hành rà soát phạm vi dữ liệu trước khi thực thi.`;
+          formContainer.classList.add('hidden');
+          return;
+        }
+
+        if (data.latestRequest && data.latestRequest.status === 'Rejected') {
+          badge.textContent = "Bị từ chối";
+          badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-700";
+          container.className = "p-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-900";
+          icon.textContent = "cancel";
+          icon.className = "material-symbols-outlined text-[20px] shrink-0 text-rose-600";
+          title.textContent = "Yêu cầu gần nhất đã bị từ chối phê duyệt";
+          desc.innerHTML = `Yêu cầu gửi ngày ${formatDateTime(data.latestRequest.createdAt)} đã bị từ chối lúc ${formatDateTime(data.latestRequest.reviewedAt)}.<br><strong>Phản hồi từ Quản trị viên:</strong> <em>"${data.latestRequest.adminNote || 'Chưa cung cấp lý do cụ thể'}"</em>.<br>Bạn có thể điều chỉnh và gửi lại yêu cầu bên dưới nếu cần thiết.`;
+          formContainer.classList.remove('hidden');
+          return;
+        }
+
+        // Chưa gửi yêu cầu nào
+        badge.textContent = "Chưa gửi yêu cầu";
+        badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600";
+        container.className = "p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-700";
+        icon.textContent = "privacy_tip";
+        icon.className = "material-symbols-outlined text-[20px] shrink-0 text-slate-500";
+        title.textContent = "Bạn chưa gửi yêu cầu xoá dữ liệu cá nhân nào";
+        desc.textContent = "Nếu bạn muốn thực hiện quyền xoá dữ liệu theo Nghị định 13/2023/NĐ-CP, vui lòng điền lý do và xác nhận vào biểu mẫu dưới đây.";
+        formContainer.classList.remove('hidden');
+
+      } catch (err) {
+        console.error("Lỗi tải trạng thái xoá dữ liệu S-53:", err);
+      }
+    }
+
+    async function submitDataDeletionRequest() {
+      const chk = document.getElementById('chkConfirmDeletion');
+      if (!chk.checked) {
+        showAlert('Chưa xác nhận', 'Vui lòng tích chọn xác nhận bạn đã hiểu rõ tài khoản sẽ bị vô hiệu hoá vĩnh viễn trước khi gửi yêu cầu.', true);
+        return;
+      }
+
+      const reason = document.getElementById('deletionReasonInput').value.trim();
+      const btn = document.getElementById('btnSubmitDeletion');
+      const token = localStorage.getItem('access_token');
+
+      btn.disabled = true;
+      btn.innerHTML = `<span class="material-symbols-outlined text-[18px] animate-spin">hourglass_empty</span><span>Đang gửi yêu cầu...</span>`;
+
+      try {
+        const res = await fetch('/api/v1/user/privacy/data-deletion', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ reason })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          showAlert('Gửi yêu cầu thành công', 'Yêu cầu xoá dữ liệu cá nhân của bạn đã được tiếp nhận và chuyển đến người có thẩm quyền phê duyệt.', false);
+          document.getElementById('deletionReasonInput').value = '';
+          chk.checked = false;
+          await loadDeletionStatus();
+          // Nếu đang là admin thì tải lại danh sách admin
+          loadAdminDeletionRequests();
+        } else {
+          showAlert('Lỗi gửi yêu cầu', data.message || 'Không thể tạo yêu cầu xoá dữ liệu.', true);
+        }
+      } catch (err) {
+        showAlert('Lỗi kết nối', 'Không thể kết nối đến máy chủ.', true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">delete_forever</span><span>Gửi yêu cầu xoá dữ liệu cá nhân</span>`;
+      }
+    }
+
+    // ==========================================
+    // ADMIN DPO REVIEW (S-53 NFR)
+    // ==========================================
+
+    function checkAndInitAdmin() {
+      try {
+        const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
+        const roles = userInfo.roles || [];
+        const isAdmin = roles.includes('Admin') || roles.includes('ADMIN');
+
+        // Thử kiểm tra từ token payload nếu chưa có trong user_info
+        if (!isAdmin) {
+          const token = localStorage.getItem('access_token');
+          if (token) {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            const tokenRoles = payload.role || payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || [];
+            if (Array.isArray(tokenRoles) ? tokenRoles.includes('Admin') : tokenRoles === 'Admin') {
+              showAdminPanel();
+              return;
+            }
+          }
+        } else {
+          showAdminPanel();
+        }
+      } catch {
+        // bỏ qua
+      }
+    }
+
+    function showAdminPanel() {
+      const panel = document.getElementById('adminDeletionPanel');
+      if (panel) {
+        panel.classList.remove('hidden');
+        loadAdminDeletionRequests();
+      }
+    }
+
+    async function loadAdminDeletionRequests() {
+      const token = localStorage.getItem('access_token');
+      const listEl = document.getElementById('adminDeletionList');
+      const countBadge = document.getElementById('adminPendingCountBadge');
+      if (!listEl) return;
+
+      try {
+        const res = await fetch('/api/v1/admin/privacy/data-deletion-requests', {
+          headers: {
+            'Authorization': 'Bearer ' + token
+          }
+        });
+
+        if (!res.ok) {
+          listEl.innerHTML = `<div class="p-3 bg-slate-50 rounded-xl text-slate-400 text-center">Chỉ tài khoản Quản trị viên (Admin) mới có quyền duyệt yêu cầu.</div>`;
+          return;
+        }
+
+        const requests = await res.json();
+        const pendingCount = requests.filter(r => r.status === 'Pending').length;
+        if (countBadge) {
+          countBadge.textContent = `${pendingCount} chờ duyệt`;
+          countBadge.className = pendingCount > 0
+            ? "px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 animate-pulse"
+            : "px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600";
+        }
+
+        if (requests.length === 0) {
+          listEl.innerHTML = `<div class="p-4 text-center text-slate-400 bg-slate-50 rounded-xl">Chưa có yêu cầu xoá dữ liệu nào từ khách hàng.</div>`;
+          return;
+        }
+
+        listEl.innerHTML = requests.map(req => {
+          const isPending = req.status === 'Pending';
+          let statusBadgeClass = 'bg-slate-100 text-slate-600';
+          if (req.status === 'Pending') statusBadgeClass = 'bg-amber-100 text-amber-800 font-bold';
+          if (req.status === 'Approved') statusBadgeClass = 'bg-emerald-100 text-emerald-800 font-bold';
+          if (req.status === 'Rejected') statusBadgeClass = 'bg-rose-100 text-rose-800 font-bold';
+
+          return `
+            <div class="p-3 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition shadow-2xs space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-bold text-slate-900 truncate" title="${req.requesterEmail}">${req.requesterName || req.requesterEmail}</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] ${statusBadgeClass}">${req.status}</span>
+              </div>
+              <div class="text-[11px] text-slate-500 font-mono truncate">${req.requesterEmail}</div>
+              <div class="p-2 rounded-lg bg-slate-50 text-[11px] text-slate-700 italic border border-slate-100">
+                "${req.reason || 'Yêu cầu xoá dữ liệu'}"
+              </div>
+              <div class="text-[10px] text-slate-400">
+                Gửi lúc: ${formatDateTime(req.createdAt)}
+                ${req.reviewedAt ? `<br>Duyệt: ${formatDateTime(req.reviewedAt)} (${req.reviewedByAdminEmail || 'Admin'})` : ''}
+                ${req.adminNote ? `<br>Ghi chú: ${req.adminNote}` : ''}
+              </div>
+              ${isPending ? `
+                <div class="flex items-center gap-2 pt-1 border-t border-slate-100">
+                  <button onclick="reviewDeletionRequest('${req.id}', true)" class="flex-1 py-1.5 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] transition shadow-xs flex items-center justify-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">check</span>
+                    <span>Duyệt ẩn danh</span>
+                  </button>
+                  <button onclick="reviewDeletionRequest('${req.id}', false)" class="py-1.5 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] transition flex items-center justify-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">close</span>
+                    <span>Từ chối</span>
+                  </button>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        listEl.innerHTML = `<div class="p-3 text-center text-rose-500">Lỗi khi tải danh sách Admin.</div>`;
+      }
+    }
+
+    async function reviewDeletionRequest(requestId, approved) {
+      let adminNote = '';
+      if (!approved) {
+        adminNote = prompt('Vui lòng nhập lý do từ chối yêu cầu xoá dữ liệu:');
+        if (adminNote === null) return; // Khách bấm cancel prompt
+      } else {
+        const confirmMsg = 'CẢNH BÁO: Phê duyệt yêu cầu này sẽ:\n1. Ẩn danh hoá vĩnh viễn họ tên, email, tên người dùng trong toàn bộ cơ sở dữ liệu.\n2. Vô hiệu hoá tài khoản người dùng (không thể đăng nhập lại).\n3. Giữ nguyên 100% chứng từ đơn hàng và số liệu kế toán.\n\nBạn có chắc chắn muốn DUYỆT yêu cầu này?';
+        if (!confirm(confirmMsg)) return;
+        adminNote = 'Đã rà soát phạm vi dữ liệu theo quy định. Phê duyệt ẩn danh dữ liệu cá nhân.';
+      }
+
+      const token = localStorage.getItem('access_token');
+      try {
+        const res = await fetch(`/api/v1/admin/privacy/data-deletion-requests/${requestId}/review`, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            approved,
+            adminNote
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          showAlert(
+            approved ? 'Đã duyệt và ẩn danh dữ liệu' : 'Đã từ chối yêu cầu',
+            approved ? `Dữ liệu cá nhân của người dùng đã được ẩn danh thành công. Sổ kế toán được bảo toàn nguyên vẹn.` : `Đã từ chối yêu cầu với lý do: ${adminNote}`,
+            !approved
+          );
+          loadAdminDeletionRequests();
+          loadDeletionStatus();
+        } else {
+          showAlert('Lỗi xử lý', data.message || 'Không thể phê duyệt yêu cầu.', true);
+        }
+      } catch (err) {
+        showAlert('Lỗi kết nối', 'Không thể kết nối đến máy chủ.', true);
+      }
     }
   </script>
 </body>
