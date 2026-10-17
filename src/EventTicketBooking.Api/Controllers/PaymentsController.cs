@@ -103,6 +103,17 @@ namespace EventTicketBooking.Api.Controllers
                         ApiResponse<object>.FailureResult(result.ErrorMessage));
                 }
 
+                // Task T-41: Đơn hết hạn hoặc đã trả thì từ chối; đơn hết hạn thì trả HTTP 409 Conflict
+                if (result.ErrorMessage == "Đơn hàng đã hết hạn thanh toán." ||
+                    result.ErrorMessage?.Contains("hết hạn", StringComparison.OrdinalIgnoreCase) == true ||
+                    result.ErrorMessage == "Đơn hàng đã được thanh toán thành công." ||
+                    result.ErrorMessage?.Contains("không ở trạng thái chờ thanh toán", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    return StatusCode(
+                        StatusCodes.Status409Conflict,
+                        ApiResponse<object>.FailureResult(result.ErrorMessage));
+                }
+
                 return BadRequest(
                     ApiResponse<object>.FailureResult(
                         result.ErrorMessage ?? "Không thể tạo yêu cầu thanh toán."));

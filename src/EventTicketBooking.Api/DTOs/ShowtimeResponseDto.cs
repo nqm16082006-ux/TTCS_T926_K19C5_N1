@@ -6,6 +6,8 @@ namespace EventTicketBooking.Api.DTOs
 {
     public class ShowtimeResponseDto
     {
+        public string? Name { get; set; }
+        public DateTime? SalesEndTime { get; set; }
         public string? SeatingMapImageUrl { get; set; }
         public Guid Id { get; set; }
         public Guid EventId { get; set; }
@@ -23,7 +25,7 @@ namespace EventTicketBooking.Api.DTOs
         public int SoldSeatCount { get; set; }
         public EventTicketBooking.Api.Models.ShowtimeStatus Status { get; set; }
         public List<SeatCategoryPriceDto> SeatCategories { get; set; } = new();
-        public bool CanOpenSale => Status == EventTicketBooking.Api.Models.ShowtimeStatus.Draft && AvailableSeats > 0 &&
+        public bool CanOpenSale => Status == EventTicketBooking.Api.Models.ShowtimeStatus.Draft && (SalesEndTime ?? StartTime) > DateTime.UtcNow && EndTime > DateTime.UtcNow && AvailableSeats > 0 &&
             (!ActualSeatCount.HasValue || (ActualSeatCount > 0 && SeatCategories.Count > 0 && SeatCategories.TrueForAll(c => c.Price is >= 0)));
         public bool CanCloseSale => Status == EventTicketBooking.Api.Models.ShowtimeStatus.OnSale;
         public bool CanCancel => (Status == EventTicketBooking.Api.Models.ShowtimeStatus.OnSale || Status == EventTicketBooking.Api.Models.ShowtimeStatus.Closed) && EndTime >= DateTime.UtcNow;
@@ -32,6 +34,10 @@ namespace EventTicketBooking.Api.DTOs
 
     public class CreateShowtimeDto : IValidatableObject
     {
+        [StringLength(200, ErrorMessage = "Tên suất diễn không được vượt quá 200 ký tự.")]
+        public string? Name { get; set; }
+        public DateTime? SalesEndTime { get; set; }
+
         [Required(ErrorMessage = "Thời gian bắt đầu là bắt buộc.")]
         public DateTime StartTime { get; set; }
 
@@ -45,6 +51,8 @@ namespace EventTicketBooking.Api.DTOs
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
+            if (SalesEndTime.HasValue && SalesEndTime > EndTime)
+                yield return new ValidationResult("Hạn bán vé không được vượt giờ kết thúc suất diễn.", new[] { nameof(SalesEndTime) });
             if (EndTime <= StartTime)
             {
                 yield return new ValidationResult(
@@ -57,6 +65,10 @@ namespace EventTicketBooking.Api.DTOs
 
     public class UpdateShowtimeDto : IValidatableObject
     {
+        [StringLength(200, ErrorMessage = "Tên suất diễn không được vượt quá 200 ký tự.")]
+        public string? Name { get; set; }
+        public DateTime? SalesEndTime { get; set; }
+
         [Required(ErrorMessage = "Thời gian bắt đầu là bắt buộc.")]
         public DateTime StartTime { get; set; }
 
@@ -70,6 +82,8 @@ namespace EventTicketBooking.Api.DTOs
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
+            if (SalesEndTime.HasValue && SalesEndTime > EndTime)
+                yield return new ValidationResult("Hạn bán vé không được vượt giờ kết thúc suất diễn.", new[] { nameof(SalesEndTime) });
             if (EndTime <= StartTime)
             {
                 yield return new ValidationResult(

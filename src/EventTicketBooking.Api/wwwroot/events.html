@@ -254,7 +254,7 @@
         <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./events.html?action=seats" onclick="openFirstEventSeats();return false;" id="nav-cau-hinh-ghe">
           <span class="material-symbols-outlined text-[20px]">chair</span>Cấu hình ghế &amp; bảng giá
         </a>
-        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./export-test.html" id="nav-xuat-checkin">
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./checkin-export.html" id="nav-xuat-checkin">
           <span class="material-symbols-outlined text-[20px]">file_download</span>Xuất danh sách Check-in
         </a>
       </nav>
@@ -587,9 +587,6 @@
       <span>Xuất danh sách Check-in (CSV)</span>
     </button>
     <div class="h-px bg-surface-container my-1"></div>
-    <button onclick="handleMenuAction('duplicate')" class="w-full flex items-center gap-2 px-3.5 py-2.5 text-on-surface hover:bg-surface-container transition-colors text-left">
-      <span class="material-symbols-outlined text-[18px]">content_copy</span> Nhân bản sự kiện
-    </button>
     <button onclick="handleMenuAction('delete')" class="w-full flex items-center gap-2 px-3.5 py-2.5 text-error hover:bg-error-container hover:text-on-error-container transition-colors text-left">
       <span class="material-symbols-outlined text-[18px]">delete</span>
       <span>Xóa sự kiện</span>
@@ -1089,9 +1086,9 @@
 
         // Seat progress / status
         let seatProgressHtml = '';
-        const totalSeats = e.totalSeats || 0;
+        const totalSeats = showtimes.reduce((sum, s) => sum + Number(s.actualSeatCount ?? 0), 0);
         const firstShowtime = showtimes[0];
-        const hasSeats = firstShowtime && (firstShowtime.availableSeats > 0 || (firstShowtime.seatCategories && firstShowtime.seatCategories.length > 0));
+        const hasSeats = totalSeats > 0;
 
         if (!hasSeats) {
           seatProgressHtml = `
@@ -1102,10 +1099,9 @@
           `;
         } else {
           // Available seats & Sold seats
-          const avail = firstShowtime ? firstShowtime.availableSeats : totalSeats;
+          const avail = Math.max(0, totalSeats - showtimes.reduce((sum, s) => sum + Number(s.soldSeatCount || 0), 0));
           const sold = Math.max(0, totalSeats - avail);
           let pct = totalSeats > 0 ? Math.round((sold / totalSeats) * 100) : 0;
-          if (status === 'active' && pct === 0) pct = 65; // realistic demo fill for live concerts
           const isHighSales = pct >= 90;
           const barColor = isHighSales ? 'bg-error' : (pct >= 50 ? 'bg-secondary' : 'bg-primary');
 
@@ -1221,7 +1217,7 @@
                 <a href="./create-event.html?id=${e.id}" class="p-2 rounded-lg text-outline hover:text-primary hover:bg-surface-container transition-colors inline-flex items-center justify-center" title="Chỉnh sửa sự kiện">
                   <span class="material-symbols-outlined text-[20px]">edit</span>
                 </a>
-                <a href="./export-test.html?showId=${showtimes.length > 0 ? encodeURIComponent(showtimes[0].id) : ''}" class="p-2 rounded-lg text-outline hover:text-emerald-700 hover:bg-emerald-50 transition-colors inline-flex items-center justify-center" title="Xuất danh sách check-in CSV (S-62)">
+                <a href="./checkin-export.html?showId=${showtimes.length > 0 ? encodeURIComponent(showtimes[0].id) : ''}" class="p-2 rounded-lg text-outline hover:text-emerald-700 hover:bg-emerald-50 transition-colors inline-flex items-center justify-center" title="Xuất danh sách check-in CSV (S-62)">
                   <span class="material-symbols-outlined text-[20px]">file_download</span>
                 </a>
                 <div class="relative inline-block text-left">
@@ -1243,12 +1239,11 @@
         const imageInfo = getEventImage(e, index);
         const showtimes = e.showtimes || [];
         const showtimeCount = showtimes.length;
-        const totalSeats = e.totalSeats || 0;
+        const totalSeats = showtimes.reduce((sum, s) => sum + Number(s.actualSeatCount ?? 0), 0);
         const firstShowtime = showtimes[0];
-        const avail = firstShowtime ? firstShowtime.availableSeats : totalSeats;
+        const avail = Math.max(0, totalSeats - showtimes.reduce((sum, s) => sum + Number(s.soldSeatCount || 0), 0));
         const sold = Math.max(0, totalSeats - avail);
         let pct = totalSeats > 0 ? Math.round((sold / totalSeats) * 100) : 0;
-        if (status === 'active' && pct === 0) pct = 65;
 
         return `
           <div class="rounded-xl bg-surface-container-lowest shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden border border-outline-variant/30 group">
@@ -1294,7 +1289,7 @@
                 <span class="material-symbols-outlined text-[16px]">visibility</span>
                 <span>Xem chi tiết (${showtimeCount} suất)</span>
               </a>
-              <a href="./export-test.html?showId=${showtimes.length > 0 ? encodeURIComponent(showtimes[0].id) : ''}" class="h-9 px-3 rounded-lg bg-surface-container hover:bg-emerald-50 hover:text-emerald-700 text-on-surface font-label-md text-label-md flex items-center justify-center transition" title="Xuất danh sách check-in CSV (S-62)">
+              <a href="./checkin-export.html?showId=${showtimes.length > 0 ? encodeURIComponent(showtimes[0].id) : ''}" class="h-9 px-3 rounded-lg bg-surface-container hover:bg-emerald-50 hover:text-emerald-700 text-on-surface font-label-md text-label-md flex items-center justify-center transition" title="Xuất danh sách check-in CSV (S-62)">
                 <span class="material-symbols-outlined text-[18px]">file_download</span>
               </a>
               <a href="./create-event.html?id=${e.id}" class="h-9 px-3 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md flex items-center justify-center transition" title="Chỉnh sửa sự kiện">
@@ -1362,34 +1357,17 @@
       } else if (action === 'export-csv') {
         const ev = currentEvents.find(e => e.id === activeMenuEventId);
         const showId = ev && ev.showtimes && ev.showtimes.length > 0 ? ev.showtimes[0].id : '';
-        window.location.href = `./export-test.html?showId=${encodeURIComponent(showId)}`;
+        window.location.href = `./checkin-export.html?showId=${encodeURIComponent(showId)}`;
       } else if (action === 'showtimes') {
         window.location.href = `./event-detail.html?id=${activeMenuEventId}`;
       } else if (action === 'seats') {
         window.location.href = `./event-detail.html?id=${activeMenuEventId}`;
       } else if (action === 'edit') {
         window.location.href = `./create-event.html?id=${activeMenuEventId}`;
-      } else if (action === 'duplicate') {
-        duplicateEvent(activeMenuEventId);
+
       } else if (action === 'delete') {
         confirmDeleteEvent(activeMenuEventId);
       }
-    }
-
-    let duplicateInProgress = false;
-    async function duplicateEvent(eventId) {
-      if (duplicateInProgress) return;
-      duplicateInProgress = true;
-      try {
-        const response = await fetch(`${API_BASE}/api/events/${eventId}/duplicate`, {
-          method: 'POST', headers: { Authorization: 'Bearer ' + token }
-        });
-        const result = await response.json();
-        if (!response.ok || !result.data) throw new Error(result.message || 'Không thể nhân bản sự kiện.');
-        window.location.href = `./event-detail.html?id=${result.data.id}`;
-      } catch (error) {
-        alert(error.message || 'Không thể kết nối máy chủ.');
-      } finally { duplicateInProgress = false; }
     }
 
     document.addEventListener('click', (e) => {

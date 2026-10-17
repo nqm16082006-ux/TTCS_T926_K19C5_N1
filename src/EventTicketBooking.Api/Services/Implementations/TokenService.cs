@@ -24,6 +24,23 @@ namespace EventTicketBooking.Api.Services.Implementations
 
         public string GenerateAccessToken(User user, IEnumerable<string> roles)
         {
+            if (user == null)
+            {
+                throw new ArgumentNullException(nameof(user));
+            }
+
+            var roleList = roles?.ToList();
+            if (roleList == null || roleList.Count != 1)
+            {
+                throw new InvalidOperationException($"Single-role invariant violation: User must have exactly 1 role, but received {(roleList == null ? 0 : roleList.Count)}.");
+            }
+
+            var singleRole = roleList[0];
+            if (!SystemRoles.IsValid(singleRole))
+            {
+                throw new InvalidOperationException($"Invalid system role '{singleRole}'. Allowed roles are: {string.Join(", ", SystemRoles.All)}.");
+            }
+
             var secretKey = EventTicketBooking.Api.Services.JwtValidation.Secret(_configuration);
 
             var issuer = _configuration["JwtSettings:Issuer"]
@@ -45,14 +62,10 @@ namespace EventTicketBooking.Api.Services.Implementations
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Name, user.FullName ?? user.Username),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.Role, singleRole),
+                new Claim("role", singleRole)
             };
-
-            foreach (var role in roles)
-            {
-                claims.Add(new Claim(ClaimTypes.Role, role));
-                claims.Add(new Claim("role", role));
-            }
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
