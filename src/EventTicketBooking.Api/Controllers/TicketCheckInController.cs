@@ -320,6 +320,19 @@ namespace EventTicketBooking.Api.Controllers
 
             if (ticket == null)
             {
+                // Story S-57: Kiểm tra nếu là mã vé cũ đã bị vô hiệu hoá do chuyển nhượng
+                if (!string.IsNullOrWhiteSpace(codeToSearch) && await _context.TicketTransfers.AnyAsync(tt => tt.OldTicketCode == codeToSearch))
+                {
+                    _logger.LogWarning("Từ chối check-in: {ReasonCode}. Mã vé cũ: {TicketCode}, Cổng: {GateName}, Suất diễn chọn: {SelectedShowtimeId}",
+                        "TICKET_TRANSFERRED", MaskIdentifier(codeToSearch), request.GateName, request.SelectedShowtimeId);
+
+                    return BadRequest(new
+                    {
+                        Message = "Vé này đã được chuyển nhượng cho người khác. Mã vé cũ không còn hiệu lực.",
+                        Reason = "TICKET_TRANSFERRED"
+                    });
+                }
+
                 _logger.LogWarning("Từ chối check-in: {ReasonCode}. Mã tìm kiếm: {CodeSearch}, Cổng: {GateName}, Suất diễn chọn: {SelectedShowtimeId}",
                     "UNKNOWN_TICKET", MaskIdentifier(codeToSearch ?? request.TicketId?.ToString()), request.GateName, request.SelectedShowtimeId);
 

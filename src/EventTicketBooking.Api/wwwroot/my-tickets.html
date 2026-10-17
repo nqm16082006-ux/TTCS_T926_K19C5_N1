@@ -154,6 +154,59 @@
     </div>
   </div>
 
+  <!-- Modal Chuyển nhượng vé (Story S-57) -->
+  <div id="transferModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden my-8">
+      <div class="px-6 py-5 bg-gradient-to-r from-primary to-indigo-600 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
+            <span class="material-symbols-outlined text-[24px]">swap_horiz</span>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-white">Chuyển nhượng vé</h3>
+            <p class="text-xs text-indigo-200 font-medium">Chuyển quyền sở hữu vé cho bạn bè</p>
+          </div>
+        </div>
+        <button onclick="closeTransferModal()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div id="transferTicketSummary" class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 text-xs space-y-1">
+          <!-- Rendered dynamically -->
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5" for="transferRecipientEmail">
+            Email người nhận vé <span class="text-rose-500">*</span>
+          </label>
+          <input type="email" id="transferRecipientEmail" placeholder="nguoinhan@example.com" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm font-medium">
+          <p class="text-[11px] text-slate-400 mt-1">Người nhận phải đã có tài khoản trên hệ thống EventPulse.</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5" for="transferNote">
+            Lời nhắn / Ghi chú (không bắt buộc)
+          </label>
+          <textarea id="transferNote" rows="2" placeholder="Ví dụ: Tặng bạn vé xem kịch nhé..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"></textarea>
+        </div>
+
+        <div class="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5">
+          <span class="material-symbols-outlined text-[20px] text-amber-600 shrink-0">warning</span>
+          <div class="leading-relaxed">
+            <span class="font-bold">Lưu ý quan trọng:</span> Sau khi chuyển nhượng, mã vé và mã QR cũ của bạn sẽ bị <strong>vô hiệu hoá ngay lập tức</strong>. Người nhận sẽ được cấp mã vé mới. Mỗi vé chỉ được chuyển nhượng <strong>tối đa 1 lần</strong>.
+          </div>
+        </div>
+      </div>
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button onclick="closeTransferModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold rounded-xl transition">Hủy</button>
+        <button id="btnConfirmTransfer" onclick="submitTicketTransfer()" class="px-5 py-2 bg-primary hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm shadow-primary/20">
+          <span class="material-symbols-outlined text-[18px]">send</span> Xác nhận chuyển
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="fixed bottom-6 right-6 z-50 hidden bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 flex items-center gap-2.5 text-sm font-semibold">
     <span class="material-symbols-outlined text-[20px] text-emerald-400" id="toastIcon">check_circle</span>
     <span id="toastMessage">Thông báo</span>
@@ -237,75 +290,111 @@
       try {
         const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
 
-        // 1) Lấy TẤT CẢ đơn của user (phân trang để giảm số request).
-        const orders = [];
-        let page = 1, totalPages = 1;
-        do {
-          const res = await fetch(`/api/v1/orders/my-orders?page=${page}&pageSize=50`, { headers });
-          if (res.status === 401) {
+        const validTickets = [];
+        const cancelledTickets = [];
+        const now = Date.now();
+
+        // 1) Gọi API lấy vé cá nhân (Story S-57 & S-38: Hỗ trợ cả vé mua và vé được nhận chuyển nhượng)
+        let loadedFromTicketsApi = false;
+        try {
+          const tRes = await fetch(`/api/v1/tickets/my-tickets`, { headers });
+          if (tRes.status === 401) {
             localStorage.removeItem('access_token');
             loadingState.classList.add('hidden');
             unauthState.classList.remove('hidden');
             if (refreshSpinner) refreshSpinner.classList.remove('animate-spin');
             return;
           }
-          const data = await res.json();
-          if (!res.ok || !data.success) throw new Error(data.message || 'Không thể tải đơn hàng.');
-          const paged = data.data || {};
-          orders.push(...(paged.items || []));
-          totalPages = paged.totalPages || 1;
-          page++;
-        } while (page <= totalPages);
-
-        // 2) Đơn Paid -> lấy vé (S-25). Chỉ đơn Cancelled do mong muốn hoàn tiền của người dùng (S-45) -> vé đã huỷ (hiển thị mờ, không QR).
-        const validTickets = [];
-        const cancelledTickets = [];
-        const now = Date.now();
-
-        for (const order of orders) {
-          const startMs = order.showtimeStartTime ? new Date(order.showtimeStartTime).getTime() : null;
-          const isUpcoming = startMs !== null && startMs >= now;
-
-          if (order.status === 'Paid') {
-            let tRes;
-            try { tRes = await fetch(`/api/v1/orders/${order.id}/tickets`, { headers }); }
-            catch (_) { continue; }
-            if (!tRes.ok) continue; // 403/404 -> bỏ qua
-            const tJson = await tRes.json();
-            for (const t of ((tJson && tJson.data) || [])) {
-              validTickets.push({
-                kind: 'valid', orderId: order.id, orderStatus: order.status,
-                ticketId: t.id, ticketCode: t.ticketCode, qrPayload: t.qrPayload || t.ticketCode,
-                eventTitle: t.eventTitle || order.eventTitle,
-                eventLocation: t.eventLocation || order.eventLocation,
-                eventImageUrl: order.eventImageUrl,
-                showtimeStartTime: t.showtimeStartTime || order.showtimeStartTime,
-                seatName: t.seatName || (t.seatRow ? `${t.seatRow}${t.seatNumber}` : 'Chưa định vị'),
-                categoryName: t.categoryName || 'Tiêu chuẩn',
-                price: t.price, startMs, isUpcoming
-              });
+          if (tRes.ok) {
+            const tData = await tRes.json();
+            if (tData.success && Array.isArray(tData.data)) {
+              loadedFromTicketsApi = true;
+              for (const t of tData.data) {
+                const startMs = t.showtimeStartTime ? new Date(t.showtimeStartTime).getTime() : null;
+                const isUpcoming = startMs !== null && startMs >= now;
+                validTickets.push({
+                  kind: t.isTransferred ? 'transferred' : 'valid',
+                  ticketId: t.id,
+                  orderId: t.orderId,
+                  ticketCode: t.ticketCode,
+                  qrPayload: t.qrPayload || t.ticketCode,
+                  eventTitle: t.eventTitle,
+                  eventLocation: t.eventLocation,
+                  eventImageUrl: t.eventImageUrl,
+                  showtimeStartTime: t.showtimeStartTime,
+                  seatName: t.seatName || (t.seatRow ? `${t.seatRow}${t.seatNumber}` : 'Chưa định vị'),
+                  categoryName: t.categoryName || 'Tiêu chuẩn',
+                  price: t.price,
+                  startMs,
+                  isUpcoming,
+                  isTransferred: t.isTransferred,
+                  transferredToEmail: t.transferredToEmail,
+                  transferredFromEmail: t.transferredFromEmail,
+                  canTransfer: t.canTransfer,
+                  transferCount: t.transferCount
+                });
+              }
             }
-          } else if (order.status === 'Cancelled' && (order.cancelReason === 'CUSTOMER_REFUND' || order.cancelReason === 'CustomerRefund' || order.refundStatus)) {
-            // S-38 & S-45: Cơ chế làm mờ và không hiện QR chỉ làm đối với vé đã bị hủy do mong muốn hoàn tiền của người dùng
-            const seats = (order.seatNames && order.seatNames.length) ? order.seatNames.join(', ')
-              : (order.items ? order.items.map(i => i.seatName).filter(Boolean).join(', ') : 'Chưa định vị');
-            cancelledTickets.push({
-              kind: 'cancelled', orderId: order.id, orderStatus: order.status,
-              cancelReason: order.cancelReason,
-              eventTitle: order.eventTitle, eventLocation: order.eventLocation,
-              eventImageUrl: order.eventImageUrl, showtimeStartTime: order.showtimeStartTime,
-              seatName: seats,
-              categoryName: order.items && order.items[0] ? order.items[0].categoryName : 'Tiêu chuẩn',
-              price: order.totalAmount, startMs, isUpcoming
-            });
           }
-        }
+        } catch (_) {}
+
+        // 2) Lấy các đơn hàng Cancelled (S-45 / S-38) để hiển thị lịch sử vé đã huỷ hoàn tiền
+        try {
+          const ordersRes = await fetch(`/api/v1/orders/my-orders?page=1&pageSize=50`, { headers });
+          if (ordersRes.ok) {
+            const oData = await ordersRes.json();
+            const orders = (oData.data && oData.data.items) || [];
+            for (const order of orders) {
+              const startMs = order.showtimeStartTime ? new Date(order.showtimeStartTime).getTime() : null;
+              const isUpcoming = startMs !== null && startMs >= now;
+
+              if (order.status === 'Cancelled' && (order.cancelReason === 'CUSTOMER_REFUND' || order.cancelReason === 'CustomerRefund' || order.refundStatus)) {
+                const seats = (order.seatNames && order.seatNames.length) ? order.seatNames.join(', ')
+                  : (order.items ? order.items.map(i => i.seatName).filter(Boolean).join(', ') : 'Chưa định vị');
+                cancelledTickets.push({
+                  kind: 'cancelled', orderId: order.id, orderStatus: order.status,
+                  cancelReason: order.cancelReason,
+                  eventTitle: order.eventTitle, eventLocation: order.eventLocation,
+                  eventImageUrl: order.eventImageUrl, showtimeStartTime: order.showtimeStartTime,
+                  seatName: seats,
+                  categoryName: order.items && order.items[0] ? order.items[0].categoryName : 'Tiêu chuẩn',
+                  price: order.totalAmount, startMs, isUpcoming
+                });
+              } else if (!loadedFromTicketsApi && order.status === 'Paid') {
+                // Fallback nếu API /my-tickets chưa sẵn sàng
+                let tRes;
+                try { tRes = await fetch(`/api/v1/orders/${order.id}/tickets`, { headers }); } catch (_) { continue; }
+                if (!tRes.ok) continue;
+                const tJson = await tRes.json();
+                for (const t of ((tJson && tJson.data) || [])) {
+                  validTickets.push({
+                    kind: t.isTransferred ? 'transferred' : 'valid',
+                    orderId: order.id, orderStatus: order.status,
+                    ticketId: t.id, ticketCode: t.ticketCode, qrPayload: t.qrPayload || t.ticketCode,
+                    eventTitle: t.eventTitle || order.eventTitle,
+                    eventLocation: t.eventLocation || order.eventLocation,
+                    eventImageUrl: order.eventImageUrl,
+                    showtimeStartTime: t.showtimeStartTime || order.showtimeStartTime,
+                    seatName: t.seatName || (t.seatRow ? `${t.seatRow}${t.seatNumber}` : 'Chưa định vị'),
+                    categoryName: t.categoryName || 'Tiêu chuẩn',
+                    price: t.price, startMs, isUpcoming,
+                    isTransferred: t.isTransferred,
+                    transferredToEmail: t.transferredToEmail,
+                    transferredFromEmail: t.transferredFromEmail,
+                    canTransfer: t.canTransfer,
+                    transferCount: t.transferCount
+                  });
+                }
+              }
+            }
+          }
+        } catch (_) {}
 
         allTicketsCache = [...validTickets, ...cancelledTickets];
         loadingState.classList.add('hidden');
 
         if (allTicketsCache.length === 0) {
-          emptyDesc.textContent = 'Bạn chưa có vé điện tử hợp lệ. Vé sẽ xuất hiện sau khi đơn hàng được thanh toán thành công.';
+          emptyDesc.textContent = 'Bạn chưa có vé điện tử hợp lệ. Vé sẽ xuất hiện sau khi đơn hàng được thanh toán hoặc nhận chuyển nhượng từ người khác.';
           emptyState.classList.remove('hidden');
           return;
         }
@@ -354,7 +443,8 @@
     function buildTicketCard(t, bucket, index) {
       const card = document.createElement('div');
       const cancelled = t.kind === 'cancelled';
-      card.className = `bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition overflow-hidden ${cancelled ? 'opacity-60 saturate-50' : ''}`;
+      const transferred = t.isTransferred || t.kind === 'transferred';
+      card.className = `bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition overflow-hidden ${(cancelled || transferred) ? 'opacity-60 saturate-50' : ''}`;
 
       const eventImage = t.eventImageUrl || 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=600&q=80';
       const timeStr = t.showtimeStartTime ? formatDateTime(t.showtimeStartTime) : 'Chưa xác định';
@@ -364,13 +454,28 @@
         statusBadge = `<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border bg-rose-50 text-rose-700 border-rose-200"><span class="material-symbols-outlined text-[14px]">cancel</span>Đã huỷ</span>`;
       } else if (cancelled && t.orderStatus === 'Expired') {
         statusBadge = `<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border bg-slate-100 text-slate-600 border-slate-200"><span class="material-symbols-outlined text-[14px]">timer_off</span>Đã hết hạn</span>`;
+      } else if (transferred) {
+        statusBadge = `<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border bg-purple-50 text-purple-700 border-purple-200" title="Đã chuyển cho ${escapeHtml(t.transferredToEmail || '')}"><span class="material-symbols-outlined text-[14px]">send</span>Đã chuyển</span>`;
       } else {
         statusBadge = `<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200"><span class="material-symbols-outlined text-[14px]">check_circle</span>Hợp lệ</span>`;
       }
 
-      const actionBtn = cancelled
-        ? `<button onclick="openTicketModal(${bucket}, ${index})" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">visibility</span>Xem chi tiết</button>`
-        : `<button onclick="openTicketModal(${bucket}, ${index})" class="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">qr_code_2</span>Mở mã QR</button>`;
+      let transferTag = '';
+      if (t.transferredFromEmail) {
+        transferTag = `<div class="text-[11px] text-indigo-700 font-semibold bg-indigo-50 px-2 py-0.5 rounded inline-flex items-center gap-1 mt-1"><span class="material-symbols-outlined text-[13px]">input</span>Nhận từ: ${escapeHtml(t.transferredFromEmail)}</div>`;
+      } else if (transferred && t.transferredToEmail) {
+        transferTag = `<div class="text-[11px] text-purple-700 font-semibold bg-purple-50 px-2 py-0.5 rounded inline-flex items-center gap-1 mt-1"><span class="material-symbols-outlined text-[13px]">output</span>Chuyển cho: ${escapeHtml(t.transferredToEmail)}</div>`;
+      }
+
+      let actionButtons = '';
+      if (cancelled || transferred) {
+        actionButtons = `<button onclick="openTicketModal(${bucket}, ${index})" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">visibility</span>Xem chi tiết</button>`;
+      } else {
+        actionButtons = `<div class="flex items-center gap-2 flex-wrap">
+          <button onclick="openTicketModal(${bucket}, ${index})" class="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">qr_code_2</span>Mở mã QR</button>
+          ${t.canTransfer ? `<button onclick="openTransferModal('${t.ticketId}')" class="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-primary border border-indigo-200 text-xs font-bold rounded-xl transition flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">swap_horiz</span>Chuyển vé</button>` : ''}
+        </div>`;
+      }
 
       card.innerHTML = `
         <div class="flex items-start gap-4 p-5">
@@ -381,12 +486,14 @@
             <h4 class="text-sm sm:text-base font-bold text-slate-900 truncate">${escapeHtml(t.eventTitle || 'Sự kiện')}</h4>
             <div class="text-xs text-slate-500 mt-1 flex items-center gap-1"><span class="material-symbols-outlined text-[14px] text-slate-400">schedule</span>${timeStr}</div>
             <div class="text-xs text-slate-500 mt-1 flex items-center gap-1 truncate"><span class="material-symbols-outlined text-[14px] text-slate-400">event_seat</span>${escapeHtml(t.seatName || 'Chưa định vị')} • ${escapeHtml(t.categoryName || 'Tiêu chuẩn')}</div>
+            ${transferTag}
             <div class="mt-2 flex items-center justify-between gap-2">${statusBadge}<span class="text-xs font-bold text-slate-700">${formatCurrency(t.price)}</span></div>
-            <div class="mt-3">${actionBtn}</div>
+            <div class="mt-3">${actionButtons}</div>
           </div>
         </div>`;
       return card;
     }
+
     function openTicketModal(bucket, index) {
       const list = sortTickets(allTicketsCache.filter(t => (bucket === 0 ? t.isUpcoming : !t.isUpcoming)));
       const t = list[index];
@@ -397,7 +504,31 @@
       const modalBody = document.getElementById('ticketModalBody');
       const downloadBtn = document.getElementById('downloadQrBtn');
       const cancelled = t.kind === 'cancelled';
+      const transferred = t.isTransferred || t.kind === 'transferred';
       const timeStr = t.showtimeStartTime ? formatDateTime(t.showtimeStartTime) : 'Chưa xác định';
+
+      if (transferred) {
+        // Vé đã chuyển nhượng: Không cấp mã QR nữa
+        downloadBtn.classList.add('hidden');
+        modalBody.innerHTML = `
+          <div class="text-center py-4">
+            <div class="w-16 h-16 mx-auto rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-4">
+              <span class="material-symbols-outlined text-[36px]">swap_horiz</span>
+            </div>
+            <h4 class="text-lg font-bold text-slate-800">${escapeHtml(t.eventTitle || 'Sự kiện')}</h4>
+            <p class="text-sm text-slate-500 mt-1">${timeStr}</p>
+            <div class="inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-bold border bg-purple-50 text-purple-700 border-purple-200">
+              <span class="material-symbols-outlined text-[14px]">send</span> Vé đã chuyển nhượng
+            </div>
+            <p class="text-xs text-slate-500 mt-4 leading-relaxed">Vé này đã được chuyển nhượng thành công cho tài khoản <strong>${escapeHtml(t.transferredToEmail || 'người nhận')}</strong>. Mã vé và mã QR cũ của bạn đã bị thu hồi và không còn giá trị vào cổng.</p>
+            <div class="mt-4 grid grid-cols-2 gap-2 text-xs text-left">
+              <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100"><span class="text-slate-400 block text-[10px]">Vị trí ghế:</span><span class="font-bold text-slate-700">${escapeHtml(t.seatName || 'Chưa định vị')}</span></div>
+              <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100"><span class="text-slate-400 block text-[10px]">Hạng vé:</span><span class="font-bold text-slate-700">${escapeHtml(t.categoryName || 'Tiêu chuẩn')}</span></div>
+            </div>
+          </div>`;
+        modal.classList.remove('hidden');
+        return;
+      }
 
       if (cancelled) {
         // Vé đã huỷ: KHÔNG hiển thị QR dùng được, chỉ trạng thái rõ ràng.
@@ -450,6 +581,76 @@
           qrBox.innerHTML = `<div class="text-xs text-slate-500 font-mono break-all">${escapeHtml(payload || '')}</div>`;
         }
       }, 30);
+    }
+
+    // Story S-57: Functions quản lý chuyển nhượng vé
+    let selectedTransferTicketId = null;
+
+    function openTransferModal(ticketId) {
+      selectedTransferTicketId = ticketId;
+      const t = allTicketsCache.find(x => x.ticketId === ticketId);
+      if (!t) return;
+
+      const summary = document.getElementById('transferTicketSummary');
+      summary.innerHTML = `
+        <div class="font-bold text-slate-800 text-sm truncate">${escapeHtml(t.eventTitle || 'Sự kiện')}</div>
+        <div class="text-slate-500 flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">event_seat</span>${escapeHtml(t.seatName || '')} (${escapeHtml(t.categoryName || 'Tiêu chuẩn')})</div>
+        <div class="text-slate-500 font-mono text-[11px]">Mã vé: ${escapeHtml(t.ticketCode || '')}</div>
+      `;
+
+      document.getElementById('transferRecipientEmail').value = '';
+      document.getElementById('transferNote').value = '';
+      document.getElementById('transferModal').classList.remove('hidden');
+    }
+
+    function closeTransferModal() {
+      document.getElementById('transferModal').classList.add('hidden');
+      selectedTransferTicketId = null;
+    }
+
+    async function submitTicketTransfer() {
+      const email = document.getElementById('transferRecipientEmail').value.trim();
+      const note = document.getElementById('transferNote').value.trim();
+      const btn = document.getElementById('btnConfirmTransfer');
+
+      if (!email) {
+        showToast('Vui lòng nhập email người nhận.', true);
+        return;
+      }
+
+      if (!selectedTransferTicketId) {
+        showToast('Không xác định được vé cần chuyển.', true);
+        return;
+      }
+
+      const token = localStorage.getItem('access_token');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="material-symbols-outlined text-[18px] animate-spin">progress_activity</span> Đang xử lý...`;
+
+      try {
+        const res = await fetch(`/api/v1/tickets/${selectedTransferTicketId}/transfer`, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ recipientEmail: email, note: note })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || 'Chuyển nhượng vé thất bại.');
+        }
+
+        closeTransferModal();
+        showToast(data.message || 'Chuyển nhượng vé thành công!');
+        await loadMyTickets(true);
+      } catch (err) {
+        showToast(err.message || 'Lỗi khi chuyển nhượng vé.', true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">send</span> Xác nhận chuyển`;
+      }
     }
 
     function downloadCurrentQr() {
