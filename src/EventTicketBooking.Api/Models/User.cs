@@ -21,11 +21,16 @@ namespace EventTicketBooking.Api.Models
         public string TermsVersion { get; set; } = string.Empty;
         public DateTime? TermsAcceptedAt { get; set; }
         public bool MarketingEmailOptIn { get; set; }
+        public bool IsAnonymized { get; set; } = false;
+        public DateTime? AnonymizedAt { get; set; }
 
         // Navigation property quan hệ N:N thông qua bảng trung gian UserRoles
         public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 
         // Navigation property 1:N với Events (Task T-10)
         public ICollection<Event> Events { get; set; } = new List<Event>();
+
+        // Navigation property 1:N với DataDeletionRequests (Story S-53)
+        public ICollection<DataDeletionRequest> DataDeletionRequests { get; set; } = new List<DataDeletionRequest>();
     }
 }

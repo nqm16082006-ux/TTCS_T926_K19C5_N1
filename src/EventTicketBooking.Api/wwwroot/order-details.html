@@ -98,6 +98,51 @@
         </div>
       </div>
 
+      <!-- S-61: Thông tin Sự kiện, Suất diễn & Chỉ dẫn địa điểm -->
+      <div id="eventInfoCard" class="hidden p-6 border-b border-slate-100 bg-gradient-to-r from-indigo-50/40 via-white to-slate-50/60">
+        <div class="space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-700 tracking-wide uppercase">Sự kiện & Suất diễn</span>
+            <span id="reminderStatusBadge" class="hidden px-2.5 py-0.5 rounded-full text-[11px] font-semibold"></span>
+          </div>
+          <h2 id="eventTitleDisplay" class="text-xl font-bold text-slate-800"></h2>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-sm text-slate-600">
+            <div class="flex items-start gap-2.5">
+              <i class="fa-regular fa-calendar-days text-indigo-600 mt-1"></i>
+              <div>
+                <p class="text-xs text-slate-400 font-semibold uppercase">Thời gian diễn</p>
+                <p id="showtimeTimeDisplay" class="font-bold text-slate-700"></p>
+              </div>
+            </div>
+            <div class="flex items-start gap-2.5">
+              <i class="fa-solid fa-location-dot text-rose-500 mt-1"></i>
+              <div>
+                <p class="text-xs text-slate-400 font-semibold uppercase">Địa điểm tổ chức</p>
+                <p id="eventLocationDisplay" class="font-bold text-slate-700"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chỉ dẫn vào cửa & Check-in -->
+          <div class="mt-3 p-3.5 bg-white border border-indigo-100 rounded-xl text-xs text-slate-600 space-y-1.5">
+            <div class="font-bold text-indigo-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-map-location-dot text-indigo-600"></i>
+              <span>Chỉ dẫn địa điểm & Check-in trước giờ diễn:</span>
+            </div>
+            <ul class="list-disc list-inside space-y-1 text-slate-600 pl-1">
+              <li>Vui lòng có mặt tại địa điểm trước giờ diễn ít nhất <strong>30 - 45 phút</strong> để hoàn tất thủ tục soát vé.</li>
+              <li>Chuẩn bị sẵn mã đơn hàng hoặc vé điện tử (QR) đã được gửi qua email để xuất trình tại quầy check-in.</li>
+              <li>Trường hợp có thay đổi giờ diễn, hệ thống sẽ tự động gửi email cập nhật tới hộp thư của bạn.</li>
+            </ul>
+            <div id="reminderSentNote" class="hidden pt-1.5 border-t border-slate-100 text-emerald-700 font-semibold flex items-center gap-1.5">
+              <i class="fa-solid fa-envelope-circle-check text-emerald-600"></i>
+              <span id="reminderSentText"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Items List -->
       <div class="p-6">
         <h3 class="text-base font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">Danh sách vé</h3>
@@ -166,6 +211,90 @@
                 <span>Huỷ &amp; hoàn tiền</span>
                 <i class="fa-solid fa-rotate-left"></i>
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- S-48: Section Hoàn Tiền Đơn Hàng -->
+      <div id="refundSectionCard" class="border-t border-slate-200 p-6 bg-white">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+              <i class="fa-solid fa-money-bill-transfer"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-slate-800">Thông tin hoàn tiền</h3>
+              <p class="text-xs text-slate-500">Trạng thái và tiến trình hoàn tiền cho đơn hàng (Story S-48)</p>
+            </div>
+          </div>
+          <span id="refundSectionStatusBadge" class="hidden px-3 py-1 text-xs font-bold rounded-full border self-start sm:self-auto"></span>
+        </div>
+
+        <!-- Empty state when no refund -->
+        <div id="refundEmptyState" class="py-4 text-center text-slate-500 text-sm bg-slate-50 rounded-xl border border-slate-100">
+          <i class="fa-solid fa-circle-info text-slate-400 mr-1.5"></i>
+          <span>Đơn hàng này chưa có yêu cầu hoàn tiền.</span>
+        </div>
+
+        <!-- Content state when refund exists -->
+        <div id="refundDetailsContent" class="hidden space-y-4">
+          <!-- Main Info Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+            <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="text-xs text-slate-500 block mb-0.5">Số tiền hoàn:</span>
+              <span id="cardRefundAmount" class="text-base font-black text-emerald-700">0 ₫</span>
+            </div>
+            <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="text-xs text-slate-500 block mb-0.5">Mã yêu cầu hoàn tiền:</span>
+              <div class="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-700">
+                <span id="cardRefundId">--</span>
+                <button type="button" id="btnCopyRefundId" onclick="copyRefundId()" class="text-slate-400 hover:text-indigo-600 p-1" title="Sao chép mã hoàn tiền">
+                  <i class="fa-regular fa-copy"></i>
+                </button>
+              </div>
+            </div>
+            <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="text-xs text-slate-500 block mb-0.5">Thời gian cập nhật:</span>
+              <span id="cardRefundUpdatedAt" class="font-semibold text-slate-700 text-xs">--</span>
+            </div>
+          </div>
+
+          <!-- Customer Message Alert -->
+          <div id="refundCustomerAlert" class="p-4 rounded-xl border text-sm flex items-start gap-3 bg-emerald-50 border-emerald-200">
+            <i id="refundCustomerIcon" class="fa-solid fa-circle-info text-base mt-0.5 shrink-0 text-emerald-600"></i>
+            <div class="flex-1">
+              <p id="refundCustomerTitle" class="font-bold text-sm text-emerald-900">Thông tin hoàn tiền</p>
+              <p id="refundCustomerDesc" class="text-xs mt-1 leading-relaxed text-emerald-700"></p>
+            </div>
+          </div>
+
+          <!-- Auditor/Technical Section (Only visible for Auditor/Admin) -->
+          <div id="refundTechnicalDetails" class="hidden p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2.5">
+            <div class="font-bold text-slate-700 flex items-center justify-between border-b border-slate-200/60 pb-1.5">
+              <span class="flex items-center gap-1.5">
+                <i class="fa-solid fa-terminal text-indigo-600"></i>
+                <span>Thông tin kỹ thuật (Kế toán / Auditor):</span>
+              </span>
+              <span class="text-[11px] font-normal text-slate-400">Chỉ hiển thị cho vai trò Kế toán / Quản trị viên</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-slate-600">
+              <div>Số lần thử thực tế: <strong id="techAttemptCount" class="text-slate-800">0</strong></div>
+              <div>Số lần thử lại: <strong id="techRetryCount" class="text-slate-800">0</strong></div>
+              <div>Lần thử gần nhất: <span id="techLastAttemptAt" class="font-semibold text-slate-800">--</span></div>
+              <div>Lịch thử lại kế tiếp: <span id="techNextRetryAt" class="font-semibold text-slate-800">--</span></div>
+            </div>
+            <div id="techErrorRow" class="pt-1.5 border-t border-slate-200/60 text-rose-700">
+              Lý do từ cổng: <span id="techErrorCode" class="font-mono font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200"></span>
+              <span id="techErrorMessage" class="ml-1 font-medium"></span>
+            </div>
+            <div class="pt-1 flex flex-wrap items-center gap-2">
+              <a href="./auditor.html" class="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-sm transition">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Cổng Kế Toán (Auditor)
+              </a>
+              <a id="techLinkAuditLog" href="./order-audit-logs.html" class="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg font-bold text-xs transition">
+                <i class="fa-solid fa-clock-rotate-left"></i> Nhật Ký Đối Soát
+              </a>
             </div>
           </div>
         </div>
@@ -265,19 +394,84 @@
 
   <script>
     const urlParams = new URLSearchParams(window.location.search);
-    const orderId = urlParams.get('orderId') || urlParams.get('orderCode');
+    // S-48: Hỗ trợ canonical ?id=<GUID> và backward-compatible ?orderId= / ?orderCode=
+    const orderId = urlParams.get('id') || urlParams.get('orderId') || urlParams.get('orderCode');
     let countdownInterval = null;
 
     if (!orderId) {
       showError("Không tìm thấy mã đơn hàng trong URL. Vui lòng chọn đơn hàng từ danh sách.");
     } else if (orderId.includes('<') || orderId.includes('>') || orderId === 'null' || orderId === 'undefined') {
-      showError("Mã đơn hàng không hợp lệ (bạn đang nhập chuỗi mẫu giữ chỗ '" + orderId + "'). Vui lòng chọn một đơn hàng thực tế từ danh sách 'Đơn hàng của tôi'.");
+      showError("Mã đơn hàng không hợp lệ (bạn đang nhập chuỗi mẫu giữ chỗ '" + escapeHtml(orderId) + "'). Vui lòng chọn một đơn hàng thực tế từ danh sách 'Đơn hàng của tôi'.");
     } else {
+      // Chuẩn hoá URL về canonical ?id= nếu đang dùng tham số cũ
+      if (!urlParams.get('id')) {
+        window.history.replaceState({}, '', `order-details.html?id=${encodeURIComponent(orderId)}`);
+      }
       loadOrderDetails();
     }
 
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
     function formatCurrency(amount) {
-      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
+    }
+
+    function formatDateTime(isoString) {
+      if (!isoString) return '—';
+      try {
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) return String(isoString);
+        return d.toLocaleString('vi-VN', {
+          timeZone: 'Asia/Ho_Chi_Minh',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+      } catch (e) {
+        return String(isoString);
+      }
+    }
+
+    function getUserRoles() {
+      try {
+        const raw = localStorage.getItem('user_info');
+        if (!raw) return [];
+        const user = JSON.parse(raw);
+        return (user.roles || []).map(r => String(r).toLowerCase());
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function isStaffOrAdmin() {
+      const roles = getUserRoles();
+      return roles.includes('auditor') || roles.includes('admin');
+    }
+
+    function copyRefundId() {
+      const el = document.getElementById('cardRefundId');
+      const fullId = el?.getAttribute('data-full-id') || el?.textContent;
+      if (!fullId || fullId === '--') return;
+      navigator.clipboard.writeText(fullId).then(() => {
+        const btn = document.getElementById('btnCopyRefundId');
+        if (btn) {
+          btn.innerHTML = '<i class="fa-solid fa-check text-emerald-600"></i>';
+          setTimeout(() => { btn.innerHTML = '<i class="fa-regular fa-copy"></i>'; }, 2000);
+        }
+      }).catch(() => {
+        alert('Mã hoàn tiền: ' + fullId);
+      });
     }
 
     function showError(message) {
@@ -336,7 +530,7 @@
         // S-45: deep-link ?cancel=1 từ my-orders → tự mở modal huỷ nếu nút huỷ đang hiển thị.
         if (urlParams.get('cancel') === '1') {
           urlParams.delete('cancel');
-          window.history.replaceState({}, '', `order-details.html?orderId=${encodeURIComponent(orderId)}`);
+          window.history.replaceState({}, '', `order-details.html?id=${encodeURIComponent(orderId)}`);
           const btnCancel = document.getElementById('btnCancelOrder');
           if (btnCancel && !btnCancel.classList.contains('hidden')) {
             openCancelRefundModal(result.data);
@@ -408,9 +602,56 @@
         }
       }
 
+      // S-61: Render thông tin Sự kiện, Suất diễn, Địa điểm và Trạng thái email nhắc nhở
+      const eventCard = document.getElementById('eventInfoCard');
+      if (order.eventTitle || order.showtimeStartTime) {
+        eventCard.classList.remove('hidden');
+        document.getElementById('eventTitleDisplay').textContent = order.eventTitle || 'Sự kiện';
+        
+        let timeStr = 'Chưa xác định';
+        if (order.showtimeStartTime) {
+          const start = new Date(order.showtimeStartTime);
+          const startFormatted = start.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
+          if (order.showtimeEndTime) {
+            const end = new Date(order.showtimeEndTime);
+            const endFormatted = end.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            timeStr = `${startFormatted} - ${endFormatted}`;
+          } else {
+            timeStr = startFormatted;
+          }
+        }
+        document.getElementById('showtimeTimeDisplay').textContent = timeStr;
+        document.getElementById('eventLocationDisplay').textContent = order.eventLocation || 'Xem chi tiết trên vé hoặc liên hệ BTC';
+
+        // S-61 Reminder status
+        const reminderBadge = document.getElementById('reminderStatusBadge');
+        const reminderSentNote = document.getElementById('reminderSentNote');
+        const reminderSentText = document.getElementById('reminderSentText');
+        
+        if (order.reminderSentAt) {
+          const sentDate = new Date(order.reminderSentAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
+          reminderBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 flex items-center gap-1';
+          reminderBadge.innerHTML = '<i class="fa-solid fa-check"></i> Đã gửi email nhắc 24h';
+          reminderBadge.classList.remove('hidden');
+
+          reminderSentNote.classList.remove('hidden');
+          reminderSentText.textContent = `Email nhắc nhở 24h kèm mã vé & chỉ dẫn địa điểm đã được gửi tới ${order.customerEmail || 'hộp thư của bạn'} lúc ${sentDate}.`;
+        } else if (order.status === 'Paid') {
+          reminderBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1';
+          reminderBadge.innerHTML = '<i class="fa-regular fa-bell"></i> Sẽ gửi email nhắc 24h trước suất';
+          reminderBadge.classList.remove('hidden');
+          reminderSentNote.classList.add('hidden');
+        } else {
+          reminderBadge.classList.add('hidden');
+          reminderSentNote.classList.add('hidden');
+        }
+      } else {
+        eventCard.classList.add('hidden');
+      }
+
       const itemsList = document.getElementById('orderItemsList');
       itemsList.innerHTML = '';
-      order.items.forEach(item => {
+      (order.items || []).forEach(item => {
         const li = document.createElement('li');
         li.className = 'flex items-center justify-between p-3 bg-slate-50/50 border border-slate-100 rounded-lg';
         li.innerHTML = `
@@ -504,7 +745,7 @@
       if (btnText) btnText.textContent = 'Đang xử lý...';
 
       try {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || sessionStorage.getItem('access_token') || sessionStorage.getItem('accessToken');
         const res = await fetch(`/api/v1/orders/${currentOrderId}/apply-discount`, {
           method: 'POST',
           headers: {
@@ -559,146 +800,257 @@
       countdownInterval = setInterval(update, 1000);
     }
 
-    // ===== S-45: Huỷ vé & hoàn tiền =====
+    // ===== S-45 & S-48: Huỷ vé & hoàn tiền =====
     let pendingCancelOrderId = null;
 
-    function getRefundStatusDisplay(status) {
+    function getRefundStatusDisplay(status, isCustomerView = true) {
+      // Backend statuses: Pending, Processing, RetryScheduled, Succeeded, ManualReviewRequired, AccountingProcessing, AccountingResolved, Failed, Cancelled
       switch (status) {
-        case 'Succeeded': return { text: 'Đã hoàn tiền', css: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
-        case 'Failed': return { text: 'Hoàn tiền thất bại — cần xử lý tiếp', css: 'bg-rose-100 text-rose-800 border-rose-200' };
-        case 'RetryScheduled': return { text: 'Đang lên lịch thử lại hoàn tiền', css: 'bg-amber-100 text-amber-800 border-amber-200' };
-        case 'AccountingProcessing':
-          return { text: 'Kế toán đang xử lý hoàn tiền', css: 'bg-sky-100 text-sky-800 border-sky-300' };
+        case 'Succeeded':
+          return {
+            text: isCustomerView ? 'Đã hoàn tiền' : 'Hoàn tiền thành công (Succeeded)',
+            css: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+            icon: 'fa-circle-check',
+            iconColor: 'text-emerald-600',
+            boxBg: 'bg-emerald-50 border-emerald-200',
+            titleColor: 'text-emerald-900',
+            descColor: 'text-emerald-700',
+            customerTitle: 'Đã hoàn tiền thành công',
+            customerDesc: 'Khoản tiền hoàn đã được cổng thanh toán chuyển trả về tài khoản ban đầu của bạn.'
+          };
         case 'AccountingResolved':
-          return { text: 'Kế toán đã hoàn tất hoàn tiền', css: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
+          return {
+            text: isCustomerView ? 'Đã hoàn tiền' : 'Kế toán đã giải quyết (AccountingResolved)',
+            css: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+            icon: 'fa-circle-check',
+            iconColor: 'text-emerald-600',
+            boxBg: 'bg-emerald-50 border-emerald-200',
+            titleColor: 'text-emerald-900',
+            descColor: 'text-emerald-700',
+            customerTitle: 'Đã hoàn tất hoàn tiền',
+            customerDesc: 'Bộ phận kế toán đã hoàn tất đối soát và hoàn tiền vào tài khoản ngân hàng của bạn.'
+          };
+        case 'RetryScheduled':
+          return {
+            text: isCustomerView ? 'Đang thử lại' : 'Đang xếp lịch thử lại (RetryScheduled)',
+            css: 'bg-amber-100 text-amber-800 border-amber-200',
+            icon: 'fa-clock-rotate-left',
+            iconColor: 'text-amber-600',
+            boxBg: 'bg-amber-50 border-amber-200',
+            titleColor: 'text-amber-900',
+            descColor: 'text-amber-700',
+            customerTitle: 'Đang tự động thử lại hoàn tiền',
+            customerDesc: 'Cổng thanh toán tạm thời gián đoạn. Hệ thống đang tự động xếp lịch thử lại hoàn tiền mà bạn không cần thao tác thêm.'
+          };
         case 'RequiresManualReview':
         case 'ManualReviewRequired':
         case 'ManualPending':
-          return { text: 'Đã chuyển thông tin cho kế toán xử lý thủ công', css: 'bg-rose-100 text-rose-800 border-rose-300' };
-        case 'Requested': return { text: 'Yêu cầu hoàn tiền đang được xử lý', css: 'bg-blue-100 text-blue-800 border-blue-200' };
-        default: return { text: status || '', css: 'bg-slate-100 text-slate-800 border-slate-200' };
+          return {
+            text: isCustomerView ? 'Cần bộ phận hỗ trợ kiểm tra' : 'Chờ kế toán xử lý (ManualReviewRequired)',
+            css: 'bg-rose-100 text-rose-800 border-rose-300',
+            icon: 'fa-triangle-exclamation',
+            iconColor: 'text-rose-600',
+            boxBg: 'bg-rose-50 border-rose-200',
+            titleColor: 'text-rose-900',
+            descColor: 'text-rose-700',
+            customerTitle: 'Cần bộ phận hỗ trợ kiểm tra',
+            customerDesc: 'Yêu cầu hoàn tiền đã được chuyển sang bộ phận kế toán để xử lý đối soát trực tiếp. Tiền hoàn của bạn sẽ được bảo toàn.'
+          };
+        case 'AccountingProcessing':
+          return {
+            text: isCustomerView ? 'Đang xử lý hoàn tiền' : 'Kế toán đang xử lý (AccountingProcessing)',
+            css: 'bg-sky-100 text-sky-800 border-sky-300',
+            icon: 'fa-spinner fa-spin',
+            iconColor: 'text-sky-600',
+            boxBg: 'bg-sky-50 border-sky-200',
+            titleColor: 'text-sky-900',
+            descColor: 'text-sky-700',
+            customerTitle: 'Kế toán đang xử lý hoàn tiền',
+            customerDesc: 'Hồ sơ hoàn tiền đã được chuyên viên kế toán tiếp nhận và đang tiến hành chuyển tiền qua ngân hàng.'
+          };
+        case 'Pending':
+        case 'Processing':
+        case 'Requested':
+          return {
+            text: isCustomerView ? 'Đang xử lý hoàn tiền' : 'Đang xử lý (' + (status || 'Processing') + ')',
+            css: 'bg-blue-100 text-blue-800 border-blue-200',
+            icon: 'fa-clock',
+            iconColor: 'text-blue-600',
+            boxBg: 'bg-blue-50 border-blue-200',
+            titleColor: 'text-blue-900',
+            descColor: 'text-blue-700',
+            customerTitle: 'Đang xử lý hoàn tiền',
+            customerDesc: 'Yêu cầu hoàn tiền đang được gửi đến cổng thanh toán để xử lý.'
+          };
+        case 'Failed':
+        case 'Cancelled':
+          return {
+            text: isCustomerView ? 'Cần bộ phận hỗ trợ kiểm tra' : 'Hoàn tiền thất bại (' + status + ')',
+            css: 'bg-rose-100 text-rose-800 border-rose-200',
+            icon: 'fa-circle-xmark',
+            iconColor: 'text-rose-600',
+            boxBg: 'bg-rose-50 border-rose-200',
+            titleColor: 'text-rose-900',
+            descColor: 'text-rose-700',
+            customerTitle: 'Cần bộ phận hỗ trợ kiểm tra',
+            customerDesc: 'Quá trình hoàn tiền tự động gặp sự cố và đã được chuyển sang danh sách hỗ trợ thủ công.'
+          };
+        default:
+          return {
+            text: isCustomerView ? 'Đang xử lý' : (status || 'Không xác định'),
+            css: 'bg-slate-100 text-slate-800 border-slate-200',
+            icon: 'fa-circle-info',
+            iconColor: 'text-slate-500',
+            boxBg: 'bg-slate-50 border-slate-200',
+            titleColor: 'text-slate-900',
+            descColor: 'text-slate-600',
+            customerTitle: 'Thông tin hoàn tiền',
+            customerDesc: 'Yêu cầu hoàn tiền đang được theo dõi trên hệ thống.'
+          };
       }
     }
 
     function renderRefundInfo(order) {
-      const badge = document.getElementById('refundStatusBadge');
+      const topBadge = document.getElementById('refundStatusBadge');
+      const cardSection = document.getElementById('refundSectionCard');
+      const emptyState = document.getElementById('refundEmptyState');
+      const detailsContent = document.getElementById('refundDetailsContent');
+      const sectionBadge = document.getElementById('refundSectionStatusBadge');
+      const cardAmountEl = document.getElementById('cardRefundAmount');
+      const cardRefundIdEl = document.getElementById('cardRefundId');
+      const cardUpdatedAtEl = document.getElementById('cardRefundUpdatedAt');
+      const customerAlert = document.getElementById('refundCustomerAlert');
+      const customerIcon = document.getElementById('refundCustomerIcon');
+      const customerTitle = document.getElementById('refundCustomerTitle');
+      const customerDesc = document.getElementById('refundCustomerDesc');
+      const techDetails = document.getElementById('refundTechnicalDetails');
+
+      // Legacy fallback elements
       const box = document.getElementById('refundInfoBox');
       const amountEl = document.getElementById('refundAmountDisplay');
       const failureBox = document.getElementById('refundFailureBox');
       const mockActionContainer = document.getElementById('refundMockActionContainer');
-      const retryMockBtnText = document.getElementById('btnRetryMockFailText');
-      if (!badge || !box || !amountEl || !failureBox) return;
 
-      if (!order.refundStatus) {
-        badge.classList.add('hidden');
-        box.classList.add('hidden');
+      const hasRefund = Boolean(order.refundStatus || order.refundRequestId || (order.refundAmount && order.refundAmount > 0));
+
+      // Trường hợp 1: Đơn chưa có hoàn tiền -> Hiện empty state thân thiện, không báo lỗi đỏ
+      if (!hasRefund) {
+        if (topBadge) topBadge.classList.add('hidden');
+        if (sectionBadge) sectionBadge.classList.add('hidden');
+        if (emptyState) emptyState.classList.remove('hidden');
+        if (detailsContent) detailsContent.classList.add('hidden');
+        if (box) box.classList.add('hidden');
         if (mockActionContainer) mockActionContainer.classList.add('hidden');
         return;
       }
 
-      const isManualReview = order.refundStatus === 'RequiresManualReview' ||
-                             order.refundStatus === 'ManualReviewRequired' ||
-                             order.refundStatus === 'AccountingProcessing' ||
-                             order.refundStatus === 'AccountingResolved' ||
-                             (order.refundRetryCount && order.refundRetryCount >= 3);
+      // Trường hợp 2: Có thông tin hoàn tiền
+      const isStaff = isStaffOrAdmin();
+      const cfg = getRefundStatusDisplay(order.refundStatus, !isStaff);
 
-      const cfg = getRefundStatusDisplay(order.refundStatus);
-      badge.textContent = cfg.text;
-      badge.className = 'px-3 py-1 text-xs font-bold rounded-full border ' + cfg.css;
-      amountEl.textContent = formatCurrency(order.refundAmount || 0);
-      box.classList.remove('hidden');
+      if (emptyState) emptyState.classList.add('hidden');
+      if (detailsContent) detailsContent.classList.remove('hidden');
 
-      if (order.refundStatus === 'AccountingProcessing') {
-        failureBox.innerHTML = `
-          <div class="p-3.5 bg-sky-50 border border-sky-200 rounded-2xl space-y-2.5">
-            <div class="flex items-start gap-2.5">
-              <i class="fa-solid fa-spinner fa-spin text-sky-600 text-base mt-0.5 shrink-0"></i>
-              <div>
-                <p class="text-sky-900 font-bold text-sm">Kế toán đang xử lý hoàn tiền thủ công (Story S-48)</p>
-                <p class="text-sky-700 text-xs mt-0.5">Hồ sơ đã được kế toán viên tiếp nhận và đang tiến hành chuyển tiền qua cổng thanh toán / ngân hàng.</p>
-              </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-sky-200/60">
-              <a href="./auditor.html" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Cổng Kế Toán (Auditor)
-              </a>
-              <a href="./order-audit-logs.html?orderId=${encodeURIComponent(order.id)}" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-sky-100 text-sky-800 border border-sky-300 text-xs font-bold rounded-lg transition">
-                <i class="fa-solid fa-clock-rotate-left"></i> Nhật Ký Đối Soát
-              </a>
-            </div>
-          </div>
-        `;
-        failureBox.className = '';
-        failureBox.classList.remove('hidden');
-        if (mockActionContainer) mockActionContainer.classList.add('hidden');
-      } else if (order.refundStatus === 'AccountingResolved') {
-        failureBox.innerHTML = `
-          <div class="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-2">
-            <div class="flex items-start gap-2.5">
-              <i class="fa-solid fa-circle-check text-emerald-600 text-base mt-0.5 shrink-0"></i>
-              <div>
-                <p class="text-emerald-900 font-bold text-sm">Kế toán đã hoàn tất hoàn tiền thủ công (Story S-48)</p>
-                <p class="text-emerald-700 text-xs mt-0.5">Khoản tiền đã được chuyển trả cho khách hàng thành công.</p>
-              </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-emerald-200/60">
-              <a href="./auditor.html" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Cổng Kế Toán
-              </a>
-              <a href="./order-audit-logs.html?orderId=${encodeURIComponent(order.id)}" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-lg transition">
-                <i class="fa-solid fa-clock-rotate-left"></i> Nhật Ký Đối Soát
-              </a>
-            </div>
-          </div>
-        `;
-        failureBox.className = '';
-        failureBox.classList.remove('hidden');
-        if (mockActionContainer) mockActionContainer.classList.add('hidden');
-      } else if (isManualReview) {
-        failureBox.innerHTML = `
-          <div class="p-4 bg-rose-50/90 border border-rose-200 rounded-2xl space-y-3">
-            <div class="flex items-start gap-3">
-              <div class="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 text-base">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-              </div>
-              <div class="flex-1">
-                <p class="text-rose-900 font-bold text-sm">Hoàn tiền thất bại 3 lần — Đã chuyển sang Cổng Kế Toán (Story S-48)</p>
-                <p class="text-rose-700 text-xs mt-0.5 leading-relaxed">
-                  Lý do từ cổng: <strong>${order.refundFailureReason || 'Cổng thanh toán phản hồi lỗi Timeout / từ chối giao dịch.'}</strong>. 
-                  Hệ thống đã dừng cơ chế tự động thử lại và bàn giao hồ sơ vào danh sách xử lý thủ công của Kế toán. Bạn không cần tạo lại yêu cầu hoàn tiền.
-                </p>
-              </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-rose-200/60">
-              <a href="./auditor.html" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-sm transition">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Cổng Kế Toán (Auditor Portal)
-              </a>
-              <a href="./order-audit-logs.html?orderId=${encodeURIComponent(order.id)}" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-rose-100 text-rose-800 border border-rose-300 text-xs font-bold rounded-xl transition">
-                <i class="fa-solid fa-clock-rotate-left"></i> Xem Nhật Ký Đối Soát
-              </a>
-            </div>
-          </div>
-        `;
-        failureBox.className = '';
-        failureBox.classList.remove('hidden');
-        if (mockActionContainer) mockActionContainer.classList.add('hidden');
-      } else if (order.refundStatus === 'Failed' || order.refundStatus === 'RetryScheduled') {
-        const retryCount = order.refundRetryCount || 1;
-        const retryText = ` (Đã ghi nhận ${retryCount}/3 lần thất bại)`;
-        failureBox.textContent = 'Lý do: ' + (order.refundFailureReason || 'Cổng thanh toán phản hồi lỗi Timeout.') + retryText;
-        failureBox.className = 'text-sm text-rose-700 font-medium';
-        failureBox.classList.remove('hidden');
+      // Badges
+      if (topBadge) {
+        topBadge.textContent = cfg.text;
+        topBadge.className = 'px-3 py-1 text-xs font-bold rounded-full border ' + cfg.css;
+        topBadge.classList.remove('hidden');
+      }
+      if (sectionBadge) {
+        sectionBadge.textContent = cfg.text;
+        sectionBadge.className = 'px-3 py-1 text-xs font-bold rounded-full border ' + cfg.css;
+        sectionBadge.classList.remove('hidden');
+      }
 
-        if (mockActionContainer) {
-          mockActionContainer.classList.remove('hidden');
-          const nextRetry = Math.min(retryCount + 1, 3);
-          if (retryMockBtnText) {
-            retryMockBtnText.textContent = `⚠️ Mock Hoàn thất bại tiếp (Lần ${nextRetry}/3 - Test S48)`;
-          }
+      // Amount & IDs
+      const refundAmount = order.refundAmount || order.totalAmount || 0;
+      if (cardAmountEl) cardAmountEl.textContent = formatCurrency(refundAmount);
+      if (amountEl) amountEl.textContent = formatCurrency(refundAmount);
+
+      const refundIdStr = order.refundRequestId ? String(order.refundRequestId) : '';
+      if (cardRefundIdEl) {
+        cardRefundIdEl.textContent = refundIdStr ? (refundIdStr.substring(0, 8) + '...') : '—';
+        cardRefundIdEl.setAttribute('data-full-id', refundIdStr);
+        cardRefundIdEl.title = refundIdStr ? `Mã đầy đủ: ${refundIdStr} (Bấm biểu tượng để sao chép)` : '';
+      }
+
+      const updateTime = order.refundUpdatedAt || order.refundCreatedAt || order.createdAt;
+      if (cardUpdatedAtEl) cardUpdatedAtEl.textContent = formatDateTime(updateTime);
+
+      // Customer Friendly Message Box
+      if (customerAlert) {
+        customerAlert.className = `p-4 rounded-xl border text-sm flex items-start gap-3 ${cfg.boxBg}`;
+      }
+      if (customerIcon) {
+        customerIcon.className = `fa-solid ${cfg.icon} text-base mt-0.5 shrink-0 ${cfg.iconColor}`;
+      }
+      if (customerTitle) {
+        customerTitle.textContent = cfg.customerTitle;
+        customerTitle.className = `font-bold text-sm ${cfg.titleColor}`;
+      }
+      if (customerDesc) {
+        let descText = cfg.customerDesc;
+        // Nếu có thời gian retry kế tiếp và đang ở RetryScheduled
+        if (order.refundStatus === 'RetryScheduled' && order.refundNextRetryAt) {
+          descText += ` Lịch thử lại dự kiến: ${formatDateTime(order.refundNextRetryAt)}.`;
         }
-      } else {
-        failureBox.classList.add('hidden');
-        if (mockActionContainer) mockActionContainer.classList.add('hidden');
+        customerDesc.textContent = descText;
+        customerDesc.className = `text-xs mt-1 leading-relaxed ${cfg.descColor}`;
+      }
+
+      // Auditor / Technical Details: Chỉ hiển thị cho Kế toán / Quản trị viên
+      if (techDetails) {
+        if (isStaff) {
+          techDetails.classList.remove('hidden');
+          const elAttempt = document.getElementById('techAttemptCount');
+          if (elAttempt) elAttempt.textContent = order.refundAttemptCount || (order.refundRetryCount ? order.refundRetryCount + 1 : 1);
+
+          const elRetry = document.getElementById('techRetryCount');
+          if (elRetry) elRetry.textContent = order.refundRetryCount || 0;
+
+          const elLast = document.getElementById('techLastAttemptAt');
+          if (elLast) elLast.textContent = formatDateTime(order.refundLastAttemptedAt);
+
+          const elNext = document.getElementById('techNextRetryAt');
+          if (elNext) elNext.textContent = order.refundNextRetryAt ? formatDateTime(order.refundNextRetryAt) : '—';
+
+          const errorRow = document.getElementById('techErrorRow');
+          const errorCodeEl = document.getElementById('techErrorCode');
+          const errorMsgEl = document.getElementById('techErrorMessage');
+          const hasError = Boolean(order.refundErrorCode || order.refundErrorMessage || order.refundFailureReason);
+
+          if (hasError && errorRow) {
+            errorRow.classList.remove('hidden');
+            if (errorCodeEl) errorCodeEl.textContent = escapeHtml(order.refundErrorCode || 'GATEWAY_ERROR');
+            if (errorMsgEl) errorMsgEl.textContent = escapeHtml(order.refundErrorMessage || order.refundFailureReason || 'Không có mô tả lỗi.');
+          } else if (errorRow) {
+            errorRow.classList.add('hidden');
+          }
+
+          const linkAudit = document.getElementById('techLinkAuditLog');
+          if (linkAudit) linkAudit.href = `./order-audit-logs.html?orderId=${encodeURIComponent(order.id)}`;
+        } else {
+          techDetails.classList.add('hidden');
+        }
+      }
+
+      // Giữ legacy infoBox đồng bộ nếu cần
+      if (box) box.classList.remove('hidden');
+      if (failureBox) {
+        if (order.refundStatus === 'ManualReviewRequired' || (order.refundRetryCount && order.refundRetryCount >= 3)) {
+          failureBox.innerHTML = `<span class="text-xs text-rose-700 font-medium">Lý do từ cổng: ${escapeHtml(order.refundErrorMessage || order.refundFailureReason || 'Timeout / từ chối')} (Đã bàn giao Kế toán)</span>`;
+          failureBox.classList.remove('hidden');
+        } else if (order.refundStatus === 'RetryScheduled' || order.refundStatus === 'Failed') {
+          failureBox.innerHTML = `<span class="text-xs text-amber-700 font-medium">Lần thử: ${order.refundRetryCount || 1}/3 - Lý do: ${escapeHtml(order.refundErrorMessage || order.refundFailureReason || 'Đang chờ')}</span>`;
+          failureBox.classList.remove('hidden');
+        } else {
+          failureBox.classList.add('hidden');
+        }
+      }
+      if (mockActionContainer) {
+        // Mock buttons chỉ hiển thị cho auditor/admin hoặc khi có lỗi thử lại
+        mockActionContainer.classList.toggle('hidden', !isStaff);
       }
     }
 
@@ -773,6 +1125,10 @@
     async function mockCancelOrderFailed() {
       const targetOrderId = pendingCancelOrderId || orderId;
       if (!targetOrderId) return;
+
+      // Cloud-safe mode check: Cảnh báo người dùng đây là thao tác giả lập kiểm thử
+      const confirmed = confirm("⚠️ CẢNH BÁO KIỂM THỬ (Dev Only):\nThao tác này chỉ dùng để kiểm thử lỗi cổng thanh toán trên môi trường phát triển (Local Test).\nTUYỆT ĐỐI KHÔNG SỬ DỤNG TRÊN PRODUCTION / SHARED CLOUD.\n\nBạn có chắc chắn muốn chạy thử nghiệm này?");
+      if (!confirmed) return;
 
       const btnModal = document.getElementById('btnMockCancelFail');
       const btnRetry = document.getElementById('btnRetryMockFail');
@@ -905,7 +1261,7 @@
         }
 
         const json = await res.json();
-        orderAuditLogs = json.data || [];
+        orderAuditLogs = Array.isArray(json.data) ? json.data : [];
 
         // Update counts
         document.getElementById('auditCountAll').textContent = orderAuditLogs.length;

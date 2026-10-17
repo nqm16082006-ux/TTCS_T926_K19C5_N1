@@ -124,22 +124,32 @@ namespace EventTicketBooking.Api.Services.Implementations
             var normalizedEmail = request.Email?.Trim().ToLowerInvariant() ?? string.Empty;
             var normalizedIp = NormalizeClientIp(clientIp);
 
-            // S-02 CỰC KỲ QUAN TRỌNG: Redis unavailable -> FAIL CLOSED. Trả 503 Service Unavailable.
+            IDatabase? db = null;
             if (_redis == null || !_redis.IsConnected)
             {
-                _logger.LogError("REDIS UNAVAILABLE: Kết nối Redis không khả dụng khi xử lý đăng nhập cho {Email}. Fail-closed.", normalizedEmail);
-                return AuthResult.ServiceUnavailable("Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.");
-            }
+                if (_securityOptions.FailClosedOnRedisDown)
+                {
+                    _logger.LogError("REDIS UNAVAILABLE: Kết nối Redis không khả dụng khi xử lý đăng nhập cho {Email}. Fail-closed.", normalizedEmail);
+                    return AuthResult.ServiceUnavailable("Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.");
+                }
 
-            IDatabase db;
-            try
-            {
-                db = _redis.GetDatabase();
+                _logger.LogWarning("REDIS UNAVAILABLE: Kết nối Redis không khả dụng. Chế độ Development Fallback: Đăng nhập trực tiếp qua CSDL cho {Email}.", normalizedEmail);
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogError(ex, "REDIS UNAVAILABLE: Lỗi khi lấy kết nối IDatabase từ Redis cho {Email}. Fail-closed.", normalizedEmail);
-                return AuthResult.ServiceUnavailable("Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.");
+                try
+                {
+                    db = _redis.GetDatabase();
+                }
+                catch (Exception ex)
+                {
+                    if (_securityOptions.FailClosedOnRedisDown)
+                    {
+                        _logger.LogError(ex, "REDIS UNAVAILABLE: Lỗi khi lấy kết nối IDatabase từ Redis cho {Email}. Fail-closed.", normalizedEmail);
+                        return AuthResult.ServiceUnavailable("Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.");
+                    }
+                    _logger.LogWarning(ex, "REDIS UNAVAILABLE: Lỗi lấy database từ Redis. Fallback trực tiếp CSDL.");
+                }
             }
 
             var accountLockoutKey = $"login:lockout:{normalizedEmail}";
@@ -148,7 +158,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             var ipAttemptsKey = $"login:ip:attempts:{normalizedIp}";
 
             // 1. Kiểm tra lockout theo IP TRƯỚC KHI verify password
-            if (normalizedIp != "unknown")
+            if (db != null && normalizedIp != "unknown")
             {
                 try
                 {
@@ -166,30 +176,39 @@ namespace EventTicketBooking.Api.Services.Implementations
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Lỗi kiểm tra Redis IP lockout cho IP {Ip}. Fail-closed.", normalizedIp);
-                    return AuthResult.ServiceUnavailable("Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.");
+                    if (_securityOptions.FailClosedOnRedisDown)
+                    {
+                        _logger.LogError(ex, "Lỗi kiểm tra Redis IP lockout cho IP {Ip}. Fail-closed.", normalizedIp);
+                        return AuthResult.ServiceUnavailable("Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.");
+                    }
                 }
             }
 
             // 2. Kiểm tra lockout theo Account TRƯỚC KHI verify password
-            try
+            if (db != null)
             {
-                bool isAccountLocked = await db.KeyExistsAsync(accountLockoutKey);
-                if (isAccountLocked)
+                try
                 {
-                    var ttl = await db.KeyTimeToLiveAsync(accountLockoutKey);
-                    var minutesRemaining = ttl.HasValue && ttl.Value.TotalMinutes > 0
-                        ? Math.Ceiling(ttl.Value.TotalMinutes)
-                        : _securityOptions.LockoutMinutes;
+                    bool isAccountLocked = await db.KeyExistsAsync(accountLockoutKey);
+                    if (isAccountLocked)
+                    {
+                        var ttl = await db.KeyTimeToLiveAsync(accountLockoutKey);
+                        var minutesRemaining = ttl.HasValue && ttl.Value.TotalMinutes > 0
+                            ? Math.Ceiling(ttl.Value.TotalMinutes)
+                            : _securityOptions.LockoutMinutes;
 
-                    _logger.LogWarning("Tài khoản {Email} đang bị khóa. Còn {Minutes} phút.", normalizedEmail, minutesRemaining);
-                    return AuthResult.Locked($"Tài khoản của bạn đã bị khóa tạm thời trong 15 phút. Vui lòng thử lại sau khoảng {minutesRemaining} phút.");
+                        _logger.LogWarning("Tài khoản {Email} đang bị khóa. Còn {Minutes} phút.", normalizedEmail, minutesRemaining);
+                        return AuthResult.Locked($"Tài khoản của bạn đã bị khóa tạm thời trong 15 phút. Vui lòng thử lại sau khoảng {minutesRemaining} phút.");
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lỗi kiểm tra Redis account lockout cho {Email}. Fail-closed.", normalizedEmail);
-                return AuthResult.ServiceUnavailable("Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.");
+                catch (Exception ex)
+                {
+                    if (_securityOptions.FailClosedOnRedisDown)
+                    {
+                        _logger.LogError(ex, "Lỗi kiểm tra Redis account lockout cho {Email}. Fail-closed.", normalizedEmail);
+                        return AuthResult.ServiceUnavailable("Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.");
+                    }
+                }
             }
 
             // 3. Tìm user trong CSDL
@@ -212,48 +231,54 @@ namespace EventTicketBooking.Api.Services.Implementations
 
             if (user == null || !isPasswordValid)
             {
-                try
+                if (db != null)
                 {
-                    // Ghi nhận lần thử sai theo IP
-                    if (normalizedIp != "unknown")
+                    try
                     {
-                        long ipAttempts = await db.StringIncrementAsync(ipAttemptsKey);
-                        if (ipAttempts == 1)
+                        // Ghi nhận lần thử sai theo IP
+                        if (normalizedIp != "unknown")
                         {
-                            await db.KeyExpireAsync(ipAttemptsKey, TimeSpan.FromMinutes(_securityOptions.LockoutMinutes));
+                            long ipAttempts = await db.StringIncrementAsync(ipAttemptsKey);
+                            if (ipAttempts == 1)
+                            {
+                                await db.KeyExpireAsync(ipAttemptsKey, TimeSpan.FromMinutes(_securityOptions.LockoutMinutes));
+                            }
+
+                            if (ipAttempts >= _securityOptions.IpMaxFailures)
+                            {
+                                await db.StringSetAsync(ipLockoutKey, "locked", TimeSpan.FromMinutes(_securityOptions.LockoutMinutes));
+                                await db.KeyDeleteAsync(ipAttemptsKey);
+                                _logger.LogWarning("IP {Ip} đã bị khóa {Minutes} phút do nhập sai {Attempts} lần.",
+                                    normalizedIp, _securityOptions.LockoutMinutes, ipAttempts);
+                            }
                         }
 
-                        if (ipAttempts >= _securityOptions.IpMaxFailures)
+                        // Ghi nhận lần thử sai theo Account
+                        long attempts = await db.StringIncrementAsync(accountAttemptsKey);
+                        if (attempts == 1)
                         {
-                            await db.StringSetAsync(ipLockoutKey, "locked", TimeSpan.FromMinutes(_securityOptions.LockoutMinutes));
-                            await db.KeyDeleteAsync(ipAttemptsKey);
-                            _logger.LogWarning("IP {Ip} đã bị khóa {Minutes} phút do nhập sai {Attempts} lần.",
-                                normalizedIp, _securityOptions.LockoutMinutes, ipAttempts);
+                            await db.KeyExpireAsync(accountAttemptsKey, TimeSpan.FromMinutes(_securityOptions.LockoutMinutes));
+                        }
+
+                        _logger.LogInformation("Đăng nhập thất bại {Email}. Lần sai: {Attempts}", normalizedEmail, attempts);
+
+                        // Sai lần thứ 5 -> Khóa tài khoản 15 phút và trả về 401
+                        if (attempts >= _securityOptions.AccountMaxFailures)
+                        {
+                            await db.StringSetAsync(accountLockoutKey, "locked", TimeSpan.FromMinutes(_securityOptions.LockoutMinutes));
+                            await db.KeyDeleteAsync(accountAttemptsKey);
+
+                            return AuthResult.Unauthorized("Tài khoản của bạn đã bị khóa tạm thời trong 15 phút do nhập sai 5 lần liên tiếp.");
                         }
                     }
-
-                    // Ghi nhận lần thử sai theo Account
-                    long attempts = await db.StringIncrementAsync(accountAttemptsKey);
-                    if (attempts == 1)
+                    catch (Exception ex)
                     {
-                        await db.KeyExpireAsync(accountAttemptsKey, TimeSpan.FromMinutes(_securityOptions.LockoutMinutes));
+                        if (_securityOptions.FailClosedOnRedisDown)
+                        {
+                            _logger.LogError(ex, "Lỗi ghi nhận số lần đăng nhập thất bại vào Redis. Fail-closed.");
+                            return AuthResult.ServiceUnavailable("Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.");
+                        }
                     }
-
-                    _logger.LogInformation("Đăng nhập thất bại {Email}. Lần sai: {Attempts}", normalizedEmail, attempts);
-
-                    // Sai lần thứ 5 -> Khóa tài khoản 15 phút và trả về 401
-                    if (attempts >= _securityOptions.AccountMaxFailures)
-                    {
-                        await db.StringSetAsync(accountLockoutKey, "locked", TimeSpan.FromMinutes(_securityOptions.LockoutMinutes));
-                        await db.KeyDeleteAsync(accountAttemptsKey);
-
-                        return AuthResult.Unauthorized("Tài khoản của bạn đã bị khóa tạm thời trong 15 phút do nhập sai 5 lần liên tiếp.");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Lỗi ghi nhận số lần đăng nhập thất bại vào Redis. Fail-closed.");
-                    return AuthResult.ServiceUnavailable("Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.");
                 }
 
                 // Sai từ lần 1 đến lần 4: trả 401 generic
@@ -261,18 +286,25 @@ namespace EventTicketBooking.Api.Services.Implementations
             }
 
             // 5. Đăng nhập thành công -> Xóa bộ đếm thất bại của CHÍNH account đó (TUYỆT ĐỐI KHÔNG xóa counter của IP)
-            try
+            if (db != null)
             {
-                await db.KeyDeleteAsync(accountAttemptsKey);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Lỗi xóa bộ đếm đăng nhập thất bại của tài khoản từ Redis.");
+                try
+                {
+                    await db.KeyDeleteAsync(accountAttemptsKey);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Lỗi xóa bộ đếm đăng nhập thất bại của tài khoản từ Redis.");
+                }
             }
 
-            // 6. Kiểm tra trạng thái hoạt động (kích hoạt / đóng tài khoản)
+            // 6. Kiểm tra trạng thái hoạt động (kích hoạt / đóng tài khoản / ẩn danh)
             if (!user.IsActive)
             {
+                if (user.IsAnonymized)
+                {
+                    return AuthResult.Locked("Tài khoản này đã bị xoá và ẩn danh dữ liệu cá nhân theo yêu cầu bảo vệ quyền riêng tư (Nghị định 13/2023/NĐ-CP). Bạn không thể đăng nhập lại.");
+                }
                 if (string.IsNullOrEmpty(user.VerificationCode))
                 {
                     return AuthResult.Locked("Tài khoản của bạn đã bị khóa bởi Quản trị viên. Vui lòng liên hệ Admin để được hỗ trợ.");

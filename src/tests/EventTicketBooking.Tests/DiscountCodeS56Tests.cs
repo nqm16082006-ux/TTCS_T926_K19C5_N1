@@ -1388,6 +1388,89 @@ namespace EventTicketBooking.Tests
             Assert.Equal(1, finalCode!.UsedCount);
         }
 
+        [Fact]
+        public async Task SeatHoldService_DeselectLastSeat_ReleasesDiscountReservationDirectly()
+        {
+            using var context = CreateInMemoryContext();
+            var (user, ev, showtime, order) = await SeedOrderScenarioAsync(context, price: 500000);
+
+            var code = new DiscountCode
+            {
+                Id = Guid.NewGuid(),
+                EventId = ev.Id,
+                Code = "RELEASEHOLD",
+                DiscountType = DiscountType.FixedAmount,
+                DiscountValue = 50000,
+                UsageLimit = 10,
+                UsedCount = 1,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(1),
+                IsActive = true,
+                CreatedByUserId = user.Id
+            };
+            context.DiscountCodes.Add(code);
+
+            order.DiscountCodeId = code.Id;
+            order.OriginalAmount = 500000;
+            order.DiscountAmount = 50000;
+            order.TotalAmount = 450000;
+            order.Status = OrderStatus.Pending;
+
+            var seat = new Seat
+            {
+                Id = Guid.NewGuid(),
+                ShowtimeId = showtime.Id,
+                Row = "A",
+                SeatNumber = 1,
+                Status = "HELD"
+            };
+            context.Seats.Add(seat);
+
+            var orderItem = new OrderItem
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                SeatId = seat.Id,
+                Price = 500000
+            };
+            context.OrderItems.Add(orderItem);
+            order.OrderItems = new List<OrderItem> { orderItem };
+
+            var hold = new SeatHolds
+            {
+                Id = Guid.NewGuid(),
+                SeatId = seat.Id,
+                UserId = user.Id,
+                Status = "ACTIVE",
+                HeldAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+            };
+            context.SeatHold.Add(hold);
+            await context.SaveChangesAsync();
+
+            var discountService = new DiscountCodeService(context);
+            var seatHoldService = new SeatHoldService(
+                context,
+                NullLogger<SeatHoldService>.Instance,
+                hubContext: null,
+                redis: null,
+                metrics: null,
+                discountCodeService: discountService);
+
+            var result = await seatHoldService.CancelSeatHoldAsync(showtime.Id, seat.Id, user.Id, cancelOrder: true);
+
+            Assert.Equal(HoldSeatsResultStatus.Success, result.Status);
+
+            var updatedOrder = await context.Orders.FindAsync(order.Id);
+            Assert.NotNull(updatedOrder);
+            Assert.Equal(OrderStatus.Cancelled, updatedOrder.Status);
+            Assert.Null(updatedOrder.DiscountCodeId);
+            Assert.Equal(0, updatedOrder.DiscountAmount);
+
+            var updatedCode = await context.DiscountCodes.FindAsync(code.Id);
+            Assert.NotNull(updatedCode);
+            Assert.Equal(0, updatedCode.UsedCount);
+        }
+
         #endregion
     }
 }
