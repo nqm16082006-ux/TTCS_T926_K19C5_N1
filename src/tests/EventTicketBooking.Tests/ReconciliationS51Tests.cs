@@ -115,7 +115,7 @@ TX_CSV_02,500000,2026-10-15 11:30:00,Thanh toan VIP";
         {
             // Arrange
             var service = new ReconciliationService(null!, NullLogger<ReconciliationService>.Instance);
-            
+
             // Semicolon separator
             string semicolonCsv = "TransactionId;Amount;TransactionDate;Description\nTX_SEMI_01;150000;2026-10-15 10:00:00;Semicolon test";
             var (semiItems, semiErrors) = service.ParseCsvStatement(semicolonCsv);
