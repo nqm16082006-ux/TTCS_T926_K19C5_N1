@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using EventTicketBooking.Api.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Distributed;
@@ -12,17 +13,18 @@ namespace EventTicketBooking.Api.Controllers
     public class HealthController : ControllerBase
     {
         private readonly AppDbContext _dbContext;
-        private readonly IDistributedCache _cache;
+        private readonly StackExchange.Redis.IConnectionMultiplexer? _redis;
         private readonly IConfiguration _configuration;
 
-        public HealthController(AppDbContext dbContext, IDistributedCache cache, IConfiguration configuration)
+        public HealthController(AppDbContext dbContext, StackExchange.Redis.IConnectionMultiplexer? redis, IConfiguration configuration)
         {
             _dbContext = dbContext;
-            _cache = cache;
+            _redis = redis;
             _configuration = configuration;
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetHealthStatus()
         {
             bool isDbConnected = false;
@@ -32,9 +34,9 @@ namespace EventTicketBooking.Api.Controllers
             {
                 isDbConnected = await _dbContext.Database.CanConnectAsync();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                dbError = "Database connection failed.";
+                dbError = $"Database connection failed: {ex.Message}";
             }
 
             bool isRedisConnected = false;
@@ -42,17 +44,21 @@ namespace EventTicketBooking.Api.Controllers
 
             try
             {
-                var pingKey = "health_ping_" + Guid.NewGuid();
-                await _cache.SetStringAsync(pingKey, "ok", new DistributedCacheEntryOptions
+                if (_redis != null && _redis.IsConnected)
                 {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(5)
-                });
-                var value = await _cache.GetStringAsync(pingKey);
-                isRedisConnected = value == "ok";
+                    var db = _redis.GetDatabase();
+                    await db.PingAsync();
+                    isRedisConnected = true;
+                }
+                else
+                {
+                    redisError = _redis == null ? "Redis multiplexer service not registered." : "Redis connection is disconnected.";
+                }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                redisError = "Cache connection failed.";
+                isRedisConnected = false;
+                redisError = $"Redis ping failed: {ex.Message}";
             }
 
             var response = new

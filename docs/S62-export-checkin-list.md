@@ -1,56 +1,66 @@
-# S-62: Xuất danh sách khách vào cửa theo suất diễn
+# S-62 — Xuất danh sách khách vào cửa theo suất diễn
 
-## 1. Mô tả tính năng
-Tính năng cho phép Người tổ chức sự kiện (Organizer), Quản trị viên (Admin) và Nhân viên kiểm soát vé (Staff) xuất danh sách toàn bộ khách đã vào cửa theo từng suất diễn ra tệp CSV chuẩn hóa. Tệp CSV được tối ưu hóa đặc biệt với UTF-8 BOM để mở trên Microsoft Excel mà không bị vỡ font Tiếng Việt.
+## Phạm vi và quy tắc
 
-## 2. API Endpoint
-`GET /api/shows/{showId}/checkins/export-csv`
+CSV có mã vé, ghế, thời gian theo UTC+7, cửa vào, cờ xung đột, ghi chú, loại lượt và kết quả.
 
-Bí danh hỗ trợ: `GET /api/v1/checkin/showtimes/{showId}/export-csv`
+- Mặc định chỉ xuất lượt đã vào cửa. Mỗi lượt là một dòng; số vé duy nhất được thống kê riêng.
+- Lượt vào lại được nhân viên duyệt theo S-31 không tự động bị coi là xung đột.
+- Check-in thành công được tổng hợp từ OrderItem. Bản ghi đồng bộ offline thành công không tạo dòng vào cửa thứ hai.
+- Vé có xung đột offline được gắn cờ ở dòng đã vào để ban tổ chức biết cần đối soát.
+- Chế độ nhật ký đối soát bổ sung từng lượt offline xung đột, với đúng cửa/giờ quét và kết quả “Xung đột”. Dòng này không xác nhận khách đã vào.
+- Xuất mặc định không gồm vé chưa vào. Tham số `includeNotCheckedIn` cũ chỉ được giữ cho API tương thích; giao diện mới không bật tùy chọn này.
+- Không có dữ liệu: xem trước báo rỗng, CSV chỉ có tiêu đề.
 
-### Tham số Query String (tùy chọn)
-- `gateName` / `doorName` / `gateId` / `doorId` (string, tùy chọn): Lọc theo tên cửa hoặc cổng soát vé cụ thể.
-- `onlyConflicts` (bool, tùy chọn): Nếu `true`, chỉ xuất các vé/lượt quét có cờ xung đột.
-- `includeNotCheckedIn` (bool, tùy chọn, mặc định `false`): Nếu `true`, bao gồm cả các vé chưa vào cửa.
+## Quyền truy cập
 
-### Phản hồi
-- **Mã HTTP**: 200 OK
-- **Content-Type**: `text/csv; charset=utf-8`
-- **Content-Disposition**: `attachment; filename="danh-sach-checkin-suat-{showId}.csv"`
-- **Mã hóa**: UTF-8 có BOM (`0xEF, 0xBB, 0xBF`).
+Admin được xuất; Organizer chỉ được xem/xuất suất diễn thuộc sự kiện mình sở hữu. Staff và Customer không được xuất. Hiện chưa có quan hệ phân công Staff theo suất diễn nên không cấp quyền xuất toàn hệ thống cho Staff. Cả API xem trước và CSV dùng chung kiểm tra quyền.
 
-## 3. Cấu trúc tệp CSV xuất bản
-Header tệp CSV:
-```csv
-Mã vé,Số ghế,Thời gian vào,Cửa vào,Cờ xung đột,Ghi chú xung đột
-```
+Trang `checkin-export.html` sử dụng phiên đăng nhập hiện tại, không chứa thông tin đăng nhập demo và không tự chuyển sang tài khoản Admin. Các liên kết xuất CSV ở danh sách sự kiện, chi tiết suất diễn, overview và live-checkin trỏ tới trang này. Trang PDF S-60 giữ luồng riêng.
 
-### Các trường dữ liệu:
-1. **Mã vé (`TicketCode`)**: Mã vé điện tử ngẫu nhiên bảo mật của vé.
-2. **Số ghế (`SeatNumber` / `SeatCode`)**: Vị trí ghế ngồi (ghép Hàng ghế + Số ghế, ví dụ: `A12`, `VIP-01`).
-3. **Thời gian vào (`CheckinTime`)**: Thời gian khách qua cửa (giờ Việt Nam UTC+7, định dạng `yyyy-MM-dd HH:mm:ss`).
-4. **Cửa vào (`GateName` / `DoorName`)**: Cửa hoặc cổng soát vé (ví dụ: `Cổng A`, `Cổng VIP`).
-5. **Cờ xung đột (`IsConflict` / `HasConflict`)**: Hiển thị `Có` hoặc `Không`.
-6. **Ghi chú xung đột (`ConflictNote`)**: Lý do xung đột nếu có.
+## API
 
-## 4. Các quy tắc phát hiện Cờ xung đột
-1. **Vé quét lại nhiều lần / Vào bổ sung (Re-admissions)**:
-   - Vé có bản ghi trong bảng `TicketReadmissions` (S-31).
-   - Lượt check-in ban đầu được gắn cờ xung đột kèm ghi chú số lượt vào bổ sung.
-   - Mỗi lượt vào bổ sung được xuất thành một dòng riêng biệt kèm lý do và tên nhân viên duyệt.
-2. **Vé chưa thanh toán / Hủy / Quá hạn nhưng có dữ liệu quét**:
-   - Đơn hàng ở trạng thái khác `OrderStatus.Paid` (ví dụ: `Cancelled`, `Expired`, `Pending`) nhưng vẫn ghi nhận lượt vào cửa.
-3. **Vé sai suất diễn / Xung đột ngoại tuyến**:
-   - Các lượt quét ngoại tuyến được ghi nhận trong `OfflineCheckInRecords` (S-35 & S-36) có `IsConflict = true` (quét ở nhiều cửa cùng lúc, quét sai suất diễn...).
+- `GET /api/shows/{showId}/checkins/export-csv`
+- `GET /api/shows/{showId}/checkins/export-preview`
+- URL CSV cũ `/api/v1/checkin/showtimes/{showId}/export-csv` gọi cùng action, cùng quyền.
 
-## 5. Kiểm thử tự động
-Chạy kiểm thử riêng cho S-62:
+Bộ lọc chung: `gateName`, `onlyConflicts`, `includeScanLog` (mặc định false). CSV hỗ trợ các bí danh cửa cũ `doorName`, `gateId`, `doorId` dưới dạng chuỗi tên cửa; không có bảng mã cổng riêng.
+
+JSON xem trước trả tối đa 200 dòng cùng tổng số dòng, lượt đã vào, vé duy nhất và dòng có xung đột sau khi lọc. CSV xuất toàn bộ kết quả. UTF-8 BOM, CRLF, escape dấu phẩy/nháy kép/xuống dòng và thêm dấu nháy đơn cho dữ liệu có thể được Excel diễn giải thành công thức. Phản hồi có `Cache-Control: no-store`.
+
+Không thay đổi schema database. Dữ liệu được đọc từ Tickets, OrderItems, TicketReadmissions và OfflineCheckInRecords. Chưa có nhật ký độc lập cho mọi lần quét online bị từ chối; những lần không được lưu không thể khôi phục từ S-62. Hiện việc tổng hợp vẫn giữ danh sách trong bộ nhớ; cần bổ sung phân trang/streaming hoặc tác vụ nền nếu triển khai xuất dữ liệu quy mô rất lớn.
+
+## Chạy riêng trên local (PowerShell 7, Docker Desktop, .NET 9)
+
 ```powershell
-dotnet test src/tests/EventTicketBooking.Tests --filter FullyQualifiedName~CheckinExportS62Tests
+./scripts/start-s62-local.ps1 -SeedDemo
 ```
-Toàn bộ 10 bài test bao phủ:
-- Kiểm tra validation `showId` không tồn tại (404) hoặc rỗng (400).
-- Kiểm tra tính toán cờ xung đột cho các trường hợp nghiệp vụ.
-- Kiểm tra bộ lọc theo cổng và bộ lọc chỉ lấy xung đột.
-- Kiểm tra định dạng CSV có UTF-8 BOM và chuẩn hóa ký tự RFC 4180.
-- Kiểm tra endpoint controller trả về file download chính xác.
+
+Script tạo cấu hình riêng trong `.tmp/s62-local/.env`, PostgreSQL riêng `s62_local` tại `127.0.0.1:55432`, Redis riêng `127.0.0.1:56379` và chạy API tại `http://localhost:5013`. Không dùng file `.env` ở gốc và không truy cập database cloud. Giữ container/volume để có thể chạy lại. Chỉ dừng process local được ghi trong `app.pid` sau khi xác minh đường dẫn. Không commit cấu hình riêng.
+
+- Mở `http://localhost:5013/login.html`, đăng nhập tài khoản seed local `organizer@eventticket.com` / `Organizer@123456`.
+- Mở `http://localhost:5013/checkin-export.html`, chọn sự kiện `[LOCAL S62] Đối soát vào cửa`.
+- Mặc định: 4 lượt đã vào, 3 vé duy nhất; vé A4 chưa vào không được xuất.
+- Chọn nhật ký đối soát: 5 dòng, có lượt xung đột tại Cửa C.
+- Lọc Cửa C: 1 dòng xung đột, 0 lượt đã vào.
+- Lượt vào lại Cửa B có ghi chú nhiều dòng và không bị gắn cờ xung đột.
+
+Các tài khoản/mật khẩu ở trên chỉ dành cho dữ liệu demo trên local. Tool `tools/S62LocalDemo` chỉ chấp nhận đúng database local nêu trên. Tool tạo fixture lặp lại an toàn và kiểm tra API thật với Admin, Organizer sở hữu, Organizer khác, Staff và request chưa đăng nhập. CSV kiểm tra được lưu ở `.tmp/s62-local/s62-audit.csv`.
+
+Lưu ý có sẵn của repository: database mới chạy migrations hiện chưa có bảng `refund_requests` của S-48; worker hoàn tiền có thể ghi lỗi thiếu bảng. Đây là phần ngoài S-62, không ngăn xuất check-in. Không tự sửa schema S-48 bằng tool demo S-62.
+
+## Kiểm thử
+
+```powershell
+dotnet test src/tests/EventTicketBooking.Tests --filter 'FullyQualifiedName~CheckinExportS62Tests|FullyQualifiedName~StoryS02AuthTests|FullyQualifiedName~AuditHttpFlowTests'
+```
+
+S-62 bao phủ dữ liệu đã/chưa vào, vào lại hợp lệ, xung đột đúng cửa, không nhân đôi lượt offline thành công, định dạng CSV và phòng công thức Excel. Kiểm thử quyền sở hữu được cập nhật để dùng controller chung. `start-s62-local.ps1 -SeedDemo` bổ sung kiểm tra tích hợp với PostgreSQL thật và HTTP.
+
+## Trạng thái đơn tại thời điểm vào cửa
+
+S-62 tra nhật ký thay đổi trạng thái đơn để đánh giá từng lượt vào và vào lại. Đơn được hủy/hoàn tiền sau lượt vào không tự động biến lượt vào hợp lệ trước đó thành xung đột. Thông tin hủy sau lượt vào được giữ ở ghi chú. Lượt vào sau khi đơn đã hủy vẫn bị gắn cờ; xung đột offline vẫn được giữ độc lập. Dữ liệu cũ không có lịch sử trạng thái tiếp tục được kiểm tra thận trọng theo trạng thái hiện tại để đối soát.
+
+## Tải Excel có định dạng
+
+Nút Tải Excel (.xlsx) gọi `/api/shows/{showId}/checkins/export-excel`, dùng cùng quyền, dữ liệu và bộ lọc với CSV. File XLSX có 8 cột thật, tiêu đề sự kiện/suất diễn, số liệu tổng hợp, ngày giờ kiểu ngày Excel (UTC+7), độ rộng cột, ngắt dòng ghi chú, tiêu đề cố định, bộ lọc và màu cảnh báo xung đột. Chuỗi luôn được lưu dạng văn bản, không tạo công thức từ nội dung đầu vào. CSV vẫn giữ định dạng chuẩn, không thêm dòng `sep=`; nên dùng XLSX để mở trực tiếp với định dạng sẵn.

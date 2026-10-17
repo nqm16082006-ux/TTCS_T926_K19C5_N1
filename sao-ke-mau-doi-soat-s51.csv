@@ -1,0 +1,65 @@
+﻿# ==============================================================================
+# CỔNG THANH TOÁN TRỰC TUYẾN PAYOS - BÁO CÁO SAO KÊ GIAO DỊCH (MERCHANT STATEMENT)
+# Đơn vị thụ hưởng: CÔNG TY CỔ PHẦN CÔNG NGHỆ VÀ VÉ SỰ KIỆN EVENTPULSE
+# Mã ĐVCNT (Merchant ID): MER-EVENTPULSE-88392
+# Tài khoản thụ hưởng: 0348889999 - Ngân hàng TMCP Quân Đội (MBBank)
+# Kỳ sao kê: Từ 00:00:00 01/10/2026 Đến 23:59:59 17/10/2026
+# Ngày xuất báo cáo: 17/10/2026 12:00:00 (GMT+7)
+# Loại tiền tệ: VND (Việt Nam Đồng)
+# ==============================================================================
+Mã giao dịch cổng,Mã đơn hàng,Số tiền,Thời gian giao dịch,Nội dung thanh toán,Kênh thanh toán,Trạng thái
+MOCK-32F60F50,8479806851,"224",2026-10-17 07:32:32,"Thanh toan don hang 8479806851",VietQR - PayOS,Thành công
+MOCK-4A1AFA19,7331521483,"24.600.000",2026-10-17 03:50:41,"Thanh toan don hang 7331521483",VietQR - PayOS,Thành công
+MOCK-622E4944,1667078107,"888.888",2026-10-17 02:31:21,"Thanh toan don hang 1667078107",VietQR - PayOS,Thành công
+MOCK-FD699092,1883786585,"1.000",2026-10-16 15:46:39,"Thanh toan don hang 1883786585",VietQR - PayOS,Thành công
+MOCK-1A76EEFE,5043023427,"1.000.000",2026-10-16 15:42:32,"Thanh toan don hang 5043023427",VietQR - PayOS,Thành công
+MOCK-8A6B9653,5035943844,"8.888.800",2026-10-16 15:40:50,"Thanh toan don hang 5035943844",VietQR - PayOS,Thành công
+MOCK-CD4F848A,3181589862,"444.444",2026-10-16 11:46:44,"Thanh toan don hang 3181589862",VietQR - PayOS,Thành công
+MOCK-A5599239,1511952564,"444.444",2026-10-16 11:44:40,"Thanh toan don hang 1511952564",VietQR - PayOS,Thành công
+MOCK-515C311F,1180920668,"112",2026-10-16 09:35:44,"Thanh toan don hang 1180920668",VietQR - PayOS,Thành công
+SIM_TX_f57c3a98e6a14,1039775496,"500.000",2026-10-15 09:05:47,"Thanh toan don hang 1039775496",VietQR - PayOS,Thành công
+MOCK-2754D608,5172384209,"1.760.000",2026-10-15 08:43:42,"Thanh toan don hang 5172384209",VietQR - PayOS,Thành công
+MOCK-91201E80,4496272405,"880.000",2026-10-15 08:33:45,"Thanh toan don hang 4496272405",VietQR - PayOS,Thành công
+MOCK-44448AA3,2584191792,"444.444",2026-10-15 07:29:02,"Thanh toan don hang 2584191792",VietQR - PayOS,Thành công
+MOCK-D36D07E0,9368634465,"222.121",2026-10-15 07:28:15,"Thanh toan don hang 9368634465",VietQR - PayOS,Thành công
+MOCK-CF7B79CD,9882595823,"222.121",2026-10-15 07:21:51,"Thanh toan don hang 9882595823",VietQR - PayOS,Thành công
+MOCK-47123C64,8006805874,"112",2026-10-15 07:15:50,"Thanh toan don hang 8006805874",VietQR - PayOS,Thành công
+MOCK-A521F751,6955597650,"222.121",2026-10-15 07:15:32,"Thanh toan don hang 6955597650",VietQR - PayOS,Thành công
+MOCK-CF09181C,9910351524,"112",2026-10-15 07:13:30,"Thanh toan don hang 9910351524",VietQR - PayOS,Thành công
+MOCK-DE039575,9774809544,"112",2026-10-15 07:09:17,"Thanh toan don hang 9774809544",VietQR - PayOS,Thành công
+MOCK-E78F8685,7830008536,"222.121",2026-10-15 07:07:08,"Thanh toan don hang 7830008536",VietQR - PayOS,Thành công
+MOCK-9609C5CF,1835287158,"444.444",2026-10-15 07:01:03,"Thanh toan don hang 1835287158",VietQR - PayOS,Thành công
+MOCK-9F3374F0,5071467183,"222.121",2026-10-15 06:44:21,"Thanh toan don hang 5071467183",VietQR - PayOS,Thành công
+MOCK-6533641E,6827002554,"222.121",2026-10-15 06:40:23,"Thanh toan don hang 6827002554",VietQR - PayOS,Thành công
+MOCK-43A5C4E6,2615317954,"222.121",2026-10-15 06:36:12,"Thanh toan don hang 2615317954",VietQR - PayOS,Thành công
+MOCK-1F1144F0,2539672115,"222.121",2026-10-15 06:32:36,"Thanh toan don hang 2539672115",VietQR - PayOS,Thành công
+MOCK-E6B341BF,8767163042,"222.121",2026-10-15 06:19:35,"Thanh toan don hang 8767163042",VietQR - PayOS,Thành công
+MOCK-7CEE4E5F,7078621107,"222.121",2026-10-15 06:10:38,"Thanh toan don hang 7078621107",VietQR - PayOS,Thành công
+SIM_TX_745a636770f54,3519785250,"500.000",2026-10-15 00:34:33,"Thanh toan don hang 3519785250",VietQR - PayOS,Thành công
+MOCK-F6C55DE7,7971788476,"800",2026-10-15 00:04:45,"Thanh toan don hang 7971788476",VietQR - PayOS,Thành công
+SIM_TX_446ab127cc834,7433999194,"500.000",2026-10-14 23:54:00,"Thanh toan don hang 7433999194",VietQR - PayOS,Thành công
+SIM_TX_9735f01b1ce64,9878191229,"500.000",2026-10-14 23:53:55,"Thanh toan don hang 9878191229",VietQR - PayOS,Thành công
+SIM_TX_2eafa1d959c94,3281794356,"500.000",2026-10-14 23:53:50,"Thanh toan don hang 3281794356",VietQR - PayOS,Thành công
+SIM_TX_b375f539547e4,7487112129,"500.000",2026-10-14 23:53:49,"Thanh toan don hang 7487112129",VietQR - PayOS,Thành công
+SIM_TX_d732057af8664,2159498526,"500.000",2026-10-14 23:53:47,"Thanh toan don hang 2159498526",VietQR - PayOS,Thành công
+SIM_TX_bcc058777c204,5704606239,"500.000",2026-10-14 23:53:45,"Thanh toan don hang 5704606239",VietQR - PayOS,Thành công
+MOCK-7F67B7E3,3894872434,"111.111",2026-10-14 19:19:44,"Thanh toan don hang 3894872434",VietQR - PayOS,Thành công
+MOCK-11F92CEA,4452805694,"222.121",2026-10-14 18:55:05,"Thanh toan don hang 4452805694",VietQR - PayOS,Thành công
+MOCK-2F98D9FB,9277863383,"222.121",2026-10-14 18:49:31,"Thanh toan don hang 9277863383",VietQR - PayOS,Thành công
+MOCK-78A2A3C6,7532130125,"111.111",2026-10-14 18:48:34,"Thanh toan don hang 7532130125",VietQR - PayOS,Thành công
+MOCK-88D6FE69,1138248515,"222.121",2026-10-14 18:41:35,"Thanh toan don hang 1138248515",VietQR - PayOS,Thành công
+MOCK-35B6C76C,5198448621,"1.200",2026-10-14 01:32:53,"Thanh toan don hang 5198448621",VietQR - PayOS,Thành công
+MOCK-48C5C832,6237162062,"1.200",2026-10-14 01:16:31,"Thanh toan don hang 6237162062",VietQR - PayOS,Thành công
+MOCK-94673437,2595807444,"1.200",2026-10-13 23:57:00,"Thanh toan don hang 2595807444",VietQR - PayOS,Thành công
+MOCK-05A1DFB1,1777730984,"300.000",2026-10-13 08:27:14,"Thanh toan don hang 1777730984",VietQR - PayOS,Thành công
+MOCK-10017EE0,5392691300,"2.450.000",2026-10-13 08:22:46,"Thanh toan don hang 5392691300",VietQR - PayOS,Thành công
+MOCK-0F9E59E1,1183798867,"800",2026-10-13 08:20:51,"Thanh toan don hang 1183798867",VietQR - PayOS,Thành công
+MOCK-130D853A,2430215267,"4.900.000",2026-10-13 08:17:21,"Thanh toan don hang 2430215267",VietQR - PayOS,Thành công
+MOCK-546E1F18,5431497669,"2.400",2026-10-13 08:12:17,"Thanh toan don hang 5431497669",VietQR - PayOS,Thành công
+MOCK-C5006904,5231164484,"2.000",2026-10-13 07:56:09,"Thanh toan don hang 5231164484",VietQR - PayOS,Thành công
+MOCK-46934EB7,4701051389,"1.200.000",2026-10-13 07:54:12,"Thanh toan don hang 4701051389",VietQR - PayOS,Thành công
+MOCK-318CC0AC,3817935950,"1.200.000",2026-10-13 07:48:55,"Thanh toan don hang 3817935950",VietQR - PayOS,Thành công
+MOCK-FD9AAC0B,5059693487,"1.200.000",2026-10-13 03:06:00,"Thanh toan don hang 5059693487",VietQR - PayOS,Thành công
+MOCK-D5ECFA8A,4698011387,"1.200.000",2026-10-13 03:04:44,"Thanh toan don hang 4698011387",VietQR - PayOS,Thành công
+PAYOS_EXT_99281,9988112233,"500,000",2026-10-17 11:20:00,"Thanh toan don hang 9988112233",The quoc te Visa,Thành công
+PAYOS_EXT_11982,8877665544,"300,000",2026-10-16 14:15:00,"Thanh toan don hang 8877665544",VietQR - Techcombank,Thành công

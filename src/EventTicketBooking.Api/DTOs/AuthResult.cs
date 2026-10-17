@@ -10,6 +10,8 @@ namespace EventTicketBooking.Api.DTOs
         public bool RequiresTermsAcceptance { get; set; }
         public string? RequiredTermsVersion { get; set; }
         public int StatusCode { get; set; }
+        public bool IsServiceUnavailable => StatusCode == 503;
+        public bool IsForbidden => StatusCode == 403;
         public string Message { get; set; } = string.Empty;
         public LoginResponseDto? Data { get; set; }
 
@@ -46,6 +48,22 @@ namespace EventTicketBooking.Api.DTOs
             RequiredTermsVersion = version,
             StatusCode = 428,
             Message = $"Bạn cần chấp nhận Điều khoản dịch vụ phiên bản {version} trước khi đăng nhập."
+        };
+
+        public static AuthResult ServiceUnavailable(string message = "Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.") => new()
+        {
+            Success = false,
+            IsLocked = false,
+            StatusCode = 503,
+            Message = message
+        };
+
+        public static AuthResult Forbidden(string message = "Dữ liệu phân quyền của tài khoản không hợp lệ. Vui lòng liên hệ Quản trị viên.") => new()
+        {
+            Success = false,
+            IsLocked = false,
+            StatusCode = 403,
+            Message = message
         };
     }
 }

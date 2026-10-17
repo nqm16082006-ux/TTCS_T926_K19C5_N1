@@ -417,7 +417,7 @@
               <!-- Primary Actions -->
               <div class="flex flex-col gap-space-xs pt-space-xs">
                 <button onclick="handlePrimaryAction()" id="btnPrimaryAction" disabled class="w-full h-12 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
-                  <span id="btnPrimaryActionText">Tiến hành giữ vé &amp; thanh toán</span>
+                  <span id="btnPrimaryActionText">Giữ vé</span>
                   <span class="material-symbols-outlined text-[20px]" id="btnPrimaryActionIcon">arrow_forward</span>
                 </button>
                 <a id="btnBackToEvent" class="w-full h-10 rounded-lg bg-transparent hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm flex items-center justify-center transition-colors font-semibold" href="./public-events.html">
@@ -597,12 +597,44 @@
         });
       });
 
+      // Story S-44: Cập nhật ghế sang SOLD ngay khi có người thanh toán thành công
+      seatHubConnection.on("SeatSold", (data) => {
+        if (!data || !data.seatIds) return;
+        data.seatIds.forEach(id => {
+          const seat = seatMap.get(id);
+          if (seat) seat.status = 'SOLD';
+          // Xoá khỏi giỏ nếu đang chọn hoặc đang giữ (ghế đã bị mua bởi người khác)
+          if (selectedSeatIds.has(id)) {
+            selectedSeatIds.delete(id);
+            showConflictToast(`Ghế ${seat ? seat.row + String(seat.seatNumber).padStart(2, '0') : id} vừa được người khác mua thành công.`);
+          }
+          if (myHeldSeatIds.has(id)) {
+            myHeldSeatIds.delete(id);
+          }
+          updateSeatButtonState(id);
+        });
+        updateCartPanel();
+      });
+
       try {
         await seatHubConnection.start();
         console.log("Connected to SignalR SeatStatusHub");
+        // Gia nhập group của suất chiếu để nhận các broadcast SeatHeld/SeatReleased/SeatSold
+        await seatHubConnection.invoke("JoinShowtimeGroup", showtimeId);
+        console.log(`Joined showtime group: ${showtimeId}`);
       } catch (err) {
         console.error("SignalR Connection Error: ", err);
       }
+
+      // Tự động rejoin group khi SignalR reconnect
+      seatHubConnection.onreconnected(async () => {
+        console.log("SignalR reconnected. Rejoining showtime group...");
+        try {
+          await seatHubConnection.invoke("JoinShowtimeGroup", showtimeId);
+        } catch (err) {
+          console.error("Lỗi rejoin group sau reconnect:", err);
+        }
+      });
     }
 
     let allSeats = [];
@@ -1234,7 +1266,7 @@
         subtotalPrice.textContent = `0 ₫`;
         totalPaymentPrice.textContent = `0 ₫`;
         btnAction.disabled = true;
-        btnActionText.textContent = "Tiến hành giữ vé & thanh toán";
+        btnActionText.textContent = "Giữ vé";
         updateBookingRateLimitUI();
         return;
       }
@@ -1266,9 +1298,9 @@
 
       btnAction.disabled = bookingActionInFlight;
       if (selectedSeatIds.size > 0) {
-        btnActionText.textContent = "Tiến hành giữ vé & thanh toán";
+        btnActionText.textContent = "Giữ vé";
       } else if (myHeldSeatIds.size > 0) {
-        btnActionText.textContent = "Xác nhận & Chuyển sang thanh toán";
+        btnActionText.textContent = "Tiến hành thanh toán";
       }
       updateBookingRateLimitUI();
     }
@@ -1299,7 +1331,7 @@
         button.disabled = remaining > 0 || (selectedSeatIds.size + myHeldSeatIds.size === 0);
         text.textContent = remaining > 0 ? `Thử lại sau ${remaining} giây`
           : selectedSeatIds.size > 0 || myHeldSeatIds.size === 0
-            ? 'Tiến hành giữ vé & thanh toán' : 'Xác nhận & Chuyển sang thanh toán';
+            ? 'Giữ vé' : 'Tiến hành thanh toán';
       }
       if (![...bookingRateLimits.keys()].some(key => bookingRetrySeconds(key) > 0)) {
         clearInterval(bookingRateLimitTimer);
@@ -1452,10 +1484,9 @@
 
           // Kích hoạt Countdown Timer 10 phút
           await restoreMyHoldsOnLoad();
-          showSuccessToast(`Đã giữ thành công ${newlyHeld.length} ghế! Đang khởi tạo đơn hàng...`);
-
-          // Tự động chuyển tiếp sang khởi tạo đơn hàng & thanh toán
-          await createOrderAndProceed();
+          btn.innerHTML = originalText;
+          updateCartPanel();
+          showSuccessToast(`Đã giữ thành công ${newlyHeld.length} ghế. Bấm “Tiến hành thanh toán” khi bạn sẵn sàng.`);
 
         } else if (res.status === 429) {
           // S-40: Lượng truy cập vượt ngưỡng -> Điều hướng sang Phòng chờ
@@ -1624,7 +1655,7 @@
         console.warn("Thời gian giữ ghế không hợp lệ; không tạo bộ đếm.");
         return;
       }
-      if (expiresAtMs <= serverTimeMs) {
+      if (expiresAtMs - serverTimeMs < 1000) {
         if (expireIfElapsed) handleHoldExpired();
         return;
       }
@@ -1653,7 +1684,7 @@
       const elapsed = performance.now() - holdRefLocalPerfMs;
       const currentServerMs = holdRefServerTimeMs + elapsed;
       const remainMs = holdExpiresAtMs - currentServerMs;
-      const remainSec = Math.max(0, Math.floor(remainMs / 1000));
+      const remainSec = Math.max(0, Math.ceil(remainMs / 1000));
 
       const mins = Math.floor(remainSec / 60);
       const secs = remainSec % 60;
@@ -1702,7 +1733,7 @@
         }
       }
 
-      if (remainSec <= 0) {
+      if (remainMs <= 0) {
         stopHoldCountdown();
         handleHoldExpired();
       }

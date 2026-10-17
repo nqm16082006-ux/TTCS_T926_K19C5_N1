@@ -467,6 +467,84 @@ namespace EventTicketBooking.Api.Migrations
                     b.ToTable("payment_transactions", (string)null);
                 });
 
+            modelBuilder.Entity("EventTicketBooking.Api.Models.ReconciliationSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AmountMismatchCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("ExecutedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExecutedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("GatewayOnlyCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("IneligibleCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MatchedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("PeriodFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("PeriodTo")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RawCsv")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SessionCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("SummaryJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("SystemOnlyCount")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("TotalGatewayAmount")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("TotalGatewayCount")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("TotalInternalAmount")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("TotalInternalCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExecutedAt");
+
+                    b.HasIndex("SessionCode");
+
+                    b.ToTable("reconciliation_sessions", (string)null);
+                });
+
             modelBuilder.Entity("EventTicketBooking.Api.Models.Refund", b =>
                 {
                     b.Property<Guid>("Id")
@@ -670,6 +748,13 @@ namespace EventTicketBooking.Api.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(10);
 
+                    b.Property<string>("Name")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("SalesEndTime")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("SeatingMapImageUrl")
                         .HasColumnType("text");
 
@@ -814,7 +899,7 @@ namespace EventTicketBooking.Api.Migrations
 
                     b.HasIndex("StaffUserId");
 
-                    b.ToTable("TicketReadmissions");
+                    b.ToTable("TicketReadmissions", (string)null);
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.User", b =>

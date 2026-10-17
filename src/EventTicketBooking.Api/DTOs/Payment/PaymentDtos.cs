@@ -102,6 +102,7 @@ namespace EventTicketBooking.Api.DTOs.Payment
         public long OrderCode { get; set; }
         public int Amount { get; set; }
         public string Description { get; set; } = string.Empty;
+        public bool SimulateFailure { get; set; } = false;
     }
 
     /// <summary>
@@ -114,12 +115,14 @@ namespace EventTicketBooking.Api.DTOs.Payment
         public bool ManualRequired { get; set; }
         public string? RefundReference { get; set; }
         public string? ErrorMessage { get; set; }
+        public string? ErrorCode { get; set; }
+        public bool IsRetryable { get; set; }
 
         public static RefundCreationResult CreateSuccess(string? refundReference = null) =>
             new() { Success = true, RefundReference = refundReference };
 
-        public static RefundCreationResult CreateFailure(string errorMessage) =>
-            new() { Success = false, ErrorMessage = errorMessage };
+        public static RefundCreationResult CreateFailure(string errorMessage, string? errorCode = null, bool isRetryable = true) =>
+            new() { Success = false, ErrorMessage = errorMessage, ErrorCode = errorCode, IsRetryable = isRetryable };
 
         public static RefundCreationResult CreateManualRequired(string reason) =>
             new() { Success = false, ManualRequired = true, ErrorMessage = reason };

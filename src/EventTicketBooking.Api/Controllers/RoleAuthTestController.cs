@@ -24,6 +24,7 @@ namespace EventTicketBooking.Api.Controllers
         /// 1. Endpoint công khai (Public) - Không yêu cầu đăng nhập hay xác thực email.
         /// </summary>
         [HttpGet("public")]
+        [Microsoft.AspNetCore.Authorization.AllowAnonymous]
         public IActionResult PublicEndpoint()
         {
             return Ok(new

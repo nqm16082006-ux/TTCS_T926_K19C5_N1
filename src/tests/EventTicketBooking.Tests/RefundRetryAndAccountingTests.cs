@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using EventTicketBooking.Api.Data;
+using EventTicketBooking.Api.DTOs.Common;
 using EventTicketBooking.Api.DTOs.Payment;
 using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Options;
@@ -889,6 +890,267 @@ namespace EventTicketBooking.Tests
             Assert.Equal(1, finalRefund.AttemptCount);
             Assert.Equal(0, finalRefund.RetryCount); // Không retry vì là lỗi non-retryable
             Assert.Null(finalRefund.NextRetryAt);
+        }
+
+        // ──────────────────────────────────────────────────────────────────────────
+        // Kịch bản 15: Mock hoàn tiền thất bại tăng dần RetryCount (1 -> 2 -> 3)
+        // Khi chạm mốc 3 lần: tự động chuyển sang ManualReviewRequired và kích hoạt thông báo Kế toán
+        // ──────────────────────────────────────────────────────────────────────────
+        [Fact]
+        public async Task Scenario15_MockRefundFailure_IncrementsRetryCount_TransitionsToManualReviewAndNotifiesAccountingAt3Failures()
+        {
+            await using var context = CreateInMemoryDbContext();
+            var order = await CreateTestOrderAsync(context, 750_000);
+
+            var mockEmailService = new Mock<IEmailService>();
+            mockEmailService
+                .Setup(e => e.SendAccountingAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .ReturnsAsync(true);
+
+            var accountingOptions = Options.Create(new AccountingOptions { Email = "accounting@test.vn" });
+            var accountingService = new AccountingNotificationService(
+                mockEmailService.Object, accountingOptions, NullLogger<AccountingNotificationService>.Instance, context);
+
+            var refundOptions = Options.Create(new RefundOptions { MaxRetries = 3 });
+            var auditService = new OrderAuditService(context, NullLogger<OrderAuditService>.Instance);
+            var mockGateway = new DevelopmentMockPaymentGateway();
+
+            var refundService = new RefundService(
+                context, mockGateway, accountingService, auditService, refundOptions, NullLogger<RefundService>.Instance);
+
+            // Lần 1: Nhấn Mock thất bại
+            var res1 = await refundService.SimulateRefundFailureForOrderAsync(order.Id);
+            Assert.Equal(1, res1.RetryCount);
+            Assert.False(res1.IsManualReview);
+            Assert.Equal("Failed", res1.Status);
+
+            var req1 = await context.RefundRequests.FirstAsync(r => r.OrderId == order.Id);
+            Assert.Equal(1, req1.RetryCount);
+            Assert.Equal(RefundStatus.RetryScheduled, req1.Status);
+            mockEmailService.Verify(e => e.SendAccountingAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+
+            // Lần 2: Nhấn Mock thất bại tiếp
+            var res2 = await refundService.SimulateRefundFailureForOrderAsync(order.Id);
+            Assert.Equal(2, res2.RetryCount);
+            Assert.False(res2.IsManualReview);
+            mockEmailService.Verify(e => e.SendAccountingAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+
+            // Lần 3: Nhấn Mock thất bại lần thứ 3 -> Chạm mốc 3
+            var res3 = await refundService.SimulateRefundFailureForOrderAsync(order.Id);
+            Assert.Equal(3, res3.RetryCount);
+            Assert.True(res3.IsManualReview);
+            Assert.Equal("RequiresManualReview", res3.Status);
+            Assert.Contains("Đã chuyển thông tin cho kế toán xử lý thủ công", res3.Message);
+
+            var finalReq = await context.RefundRequests.FirstAsync(r => r.OrderId == order.Id);
+            Assert.Equal(3, finalReq.RetryCount);
+            Assert.Equal(RefundStatus.ManualReviewRequired, finalReq.Status);
+
+            var finalRefundEntity = await context.Refunds.FirstAsync(r => r.OrderId == order.Id);
+            Assert.Equal("RequiresManualReview", finalRefundEntity.Status);
+            Assert.Contains("Đã chuyển thông tin cho kế toán xử lý thủ công", finalRefundEntity.FailureReason);
+
+            // Kiểm tra: Đã gọi AccountingNotificationService gửi email cho kế toán
+            mockEmailService.Verify(e => e.SendAccountingAlertEmailAsync(
+                "accounting@test.vn",
+                It.Is<string>(s => s.Contains("Cần xử lý hoàn tiền thủ công")),
+                It.IsAny<string>()), Times.Once);
+
+            // Kiểm tra: Nhật ký audit log ghi nhận rõ ràng
+            var auditLogs = await context.OrderAuditLogs.Where(l => l.OrderId == order.Id).ToListAsync();
+            Assert.Contains(auditLogs, l => l.Action == "REFUND_MANUAL_REVIEW_REQUIRED" &&
+                                           l.Note.Contains("Hoàn tiền thất bại 3 lần - Đã chuyển thông tin cho kế toán xử lý thủ công"));
+        }
+
+        // ──────────────────────────────────────────────────────────────────────────
+        // Kịch bản 16: Hai lần đầu thất bại, lần 3 thành công: không chuyển kế toán
+        // ──────────────────────────────────────────────────────────────────────────
+        [Fact]
+        public async Task Scenario16_FirstTwoAttemptsFail_ThirdAttemptSucceeds_DoesNotNotifyAccounting()
+        {
+            await using var context = CreateInMemoryDbContext();
+            var order = await CreateTestOrderAsync(context);
+
+            int callCount = 0;
+            var fakeGateway = new FakePaymentGateway
+            {
+                CustomRefundHandler = req =>
+                {
+                    callCount++;
+                    if (callCount < 3)
+                    {
+                        return Task.FromResult(RefundExecutionResult.CreateFailure(
+                            "GATEWAY_TIMEOUT", $"Lỗi timeout kết nối lần {callCount}", isRetryable: true));
+                    }
+                    return Task.FromResult(RefundExecutionResult.CreateSuccess("REF_SUCCESS_ATTEMPT_3"));
+                }
+            };
+
+            var mockEmailService = new Mock<IEmailService>();
+            var accountingOptions = Options.Create(new AccountingOptions { Email = "accounting@test.vn" });
+            var accountingService = new AccountingNotificationService(
+                mockEmailService.Object, accountingOptions, NullLogger<AccountingNotificationService>.Instance, context);
+
+            var refundOptions = Options.Create(new RefundOptions
+            {
+                MaxRetries = 3,
+                BackoffMinutes = new[] { 1, 2, 4 }
+            });
+            var auditService = new OrderAuditService(context, NullLogger<OrderAuditService>.Instance);
+            var refundService = new RefundService(
+                context, fakeGateway, accountingService, auditService, refundOptions, NullLogger<RefundService>.Instance);
+
+            var refund = await refundService.CreateRefundRequestAsync(order.Id);
+
+            // Lần 1 thất bại
+            var res1 = await refundService.ProcessRefundAsync(refund.Id);
+            Assert.False(res1.Success);
+            var req1 = await context.RefundRequests.FindAsync(refund.Id);
+            Assert.Equal(RefundStatus.RetryScheduled, req1.Status);
+            Assert.Equal(1, req1.RetryCount);
+
+            // Lần 2 thất bại
+            var res2 = await refundService.ProcessRefundAsync(refund.Id);
+            Assert.False(res2.Success);
+            var req2 = await context.RefundRequests.FindAsync(refund.Id);
+            Assert.Equal(RefundStatus.RetryScheduled, req2.Status);
+            Assert.Equal(2, req2.RetryCount);
+
+            // Lần 3 thành công
+            var res3 = await refundService.ProcessRefundAsync(refund.Id);
+            Assert.True(res3.Success);
+            Assert.Equal("REF_SUCCESS_ATTEMPT_3", res3.RefundTransactionId);
+
+            var finalReq = await context.RefundRequests.FindAsync(refund.Id);
+            Assert.Equal(RefundStatus.Succeeded, finalReq.Status);
+            Assert.Equal(3, finalReq.AttemptCount);
+            Assert.Equal(2, finalReq.RetryCount);
+            Assert.Null(finalReq.NextRetryAt);
+            Assert.False(finalReq.AccountingNotified);
+
+            // Kiểm tra: Tuyệt đối không gửi email chuyển kế toán
+            mockEmailService.Verify(e => e.SendAccountingAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        }
+
+        // ──────────────────────────────────────────────────────────────────────────
+        // Kịch bản 17: Giao dịch thành công: không được hoàn lại hoặc chạy lại
+        // ──────────────────────────────────────────────────────────────────────────
+        [Fact]
+        public async Task Scenario17_AlreadySucceededRefund_CannotBeManuallyRefundedOrReProcessed()
+        {
+            await using var context = CreateInMemoryDbContext();
+            var order = await CreateTestOrderAsync(context);
+
+            int callCount = 0;
+            var fakeGateway = new FakePaymentGateway
+            {
+                CustomRefundHandler = req =>
+                {
+                    callCount++;
+                    return Task.FromResult(RefundExecutionResult.CreateSuccess("REF_INITIAL_SUCCESS"));
+                }
+            };
+
+            var mockEmailService = new Mock<IEmailService>();
+            var accountingOptions = Options.Create(new AccountingOptions { Email = "accounting@test.vn" });
+            var accountingService = new AccountingNotificationService(
+                mockEmailService.Object, accountingOptions, NullLogger<AccountingNotificationService>.Instance, context);
+
+            var refundOptions = Options.Create(new RefundOptions { MaxRetries = 3 });
+            var auditService = new OrderAuditService(context, NullLogger<OrderAuditService>.Instance);
+            var refundService = new RefundService(
+                context, fakeGateway, accountingService, auditService, refundOptions, NullLogger<RefundService>.Instance);
+
+            var refund = await refundService.CreateRefundRequestAsync(order.Id);
+            var res1 = await refundService.ProcessRefundAsync(refund.Id);
+            Assert.True(res1.Success);
+            Assert.Equal(1, callCount);
+
+            // Cố tình gọi ProcessRefundAsync lần nữa khi đã Succeeded
+            var res2 = await refundService.ProcessRefundAsync(refund.Id);
+            Assert.True(res2.Success);
+            // Không được gửi lệnh đến cổng thanh toán lần 2 (callCount vẫn là 1)
+            Assert.Equal(1, callCount);
+
+            // Thử tạo yêu cầu hoàn tiền mới cho cùng OrderId -> Tái sử dụng bản ghi cũ, không tạo trùng
+            var dupRefund = await refundService.CreateRefundRequestAsync(order.Id);
+            Assert.Equal(refund.Id, dupRefund.Id);
+            Assert.Equal(RefundStatus.Succeeded, dupRefund.Status);
+        }
+
+        // ──────────────────────────────────────────────────────────────────────────
+        // Kịch bản 18: Kế toán tiếp nhận và hoàn tất xử lý hồ sơ thủ công
+        // ──────────────────────────────────────────────────────────────────────────
+        [Fact]
+        public async Task Scenario18_AccountingAssignAndResolve_TransitionsStatusAndAuditsCorrectly()
+        {
+            await using var context = CreateInMemoryDbContext();
+            var order = await CreateTestOrderAsync(context);
+
+            var auditService = new OrderAuditService(context, NullLogger<OrderAuditService>.Instance);
+            var refundOptions = Options.Create(new RefundOptions { MaxRetries = 3 });
+
+            var fakeGateway = new FakePaymentGateway
+            {
+                CustomRefundHandler = req => Task.FromResult(RefundExecutionResult.CreateFailure(
+                    "INVALID_ACCOUNT", "Tài khoản không hợp lệ (không retryable).", isRetryable: false))
+            };
+
+            var mockEmailService = new Mock<IEmailService>();
+            mockEmailService
+                .Setup(e => e.SendAccountingAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .ReturnsAsync(true);
+
+            var accountingOptions = Options.Create(new AccountingOptions { Email = "accounting@test.vn" });
+            var accountingService = new AccountingNotificationService(
+                mockEmailService.Object, accountingOptions, NullLogger<AccountingNotificationService>.Instance, context);
+
+            var refundService = new RefundService(
+                context, fakeGateway, accountingService, auditService, refundOptions, NullLogger<RefundService>.Instance);
+
+            // Tạo yêu cầu và xử lý gặp lỗi non-retryable -> Chuyển sang ManualReviewRequired ngay lập tức
+            var refund = await refundService.CreateRefundRequestAsync(order.Id);
+            await refundService.ProcessRefundAsync(refund.Id);
+
+            var reqAfterFailure = await context.RefundRequests.FindAsync(refund.Id);
+            Assert.Equal(RefundStatus.ManualReviewRequired, reqAfterFailure.Status);
+
+            // Khởi tạo RefundsController để test action của kế toán
+            var controller = new EventTicketBooking.Api.Controllers.RefundsController(
+                refundService, context, auditService);
+
+            // 1. Kế toán tiếp nhận xử lý
+            var assignResult = await controller.AssignAccounting(refund.Id);
+            var okAssign = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(assignResult);
+            var assignDto = okAssign.Value as ApiResponse<RefundDetailDto>;
+            Assert.NotNull(assignDto);
+            Assert.True(assignDto.Success);
+            Assert.Equal(RefundStatus.AccountingProcessing.ToString(), assignDto.Data.Status);
+
+            var reqInProcessing = await context.RefundRequests.FindAsync(refund.Id);
+            Assert.Equal(RefundStatus.AccountingProcessing, reqInProcessing.Status);
+
+            // 2. Kế toán giải quyết thủ công
+            var resolveResult = await controller.ResolveAccounting(refund.Id, new ResolveAccountingRefundDto
+            {
+                ManualTransactionCode = "VCB_MANUAL_TX_9999",
+                Notes = "Đã chuyển khoản trực tiếp qua ngân hàng Vietcombank."
+            });
+
+            var okResolve = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(resolveResult);
+            var resolveDto = okResolve.Value as ApiResponse<RefundDetailDto>;
+            Assert.NotNull(resolveDto);
+            Assert.True(resolveDto.Success);
+            Assert.Equal(RefundStatus.AccountingResolved.ToString(), resolveDto.Data.Status);
+            Assert.Equal("VCB_MANUAL_TX_9999", resolveDto.Data.RefundTransactionId);
+
+            // 3. Thử giải quyết lần nữa -> Phải bị từ chối chống hoàn trùng
+            var dupResolveResult = await controller.ResolveAccounting(refund.Id, new ResolveAccountingRefundDto
+            {
+                ManualTransactionCode = "VCB_MANUAL_TX_DUP"
+            });
+            var badResolve = Assert.IsType<Microsoft.AspNetCore.Mvc.BadRequestObjectResult>(dupResolveResult);
+            Assert.NotNull(badResolve);
         }
     }
 }

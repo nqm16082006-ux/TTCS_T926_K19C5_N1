@@ -33,6 +33,7 @@ namespace EventTicketBooking.Api.DTOs
         public string? FailureReason { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
+        public int RetryCount { get; set; }
     }
 
     /// <summary>
@@ -48,6 +49,8 @@ namespace EventTicketBooking.Api.DTOs
         public bool Skipped { get; set; }
         public string? FailureReason { get; set; }
         public string Message { get; set; } = string.Empty;
+        public int RetryCount { get; set; }
+        public bool IsManualReview { get; set; }
 
         public static RefundExecutionResult CreateSuccess(Guid orderId, Guid refundId, int amount, string message) => new()
         {

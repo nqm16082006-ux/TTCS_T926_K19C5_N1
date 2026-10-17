@@ -1,11 +1,16 @@
 using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.DTOs.Common;
+using EventTicketBooking.Api.Middlewares;
+using EventTicketBooking.Api.Services;
 using EventTicketBooking.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace EventTicketBooking.Api.Controllers
 {
@@ -80,6 +85,7 @@ namespace EventTicketBooking.Api.Controllers
         /// POST /api/showtimes/{showtimeId}/waiting-room/join
         /// </summary>
         [HttpPost("join")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<WaitingRoomStatusDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> JoinQueue(
             Guid showtimeId,
@@ -102,6 +108,7 @@ namespace EventTicketBooking.Api.Controllers
         /// POST /api/showtimes/{showtimeId}/waiting-room/heartbeat
         /// </summary>
         [HttpPost("heartbeat")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<WaitingRoomStatusDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Heartbeat(
@@ -131,6 +138,7 @@ namespace EventTicketBooking.Api.Controllers
         /// POST /api/showtimes/{showtimeId}/waiting-room/leave
         /// </summary>
         [HttpPost("leave")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> LeaveQueue(
             Guid showtimeId,
@@ -161,6 +169,7 @@ namespace EventTicketBooking.Api.Controllers
         /// GET /api/showtimes/{showtimeId}/waiting-room/status?token={queueToken}
         /// </summary>
         [HttpGet("status")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<WaitingRoomStatusDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetStatus(
@@ -186,6 +195,7 @@ namespace EventTicketBooking.Api.Controllers
         /// GET /api/showtimes/{showtimeId}/waiting-room/validate?passToken={passToken}&clientSessionId={clientSessionId}
         /// </summary>
         [HttpGet("validate")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> ValidatePass(
             Guid showtimeId,
@@ -207,6 +217,7 @@ namespace EventTicketBooking.Api.Controllers
         /// GET /api/showtimes/{showtimeId}/waiting-room/stats
         /// </summary>
         [HttpGet("stats")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<WaitingRoomStatsDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetStats(Guid showtimeId)
         {
@@ -219,14 +230,38 @@ namespace EventTicketBooking.Api.Controllers
         /// PUT /api/showtimes/{showtimeId}/waiting-room/threshold
         /// </summary>
         [HttpPut("threshold")]
+        [RequireRole("Organizer", "Admin")]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> SetThreshold(
             Guid showtimeId,
-            [FromBody] UpdateThresholdRequestDto request)
+            [FromBody] UpdateThresholdRequestDto request,
+            [FromServices] AppDbContext dbContext)
         {
             if (request == null || request.Threshold <= 0)
             {
                 return BadRequest(ApiResponse<object>.FailureResult("Ngưỡng (threshold) phải lớn hơn 0."));
+            }
+
+            var currentUserId = GetCurrentUserId();
+            var isAdmin = User.IsInRole("Admin") || User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && c.Value == "Admin");
+
+            if (!isAdmin)
+            {
+                var showtime = await dbContext.Showtimes.Include(s => s.Event).FirstOrDefaultAsync(s => s.Id == showtimeId);
+                if (showtime == null)
+                {
+                    return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy suất chiếu."));
+                }
+
+                if (showtime.Event == null || showtime.Event.OwnerId != currentUserId)
+                {
+                    SecurityAuditLogger.LogOwnershipDenied(HttpContext, "WaitingRoomThreshold", showtimeId.ToString());
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền thay đổi ngưỡng phòng chờ của sự kiện này."));
+                }
             }
 
             await _waitingRoomService.SetShowtimeThresholdAsync(showtimeId, request.Threshold);
@@ -238,6 +273,7 @@ namespace EventTicketBooking.Api.Controllers
         /// POST /api/showtimes/{showtimeId}/waiting-room/active-ping
         /// </summary>
         [HttpPost("active-ping")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> ActivePing(
             Guid showtimeId,
@@ -274,6 +310,7 @@ namespace EventTicketBooking.Api.Controllers
         /// POST /api/showtimes/{showtimeId}/waiting-room/release
         /// </summary>
         [HttpPost("release")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> ReleasePass(
             Guid showtimeId,
