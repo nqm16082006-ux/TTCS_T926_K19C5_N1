@@ -37,6 +37,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<Refund> Refunds { get; set; } = null!;
         public DbSet<SystemAlert> SystemAlerts { get; set; } = null!;
         public DbSet<DataDeletionRequest> DataDeletionRequests { get; set; } = null!;
+        public DbSet<ReconciliationSession> ReconciliationSessions { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -556,6 +557,18 @@ namespace EventTicketBooking.Api.Data
                     .WithMany()
                     .HasForeignKey(r => r.ReviewedByUserId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ReconciliationSession>(entity =>
+            {
+                entity.ToTable("reconciliation_sessions");
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.SessionCode).IsRequired().HasMaxLength(100);
+                entity.Property(x => x.SourceType).IsRequired().HasMaxLength(50);
+                entity.Property(x => x.Status).IsRequired().HasMaxLength(50);
+                entity.Property(x => x.ExecutedBy).HasMaxLength(200);
+                entity.HasIndex(x => x.SessionCode);
+                entity.HasIndex(x => x.ExecutedAt);
             });
         }
 

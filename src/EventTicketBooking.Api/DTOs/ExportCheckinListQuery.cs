@@ -11,6 +11,7 @@ namespace EventTicketBooking.Api.DTOs
         /// ID suất diễn cần xuất danh sách (ShowId / Suất diễn ID).
         /// </summary>
         public Guid ShowId { get; set; }
+        public bool IncludeScanLog { get; set; }
 
         /// <summary>
         /// Bí danh cho ShowId (ShowtimeId).
