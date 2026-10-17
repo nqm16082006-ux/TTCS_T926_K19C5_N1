@@ -315,6 +315,7 @@ namespace EventTicketBooking.Api.Controllers
         /// Loại trừ giữ chỗ hết hạn dù background job chưa kịp quét nhả.
         /// </summary>
         [HttpGet("available")]
+        [Microsoft.AspNetCore.Authorization.AllowAnonymous]
         public async Task<IActionResult> GetAvailableSeats(
             Guid showtimeId,
             [FromQuery] DateTime? nowOverride,

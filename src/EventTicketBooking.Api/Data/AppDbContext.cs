@@ -36,6 +36,8 @@ namespace EventTicketBooking.Api.Data
         public DbSet<RefundRequest> RefundRequests { get; set; } = null!;
         public DbSet<Refund> Refunds { get; set; } = null!;
         public DbSet<SystemAlert> SystemAlerts { get; set; } = null!;
+        public DbSet<DataDeletionRequest> DataDeletionRequests { get; set; } = null!;
+        public DbSet<ReconciliationSession> ReconciliationSessions { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -530,6 +532,43 @@ namespace EventTicketBooking.Api.Data
 
                 entity.HasIndex(a => a.LastUpdatedAt)
                     .HasDatabaseName("IX_SystemAlerts_LastUpdatedAt");
+            });
+
+            // Cấu hình bảng yêu cầu xoá dữ liệu cá nhân theo NĐ 13/2023/NĐ-CP (Story S-53)
+            modelBuilder.Entity<DataDeletionRequest>(entity =>
+            {
+                entity.ToTable("data_deletion_requests");
+                entity.HasKey(r => r.Id);
+                entity.Property(r => r.RequesterEmail).IsRequired().HasMaxLength(255);
+                entity.Property(r => r.RequesterName).HasMaxLength(255);
+                entity.Property(r => r.Reason).HasMaxLength(1000);
+                entity.Property(r => r.AdminNote).HasMaxLength(1000);
+                entity.Property(r => r.Status)
+                    .HasConversion<string>()
+                    .HasMaxLength(50);
+                entity.Property(r => r.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(r => r.User)
+                    .WithMany(u => u.DataDeletionRequests)
+                    .HasForeignKey(r => r.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(r => r.ReviewedByUser)
+                    .WithMany()
+                    .HasForeignKey(r => r.ReviewedByUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ReconciliationSession>(entity =>
+            {
+                entity.ToTable("reconciliation_sessions");
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.SessionCode).IsRequired().HasMaxLength(100);
+                entity.Property(x => x.SourceType).IsRequired().HasMaxLength(50);
+                entity.Property(x => x.Status).IsRequired().HasMaxLength(50);
+                entity.Property(x => x.ExecutedBy).HasMaxLength(200);
+                entity.HasIndex(x => x.SessionCode);
+                entity.HasIndex(x => x.ExecutedAt);
             });
         }
 

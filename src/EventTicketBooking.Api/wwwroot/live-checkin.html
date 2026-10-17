@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Khách Vào Cửa Thời Gian Thực (S-52) - EventPulse</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SignalR Client -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0b0f19;
+      color: #f3f4f6;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.6; }
+    }
+    .animate-pulse-dot {
+      animation: pulse-dot 1.5s infinite;
+    }
+    .glass-card {
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="min-h-full flex flex-col p-4 md:p-8">
+
+  <!-- Top Bar -->
+  <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-gray-800">
+    <div class="flex items-center gap-3">
+      <a href="./overview.html" class="p-2 rounded-lg bg-gray-800/80 hover:bg-gray-700 text-gray-300 transition">
+        <span class="material-symbols-outlined text-[20px]">arrow_back</span>
+      </a>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">STORY S-52</span>
+          <span id="liveStatusBadge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse-dot"></span>
+            <span id="liveStatusText">REAL-TIME CONNECTED</span>
+          </span>
+        </div>
+        <h1 id="eventTitle" class="text-2xl md:text-3xl font-extrabold tracking-tight mt-1 text-white">Đang tải suất diễn...</h1>
+        <p id="showtimeMeta" class="text-xs md:text-sm text-gray-400 font-mono mt-0.5">Thời gian suất diễn: --:--</p>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center gap-3">
+      <button id="btnExportCsv" type="button" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm font-semibold text-gray-200 border border-gray-700 transition shadow-sm">
+        <span class="material-symbols-outlined text-[18px]">download</span>
+        Xuất danh sách (S-62)
+      </button>
+      <button id="btnRefresh" type="button" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold text-white transition shadow-sm">
+        <span class="material-symbols-outlined text-[18px]">refresh</span>
+        Làm mới
+      </button>
+      <button id="btnFullscreen" type="button" class="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 transition" title="Toàn màn hình">
+        <span class="material-symbols-outlined text-[20px]">fullscreen</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Notification Bar for Offline Sync -->
+  <div id="syncAlertBar" class="hidden my-4 p-3 rounded-lg bg-indigo-950/80 border border-indigo-500/40 text-indigo-200 text-sm flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-indigo-400">cloud_sync</span>
+      <span id="syncAlertMessage">Vừa nhận dữ liệu đồng bộ bù từ thiết bị soát vé ngoại tuyến.</span>
+    </div>
+    <span class="text-xs text-indigo-300 font-mono" id="syncAlertTime">Vừa xong</span>
+  </div>
+
+  <!-- KPI Cards Grid -->
+  <main class="flex-1 mt-6 space-y-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- Card 1: Khách đã vào cửa -->
+      <div class="glass-card rounded-2xl p-5 relative overflow-hidden">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-gray-400">Đã vào cửa (Check-in)</p>
+            <h2 id="kpiCheckedIn" class="text-3xl md:text-4xl font-extrabold text-emerald-400 font-mono mt-2">--</h2>
+          </div>
+          <div class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+            <span class="material-symbols-outlined text-[26px]">how_to_reg</span>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-between text-xs text-gray-400">
+          <span>Tổng vé bán: <strong id="kpiTotalSold" class="text-white font-mono">--</strong></span>
+          <span class="font-bold text-emerald-400" id="kpiPercentage">--%</span>
+        </div>
+        <!-- Progress Bar -->
+        <div class="w-full h-2 rounded-full bg-gray-800 mt-2 overflow-hidden">
+          <div id="kpiProgressBar" class="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Card 2: Khách chưa vào cửa -->
+      <div class="glass-card rounded-2xl p-5 relative overflow-hidden">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-gray-400">Chưa vào cửa</p>
+            <h2 id="kpiRemaining" class="text-3xl md:text-4xl font-extrabold text-amber-400 font-mono mt-2">--</h2>
+          </div>
+          <div class="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+            <span class="material-symbols-outlined text-[26px]">person_pin</span>
+          </div>
+        </div>
+        <p class="mt-4 text-xs text-gray-400">
+          Khách chưa qua cửa soát vé để quyết định bắt đầu show
+        </p>
+      </div>
+
+      <!-- Card 3: Tốc độ khách qua cửa -->
+      <div class="glass-card rounded-2xl p-5 relative overflow-hidden">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-gray-400">Tốc độ lưu lượng</p>
+            <div class="flex items-baseline gap-1.5 mt-2">
+              <h2 id="kpiVelocity" class="text-3xl md:text-4xl font-extrabold text-indigo-400 font-mono">--</h2>
+              <span class="text-xs font-semibold text-gray-400">khách/phút</span>
+            </div>
+          </div>
+          <div class="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
+            <span class="material-symbols-outlined text-[26px]">speed</span>
+          </div>
+        </div>
+        <p class="mt-4 text-xs text-gray-400">
+          Trung bình trong 5 phút gần nhất
+        </p>
+      </div>
+
+      <!-- Card 4: Dữ liệu Offline Sync -->
+      <div class="glass-card rounded-2xl p-5 relative overflow-hidden">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-gray-400">Quét ngoại tuyến (S-35)</p>
+            <h2 id="kpiOfflineSynced" class="text-3xl md:text-4xl font-extrabold text-cyan-400 font-mono mt-2">--</h2>
+          </div>
+          <div class="p-2 rounded-xl bg-cyan-500/10 text-cyan-400">
+            <span class="material-symbols-outlined text-[26px]">sync_alt</span>
+          </div>
+        </div>
+        <p class="mt-4 text-xs text-gray-400" id="kpiLastSyncText">
+          Chưa có lượt quét ngoại tuyến nào
+        </p>
+      </div>
+    </div>
+
+    <!-- Charts & Breakdown Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- Cột 1 & 2: Biểu đồ lưu lượng theo phút -->
+      <div class="lg:col-span-2 glass-card rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-indigo-400 text-[20px]">show_chart</span>
+              Lưu lượng khách vào cửa theo phút (30 phút qua)
+            </h3>
+            <p class="text-xs text-gray-400 mt-0.5">Theo dõi thời điểm cao điểm và phân bổ tải soát vé</p>
+          </div>
+          <span class="text-xs font-mono text-gray-400" id="timelineRangeText">--:-- - --:--</span>
+        </div>
+
+        <!-- Custom SVG Bar Chart -->
+        <div class="mt-4 h-56 flex items-end gap-1.5 pt-6 pb-2 border-b border-gray-800" id="chartContainer">
+          <!-- Rendered bars go here -->
+          <div class="w-full text-center text-gray-500 text-sm self-center">Đang nạp dữ liệu lưu lượng...</div>
+        </div>
+        <div class="flex justify-between text-[10px] text-gray-500 font-mono mt-2" id="chartLabels">
+          <span>-30 phút</span>
+          <span>-15 phút</span>
+          <span>Hiện tại</span>
+        </div>
+      </div>
+
+      <!-- Cột 3: Bóc tách theo từng Cửa/Lối vào -->
+      <div class="glass-card rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-teal-400 text-[20px]">door_open</span>
+              Bóc tách theo Lối vào (Gates)
+            </h3>
+            <p class="text-xs text-gray-400 mt-0.5">Phân bổ lượng khách giữa các cổng soát vé</p>
+          </div>
+        </div>
+
+        <div class="space-y-4 mt-6" id="gateBreakdownList">
+          <div class="text-center text-gray-500 text-sm py-8">Đang tải số liệu các cửa...</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="mt-8 pt-4 border-t border-gray-800 text-center text-xs text-gray-500">
+    Hệ thống Bán vé Sự kiện có Sơ đồ ghế • Story S-52: Ban tổ chức xem số khách đã vào cửa theo thời gian thực
+  </footer>
+
+  <script>
+    const API_BASE = window.location.origin;
+    const urlParams = new URLSearchParams(window.location.search);
+    const showtimeId = urlParams.get('showId') || urlParams.get('showtimeId');
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
+    if (!token) {
+      window.location.href = './login.html';
+    }
+
+    if (!showtimeId) {
+      alert('Vui lòng chọn suất diễn từ màn hình Tổng quan!');
+      window.location.href = './overview.html';
+    }
+
+    let signalrConn = null;
+    let pollInterval = null;
+    let currentStats = null;
+
+    // Elements
+    const eventTitle = document.getElementById('eventTitle');
+    const showtimeMeta = document.getElementById('showtimeMeta');
+    const kpiCheckedIn = document.getElementById('kpiCheckedIn');
+    const kpiTotalSold = document.getElementById('kpiTotalSold');
+    const kpiRemaining = document.getElementById('kpiRemaining');
+    const kpiPercentage = document.getElementById('kpiPercentage');
+    const kpiProgressBar = document.getElementById('kpiProgressBar');
+    const kpiVelocity = document.getElementById('kpiVelocity');
+    const kpiOfflineSynced = document.getElementById('kpiOfflineSynced');
+    const kpiLastSyncText = document.getElementById('kpiLastSyncText');
+    const chartContainer = document.getElementById('chartContainer');
+    const gateBreakdownList = document.getElementById('gateBreakdownList');
+    const liveStatusBadge = document.getElementById('liveStatusBadge');
+    const liveStatusText = document.getElementById('liveStatusText');
+    const syncAlertBar = document.getElementById('syncAlertBar');
+    const syncAlertMessage = document.getElementById('syncAlertMessage');
+    const syncAlertTime = document.getElementById('syncAlertTime');
+
+    // Button actions
+    document.getElementById('btnRefresh').addEventListener('click', () => loadStats());
+    document.getElementById('btnExportCsv').addEventListener('click', () => {
+      window.location.href = `./checkin-export.html?showId=${encodeURIComponent(showtimeId)}`;
+    });
+    document.getElementById('btnFullscreen').addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+
+    async function loadStats() {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/checkin/showtimes/${encodeURIComponent(showtimeId)}/live-stats`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        if (res.status === 401) {
+          window.location.href = './login.html';
+          return;
+        }
+
+        if (res.status === 403) {
+          alert('Bạn không có quyền xem thống kê của sự kiện này.');
+          window.location.href = './overview.html';
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error('Lỗi tải dữ liệu live-stats (' + res.status + ')');
+        }
+
+        const data = await res.json();
+        currentStats = data;
+        renderDashboard(data);
+      } catch (err) {
+        console.error('Lỗi khi tải số liệu soát vé:', err);
+      }
+    }
+
+    function renderDashboard(data) {
+      // Header
+      eventTitle.textContent = data.eventTitle || 'Suất diễn không tên';
+      const start = new Date(data.startTime);
+      const end = new Date(data.endTime);
+      showtimeMeta.textContent = `Bắt đầu: ${start.toLocaleString('vi-VN')} • Kết thúc: ${end.toLocaleString('vi-VN')}`;
+
+      // KPIs
+      kpiCheckedIn.textContent = Number(data.checkedInCount).toLocaleString('vi-VN');
+      kpiTotalSold.textContent = Number(data.totalSoldTickets).toLocaleString('vi-VN');
+      kpiRemaining.textContent = Number(data.remainingCount).toLocaleString('vi-VN');
+      kpiPercentage.textContent = `${data.checkInPercentage}%`;
+      kpiProgressBar.style.width = `${Math.min(100, Math.max(0, data.checkInPercentage))}%`;
+
+      kpiVelocity.textContent = Number(data.currentVelocityPerMinute).toFixed(1);
+      kpiOfflineSynced.textContent = Number(data.offlineSyncedCount).toLocaleString('vi-VN');
+      if (data.lastSyncTime) {
+        const syncDate = new Date(data.lastSyncTime);
+        kpiLastSyncText.textContent = `Đồng bộ gần nhất: ${syncDate.toLocaleTimeString('vi-VN')}`;
+      } else {
+        kpiLastSyncText.textContent = 'Chưa có lượt quét ngoại tuyến';
+      }
+
+      // Render Gates Breakdown
+      renderGates(data.gateBreakdown || [], data.checkedInCount);
+
+      // Render Timeline Chart
+      renderChart(data.timeline || []);
+    }
+
+    function renderGates(gates, totalCheckedIn) {
+      if (!gates.length) {
+        gateBreakdownList.innerHTML = '<div class="text-center text-gray-500 text-sm py-6">Chưa có khách vào qua cổng nào.</div>';
+        return;
+      }
+
+      gateBreakdownList.innerHTML = gates.map(gate => {
+        const percent = gate.percentageOfTotal;
+        return `
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center text-sm">
+              <span class="font-semibold text-gray-200 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-teal-400"></span>
+                ${escapeHtml(gate.gateName)}
+              </span>
+              <span class="font-mono text-gray-300">
+                <strong>${Number(gate.checkedInCount).toLocaleString('vi-VN')}</strong>
+                <span class="text-xs text-gray-500">(${percent}%)</span>
+              </span>
+            </div>
+            <div class="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
+              <div class="h-full bg-gradient-to-r from-teal-500 to-cyan-400 rounded-full" style="width: ${percent}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderChart(timeline) {
+      if (!timeline.length) {
+        chartContainer.innerHTML = '<div class="w-full text-center text-gray-500 text-sm self-center">Chưa có dữ liệu theo phút.</div>';
+        return;
+      }
+
+      const maxCount = Math.max(1, ...timeline.map(t => t.count));
+      chartContainer.innerHTML = timeline.map(point => {
+        const heightPercent = Math.max(4, Math.round((point.count / maxCount) * 100));
+        const time = new Date(point.minuteBucket);
+        const timeLabel = time.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        const hasCheckins = point.count > 0;
+        const barColor = hasCheckins ? 'bg-indigo-500 hover:bg-indigo-400' : 'bg-gray-800';
+
+        return `
+          <div class="flex-1 flex flex-col items-center group relative h-full justify-end">
+            <div class="w-full rounded-t ${barColor} transition-all duration-300" style="height: ${heightPercent}%"></div>
+            <!-- Tooltip -->
+            <div class="hidden group-hover:block absolute -top-10 px-2 py-1 bg-gray-900 border border-gray-700 text-white text-[11px] font-mono rounded shadow pointer-events-none whitespace-nowrap z-20">
+              ${timeLabel}: ${point.count} khách
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // --- SignalR Setup ---
+    async function initSignalR() {
+      try {
+        signalrConn = new signalR.HubConnectionBuilder()
+          .withUrl(`${API_BASE}/hubs/checkin-live`, {
+            accessTokenFactory: () => token
+          })
+          .withAutomaticReconnect()
+          .build();
+
+        signalrConn.on('CheckinUpdated', (payload) => {
+          console.log('[SignalR] Vé mới đã quét:', payload);
+          void loadStats();
+        });
+
+        signalrConn.on('CheckinBatchSynced', (payload) => {
+          console.log('[SignalR] Lô vé ngoại tuyến đồng bộ:', payload);
+          if (syncAlertBar) {
+            syncAlertMessage.textContent = `Vừa đồng bộ bù ${payload.syncedCount || ''} vé từ thiết bị ngoại tuyến.`;
+            syncAlertTime.textContent = new Date().toLocaleTimeString('vi-VN');
+            syncAlertBar.classList.remove('hidden');
+            setTimeout(() => syncAlertBar.classList.add('hidden'), 8000);
+          }
+          void loadStats();
+        });
+
+        signalrConn.onreconnecting(() => {
+          liveStatusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30';
+          liveStatusText.textContent = 'CONNECTING...';
+        });
+
+        signalrConn.onreconnected(async () => {
+          liveStatusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+          liveStatusText.textContent = 'REAL-TIME CONNECTED';
+          await signalrConn.invoke('JoinShowtimeGroup', showtimeId);
+          void loadStats();
+        });
+
+        signalrConn.onclose(() => {
+          liveStatusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/30';
+          liveStatusText.textContent = 'POLLING (DISCONNECTED)';
+        });
+
+        await signalrConn.start();
+        await signalrConn.invoke('JoinShowtimeGroup', showtimeId);
+        console.log('[SignalR] Đã tham gia group suất diễn:', showtimeId);
+      } catch (err) {
+        console.warn('[SignalR] Không thể kết nối WebSocket, chuyển sang chế độ Polling:', err);
+        liveStatusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30';
+        liveStatusText.textContent = 'AUTO-POLLING (10S)';
+      }
+    }
+
+    // Initialize
+    loadStats();
+    initSignalR();
+
+    // Fallback polling every 10s
+    pollInterval = setInterval(loadStats, 10000);
+    window.addEventListener('beforeunload', () => {
+      if (pollInterval) clearInterval(pollInterval);
+      if (signalrConn) signalrConn.stop();
+    });
+  </script>
+</body>
+</html>

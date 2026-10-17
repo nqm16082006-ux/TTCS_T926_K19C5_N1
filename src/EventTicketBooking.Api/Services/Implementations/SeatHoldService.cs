@@ -91,6 +91,8 @@ namespace EventTicketBooking.Api.Services.Implementations
                 return HoldSeatsResult.NotFoundResult("Suất chiếu không tồn tại.");
             }
 
+            if (showtime.IsSaleExpired(DateTime.UtcNow))
+                return HoldSeatsResult.InvalidResult("Suất diễn đã hết thời gian bán vé.");
             if (showtime.Status != ShowtimeStatus.OnSale)
                 return HoldSeatsResult.InvalidResult("Suất diễn chưa mở bán hoặc đã đóng bán.");
 

@@ -137,7 +137,8 @@ public class StaffScannerS28Tests : IDisposable
             _db,
             _passwordHasher,
             _tokenService,
-            NullLogger<AuthService>.Instance);
+            NullLogger<AuthService>.Instance,
+            EventTicketBooking.Tests.Mocks.MockRedisHelper.CreateMockRedis());
 
         // 2. Act: Staff đăng nhập
         var result = await authService.LoginAsync(new LoginRequestDto
@@ -255,7 +256,8 @@ public class StaffScannerS28Tests : IDisposable
             _db,
             _passwordHasher,
             _tokenService,
-            NullLogger<AuthService>.Instance);
+            NullLogger<AuthService>.Instance,
+            EventTicketBooking.Tests.Mocks.MockRedisHelper.CreateMockRedis());
 
         var result = await authService.LoginAsync(new LoginRequestDto
         {
@@ -281,7 +283,8 @@ public class StaffScannerS28Tests : IDisposable
             _db,
             _passwordHasher,
             _tokenService,
-            NullLogger<AuthService>.Instance);
+            NullLogger<AuthService>.Instance,
+            EventTicketBooking.Tests.Mocks.MockRedisHelper.CreateMockRedis());
 
         var result = await authService.LoginAsync(new LoginRequestDto
         {
@@ -307,7 +310,8 @@ public class StaffScannerS28Tests : IDisposable
             _db,
             _passwordHasher,
             _tokenService,
-            NullLogger<AuthService>.Instance);
+            NullLogger<AuthService>.Instance,
+            EventTicketBooking.Tests.Mocks.MockRedisHelper.CreateMockRedis());
 
         var result = await authService.LoginAsync(new LoginRequestDto
         {

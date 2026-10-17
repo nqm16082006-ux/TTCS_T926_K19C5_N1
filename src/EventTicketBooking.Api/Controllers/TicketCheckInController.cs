@@ -9,10 +9,12 @@ using Microsoft.AspNetCore.Http;
 using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Middlewares;
+using EventTicketBooking.Api.Services;
 using EventTicketBooking.Api.Services.Interfaces;
 using EventTicketBooking.Api.Services.Implementations;
 using EventTicketBooking.Api.DTOs;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.SignalR;
 
 namespace EventTicketBooking.Api.Controllers
 {
@@ -26,6 +28,8 @@ namespace EventTicketBooking.Api.Controllers
         private readonly ILogger<TicketCheckInController> _logger;
         private readonly IOrderAuditService _orderAuditService;
         private readonly ICheckinExportService _checkinExportService;
+        private readonly ICheckinStatisticsService _checkinStatisticsService;
+        private readonly Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.CheckinLiveHub>? _checkinHub;
 
         [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
         public TicketCheckInController(
@@ -33,58 +37,66 @@ namespace EventTicketBooking.Api.Controllers
             ILogger<TicketCheckInController> logger,
             IQrSignatureService? qrSignatureService = null,
             IOrderAuditService? orderAuditService = null,
-            ICheckinExportService? checkinExportService = null)
+            ICheckinExportService? checkinExportService = null,
+            ICheckinStatisticsService? checkinStatisticsService = null,
+            Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.CheckinLiveHub>? checkinHub = null)
         {
             _context = context;
             _logger = logger;
             _qrSignatureService = qrSignatureService ?? new QrSignatureService();
             _orderAuditService = orderAuditService ?? new OrderAuditService(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
             _checkinExportService = checkinExportService ?? new CheckinExportService(context);
+            _checkinStatisticsService = checkinStatisticsService ?? new CheckinStatisticsService(context);
+            _checkinHub = checkinHub;
         }
 
         public TicketCheckInController(AppDbContext context, IQrSignatureService? qrSignatureService = null)
-            : this(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<TicketCheckInController>.Instance, qrSignatureService, null, null)
+            : this(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<TicketCheckInController>.Instance, qrSignatureService, null, null, null, null)
         {
         }
 
         /// <summary>
-        /// Story S-62: Xuất danh sách khách vào cửa theo suất diễn ra tệp CSV chuẩn UTF-8 có BOM.
-        /// Cho phép lọc theo GateName / DoorName / GateId / DoorId và OnlyConflicts.
-        /// Trả về file download với filename: danh-sach-checkin-suat-{showId}.csv.
+        /// Story S-52: Ban tổ chức xem số khách đã vào cửa theo thời gian thực.
         /// </summary>
-        [HttpGet("showtimes/{showId}/export-csv")]
-        [RequireRole("Admin", "Staff", "Organizer")]
-        public async Task<IActionResult> ExportCheckinListCsv(
-            [FromRoute] Guid showId,
-            [FromQuery] string? gateName = null,
-            [FromQuery] string? doorName = null,
-            [FromQuery] string? gateId = null,
-            [FromQuery] string? doorId = null,
-            [FromQuery] bool? onlyConflicts = null,
-            [FromQuery] bool includeNotCheckedIn = false,
+        [HttpGet("showtimes/{showtimeId}/live-stats")]
+        [RequireRole("Admin", "Organizer", "Staff")]
+        public async Task<IActionResult> GetLiveCheckinStats(
+            [FromRoute] Guid showtimeId,
             CancellationToken cancellationToken = default)
         {
-            if (showId == Guid.Empty)
+            if (showtimeId == Guid.Empty)
             {
                 return BadRequest(new { Message = "Mã suất diễn không hợp lệ." });
             }
 
-            var query = new ExportCheckinListQuery
+            var currentUserId = GetCurrentUserId();
+            if (!currentUserId.HasValue)
             {
-                ShowId = showId,
-                GateName = gateName,
-                DoorName = doorName,
-                GateId = gateId,
-                DoorId = doorId,
-                OnlyConflicts = onlyConflicts,
-                IncludeNotCheckedIn = includeNotCheckedIn
-            };
+                return Unauthorized(new { Message = "Vui lòng đăng nhập." });
+            }
+
+            var showtime = await _context.Showtimes
+                .AsNoTracking()
+                .Include(s => s.Event)
+                .FirstOrDefaultAsync(s => s.Id == showtimeId, cancellationToken);
+
+            if (showtime == null)
+            {
+                return NotFound(new { Message = $"Không tìm thấy suất diễn với ID {showtimeId}." });
+            }
+
+            var isStaffOrAdmin = User.IsInRole("Admin") || User.IsInRole("Staff") ||
+                User.HasClaim(c => (c.Type == "role" || c.Type == System.Security.Claims.ClaimTypes.Role) && (c.Value == "Admin" || c.Value == "Staff"));
+
+            if (!isStaffOrAdmin && showtime.Event.OwnerId != currentUserId.Value)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { Message = "Bạn không có quyền xem báo cáo của sự kiện này." });
+            }
 
             try
             {
-                var csvBytes = await _checkinExportService.ExportCheckinCsvAsync(query, cancellationToken);
-                var filename = $"danh-sach-checkin-suat-{showId}.csv";
-                return File(csvBytes, "text/csv; charset=utf-8", filename);
+                var stats = await _checkinStatisticsService.GetLiveCheckinStatsAsync(showtimeId, cancellationToken);
+                return Ok(stats);
             }
             catch (KeyNotFoundException ex)
             {
@@ -92,9 +104,17 @@ namespace EventTicketBooking.Api.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Lỗi khi xuất danh sách soát vé cho suất diễn {ShowId}", showId);
-                return StatusCode(StatusCodes.Status500InternalServerError, new { Message = "Đã xảy ra lỗi khi tạo tệp CSV xuất danh sách soát vé." });
+                _logger.LogError(ex, "Lỗi khi lấy thống kê soát vé thời gian thực cho suất {ShowtimeId}", showtimeId);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { Message = "Đã xảy ra lỗi khi lấy thống kê soát vé." });
             }
+        }
+
+        private Guid? GetCurrentUserId()
+        {
+            var claimValue = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("id")?.Value
+                ?? User.FindFirst("sub")?.Value;
+            return Guid.TryParse(claimValue, out var id) ? id : null;
         }
 
         // 1. Lấy suất diễn hôm nay (S-29)
@@ -117,15 +137,19 @@ namespace EventTicketBooking.Api.Controllers
             var todayVnStartUtc = TimeZoneInfo.ConvertTimeToUtc(nowVn.Date, vnTimeZone);
             var tomorrowVnStartUtc = todayVnStartUtc.AddDays(1);
 
-            // Lọc các suất diễn bắt đầu trong ngày hôm nay VÀ chưa kết thúc ở thời điểm hiện tại
+            // Giao thoa khoảng thời gian [StartTime, EndTime] với ngày hôm nay [todayVnStartUtc, tomorrowVnStartUtc]:
+            // 1. Suất diễn bắt đầu trước khi hết ngày hôm nay (StartTime < tomorrowVnStartUtc)
+            // 2. Suất diễn chưa kết thúc trước khi ngày hôm nay bắt đầu (EndTime >= todayVnStartUtc)
+            // => Đảm bảo bất kể suất diễn kéo dài 1 ngày, 2 ngày, hay N ngày thì mọi ngày trong khoảng đó đều hiển thị
             var shows = await _context.Showtimes
                 .Include(s => s.Event)
-                .Where(s => s.StartTime >= todayVnStartUtc
-                         && s.StartTime < tomorrowVnStartUtc
-                         && s.EndTime >= nowUtc)
+                .Where(s => s.StartTime < tomorrowVnStartUtc
+                         && s.EndTime >= todayVnStartUtc)
+                .OrderBy(s => s.StartTime)
                 .Select(s => new
                 {
                     s.Id,
+                    s.Name,
                     EventTitle = s.Event.Title,
                     s.StartTime,
                     s.EndTime
@@ -231,7 +255,7 @@ namespace EventTicketBooking.Api.Controllers
                 {
                     var showtimeInfo = await _context.Showtimes.Include(s => s.Event).FirstOrDefaultAsync(s => s.Id == qrShowtimeId.Value);
                     var message = showtimeInfo != null
-                        ? $"Vé thuộc suất diễn {showtimeInfo.Event.Title} lúc {showtimeInfo.StartTime:HH:mm dd/MM/yyyy}"
+                        ? WrongShowtimeMessage(showtimeInfo)
                         : "Vé thuộc suất diễn khác";
 
                     _logger.LogWarning("Từ chối check-in: {ReasonCode}. Mã QR: {TicketCode}, Cổng: {GateName}, Suất diễn chọn: {SelectedShowtimeId}, Suất diễn thực tế: {TicketShowtimeId}",
@@ -326,7 +350,7 @@ namespace EventTicketBooking.Api.Controllers
             {
                 var showtimeInfo = await _context.Showtimes.Include(s => s.Event).FirstOrDefaultAsync(s => s.Id == ticket.Order.ShowtimeId);
                 var message = showtimeInfo != null
-                    ? $"Vé thuộc suất diễn {showtimeInfo.Event.Title} lúc {showtimeInfo.StartTime:HH:mm dd/MM/yyyy}"
+                    ? WrongShowtimeMessage(showtimeInfo)
                     : "Vé thuộc suất diễn khác";
 
                 _logger.LogWarning("Từ chối check-in: {ReasonCode}. Mã vé: {TicketCode}, Cổng: {GateName}, Suất diễn chọn: {SelectedShowtimeId}, Suất diễn thực tế: {TicketShowtimeId}",
@@ -466,6 +490,19 @@ namespace EventTicketBooking.Api.Controllers
             {
                 var ticketRec = await _context.Tickets.FirstOrDefaultAsync(t => t.OrderItemId == ticket.Id);
                 resultTicketCode = ticketRec?.TicketCode;
+            }
+
+            // Story S-52: Bắn thông báo SignalR cập nhật số liệu khách vào cửa theo thời gian thực
+            if (_checkinHub != null && ticket.Order != null)
+            {
+                _ = _checkinHub.Clients.Group(EventTicketBooking.Api.Hubs.CheckinLiveHub.GetGroupName(ticket.Order.ShowtimeId))
+                    .SendAsync("CheckinUpdated", new
+                    {
+                        ShowtimeId = ticket.Order.ShowtimeId,
+                        TicketCode = resultTicketCode,
+                        Gate = request.GateName,
+                        CheckInTime = now
+                    });
             }
 
             return Ok(new
@@ -1148,9 +1185,30 @@ namespace EventTicketBooking.Api.Controllers
                 }
             syncedCount = results.Count(r => r.Status == "synced");
             conflictCount = results.Count(r => r.Status == "conflict");
+
+            // Story S-52: Bắn thông báo SignalR cập nhật lô vé đồng bộ ngoại tuyến cho các suất diễn liên quan
+            if (_checkinHub != null && syncedCount > 0 && request.Items != null)
+            {
+                var affectedShowtimes = request.Items
+                    .Where(i => i.ShowtimeId != Guid.Empty)
+                    .Select(i => i.ShowtimeId)
+                    .Distinct();
+
+                foreach (var sId in affectedShowtimes)
+                {
+                    _ = _checkinHub.Clients.Group(EventTicketBooking.Api.Hubs.CheckinLiveHub.GetGroupName(sId))
+                        .SendAsync("CheckinBatchSynced", new
+                        {
+                            ShowtimeId = sId,
+                            SyncedCount = syncedCount,
+                            Timestamp = DateTimeOffset.UtcNow
+                        });
+                }
+            }
+
             return Ok(new OfflineSyncBatchResponseDto
             {
-                TotalSubmitted = request.Items.Count,
+                TotalSubmitted = request?.Items?.Count ?? 0,
                 SyncedCount = syncedCount,
                 DuplicateCount = duplicateCount,
                 ConflictCount = conflictCount,
@@ -1201,6 +1259,14 @@ namespace EventTicketBooking.Api.Controllers
             }
 
             return false;
+        }
+
+        internal static string WrongShowtimeMessage(Showtime showtime)
+        {
+            var zone = TimeZoneInfo.FindSystemTimeZoneById(OperatingSystem.IsWindows() ? "SE Asia Standard Time" : "Asia/Ho_Chi_Minh");
+            var time = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(showtime.StartTime, DateTimeKind.Utc), zone);
+            var name = string.IsNullOrWhiteSpace(showtime.Name) ? showtime.Event.Title : $"{showtime.Event.Title} — {showtime.Name}";
+            return $"Vé thuộc suất diễn {name} lúc {time:HH:mm dd/MM/yyyy} (giờ Việt Nam). Vui lòng chọn đúng suất diễn của vé.";
         }
 
         private IActionResult AlreadyCheckedIn(OrderItem ticket)
