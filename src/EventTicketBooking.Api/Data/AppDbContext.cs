@@ -37,6 +37,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<Refund> Refunds { get; set; } = null!;
         public DbSet<SystemAlert> SystemAlerts { get; set; } = null!;
         public DbSet<ReconciliationSession> ReconciliationSessions { get; set; } = null!;
+        public DbSet<TicketTransfer> TicketTransfers { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -64,6 +65,8 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(e => e.ImageUrl).HasColumnType("text").HasMaxLength(2000);
                 entity.Property(e => e.TotalSeats).IsRequired();
                 entity.Property(e => e.MaxTicketsPerUser).IsRequired().HasDefaultValue(10);
+                entity.Property(e => e.AllowTicketTransfer).IsRequired().HasDefaultValue(true);
+                entity.Property(e => e.TransferCutoffHours).IsRequired().HasDefaultValue(2);
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
@@ -424,6 +427,53 @@ namespace EventTicketBooking.Api.Data
                 entity.HasIndex(t => t.TicketCode)
                       .IsUnique()
                       .HasDatabaseName("IX_tickets_TicketCode_Unique");
+
+                // Story S-57: Người sở hữu hiện tại và số lần chuyển nhượng
+                entity.Property(t => t.TransferCount).HasDefaultValue(0);
+
+                entity.HasOne(t => t.CurrentUser)
+                      .WithMany()
+                      .HasForeignKey(t => t.CurrentUserId)
+                      .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(t => t.CurrentUserId);
+            });
+
+            // Cấu hình bảng chuyển nhượng vé (Story S-57)
+            modelBuilder.Entity<TicketTransfer>(entity =>
+            {
+                entity.ToTable("ticket_transfers");
+                entity.HasKey(tt => tt.Id);
+
+                entity.Property(tt => tt.FromUserEmail).IsRequired().HasMaxLength(150);
+                entity.Property(tt => tt.ToUserEmail).IsRequired().HasMaxLength(150);
+                entity.Property(tt => tt.OldTicketCode).IsRequired().HasMaxLength(64);
+                entity.Property(tt => tt.NewTicketCode).IsRequired().HasMaxLength(64);
+                entity.Property(tt => tt.Status)
+                      .HasConversion(v => v.ToString(), v => Enum.Parse<TransferStatus>(v))
+                      .HasMaxLength(20);
+                entity.Property(tt => tt.Note).HasMaxLength(500);
+                entity.Property(tt => tt.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(tt => tt.Ticket)
+                      .WithMany()
+                      .HasForeignKey(tt => tt.TicketId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(tt => tt.FromUser)
+                      .WithMany()
+                      .HasForeignKey(tt => tt.FromUserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(tt => tt.ToUser)
+                      .WithMany()
+                      .HasForeignKey(tt => tt.ToUserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(tt => tt.TicketId);
+                entity.HasIndex(tt => tt.FromUserId);
+                entity.HasIndex(tt => tt.ToUserId);
+                entity.HasIndex(tt => tt.OldTicketCode);
             });
 
             // Cấu hình bảng nhật ký thao tác đơn hàng và vé (Story S-49)

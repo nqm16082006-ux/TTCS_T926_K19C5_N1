@@ -13,6 +13,11 @@ namespace EventTicketBooking.Api.Models
         public string TicketCode { get; set; } = string.Empty;
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+        public Guid? CurrentUserId { get; set; }
+        public int TransferCount { get; set; } = 0;
+        public DateTimeOffset? LastTransferredAt { get; set; }
+
         public OrderItem OrderItem { get; set; } = null!;
+        public User? CurrentUser { get; set; }
     }
 }
