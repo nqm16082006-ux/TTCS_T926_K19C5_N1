@@ -797,15 +797,16 @@
     </div>
 
     <!-- SECTION: Danh Sách Hoàn Tiền Cần Xử Lý Thủ Công (Story S-48) -->
+    <!-- SECTION: Hoàn tiền cần xử lý (Story S-48) -->
     <section class="section-card" id="refund-section">
       <div class="section-header">
         <div>
           <h2 class="section-title">
             <i class="fa-solid fa-triangle-exclamation text-rose-500" style="color:#e11d48;"></i>
-            Danh Sách Yêu Cầu Hoàn Tiền Cần Kế Toán Xử Lý Thủ Công (Story S-48)
+            Hoàn tiền cần xử lý (Story S-48)
           </h2>
           <p class="section-subtitle">
-            Các đơn hàng huỷ vé đã tự động thử lại 3 lần thất bại hoặc lỗi không thể thử lại. Kế toán viên đối soát và thực hiện hoàn tiền thủ công.
+            Các đơn hàng huỷ vé có lệnh hoàn tiền tự động thử lại, thất bại hoặc cần kế toán đối soát và xử lý thủ công.
           </p>
         </div>
         <div style="display:flex; gap:10px;">
@@ -815,16 +816,57 @@
         </div>
       </div>
 
+      <!-- S-48 Real Summary Metric Cards -->
+      <div class="stats-grid" style="margin-bottom: 20px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+        <div class="stat-card" style="border-left: 4px solid #f59e0b; cursor:pointer;" onclick="setFilter('RETRY_SCHEDULED')">
+          <div class="stat-icon amber" style="background:#fffbeb; color:#d97706;"><i class="fa-solid fa-clock-rotate-left"></i></div>
+          <div class="stat-info">
+            <span class="stat-value" id="s48StatRetryCount" style="color:#b45309;">0</span>
+            <span class="stat-label">Đang chờ retry</span>
+          </div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid #0284c7; cursor:pointer;" onclick="setFilter('PROCESSING')">
+          <div class="stat-icon sky"><i class="fa-solid fa-spinner fa-spin"></i></div>
+          <div class="stat-info">
+            <span class="stat-value" id="s48StatProcessingCount" style="color:#0284c7;">0</span>
+            <span class="stat-label">Đang xử lý</span>
+          </div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid #e11d48; cursor:pointer;" onclick="setFilter('PENDING')">
+          <div class="stat-icon rose"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <div class="stat-info">
+            <span class="stat-value" id="s48StatPendingCount" style="color:#be123c;">0</span>
+            <span class="stat-label">Cần kế toán xử lý</span>
+          </div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid #10b981; cursor:pointer;" onclick="setFilter('RESOLVED')">
+          <div class="stat-icon emerald"><i class="fa-solid fa-circle-check"></i></div>
+          <div class="stat-info">
+            <span class="stat-value" id="s48StatResolvedCount" style="color:#047857;">0</span>
+            <span class="stat-label">Đã hoàn thành</span>
+          </div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid #6366f1;">
+          <div class="stat-icon indigo" style="background:#e0e7ff; color:#4338ca;"><i class="fa-solid fa-money-bill-wave"></i></div>
+          <div class="stat-info">
+            <span class="stat-value" id="s48StatTotalAmount" style="color:#3730a3;">0 ₫</span>
+            <span class="stat-label">Tổng tiền chờ xử lý</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Filter & Search -->
       <div class="filter-bar">
         <div class="search-input-wrap">
           <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="text" id="searchInput" class="search-input" placeholder="Tìm theo mã đơn, mã GD, lý do..." oninput="filterRefunds()">
+          <input type="text" id="searchInput" class="search-input" placeholder="Tìm theo mã đơn, mã refund, lỗi..." oninput="filterRefunds()">
         </div>
         <div class="filter-tabs">
           <button class="filter-tab active" data-filter="ALL" onclick="setFilter('ALL', this)">Tất cả (<span id="countFilterAll">0</span>)</button>
-          <button class="filter-tab" data-filter="PENDING" onclick="setFilter('PENDING', this)">Chờ xử lý (<span id="countFilterPending">0</span>)</button>
+          <button class="filter-tab" data-filter="PENDING" onclick="setFilter('PENDING', this)">Cần kế toán xử lý (<span id="countFilterPending">0</span>)</button>
           <button class="filter-tab" data-filter="PROCESSING" onclick="setFilter('PROCESSING', this)">Đang xử lý (<span id="countFilterProcessing">0</span>)</button>
+          <button class="filter-tab" data-filter="RETRY_SCHEDULED" onclick="setFilter('RETRY_SCHEDULED', this)">Đang chờ retry (<span id="countFilterRetry">0</span>)</button>
+          <button class="filter-tab" data-filter="RESOLVED" onclick="setFilter('RESOLVED', this)">Đã hoàn thành (<span id="countFilterResolved">0</span>)</button>
         </div>
       </div>
 
@@ -833,18 +875,22 @@
         <table class="auditor-table">
           <thead>
             <tr>
-              <th>Mã Đơn / Mã Refund</th>
-              <th>Thời Gian / GD Gốc</th>
-              <th>Số Tiền Hoàn</th>
-              <th>Lý Do Thất Bại Từ Cổng</th>
-              <th>Lịch Sử 3 Lần Thử</th>
+              <th>Mã Refund</th>
+              <th>Mã Order</th>
+              <th>Số Tiền</th>
               <th>Trạng Thái</th>
+              <th>RetryCount</th>
+              <th>AttemptCount</th>
+              <th>LastError / GatewayReason</th>
+              <th>LastAttemptAt</th>
+              <th>NextRetryAt</th>
+              <th>UpdatedAt</th>
               <th style="text-align:right;">Thao Tác</th>
             </tr>
           </thead>
           <tbody id="refundsTableBody">
             <tr>
-              <td colspan="7" style="text-align:center; padding: 36px; color: var(--text-muted);">
+              <td colspan="11" style="text-align:center; padding: 36px; color: var(--text-muted);">
                 <i class="fa-solid fa-spinner fa-spin" style="font-size: 20px; display:block; margin-bottom:8px;"></i>
                 Đang tải danh sách hoàn tiền cần kế toán xử lý...
               </td>
@@ -1086,6 +1132,115 @@
     </div>
   </div>
 
+  <!-- MODAL: Chi Tiết Lệnh Hoàn Tiền (Story S-48) -->
+  <div class="modal-backdrop" id="modalRefundDetail">
+    <div class="modal-card" style="max-width: 640px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-circle-info" style="color:#0284c7;"></i> Chi Tiết Lệnh Hoàn Tiền (Story S-48)</h3>
+        <button class="modal-close" onclick="closeRefundDetailModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height: 75vh; overflow-y: auto; padding: 20px 24px;">
+        <!-- REFUND INFORMATION -->
+        <div style="margin-bottom: 20px;">
+          <h4 style="font-size: 12.5px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-file-invoice-dollar" style="color:#0284c7;"></i> REFUND INFORMATION (THÔNG TIN HOÀN TIỀN)
+          </h4>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px; display:grid; grid-template-columns: 1fr 1fr; gap:12px; font-size:12.5px;">
+            <div>
+              <span style="color:#64748b; display:block; margin-bottom:2px;">Mã Refund (RefundRequestId):</span>
+              <div style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#0f172a; word-break:break-all;" id="detailRefundId">--</div>
+            </div>
+            <div>
+              <span style="color:#64748b; display:block; margin-bottom:2px;">Mã Order (OrderId):</span>
+              <div style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#0f172a; word-break:break-all;" id="detailOrderId">--</div>
+            </div>
+            <div>
+              <span style="color:#64748b; display:block; margin-bottom:2px;">Số tiền hoàn (Amount):</span>
+              <strong style="color:#0284c7; font-size:15px;" id="detailAmount">0 ₫</strong>
+            </div>
+            <div>
+              <span style="color:#64748b; display:block; margin-bottom:2px;">Trạng thái (Status):</span>
+              <div id="detailStatusBadge" style="margin-top:2px;">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RETRY INFORMATION -->
+        <div style="margin-bottom: 20px;">
+          <h4 style="font-size: 12.5px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-rotate" style="color:#d97706;"></i> RETRY (TIẾN TRÌNH THỬ LẠI)
+          </h4>
+          <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:14px; display:grid; grid-template-columns: 1fr 1fr; gap:12px; font-size:12.5px;">
+            <div>
+              <span style="color:#92400e; display:block; margin-bottom:2px;">AttemptCount (Số lần thử):</span>
+              <strong style="color:#78350f; font-size:13.5px;" id="detailAttemptCount">0</strong>
+            </div>
+            <div>
+              <span style="color:#92400e; display:block; margin-bottom:2px;">RetryCount (Số lần thử lại):</span>
+              <strong style="color:#78350f; font-size:13.5px;" id="detailRetryCount">0</strong>
+            </div>
+            <div>
+              <span style="color:#92400e; display:block; margin-bottom:2px;">Lần thử gần nhất (LastAttemptAt):</span>
+              <span style="color:#451a03; font-weight:600;" id="detailLastAttemptAt">--</span>
+            </div>
+            <div>
+              <span style="color:#92400e; display:block; margin-bottom:2px;">Lịch thử lại kế tiếp (NextRetryAt):</span>
+              <span style="color:#451a03; font-weight:600;" id="detailNextRetryAt">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- GATEWAY INFORMATION -->
+        <div style="margin-bottom: 20px;">
+          <h4 style="font-size: 12.5px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-building-columns" style="color:#e11d48;"></i> GATEWAY (PHẢN HỒI CỔNG THANH TOÁN)
+          </h4>
+          <div style="background:#fff1f2; border:1px solid #fecdd3; border-radius:12px; padding:14px; font-size:12.5px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+              <span style="color:#9f1239;">Mã lỗi cổng (ErrorCode):</span>
+              <code style="background:#ffe4e6; padding:2px 8px; border-radius:6px; font-weight:800; color:#be123c;" id="detailErrorCode">--</code>
+            </div>
+            <div style="margin-bottom:6px;">
+              <span style="color:#9f1239; display:block; margin-bottom:2px;">Thông điệp từ cổng (ErrorMessage):</span>
+              <div style="background:#ffffff; border:1px solid #fecdd3; border-radius:8px; padding:8px 12px; color:#9f1239; font-weight:600;" id="detailErrorMessage">--</div>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:#9f1239;">Gateway Reference (Mã tham chiếu GD):</span>
+              <span style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#0f172a;" id="detailTransactionId">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACCOUNTING STATUS -->
+        <div>
+          <h4 style="font-size: 12.5px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-calculator" style="color:#10b981;"></i> ACCOUNTING (TIẾN TRÌNH KẾ TOÁN)
+          </h4>
+          <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:14px; font-size:12.5px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+              <span style="color:#166534;">Trạng thái xử lý:</span>
+              <strong style="color:#14532d;" id="detailAccountingState">--</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+              <span style="color:#166534;">Thời gian tạo:</span>
+              <span style="color:#166534; font-weight:600;" id="detailCreatedAt">--</span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:#166534;">Thời gian cập nhật:</span>
+              <span style="color:#166534; font-weight:600;" id="detailUpdatedAt">--</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <a id="detailLinkOrder" href="#" target="_blank" class="btn-action btn-outline" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+          <i class="fa-solid fa-arrow-up-right-from-square"></i> Xem đơn hàng
+        </a>
+        <button class="btn-action btn-primary" onclick="closeRefundDetailModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let rawRefundsList = [];
     let currentFilter = 'ALL';
@@ -1203,7 +1358,7 @@
       const tbody = document.getElementById('refundsTableBody');
       tbody.innerHTML = `
         <tr>
-          <td colspan="7" style="text-align:center; padding: 36px; color: var(--text-muted);">
+          <td colspan="11" style="text-align:center; padding: 36px; color: var(--text-muted);">
             <i class="fa-solid fa-spinner fa-spin" style="font-size: 20px; display:block; margin-bottom:8px;"></i>
             Đang tải danh sách hoàn tiền cần kế toán xử lý...
           </td>
@@ -1220,7 +1375,7 @@
 
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error(err.message || 'Không thể lấy danh sách yêu cầu hoàn tiền kế toán.');
+          throw new Error(err.message || 'Không tải được dữ liệu hoàn tiền. Vui lòng thử lại.');
         }
 
         const json = await res.json();
@@ -1230,7 +1385,7 @@
 
         // Check query param orderId to highlight
         const urlParams = new URLSearchParams(window.location.search);
-        const highlightOrderId = urlParams.get('orderId');
+        const highlightOrderId = urlParams.get('orderId') || urlParams.get('id');
         if (highlightOrderId) {
           setTimeout(() => {
             const row = document.getElementById('row-' + highlightOrderId);
@@ -1245,9 +1400,9 @@
         console.error(err);
         tbody.innerHTML = `
           <tr>
-            <td colspan="7" style="text-align:center; padding: 32px; color: #dc2626;">
+            <td colspan="11" style="text-align:center; padding: 32px; color: #dc2626;">
               <i class="fa-solid fa-circle-exclamation" style="font-size: 20px; display:block; margin-bottom:8px;"></i>
-              Lỗi tải dữ liệu: ${escapeHtml(err.message)}
+              Không tải được dữ liệu hoàn tiền. Vui lòng thử lại.
             </td>
           </tr>
         `;
@@ -1257,14 +1412,33 @@
     function updateMetricsAndBadges(list) {
       const pendingList = list.filter(r => r.status === 'ManualReviewRequired');
       const processingList = list.filter(r => r.status === 'AccountingProcessing');
-      const resolvedList = list.filter(r => r.status === 'AccountingResolved');
+      const resolvedList = list.filter(r => r.status === 'AccountingResolved' || r.status === 'Succeeded');
+      const retryList = list.filter(r => r.status === 'RetryScheduled');
 
       const pendingCount = pendingList.length;
       const processingCount = processingList.length;
       const resolvedCount = resolvedList.length;
+      const retryCount = retryList.length;
 
       const totalPendingAmount = [...pendingList, ...processingList].reduce((sum, r) => sum + (r.amount || 0), 0);
 
+      // S-48 Section Summary Cards
+      const elS48Retry = document.getElementById('s48StatRetryCount');
+      if (elS48Retry) elS48Retry.textContent = retryCount;
+
+      const elS48Proc = document.getElementById('s48StatProcessingCount');
+      if (elS48Proc) elS48Proc.textContent = processingCount;
+
+      const elS48Pending = document.getElementById('s48StatPendingCount');
+      if (elS48Pending) elS48Pending.textContent = pendingCount;
+
+      const elS48Resolved = document.getElementById('s48StatResolvedCount');
+      if (elS48Resolved) elS48Resolved.textContent = resolvedCount;
+
+      const elS48Total = document.getElementById('s48StatTotalAmount');
+      if (elS48Total) elS48Total.textContent = formatCurrency(totalPendingAmount);
+
+      // Top Overview Cards
       const elPending = document.getElementById('statRefundPendingCount');
       if (elPending) elPending.textContent = pendingCount;
 
@@ -1274,15 +1448,13 @@
       const elTotalAmount = document.getElementById('statRefundTotalAmount');
       if (elTotalAmount) elTotalAmount.textContent = formatCurrency(totalPendingAmount);
 
-      const elResolved = document.getElementById('statRefundResolvedCount');
-      if (elResolved) elResolved.textContent = resolvedCount;
-
       const navBadge = document.getElementById('navRefundBadge');
       if (navBadge) {
         navBadge.textContent = pendingCount;
         navBadge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
       }
 
+      // Filter Tab Counters
       const elFilterAll = document.getElementById('countFilterAll');
       if (elFilterAll) elFilterAll.textContent = list.length;
 
@@ -1291,6 +1463,12 @@
 
       const elFilterProcessing = document.getElementById('countFilterProcessing');
       if (elFilterProcessing) elFilterProcessing.textContent = processingCount;
+
+      const elFilterRetry = document.getElementById('countFilterRetry');
+      if (elFilterRetry) elFilterRetry.textContent = retryCount;
+
+      const elFilterResolved = document.getElementById('countFilterResolved');
+      if (elFilterResolved) elFilterResolved.textContent = resolvedCount;
     }
 
     function setFilter(filter, el) {
@@ -1306,25 +1484,100 @@
 
     function filterRefunds() {
       const query = (document.getElementById('searchInput').value || '').trim().toLowerCase();
-      let filtered = rawRefundsList;
+      let filtered = [...rawRefundsList];
 
       if (currentFilter === 'PENDING') {
         filtered = filtered.filter(r => r.status === 'ManualReviewRequired');
       } else if (currentFilter === 'PROCESSING') {
         filtered = filtered.filter(r => r.status === 'AccountingProcessing');
+      } else if (currentFilter === 'RETRY_SCHEDULED') {
+        filtered = filtered.filter(r => r.status === 'RetryScheduled');
+      } else if (currentFilter === 'RESOLVED') {
+        filtered = filtered.filter(r => r.status === 'AccountingResolved' || r.status === 'Succeeded');
       }
 
       if (query) {
         filtered = filtered.filter(r => 
           String(r.orderCode || '').toLowerCase().includes(query) ||
+          String(r.orderId || '').toLowerCase().includes(query) ||
+          String(r.id || '').toLowerCase().includes(query) ||
           String(r.transactionId || '').toLowerCase().includes(query) ||
+          String(r.errorCode || '').toLowerCase().includes(query) ||
           String(r.errorMessage || '').toLowerCase().includes(query) ||
-          String(r.reason || '').toLowerCase().includes(query) ||
-          String(r.id || '').toLowerCase().includes(query)
+          String(r.reason || '').toLowerCase().includes(query)
         );
       }
 
+      // Sort newest first
+      filtered.sort((a, b) => {
+        const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+        const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+        return timeB - timeA;
+      });
+
       renderRefundsTable(filtered);
+    }
+
+    function copyText(str) {
+      if (!str) return;
+      navigator.clipboard.writeText(str).then(() => {
+        alert('Đã sao chép: ' + str);
+      }).catch(() => {
+        alert('Mã: ' + str);
+      });
+    }
+
+    function openRefundDetailModal(refundId) {
+      const r = rawRefundsList.find(x => x.id === refundId);
+      if (!r) return;
+
+      document.getElementById('detailRefundId').textContent = r.id;
+      document.getElementById('detailOrderId').textContent = r.orderId;
+      document.getElementById('detailAmount').textContent = formatCurrency(r.amount || 0);
+
+      let statusBadge = '';
+      if (r.status === 'ManualReviewRequired') {
+        statusBadge = '<span class="badge-status pending"><i class="fa-solid fa-triangle-exclamation"></i> Chờ kế toán xử lý</span>';
+      } else if (r.status === 'AccountingProcessing') {
+        statusBadge = '<span class="badge-status processing"><i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý</span>';
+      } else if (r.status === 'AccountingResolved' || r.status === 'Succeeded') {
+        statusBadge = '<span class="badge-status resolved"><i class="fa-solid fa-check"></i> Đã hoàn tất</span>';
+      } else if (r.status === 'RetryScheduled') {
+        statusBadge = '<span class="badge-status" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a;"><i class="fa-solid fa-clock-rotate-left"></i> Đang chờ retry</span>';
+      } else {
+        statusBadge = `<span class="badge-status" style="background:#f1f5f9; color:#475569;">${escapeHtml(r.status)}</span>`;
+      }
+      document.getElementById('detailStatusBadge').innerHTML = statusBadge;
+
+      document.getElementById('detailAttemptCount').textContent = r.attemptCount || 0;
+      document.getElementById('detailRetryCount').textContent = `${r.retryCount || 0} / ${r.maxRetries || 3}`;
+      document.getElementById('detailLastAttemptAt').textContent = r.lastAttemptedAt ? formatDateTime(r.lastAttemptedAt) : '—';
+      document.getElementById('detailNextRetryAt').textContent = r.nextRetryAt ? formatDateTime(r.nextRetryAt) : '—';
+
+      document.getElementById('detailErrorCode').textContent = escapeHtml(r.errorCode || 'GATEWAY_ERROR');
+      document.getElementById('detailErrorMessage').textContent = escapeHtml(r.errorMessage || r.reason || 'Cổng thanh toán phản hồi lỗi Timeout / từ chối.');
+      document.getElementById('detailTransactionId').textContent = escapeHtml(r.transactionId || r.refundTransactionId || 'Chưa có');
+
+      let accountingStateText = 'Chờ phân công xử lý';
+      if (r.status === 'AccountingProcessing') accountingStateText = 'Đang trong quy trình đối soát & hoàn tiền';
+      else if (r.status === 'AccountingResolved') accountingStateText = 'Đã hoàn tất chuyển khoản cho khách hàng';
+      document.getElementById('detailAccountingState').textContent = accountingStateText;
+
+      document.getElementById('detailCreatedAt').textContent = r.createdAt ? formatDateTime(r.createdAt) : '—';
+      document.getElementById('detailUpdatedAt').textContent = r.updatedAt ? formatDateTime(r.updatedAt) : '—';
+
+      const linkOrder = document.getElementById('detailLinkOrder');
+      if (linkOrder) {
+        linkOrder.href = `./order-details.html?id=${encodeURIComponent(r.orderId)}`;
+      }
+
+      const modal = document.getElementById('modalRefundDetail');
+      if (modal) modal.classList.add('active');
+    }
+
+    function closeRefundDetailModal() {
+      const modal = document.getElementById('modalRefundDetail');
+      if (modal) modal.classList.remove('active');
     }
 
     function renderRefundsTable(list) {
@@ -1332,9 +1585,9 @@
       if (!list || list.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="7" style="text-align:center; padding: 48px; color: var(--text-muted);">
+            <td colspan="11" style="text-align:center; padding: 48px; color: var(--text-muted);">
               <i class="fa-solid fa-circle-check" style="font-size: 28px; color: #16a34a; display:block; margin-bottom:8px;"></i>
-              <strong>Tuyệt vời! Hiện không có lệnh hoàn tiền nào cần xử lý.</strong>
+              <strong>Hiện không có lệnh hoàn tiền cần xử lý thủ công.</strong>
               <p style="font-size:12.5px; margin-top:4px;">Tất cả các khoản hoàn tiền đều đã được thực hiện thành công hoặc giải quyết xong.</p>
             </td>
           </tr>
@@ -1345,31 +1598,30 @@
       tbody.innerHTML = list.map(r => {
         let statusBadge = '';
         if (r.status === 'ManualReviewRequired') {
-          statusBadge = '<span class="badge-status pending"><i class="fa-solid fa-triangle-exclamation"></i> Chờ kế toán xử lý</span>';
+          statusBadge = '<span class="badge-status pending"><i class="fa-solid fa-triangle-exclamation"></i> Chờ xử lý</span>';
         } else if (r.status === 'AccountingProcessing') {
           statusBadge = '<span class="badge-status processing"><i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý</span>';
         } else if (r.status === 'AccountingResolved') {
           statusBadge = '<span class="badge-status resolved"><i class="fa-solid fa-check"></i> Đã hoàn tất</span>';
+        } else if (r.status === 'RetryScheduled') {
+          statusBadge = '<span class="badge-status" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a;"><i class="fa-solid fa-clock-rotate-left"></i> Chờ retry</span>';
+        } else if (r.status === 'Succeeded') {
+          statusBadge = '<span class="badge-status resolved"><i class="fa-solid fa-check"></i> Thành công</span>';
         } else {
-          statusBadge = `<span class="badge-status" style="background:#f1f5f9; color:#475569;">${r.status}</span>`;
+          statusBadge = `<span class="badge-status" style="background:#f1f5f9; color:#475569;">${escapeHtml(r.status)}</span>`;
         }
 
-        // Render attempt pills (Lần 1, Lần 2, Lần 3)
-        let attemptPillsHtml = '';
-        if (r.attemptHistory && r.attemptHistory.length > 0) {
-          attemptPillsHtml = r.attemptHistory.map(att => {
-            const timeStr = att.timestamp ? new Date(att.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
-            return `<span class="attempt-pill failed" title="${escapeHtml(att.notes || att.action)}">Lần ${att.attemptNumber}: ${escapeHtml(att.errorCode || 'FAIL')} (${timeStr})</span>`;
-          }).join('');
-        } else {
-          const count = r.retryCount || r.attemptCount || 3;
-          attemptPillsHtml = `<span class="attempt-pill failed">Đã thử lại ${count}/3 lần thất bại</span>`;
-        }
-
-        const dateStr = r.createdAt ? new Date(r.createdAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '—';
+        const dateStr = r.updatedAt ? formatDateTime(r.updatedAt) : (r.createdAt ? formatDateTime(r.createdAt) : '—');
+        const lastAttemptStr = r.lastAttemptedAt ? formatDateTime(r.lastAttemptedAt) : '—';
+        const nextRetryStr = r.nextRetryAt ? formatDateTime(r.nextRetryAt) : '—';
 
         // Action buttons
         let actionsHtml = `<div style="display:flex; justify-content:flex-end; gap:6px;">`;
+        actionsHtml += `
+          <button class="btn-sm btn-sm-outline" onclick="openRefundDetailModal('${r.id}')" title="Xem chi tiết lệnh hoàn tiền">
+            <i class="fa-solid fa-circle-info"></i> Chi tiết
+          </button>
+        `;
         if (r.status === 'ManualReviewRequired') {
           actionsHtml += `
             <button class="btn-sm btn-sm-primary" onclick="assignAccounting('${r.id}')" title="Kế toán tiếp nhận xử lý hồ sơ này">
@@ -1388,37 +1640,48 @@
           <a href="./order-details.html?id=${encodeURIComponent(r.orderId)}" target="_blank" class="btn-sm btn-sm-outline" title="Xem chi tiết đơn hàng">
             <i class="fa-solid fa-eye"></i> Xem đơn
           </a>
-          <a href="./order-audit-logs.html?orderId=${encodeURIComponent(r.orderId)}" target="_blank" class="btn-sm btn-sm-outline" title="Tra cứu nhật ký đối soát">
-            <i class="fa-solid fa-clock-rotate-left"></i> Lưu vết
-          </a>
         </div>`;
 
         return `
           <tr id="row-${r.orderId}">
             <td>
-              <div style="font-weight:800; color:#0f172a;">#${r.orderCode || r.orderId.substring(0,8)}</div>
-              <div style="font-size:11px; color:#64748b; font-family:monospace;">ID: ${r.id.substring(0,8)}...</div>
-            </td>
-            <td>
-              <div style="font-size:12px; font-weight:600;">${dateStr}</div>
-              <div style="font-size:11px; color:#64748b;">GD: ${escapeHtml(r.transactionId || 'MOCK_TX')}</div>
-            </td>
-            <td>
-              <strong style="color:#0284c7; font-size:14px;">${formatCurrency(r.amount || 0)}</strong>
-            </td>
-            <td>
-              <div style="max-width:260px; font-size:12px; color:#b91c1c; font-weight:600;">
-                <i class="fa-solid fa-circle-xmark"></i> ${escapeHtml(r.errorMessage || 'Cổng thanh toán từ chối / Timeout')}
+              <div style="font-family:'JetBrains Mono', monospace; font-size:12px; font-weight:700; color:#0f172a; cursor:pointer;" onclick="copyText('${r.id}')" title="Bấm để sao chép: ${r.id}">
+                ${r.id ? r.id.substring(0, 8) + '...' : '—'} <i class="fa-regular fa-copy text-slate-400"></i>
               </div>
-              <div style="font-size:11px; color:#64748b; margin-top:2px;">Mã lỗi: <code>${escapeHtml(r.errorCode || 'GATEWAY_ERROR')}</code></div>
             </td>
             <td>
-              <div class="attempts-list">
-                ${attemptPillsHtml}
-              </div>
+              <a href="./order-details.html?id=${encodeURIComponent(r.orderId)}" target="_blank" style="font-weight:700; color:#0284c7; text-decoration:none;" title="Xem chi tiết đơn hàng">
+                #${escapeHtml(r.orderCode || (r.orderId ? r.orderId.substring(0, 8) : '—'))}
+              </a>
+            </td>
+            <td>
+              <strong style="color:#0284c7; font-size:13.5px;">${formatCurrency(r.amount || 0)}</strong>
             </td>
             <td>
               ${statusBadge}
+            </td>
+            <td>
+              <span style="font-weight:700; color:#b45309;">${r.retryCount ?? 0}</span> <span style="font-size:11px; color:#64748b;">/ ${r.maxRetries || 3}</span>
+            </td>
+            <td>
+              <span style="font-weight:700; color:#334155;">${r.attemptCount ?? 0}</span>
+            </td>
+            <td>
+              <div style="max-width:240px; font-size:11.5px; line-height:1.4;">
+                <code style="background:#fee2e2; color:#b91c1c; padding:1px 4px; border-radius:4px; font-weight:700;">${escapeHtml(r.errorCode || 'GATEWAY_ERROR')}</code>
+                <div style="color:#dc2626; font-weight:600; margin-top:2px;" title="${escapeHtml(r.errorMessage || r.reason || '')}">
+                  ${escapeHtml(r.errorMessage || r.reason || 'Cổng phản hồi lỗi / Timeout')}
+                </div>
+              </div>
+            </td>
+            <td>
+              <div style="font-size:11.5px; color:#475569; font-weight:600;">${lastAttemptStr}</div>
+            </td>
+            <td>
+              <div style="font-size:11.5px; color:#b45309; font-weight:600;">${nextRetryStr}</div>
+            </td>
+            <td>
+              <div style="font-size:11.5px; color:#64748b;">${dateStr}</div>
             </td>
             <td style="text-align:right;">
               ${actionsHtml}

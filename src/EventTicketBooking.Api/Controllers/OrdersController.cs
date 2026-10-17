@@ -376,16 +376,134 @@ namespace EventTicketBooking.Api.Controllers
             if (order == null)
                 return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
 
-            // T-39: Chỉ chủ đơn hoặc Admin mở được
-            var isAdmin = User.IsInRole("Admin") || User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && c.Value == "Admin");
-            if (!isAdmin && order.UserId != userId)
+            // T-39 & S-48: Chủ đơn hoặc Auditor/Admin mở được
+            var isPrivileged = User.IsInRole("Admin") || User.IsInRole("Auditor") ||
+                               User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && (c.Value == "Admin" || c.Value == "Auditor"));
+            if (!isPrivileged && order.UserId != userId)
             {
                 SecurityAuditLogger.LogOwnershipDenied(HttpContext, "Order", orderId.ToString());
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền truy cập đơn hàng này."));
             }
 
-            return Ok(ApiResponse<OrderDto>.SuccessResult(MapToDto(order), "Lấy thông tin đơn hàng thành công."));
+            return Ok(ApiResponse<OrderDto>.SuccessResult(MapToDto(order, isPrivileged), "Lấy thông tin đơn hàng thành công."));
         }
+
+        /// <summary>
+        /// Story S-48: Lấy thông tin chi tiết lệnh hoàn tiền của đơn hàng.
+        /// Khách hàng chỉ xem được đơn của mình dạng customer-safe (CustomerRefundDto).
+        /// Admin/Auditor xem được mọi đơn với đầy đủ thông số kỹ thuật (RefundDetailDto).
+        /// </summary>
+        [HttpGet("{orderId:guid}/refund")]
+        [RequireRole]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetOrderRefund(Guid orderId)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+
+            var order = await _context.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orderId);
+            if (order == null)
+                return NotFound(ApiResponse<object>.FailureResult("Không tìm thấy đơn hàng."));
+
+            var isPrivileged = User.IsInRole("Admin") || User.IsInRole("Auditor") ||
+                               User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && (c.Value == "Admin" || c.Value == "Auditor"));
+
+            if (!isPrivileged && order.UserId != userId)
+            {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "OrderRefund", orderId.ToString());
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Bạn không có quyền truy cập thông tin hoàn tiền của đơn hàng này."));
+            }
+
+            var refundReq = await _context.RefundRequests.AsNoTracking().FirstOrDefaultAsync(r => r.OrderId == orderId);
+            if (refundReq == null)
+            {
+                var legacyRefund = await _context.Refunds.AsNoTracking().FirstOrDefaultAsync(r => r.OrderId == orderId);
+                if (legacyRefund == null)
+                    return NotFound(ApiResponse<object>.FailureResult("Đơn hàng này chưa có yêu cầu hoàn tiền."));
+
+                if (!isPrivileged)
+                {
+                    return Ok(ApiResponse<CustomerRefundDto>.SuccessResult(new CustomerRefundDto
+                    {
+                        Id = legacyRefund.Id,
+                        OrderId = legacyRefund.OrderId,
+                        Amount = legacyRefund.Amount,
+                        Status = legacyRefund.Status,
+                        CustomerStatusText = MapToCustomerStatusText(legacyRefund.Status),
+                        CreatedAt = legacyRefund.CreatedAt,
+                        UpdatedAt = legacyRefund.UpdatedAt
+                    }, "Lấy thông tin hoàn tiền thành công."));
+                }
+
+                return Ok(ApiResponse<RefundDetailDto>.SuccessResult(new RefundDetailDto
+                {
+                    Id = legacyRefund.Id,
+                    OrderId = legacyRefund.OrderId,
+                    Amount = legacyRefund.Amount,
+                    Status = legacyRefund.Status,
+                    CreatedAt = legacyRefund.CreatedAt,
+                    UpdatedAt = legacyRefund.UpdatedAt
+                }, "Lấy thông tin hoàn tiền thành công."));
+            }
+
+            if (!isPrivileged)
+            {
+                return Ok(ApiResponse<CustomerRefundDto>.SuccessResult(new CustomerRefundDto
+                {
+                    Id = refundReq.Id,
+                    OrderId = refundReq.OrderId,
+                    Amount = refundReq.Amount,
+                    Currency = refundReq.Currency,
+                    Status = refundReq.Status.ToString(),
+                    CustomerStatusText = MapToCustomerStatusText(refundReq.Status.ToString()),
+                    CreatedAt = refundReq.CreatedAt,
+                    UpdatedAt = refundReq.UpdatedAt
+                }, "Lấy thông tin hoàn tiền thành công."));
+            }
+
+            var dto = new RefundDetailDto
+            {
+                Id = refundReq.Id,
+                OrderId = refundReq.OrderId,
+                OrderCode = refundReq.OrderCode,
+                TransactionId = refundReq.TransactionId,
+                RefundTransactionId = refundReq.RefundTransactionId,
+                Amount = refundReq.Amount,
+                Currency = refundReq.Currency,
+                Reason = refundReq.Reason,
+                Status = refundReq.Status.ToString(),
+                AttemptCount = refundReq.AttemptCount,
+                RetryCount = refundReq.RetryCount,
+                MaxRetries = refundReq.MaxRetries,
+                LastAttemptedAt = refundReq.LastAttemptedAt,
+                NextRetryAt = refundReq.NextRetryAt,
+                FailedAt = refundReq.FailedAt,
+                ErrorCode = refundReq.ErrorCode,
+                ErrorMessage = refundReq.ErrorMessage,
+                IsRetryable = refundReq.IsRetryable,
+                AccountingNotified = refundReq.AccountingNotified,
+                AccountingNotifiedAt = refundReq.AccountingNotifiedAt,
+                AccountingNotificationError = refundReq.AccountingNotificationError,
+                CreatedAt = refundReq.CreatedAt,
+                UpdatedAt = refundReq.UpdatedAt
+            };
+
+            return Ok(ApiResponse<RefundDetailDto>.SuccessResult(dto, "Lấy thông tin hoàn tiền thành công."));
+        }
+
+        private static string MapToCustomerStatusText(string? status) => status switch
+        {
+            "Succeeded" or "AccountingResolved" => "Đã hoàn tiền",
+            "RetryScheduled" => "Đang thử lại",
+            "ManualReviewRequired" or "AccountingProcessing" or "RequiresManualReview" or "ManualPending" => "Cần bộ phận hỗ trợ kiểm tra",
+            "Pending" or "Processing" or "Requested" => "Đang xử lý hoàn tiền",
+            _ => "Đang xử lý"
+        };
 
         /// <summary>
         /// T-50: API kiểm tra trạng thái đơn hàng (polling)
@@ -480,6 +598,8 @@ namespace EventTicketBooking.Api.Controllers
                 return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
 
             var userDisplayName = User.Identity?.Name ?? User.FindFirst("name")?.Value ?? User.FindFirst(ClaimTypes.Name)?.Value ?? User.FindFirst("email")?.Value ?? userId.ToString();
+            var isStaffOrAdmin = User.IsInRole("Admin") || User.IsInRole("Auditor") ||
+                                 User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && (c.Value == "Admin" || c.Value == "Auditor"));
 
             bool isSimulateFailure = simulateFailure || (body?.SimulateFailure == true);
 
@@ -513,14 +633,20 @@ namespace EventTicketBooking.Api.Controllers
                 return Ok(new ApiResponse<object>
                 {
                     Success = true,
-                    Message = simResult.Message,
-                    Data = new
-                    {
-                        order = updatedOrder != null ? MapToDto(updatedOrder) : null,
-                        refund = simRefundEntity != null ? MapRefundToDto(simRefundEntity) : null,
-                        retryCount = simResult.RetryCount,
-                        isManualReview = simResult.IsManualReview
-                    }
+                    Message = isStaffOrAdmin ? simResult.Message : "Đơn hàng đã được huỷ. Yêu cầu hoàn tiền đang được hệ thống xử lý.",
+                    Data = isStaffOrAdmin
+                        ? (object)new
+                        {
+                            order = updatedOrder != null ? MapToDto(updatedOrder, isStaffOrAdmin) : null,
+                            refund = simRefundEntity != null ? MapRefundToDto(simRefundEntity, isStaffOrAdmin) : null,
+                            retryCount = simResult.RetryCount,
+                            isManualReview = simResult.IsManualReview
+                        }
+                        : new
+                        {
+                            order = updatedOrder != null ? MapToDto(updatedOrder, false) : null,
+                            refund = simRefundEntity != null ? MapRefundToDto(simRefundEntity, false) : null
+                        }
                 });
             }
 
@@ -778,7 +904,9 @@ namespace EventTicketBooking.Api.Controllers
                 refundEntity.Status = "Succeeded";
                 refundNewStatus = "Succeeded";
                 auditAction = "REFUND_SUCCEEDED";
-                responseMessage = $"Đơn hàng đã được huỷ. Hoàn tiền {refundEntity.Amount} VND thành công (mô phỏng qua cổng {(_paymentGateway?.ProviderName ?? "Mock")}).";
+                responseMessage = isStaffOrAdmin
+                    ? $"Đơn hàng đã được huỷ. Hoàn tiền {refundEntity.Amount} VND thành công (mô phỏng qua cổng {(_paymentGateway?.ProviderName ?? "Mock")})."
+                    : $"Đơn hàng đã được huỷ và hoàn tiền {refundEntity.Amount:N0} VND thành công.";
 
                 if (refundReq == null)
                 {
@@ -853,7 +981,9 @@ namespace EventTicketBooking.Api.Controllers
                     refundNewStatus = "ManualPending";
                     auditAction = "REFUND_MANUAL_PENDING";
                     refundEntity.FailureReason = gatewayResult.ErrorMessage ?? "Cổng thanh toán không hỗ trợ hoàn tự động - Chờ xử lý thủ công.";
-                    responseMessage = "Đơn hàng đã được huỷ. Yêu cầu hoàn tiền đang chờ xử lý thủ công (cổng thanh toán không hỗ trợ hoàn tự động).";
+                    responseMessage = isStaffOrAdmin
+                        ? "Đơn hàng đã được huỷ. Yêu cầu hoàn tiền đang chờ xử lý thủ công (cổng thanh toán không hỗ trợ hoàn tự động)."
+                        : "Đơn hàng đã được huỷ. Yêu cầu hoàn tiền đang chờ xử lý thủ công (chờ bộ phận hỗ trợ kiểm tra).";
 
                     var accountingNotifService = HttpContext?.RequestServices?.GetService<EventTicketBooking.Api.Services.Interfaces.IAccountingNotificationService>();
                     if (accountingNotifService != null)
@@ -872,7 +1002,9 @@ namespace EventTicketBooking.Api.Controllers
                     refundNewStatus = "Failed";
                     auditAction = "REFUND_RETRY_SCHEDULED";
                     refundEntity.FailureReason = $"Hoàn tiền thất bại lần {refundReq.RetryCount}/3 ({refundReq.ErrorMessage}). Hệ thống tự động thử lại vào {refundReq.NextRetryAt:HH:mm:ss}.";
-                    responseMessage = $"Đơn hàng đã được huỷ nhưng hoàn tiền THẤT BẠI tạm thời ({refundReq.ErrorMessage}), hệ thống đã lên lịch tự động thử lại lần {refundReq.RetryCount}/3.";
+                    responseMessage = isStaffOrAdmin
+                        ? $"Đơn hàng đã được huỷ nhưng hoàn tiền THẤT BẠI tạm thời ({refundReq.ErrorMessage}), hệ thống đã lên lịch tự động thử lại lần {refundReq.RetryCount}/3."
+                        : "Đơn hàng đã được huỷ nhưng hoàn tiền THẤT BẠI tạm thời. Hệ thống đang tự động xếp lịch xử lý lại.";
                 }
                 else
                 {
@@ -886,7 +1018,9 @@ namespace EventTicketBooking.Api.Controllers
                     refundEntity.FailureReason = isRetryable
                         ? "Hoàn tiền thất bại 3 lần - Đã chuyển thông tin cho kế toán xử lý thủ công"
                         : $"Lỗi không thể thử lại ({refundReq.ErrorCode}: {refundReq.ErrorMessage}) - Đã chuyển cho kế toán xử lý thủ công";
-                    responseMessage = "Đơn hàng đã được huỷ nhưng hoàn tiền THẤT BẠI 3 lần. Yêu cầu hoàn tiền đã tự động được chuyển sang danh sách chờ xử lý của kế toán.";
+                    responseMessage = isStaffOrAdmin
+                        ? "Đơn hàng đã được huỷ nhưng hoàn tiền THẤT BẠI 3 lần. Yêu cầu hoàn tiền đã tự động được chuyển sang danh sách chờ xử lý của kế toán."
+                        : "Đơn hàng đã được huỷ nhưng hoàn tiền THẤT BẠI. Yêu cầu hoàn tiền đã được chuyển sang danh sách chờ xử lý thủ công.";
 
                     var accountingNotifService = HttpContext?.RequestServices?.GetService<EventTicketBooking.Api.Services.Interfaces.IAccountingNotificationService>();
                     if (accountingNotifService != null)
@@ -918,8 +1052,8 @@ namespace EventTicketBooking.Api.Controllers
                 Message = responseMessage,
                 Data = new
                 {
-                    order = MapToDto(orderForDto),
-                    refund = MapRefundToDto(refundEntity)
+                    order = MapToDto(orderForDto, isStaffOrAdmin),
+                    refund = MapRefundToDto(refundEntity, isStaffOrAdmin)
                 }
             });
         }
@@ -1004,7 +1138,7 @@ namespace EventTicketBooking.Api.Controllers
             return preview;
         }
 
-        private RefundDto MapRefundToDto(Refund refund)
+        private RefundDto MapRefundToDto(Refund refund, bool isStaffOrAdmin = false)
         {
             var refundReq = _context.RefundRequests.AsNoTracking().FirstOrDefault(r => r.OrderId == refund.OrderId);
             return new()
@@ -1013,10 +1147,10 @@ namespace EventTicketBooking.Api.Controllers
                 OrderId = refund.OrderId,
                 Amount = refund.Amount,
                 Status = refund.Status,
-                FailureReason = refund.FailureReason,
+                FailureReason = isStaffOrAdmin ? (refund.FailureReason ?? refundReq?.ErrorMessage) : null,
                 CreatedAt = refund.CreatedAt,
                 UpdatedAt = refund.UpdatedAt,
-                RetryCount = refundReq?.RetryCount ?? 0
+                RetryCount = isStaffOrAdmin ? (refundReq?.RetryCount ?? 0) : null
             };
         }
 
@@ -1246,7 +1380,9 @@ namespace EventTicketBooking.Api.Controllers
                 .Include(o => o.Refunds)
                 .ToListAsync();
 
-            var orderDtos = orders.Select(MapToDto).ToList();
+            var isStaffOrAdmin = User.IsInRole("Admin") || User.IsInRole("Auditor") ||
+                                 User.HasClaim(c => (c.Type == ClaimTypes.Role || c.Type == "role") && (c.Value == "Admin" || c.Value == "Auditor"));
+            var orderDtos = orders.Select(o => MapToDto(o, isStaffOrAdmin)).ToList();
 
             var result = new PagedResultDto<OrderDto>
             {
@@ -1259,30 +1395,25 @@ namespace EventTicketBooking.Api.Controllers
             return Ok(ApiResponse<PagedResultDto<OrderDto>>.SuccessResult(result, "Lấy lịch sử đơn hàng thành công."));
         }
 
-        private OrderDto MapToDto(Order order)
+        private OrderDto MapToDto(Order order, bool isStaffOrAdmin = false)
         {
             var seatNames = order.OrderItems?
                 .Where(oi => oi.Seat != null)
                 .Select(oi => $"{oi.Seat.Row}{oi.Seat.SeatNumber}")
                 .ToList() ?? new List<string>();
 
-            // Story S-45 & S-48: hiển thị trạng thái hoàn tiền (bản ghi mới nhất nếu có)
+            // Story S-45 & S-48: hiển thị trạng thái hoàn tiền (ưu tiên bản ghi S-48 RefundRequest)
             var latestRefund = order.Refunds?.OrderByDescending(r => r.UpdatedAt).FirstOrDefault();
             var refundReq = _context.RefundRequests.AsNoTracking().FirstOrDefault(r => r.OrderId == order.Id);
 
-            var refundStatus = latestRefund?.Status ?? (refundReq != null ? refundReq.Status.ToString() : null);
-            var failureReason = latestRefund?.FailureReason ?? refundReq?.ErrorMessage;
-            int retryCount = refundReq?.RetryCount ?? 0;
-
+            var refundStatus = refundReq != null ? refundReq.Status.ToString() : latestRefund?.Status;
             if (refundReq != null && (refundReq.Status == RefundStatus.ManualReviewRequired || refundReq.RetryCount >= 3))
             {
                 refundStatus = "RequiresManualReview";
-                failureReason = "Hoàn tiền thất bại 3 lần - Đã chuyển thông tin cho kế toán xử lý thủ công";
             }
             else if (latestRefund != null && (latestRefund.Status == "RequiresManualReview" || latestRefund.Status == "ManualReviewRequired"))
             {
                 refundStatus = "RequiresManualReview";
-                failureReason = latestRefund.FailureReason ?? "Hoàn tiền thất bại 3 lần - Đã chuyển thông tin cho kế toán xử lý thủ công";
             }
 
             return new OrderDto
@@ -1309,9 +1440,19 @@ namespace EventTicketBooking.Api.Controllers
                 CancelReason = order.CancelReason,
                 RefundStatus = refundStatus,
                 RefundAmount = latestRefund?.Amount ?? refundReq?.Amount,
-                RefundFailureReason = failureReason,
                 RefundUpdatedAt = latestRefund?.UpdatedAt ?? refundReq?.UpdatedAt,
-                RefundRetryCount = retryCount,
+                RefundRequestId = refundReq?.Id ?? latestRefund?.Id,
+                RefundCreatedAt = refundReq?.CreatedAt ?? latestRefund?.CreatedAt,
+
+                // Các trường kỹ thuật S-48: CHỈ cấp cho Auditor/Admin, Customer luôn nhận null (và bị loại bỏ khỏi raw JSON)
+                RefundFailureReason = isStaffOrAdmin ? (latestRefund?.FailureReason ?? refundReq?.ErrorMessage) : null,
+                RefundRetryCount = isStaffOrAdmin ? (refundReq?.RetryCount ?? 0) : null,
+                RefundAttemptCount = isStaffOrAdmin ? refundReq?.AttemptCount : null,
+                RefundLastAttemptedAt = isStaffOrAdmin ? refundReq?.LastAttemptedAt : null,
+                RefundNextRetryAt = isStaffOrAdmin ? refundReq?.NextRetryAt : null,
+                RefundErrorCode = isStaffOrAdmin ? refundReq?.ErrorCode : null,
+                RefundErrorMessage = isStaffOrAdmin ? refundReq?.ErrorMessage : null,
+
                 Items = order.OrderItems?.Select(oi => new OrderItemDto
                 {
                     Id = oi.Id,
