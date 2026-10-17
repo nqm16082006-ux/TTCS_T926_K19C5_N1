@@ -6,7 +6,7 @@
   <title>Giám Sát Hệ Thống & Cảnh Báo (S-43) - Event Ticket Booking</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
   <style>
     :root {
@@ -32,6 +32,9 @@
       --warning-bg: #fffbeb;
       --warning-border: #fde68a;
       --warning-text: #d97706;
+      --info-bg: #eff6ff;
+      --info-border: #bfdbfe;
+      --info-text: #2563eb;
     }
 
     * {
@@ -469,7 +472,7 @@
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
       gap: 20px;
       flex-wrap: wrap;
     }
@@ -491,35 +494,19 @@
       line-height: 1.5;
     }
 
-    .btn-grafana {
-      background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-      color: #ffffff;
-      border: none;
-      padding: 12px 20px;
-      border-radius: 10px;
-      font-size: 13.5px;
-      font-weight: 700;
-      cursor: pointer;
-      display: inline-flex;
+    .header-actions {
+      display: flex;
       align-items: center;
-      gap: 8px;
-      text-decoration: none;
-      box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35);
-      transition: all 0.2s ease;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
-    .btn-grafana:hover {
-      background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
-      transform: translateY(-1px);
-      box-shadow: 0 6px 18px rgba(249, 115, 22, 0.45);
-    }
-
-    /* Overview Banner */
-    .overview-banner {
+    /* Status Bar Banner */
+    .status-bar-banner {
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: 14px;
-      padding: 20px 24px;
+      padding: 16px 24px;
       margin-bottom: 24px;
       display: flex;
       align-items: center;
@@ -529,10 +516,11 @@
       box-shadow: var(--shadow-sm);
     }
 
-    .overview-status-indicator {
+    .status-pills-group {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
     .status-pill {
@@ -541,8 +529,32 @@
       gap: 6px;
       padding: 6px 14px;
       border-radius: 9999px;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 700;
+    }
+
+    .status-pill.live-pill {
+      background: #f0fdf4;
+      color: #16a34a;
+      border: 1px solid #bbf7d0;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    .live-pulse-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #16a34a;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 0 rgba(22, 163, 74, 0.4);
+      animation: livePulse 1.8s infinite;
+    }
+
+    @keyframes livePulse {
+      0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
+      70% { box-shadow: 0 0 0 8px rgba(22, 163, 74, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
     }
 
     .status-pill.healthy {
@@ -558,63 +570,117 @@
       animation: alertPulse 1.5s infinite;
     }
 
-    .overview-meta {
-      font-size: 13px;
-      color: var(--text-muted);
+    .status-pill.neutral {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
     }
 
-    /* Metrics Architecture Cards */
+    .status-pill.prom-up {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+
+    .status-pill.prom-down {
+      background: #fff1f2;
+      color: #be123c;
+      border: 1px solid #fecdd3;
+    }
+
+    .status-pill.signalr-up {
+      background: #f0fdf4;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+    }
+
+    .status-pill.signalr-down {
+      background: #f8fafc;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
+    }
+
+    .status-meta-info {
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-weight: 600;
+    }
+
+    /* Section Title */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
     .section-title {
       font-size: 17px;
       font-weight: 800;
       color: var(--text-heading);
-      margin-bottom: 14px;
       display: flex;
       align-items: center;
       gap: 8px;
     }
 
+    /* 5 Metrics Cards Grid */
     .metrics-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       gap: 16px;
-      margin-bottom: 32px;
+      margin-bottom: 28px;
     }
 
     .metric-card {
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 18px 20px;
+      border-radius: 14px;
+      padding: 20px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
       box-shadow: var(--shadow-sm);
       transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
     }
 
     .metric-card:hover {
       border-color: var(--border-focus);
       box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
     }
 
     .metric-card-header {
       display: flex;
       align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .metric-icon-title {
+      display: flex;
+      align-items: center;
       gap: 10px;
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13.5px;
       color: var(--text-heading);
     }
 
     .metric-icon {
-      width: 32px;
-      height: 32px;
+      width: 34px;
+      height: 34px;
       border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 16px;
+      flex-shrink: 0;
     }
 
     .metric-icon.indigo { background: #e0e7ff; color: #4338ca; }
@@ -623,19 +689,102 @@
     .metric-icon.purple { background: #f3e8ff; color: #7e22ce; }
     .metric-icon.rose { background: #ffe4e6; color: #e11d48; }
 
+    .metric-value-container {
+      margin: 4px 0;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .metric-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text-heading);
+      letter-spacing: -0.5px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .metric-unit {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .metric-na {
+      font-size: 14px;
+      font-weight: 600;
+      color: #94a3b8;
+      font-style: italic;
+      background: #f1f5f9;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px dashed #cbd5e1;
+    }
+
     .metric-card-desc {
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--text-body);
       line-height: 1.45;
     }
 
     .metric-threshold {
       margin-top: auto;
-      padding-top: 8px;
+      padding-top: 10px;
       border-top: 1px dashed var(--border-color);
       font-size: 11.5px;
       font-weight: 600;
       color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Trends Section */
+    .trends-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 20px 24px;
+      margin-bottom: 28px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .trends-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .trends-legend {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+
+    .legend-color.req { background: #4f46e5; }
+    .legend-color.err { background: #dc2626; }
+
+    .sparkline-svg {
+      width: 100%;
+      height: 90px;
+      overflow: visible;
     }
 
     /* History Table Section */
@@ -656,6 +805,33 @@
       flex-wrap: wrap;
     }
 
+    .search-filter-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      flex: 1;
+      max-width: 600px;
+    }
+
+    .search-input {
+      background: var(--bg-app);
+      border: 1px solid var(--border-color);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--text-heading);
+      outline: none;
+      transition: border-color 0.2s;
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .search-input:focus {
+      border-color: var(--border-focus);
+      background: #ffffff;
+    }
+
     .filter-tabs {
       display: flex;
       background: var(--bg-app);
@@ -663,6 +839,7 @@
       border-radius: 10px;
       border: 1px solid var(--border-color);
       gap: 4px;
+      flex-wrap: wrap;
     }
 
     .filter-tab {
@@ -675,6 +852,7 @@
       color: var(--text-muted);
       cursor: pointer;
       transition: all 0.2s ease;
+      white-space: nowrap;
     }
 
     .filter-tab.active {
@@ -705,6 +883,8 @@
 
     .table-container {
       overflow-x: auto;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
     }
 
     table {
@@ -747,6 +927,7 @@
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.3px;
+      white-space: nowrap;
     }
 
     .alert-status-badge.firing {
@@ -770,16 +951,19 @@
       font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
+      white-space: nowrap;
     }
 
     .severity-tag.critical {
       background: #fef2f2;
       color: #dc2626;
+      border: 1px solid #fecaca;
     }
 
     .severity-tag.warning {
       background: #fffbeb;
       color: #d97706;
+      border: 1px solid #fde68a;
     }
 
     .empty-state {
@@ -787,6 +971,46 @@
       padding: 48px 16px;
       color: var(--text-muted);
       font-size: 14px;
+    }
+
+    /* Responsive Queries */
+    @media (max-width: 1024px) {
+      .navbar {
+        padding: 12px 20px;
+      }
+      .main-container {
+        padding: 20px 20px 48px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .navbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        padding: 12px 16px;
+      }
+      .nav-links {
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+      .user-menu {
+        justify-content: space-between;
+      }
+      .page-header {
+        flex-direction: column;
+      }
+      .status-bar-banner {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .history-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .search-filter-box {
+        max-width: 100%;
+      }
     }
   </style>
 </head>
@@ -820,7 +1044,7 @@
               <span>🔔 Cảnh báo hệ thống</span>
               <span id="dropdownFiringBadge" class="dropdown-firing-badge" style="display: none;">0 đang diễn ra</span>
             </div>
-            <button type="button" class="dropdown-refresh-btn" onclick="fetchSystemAlertsHistory()" title="Làm mới">🔄</button>
+            <button type="button" class="dropdown-refresh-btn" onclick="fetchTableAlerts(true)" title="Làm mới">🔄</button>
           </div>
           <div id="systemAlertDropdownList" class="system-alert-dropdown-list">
             <!-- Alert items rendered here -->
@@ -844,89 +1068,185 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">📊 Giám Sát Hệ Thống & Cảnh Báo</h1>
-        <p class="page-subtitle">Theo dõi trạng thái quá tải, tỉ lệ lỗi, độ trễ và toàn bộ lịch sử cảnh báo vận hành hệ thống (Story S-43).</p>
+        <p class="page-subtitle">Theo dõi trạng thái quá tải, tỉ lệ lỗi, độ trễ p95 và lịch sử cảnh báo thời gian thực (Story S-43).</p>
       </div>
-      <a id="btnOpenGrafana" href="http://localhost:3000/d/s43-system-overview" target="_blank" rel="noopener noreferrer" class="btn-grafana">
-        📈 Mở Grafana chi tiết &rarr;
-      </a>
+      <div class="header-actions">
+        <button type="button" class="btn-refresh" onclick="triggerManualRefresh()">
+          🔄 Làm mới ngay
+        </button>
+      </div>
     </div>
 
-    <!-- Overview Banner -->
-    <div class="overview-banner">
-      <div class="overview-status-indicator">
+    <!-- Status Bar Banner -->
+    <div class="status-bar-banner">
+      <div class="status-pills-group">
+        <div id="livePill" class="status-pill live-pill">
+          <span class="live-pulse-dot"></span>
+          <span>● LIVE</span>
+        </div>
         <div id="systemStatusPill" class="status-pill healthy">
           <span id="statusPillDot">🟢</span>
           <span id="statusPillText">Hệ thống đang hoạt động bình thường</span>
         </div>
-        <span id="firingCountLabel" class="overview-meta">0 cảnh báo đang hoạt động</span>
+        <div id="promStatusPill" class="status-pill neutral">
+          <span>📡</span>
+          <span id="promStatusText">Prometheus: Đang kiểm tra...</span>
+        </div>
+        <div id="signalRStatusPill" class="status-pill signalr-down">
+          <span>⚡</span>
+          <span id="signalRStatusText">Realtime: Đang khởi tạo...</span>
+        </div>
       </div>
-      <div class="overview-meta">
-        Nguồn cảnh báo: <strong>Prometheus &rarr; Alertmanager &rarr; Webhook API &rarr; SignalR</strong>
+      <div class="status-meta-info">
+        <span id="lastUpdatedLabel">Cập nhật lần cuối: Chưa tải</span>
+        <span id="firingCountLabel">0 cảnh báo đang hoạt động</span>
       </div>
     </div>
 
     <!-- 5 Metrics Group Cards -->
-    <h2 class="section-title">🛡️ 5 Nhóm Chỉ Số Giám Sát Cốt Lõi (S-43)</h2>
+    <div class="section-header">
+      <h2 class="section-title">🛡️ 5 Nhóm Chỉ Số Giám Sát Cốt Lõi (S-43)</h2>
+      <span style="font-size: 12.5px; color: var(--text-muted);">Tự động làm mới mỗi 5 giây</span>
+    </div>
+
     <div class="metrics-grid">
+      <!-- 1. Request Rate -->
       <div class="metric-card">
         <div class="metric-card-header">
-          <div class="metric-icon indigo">🌐</div>
-          <span>1. HTTP Request Rate</span>
+          <div class="metric-icon-title">
+            <div class="metric-icon indigo">🌐</div>
+            <span>1. Request Rate</span>
+          </div>
         </div>
-        <p class="metric-card-desc">Theo dõi tổng thông lượng HTTP requests và phân bố mã phản hồi (2xx, 4xx, 5xx, 429 Rate Limiting S-41).</p>
-        <div class="metric-threshold">Mục tiêu: Đánh giá tải lưu lượng & sức chứa</div>
+        <div class="metric-value-container" id="valContainerRequestRate">
+          <span class="metric-value" id="valRequestRate">-</span>
+          <span class="metric-unit" id="unitRequestRate">req/s</span>
+        </div>
+        <p class="metric-card-desc">Tổng thông lượng HTTP requests đến hệ thống (1m moving rate).</p>
+        <div class="metric-threshold">
+          <span>🎯</span> Mục tiêu: Đánh giá lưu lượng & sức chứa
+        </div>
       </div>
 
+      <!-- 2. Error Rate -->
       <div class="metric-card">
         <div class="metric-card-header">
-          <div class="metric-icon red">💥</div>
-          <span>2. HTTP 5xx Error Rate</span>
+          <div class="metric-icon-title">
+            <div class="metric-icon red">💥</div>
+            <span>2. HTTP 5xx Error Rate</span>
+          </div>
         </div>
-        <p class="metric-card-desc">Tỉ lệ lỗi máy chủ quá tải trên tổng lưu lượng. Ngăn chặn sự cố sập luồng bán vé và giao dịch.</p>
-        <div class="metric-threshold">Ngưỡng: Warning &gt;2% (2m) | Critical &gt;5% (1m)</div>
+        <div class="metric-value-container" id="valContainerErrorRate">
+          <span class="metric-value" id="valErrorRate">-</span>
+          <span class="metric-unit" id="unitErrorRate">%</span>
+        </div>
+        <p class="metric-card-desc">Tỉ lệ lỗi máy chủ (5xx) trên tổng lưu lượng xử lý.</p>
+        <div class="metric-threshold">
+          <span>⚠️</span> Ngưỡng: Warning &gt;2% | Critical &gt;5%
+        </div>
       </div>
 
+      <!-- 3. Latency p95 -->
       <div class="metric-card">
         <div class="metric-card-header">
-          <div class="metric-icon amber">⏱️</div>
-          <span>3. Latency p95 (Histogram)</span>
+          <div class="metric-icon-title">
+            <div class="metric-icon amber">⏱️</div>
+            <span>3. Latency p95</span>
+          </div>
         </div>
-        <p class="metric-card-desc">Độ trễ phân vị 95 của các yêu cầu HTTP. Phát hiện sớm nghẽn mạng hoặc database connection pool cạn kiệt.</p>
-        <div class="metric-threshold">Ngưỡng: Warning &gt;1.0s (3m) | Critical &gt;2.5s (1m)</div>
+        <div class="metric-value-container" id="valContainerP95">
+          <span class="metric-value" id="valP95">-</span>
+          <span class="metric-unit" id="unitP95">ms</span>
+        </div>
+        <p class="metric-card-desc">Độ trễ phân vị 95 (Histogram) đo thời gian xử lý yêu cầu.</p>
+        <div class="metric-threshold">
+          <span>⚠️</span> Ngưỡng: Warning &gt;1.0s | Critical &gt;2.5s
+        </div>
       </div>
 
+      <!-- 4. Seat Conflicts -->
       <div class="metric-card">
         <div class="metric-card-header">
-          <div class="metric-icon purple">💺</div>
-          <span>4. Seat Hold Conflicts</span>
+          <div class="metric-icon-title">
+            <div class="metric-icon purple">💺</div>
+            <span>4. Seat Hold Conflicts</span>
+          </div>
         </div>
-        <p class="metric-card-desc">Tốc độ tranh chấp giữ ghế đồng thời qua Redis hoặc Database concurrency. Phát hiện bot hoặc flash-sale hot.</p>
-        <div class="metric-threshold">Ngưỡng: Warning &gt;10/phút (2m) | Critical &gt;50/phút (1m)</div>
+        <div class="metric-value-container" id="valContainerSeatConflicts">
+          <span class="metric-value" id="valSeatConflicts">-</span>
+          <span class="metric-unit" id="unitSeatConflicts">/phút</span>
+        </div>
+        <p class="metric-card-desc">Tốc độ tranh chấp giữ ghế đồng thời khi mở bán vé.</p>
+        <div class="metric-threshold">
+          <span>⚠️</span> Ngưỡng: Warning &gt;10/phút | Critical &gt;50/phút
+        </div>
       </div>
 
+      <!-- 5. Rejected Webhooks -->
       <div class="metric-card">
         <div class="metric-card-header">
-          <div class="metric-icon rose">🚫</div>
-          <span>5. Rejected Webhooks</span>
+          <div class="metric-icon-title">
+            <div class="metric-icon rose">🚫</div>
+            <span>5. Rejected Webhooks</span>
+          </div>
         </div>
-        <p class="metric-card-desc">Số lần webhook thanh toán (PayOS) bị từ chối do sai chữ ký, dữ liệu trống hoặc bất thường.</p>
-        <div class="metric-threshold">Ngưỡng: Warning &gt;3 lần (5m) | Critical &gt;10 lần (5m)</div>
+        <div class="metric-value-container" id="valContainerRejectedWebhooks">
+          <span class="metric-value" id="valRejectedWebhooks">-</span>
+          <span class="metric-unit" id="unitRejectedWebhooks">lần (5m)</span>
+        </div>
+        <p class="metric-card-desc">Webhook thanh toán PayOS bị từ chối do sai chữ ký hoặc lỗi.</p>
+        <div class="metric-threshold">
+          <span>⚠️</span> Ngưỡng: Warning &gt;3 lần | Critical &gt;10 lần
+        </div>
       </div>
+    </div>
+
+    <!-- Mini Trend Visualization (Real Prometheus Timeseries) -->
+    <div class="trends-card">
+      <div class="trends-header">
+        <div class="metric-icon-title">
+          <span>📈</span>
+          <span style="font-size: 14px; font-weight: 800; color: var(--text-heading);">Xu Hướng 15 Phút Qua (Prometheus Range Query)</span>
+        </div>
+        <div class="trends-legend">
+          <div class="legend-item">
+            <span class="legend-color req"></span>
+            <span>Request Rate (req/s)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-color err"></span>
+            <span>5xx Error Rate (%)</span>
+          </div>
+        </div>
+      </div>
+      <svg id="trendSvg" class="sparkline-svg" viewBox="0 0 1000 90" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="reqGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#4f46e5" stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="#4f46e5" stop-opacity="0.0"/>
+          </linearGradient>
+        </defs>
+        <g id="svgGridLines" stroke="#f1f5f9" stroke-width="1"></g>
+        <path id="svgReqArea" fill="url(#reqGrad)" d=""></path>
+        <path id="svgReqPath" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linecap="round" d=""></path>
+        <path id="svgErrPath" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-dasharray="4,2" d=""></path>
+        <text id="svgEmptyText" x="500" y="50" text-anchor="middle" font-size="12" fill="#94a3b8">Đang tải chuỗi dữ liệu giám sát thời gian thực...</text>
+      </svg>
     </div>
 
     <!-- History Table Section -->
     <div class="history-card">
       <div class="history-toolbar">
         <h2 class="section-title" style="margin-bottom: 0;">📜 Lịch Sử Cảnh Báo Hệ Thống</h2>
-        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div class="search-filter-box">
+          <input type="text" id="alertSearchInput" class="search-input" placeholder="🔍 Tìm kiếm cảnh báo theo tên, tóm tắt..." oninput="handleSearchInput(this.value)">
           <div class="filter-tabs">
             <button type="button" class="filter-tab active" onclick="setFilter('all', this)">Tất cả</button>
-            <button type="button" class="filter-tab" onclick="setFilter('firing', this)">Đang cảnh báo (Firing)</button>
-            <button type="button" class="filter-tab" onclick="setFilter('resolved', this)">Đã phục hồi (Resolved)</button>
+            <button type="button" class="filter-tab" onclick="setFilter('firing', this)">Đang diễn ra</button>
+            <button type="button" class="filter-tab" onclick="setFilter('resolved', this)">Đã phục hồi</button>
+            <button type="button" class="filter-tab" onclick="setFilter('critical', this)">Critical</button>
+            <button type="button" class="filter-tab" onclick="setFilter('warning', this)">Warning</button>
           </div>
-          <button type="button" class="btn-refresh" onclick="fetchTableAlerts()">
-            🔄 Làm mới
-          </button>
         </div>
       </div>
 
@@ -938,6 +1258,7 @@
               <th>Trạng thái</th>
               <th>Tên cảnh báo</th>
               <th>Nội dung chi tiết</th>
+              <th>Nguồn</th>
               <th>Thời điểm bắt đầu</th>
               <th>Thời điểm phục hồi</th>
               <th>Cập nhật cuối</th>
@@ -945,7 +1266,7 @@
           </thead>
           <tbody id="alertsTableBody">
             <tr>
-              <td colspan="7" class="empty-state">⌛ Đang tải lịch sử cảnh báo...</td>
+              <td colspan="8" class="empty-state">⌛ Đang tải lịch sử cảnh báo...</td>
             </tr>
           </tbody>
         </table>
@@ -955,10 +1276,21 @@
   </main>
 
   <script>
-    const GRAFANA_URL = window.GRAFANA_URL || 'http://localhost:3000/d/s43-system-overview';
     let currentFilter = 'all';
+    let searchQuery = '';
     let alertsData = [];
     let isAlertDropdownOpen = false;
+    let signalRConnection = null;
+
+    // Overlap Guards
+    let isSummaryFetching = false;
+    let isAlertsFetching = false;
+    let isTimeSeriesFetching = false;
+
+    // Scheduler Timers
+    let summaryTimer = null;
+    let alertsTimer = null;
+    let timeSeriesTimer = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       const token = localStorage.getItem('access_token');
@@ -984,32 +1316,295 @@
         } catch (e) {}
       }
 
-      // Thiết lập link Grafana
-      const grafanaBtn = document.getElementById('btnOpenGrafana');
-      if (grafanaBtn) {
-        grafanaBtn.href = GRAFANA_URL;
-      }
+      // Initial data load
+      triggerManualRefresh();
 
-      fetchTableAlerts();
+      // Start SignalR connection
       initSystemAlertSignalR();
+
+      // Setup Polling Schedulers
+      startSchedulers();
+
+      // Pause/resume timers when tab is hidden/visible
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          stopSchedulers();
+        } else {
+          triggerManualRefresh();
+          startSchedulers();
+        }
+      });
     });
 
-    function setFilter(filter, btn) {
-      currentFilter = filter;
-      document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
-      if (btn) btn.classList.add('active');
-      renderTable();
+    function startSchedulers() {
+      stopSchedulers();
+      // Monitoring summary: every 5 seconds
+      summaryTimer = setInterval(() => {
+        fetchMonitoringSummary();
+      }, 5000);
+
+      // Alert history reconciliation: every 10 seconds
+      alertsTimer = setInterval(() => {
+        fetchTableAlerts();
+      }, 10000);
+
+      // Real Time-Series Trend: every 15 seconds
+      timeSeriesTimer = setInterval(() => {
+        fetchMonitoringTimeSeries();
+      }, 15000);
     }
 
-    async function fetchTableAlerts() {
+    function stopSchedulers() {
+      if (summaryTimer) clearInterval(summaryTimer);
+      if (alertsTimer) clearInterval(alertsTimer);
+      if (timeSeriesTimer) clearInterval(timeSeriesTimer);
+      summaryTimer = null;
+      alertsTimer = null;
+      timeSeriesTimer = null;
+    }
+
+    async function triggerManualRefresh() {
+      await Promise.all([
+        fetchMonitoringSummary(),
+        fetchTableAlerts(),
+        fetchMonitoringTimeSeries()
+      ]);
+    }
+
+    async function fetchMonitoringSummary() {
+      if (isSummaryFetching) return;
+      isSummaryFetching = true;
+
       const token = localStorage.getItem('access_token');
-      if (!token) return;
+      if (!token) {
+        isSummaryFetching = false;
+        return;
+      }
 
       try {
-        const res = await fetch('/api/system-alerts?limit=50', {
-          headers: {
-            'Authorization': 'Bearer ' + token
+        const queryParams = window.location.search || '';
+        const res = await fetch('/api/admin/monitoring/summary' + queryParams, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        if (res.status === 401) {
+          logout();
+          return;
+        }
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            renderSummaryMetrics(json.data);
           }
+        } else {
+          renderPrometheusUnavailableState();
+        }
+      } catch (err) {
+        renderPrometheusUnavailableState();
+      } finally {
+        isSummaryFetching = false;
+      }
+    }
+
+    function renderSummaryMetrics(data) {
+      const promPill = document.getElementById('promStatusPill');
+      const promText = document.getElementById('promStatusText');
+      const lastUpdatedLabel = document.getElementById('lastUpdatedLabel');
+
+      if (data.prometheusAvailable) {
+        promPill.className = 'status-pill prom-up';
+        promText.textContent = 'Prometheus: Đã kết nối (9090)';
+      } else {
+        promPill.className = 'status-pill prom-down';
+        promText.textContent = 'Prometheus: Không khả dụng (Offline)';
+      }
+
+      if (data.generatedAt) {
+        const d = new Date(data.generatedAt);
+        lastUpdatedLabel.textContent = 'Cập nhật lần cuối: ' + d.toLocaleTimeString('vi-VN');
+      }
+
+      // 1. Request Rate
+      renderMetricSlot('RequestRate', data.requestRate, 'req/s', 1);
+
+      // 2. Error Rate
+      renderMetricSlot('ErrorRate', data.errorRatePercent, '%', 2);
+
+      // 3. P95 Latency
+      renderMetricSlot('P95', data.p95ResponseTimeMs, 'ms', 0);
+
+      // 4. Seat Conflicts
+      renderMetricSlot('SeatConflicts', data.seatConflicts, '/phút', 0);
+
+      // 5. Rejected Webhooks
+      renderMetricSlot('RejectedWebhooks', data.rejectedWebhooks, 'lần (5m)', 0);
+    }
+
+    function renderMetricSlot(slotId, value, unit, decimals) {
+      const container = document.getElementById('valContainer' + slotId);
+      if (!container) return;
+
+      if (value === null || value === undefined) {
+        container.innerHTML = `<span class="metric-na" id="val${slotId}">Chưa có dữ liệu</span>`;
+      } else {
+        const formatted = typeof value === 'number' ? value.toFixed(decimals) : value;
+        container.innerHTML = `
+          <span class="metric-value" id="val${slotId}">${formatted}</span>
+          <span class="metric-unit">${unit}</span>
+        `;
+      }
+    }
+
+    function renderPrometheusUnavailableState() {
+      const promPill = document.getElementById('promStatusPill');
+      const promText = document.getElementById('promStatusText');
+      if (promPill) {
+        promPill.className = 'status-pill prom-down';
+        promText.textContent = 'Prometheus: Không khả dụng (Offline)';
+      }
+
+      ['RequestRate', 'ErrorRate', 'P95', 'SeatConflicts', 'RejectedWebhooks'].forEach(id => {
+        const container = document.getElementById('valContainer' + id);
+        if (container) {
+          container.innerHTML = `<span class="metric-na" id="val${id}">Chưa có dữ liệu</span>`;
+        }
+      });
+    }
+
+    async function fetchMonitoringTimeSeries() {
+      if (isTimeSeriesFetching) return;
+      isTimeSeriesFetching = true;
+
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        isTimeSeriesFetching = false;
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/admin/monitoring/timeseries?minutes=15&stepSeconds=15', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            renderRealTrendChart(json.data);
+          }
+        } else {
+          renderEmptyTrendChart();
+        }
+      } catch (err) {
+        renderEmptyTrendChart();
+      } finally {
+        isTimeSeriesFetching = false;
+      }
+    }
+
+    function renderEmptyTrendChart() {
+      const emptyText = document.getElementById('svgEmptyText');
+      const reqPath = document.getElementById('svgReqPath');
+      const reqArea = document.getElementById('svgReqArea');
+      const errPath = document.getElementById('svgErrPath');
+
+      if (emptyText) {
+        emptyText.textContent = 'Chưa có dữ liệu xu hướng.';
+        emptyText.style.display = 'block';
+      }
+      if (reqPath) reqPath.setAttribute('d', '');
+      if (reqArea) reqArea.setAttribute('d', '');
+      if (errPath) errPath.setAttribute('d', '');
+    }
+
+    function renderRealTrendChart(data) {
+      const svg = document.getElementById('trendSvg');
+      const reqPath = document.getElementById('svgReqPath');
+      const reqArea = document.getElementById('svgReqArea');
+      const errPath = document.getElementById('svgErrPath');
+      const emptyText = document.getElementById('svgEmptyText');
+
+      if (!svg) return;
+
+      const reqSeries = (data && data.requestRateSeries) || [];
+      const errSeries = (data && data.errorRateSeries) || [];
+
+      if (!data || !data.prometheusAvailable || reqSeries.length === 0) {
+        renderEmptyTrendChart();
+        return;
+      }
+
+      if (emptyText) emptyText.style.display = 'none';
+
+      const width = 1000;
+      const height = 90;
+      const padding = 12;
+
+      const reqVals = reqSeries.map(p => p.value).filter(v => v !== null);
+      const errVals = errSeries.map(p => p.value).filter(v => v !== null);
+
+      let maxReq = reqVals.length > 0 ? Math.max(...reqVals, 10) : 10;
+      let maxErr = errVals.length > 0 ? Math.max(...errVals, 5) : 5;
+
+      const xStep = reqSeries.length > 1 ? width / (reqSeries.length - 1) : width;
+
+      let reqCoords = [];
+      let errCoords = [];
+
+      reqSeries.forEach((p, idx) => {
+        const x = idx * xStep;
+        if (p.value !== null && p.value !== undefined) {
+          const y = height - padding - ((p.value / maxReq) * (height - 2 * padding));
+          reqCoords.push({ x, y });
+        }
+      });
+
+      errSeries.forEach((p, idx) => {
+        const x = idx * xStep;
+        if (p.value !== null && p.value !== undefined) {
+          const y = height - padding - ((p.value / maxErr) * (height - 2 * padding));
+          errCoords.push({ x, y });
+        }
+      });
+
+      if (reqCoords.length > 1) {
+        let dReq = `M ${reqCoords[0].x} ${reqCoords[0].y}`;
+        for (let i = 1; i < reqCoords.length; i++) {
+          dReq += ` L ${reqCoords[i].x} ${reqCoords[i].y}`;
+        }
+        reqPath.setAttribute('d', dReq);
+
+        const dArea = `${dReq} L ${reqCoords[reqCoords.length - 1].x} ${height} L ${reqCoords[0].x} ${height} Z`;
+        reqArea.setAttribute('d', dArea);
+      } else {
+        reqPath.setAttribute('d', '');
+        reqArea.setAttribute('d', '');
+      }
+
+      if (errCoords.length > 1) {
+        let dErr = `M ${errCoords[0].x} ${errCoords[0].y}`;
+        for (let i = 1; i < errCoords.length; i++) {
+          dErr += ` L ${errCoords[i].x} ${errCoords[i].y}`;
+        }
+        errPath.setAttribute('d', dErr);
+      } else {
+        errPath.setAttribute('d', '');
+      }
+    }
+
+    async function fetchTableAlerts(force = false) {
+      if (isAlertsFetching && !force) return;
+      isAlertsFetching = true;
+
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        isAlertsFetching = false;
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/admin/monitoring/alerts?limit=50', {
+          headers: { 'Authorization': 'Bearer ' + token }
         });
 
         if (res.status === 401) {
@@ -1027,18 +1622,31 @@
           }
         } else {
           document.getElementById('alertsTableBody').innerHTML =
-            '<tr><td colspan="7" class="empty-state" style="color: var(--danger-text);">Không thể tải dữ liệu từ máy chủ.</td></tr>';
+            '<tr><td colspan="8" class="empty-state" style="color: var(--danger-text);">Không thể tải dữ liệu cảnh báo từ máy chủ.</td></tr>';
         }
       } catch (err) {
         document.getElementById('alertsTableBody').innerHTML =
-          '<tr><td colspan="7" class="empty-state" style="color: var(--danger-text);">Lỗi kết nối máy chủ API.</td></tr>';
+          '<tr><td colspan="8" class="empty-state" style="color: var(--danger-text);">Lỗi kết nối máy chủ API.</td></tr>';
+      } finally {
+        isAlertsFetching = false;
       }
+    }
+
+    function setFilter(filter, btn) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      renderTable();
+    }
+
+    function handleSearchInput(query) {
+      searchQuery = (query || '').trim().toLowerCase();
+      renderTable();
     }
 
     function updateOverviewStats() {
       const firingCount = alertsData.filter(a => a.status === 'firing').length;
 
-      // Banner overview
       const statusPill = document.getElementById('systemStatusPill');
       const statusPillDot = document.getElementById('statusPillDot');
       const statusPillText = document.getElementById('statusPillText');
@@ -1056,7 +1664,6 @@
 
       firingCountLabel.textContent = `${firingCount} cảnh báo đang hoạt động`;
 
-      // Badge chuông
       const badge = document.getElementById('systemAlertBadge');
       if (badge) {
         badge.textContent = firingCount;
@@ -1070,14 +1677,28 @@
       if (!tbody) return;
 
       let filtered = alertsData;
+
+      // Filter tab
       if (currentFilter === 'firing') {
-        filtered = alertsData.filter(a => a.status === 'firing');
+        filtered = filtered.filter(a => a.status === 'firing');
       } else if (currentFilter === 'resolved') {
-        filtered = alertsData.filter(a => a.status === 'resolved');
+        filtered = filtered.filter(a => a.status === 'resolved');
+      } else if (currentFilter === 'critical') {
+        filtered = filtered.filter(a => (a.severity || '').toLowerCase() === 'critical');
+      } else if (currentFilter === 'warning') {
+        filtered = filtered.filter(a => (a.severity || '').toLowerCase() === 'warning');
+      }
+
+      // Search query
+      if (searchQuery) {
+        filtered = filtered.filter(a =>
+          (a.alertName || '').toLowerCase().includes(searchQuery) ||
+          (a.summary || '').toLowerCase().includes(searchQuery)
+        );
       }
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Không có bản ghi cảnh báo nào phù hợp bộ lọc.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Chưa có cảnh báo.</td></tr>';
         return;
       }
 
@@ -1103,6 +1724,9 @@
             </td>
             <td style="max-width: 320px; line-height: 1.4;">
               ${escapeHtml(alert.summary || '-')}
+            </td>
+            <td style="white-space: nowrap; font-size: 12px; color: var(--text-muted);">
+              ${escapeHtml(alert.source || 'job=event-ticket-api')}
             </td>
             <td style="white-space: nowrap; font-size: 12.5px; color: var(--text-muted);">
               ${formatDateTime(alert.startedAt)}
@@ -1160,7 +1784,7 @@
       }
 
       if (alertsData.length === 0) {
-        listContainer.innerHTML = '<div class="dropdown-empty-state">Không có cảnh báo hệ thống nào.</div>';
+        listContainer.innerHTML = '<div class="dropdown-empty-state">Chưa có cảnh báo hệ thống nào.</div>';
         return;
       }
 
@@ -1211,10 +1835,6 @@
       }
     });
 
-    async function fetchSystemAlertsHistory() {
-      await fetchTableAlerts();
-    }
-
     function showSystemToast(alert) {
       const container = document.getElementById('systemToastContainer');
       if (!container) return;
@@ -1257,71 +1877,63 @@
       const authToken = localStorage.getItem('access_token');
       if (!authToken) return;
 
+      const signalRPill = document.getElementById('signalRStatusPill');
+      const signalRText = document.getElementById('signalRStatusText');
+
       try {
-        const connection = new signalR.HubConnectionBuilder()
+        signalRConnection = new signalR.HubConnectionBuilder()
           .withUrl("/hubs/system-alerts", {
             accessTokenFactory: () => localStorage.getItem('access_token')
           })
-          .withAutomaticReconnect()
+          .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
           .build();
 
-        connection.on("ReceiveSystemAlert", (alert) => {
-          if (!alert || !alert.fingerprint) return;
-
-          const isResolved = alert.status === 'resolved';
-
-          if (isResolved) {
-            const existingFiring = alertsData.find(a => a.fingerprint === alert.fingerprint && a.status === 'firing');
-            if (existingFiring) {
-              existingFiring.status = 'resolved';
-              existingFiring.resolvedAt = alert.resolvedAt || new Date().toISOString();
-              existingFiring.lastUpdatedAt = new Date().toISOString();
-              if (alert.summary) existingFiring.summary = alert.summary;
-            } else {
-              alertsData.unshift({
-                id: 'rt-' + Date.now(),
-                fingerprint: alert.fingerprint,
-                alertName: alert.alertName || 'Alert',
-                severity: alert.severity || 'warning',
-                summary: alert.summary || '',
-                status: 'resolved',
-                startedAt: alert.startedAt || new Date().toISOString(),
-                resolvedAt: alert.resolvedAt || new Date().toISOString(),
-                lastUpdatedAt: new Date().toISOString()
-              });
-            }
-          } else {
-            const existingFiring = alertsData.find(a => a.fingerprint === alert.fingerprint && a.status === 'firing');
-            if (existingFiring) {
-              existingFiring.summary = alert.summary || existingFiring.summary;
-              existingFiring.severity = alert.severity || existingFiring.severity;
-              existingFiring.alertName = alert.alertName || existingFiring.alertName;
-              existingFiring.lastUpdatedAt = new Date().toISOString();
-            } else {
-              alertsData.unshift({
-                id: 'rt-' + Date.now(),
-                fingerprint: alert.fingerprint,
-                alertName: alert.alertName || 'Alert',
-                severity: alert.severity || 'warning',
-                summary: alert.summary || '',
-                status: 'firing',
-                startedAt: alert.startedAt || new Date().toISOString(),
-                resolvedAt: null,
-                lastUpdatedAt: new Date().toISOString()
-              });
-            }
+        signalRConnection.onreconnecting(() => {
+          if (signalRPill) {
+            signalRPill.className = 'status-pill neutral';
+            signalRText.textContent = 'Realtime: Đang kết nối lại...';
           }
-
-          updateOverviewStats();
-          renderTable();
-          renderAlertDropdown();
-          showSystemToast(alert);
         });
 
-        await connection.start();
-        console.log("Connected to SignalR SystemAlertHub");
+        signalRConnection.onreconnected(() => {
+          if (signalRPill) {
+            signalRPill.className = 'status-pill signalr-up';
+            signalRText.textContent = 'Realtime: Đã kết nối';
+          }
+          // On reconnect, immediately refetch authoritative state
+          fetchMonitoringSummary();
+          fetchTableAlerts(true);
+          fetchMonitoringTimeSeries();
+        });
+
+        signalRConnection.onclose(() => {
+          if (signalRPill) {
+            signalRPill.className = 'status-pill signalr-down';
+            signalRText.textContent = 'Realtime: Ngoại tuyến (Polling 5s)';
+          }
+        });
+
+        signalRConnection.on("ReceiveSystemAlert", (alert) => {
+          if (!alert || !alert.fingerprint) return;
+
+          // 1. Show notification toast
+          showSystemToast(alert);
+
+          // 2. Immediately refetch authoritative DB alerts and summary
+          fetchTableAlerts(true);
+          fetchMonitoringSummary();
+        });
+
+        await signalRConnection.start();
+        if (signalRPill) {
+          signalRPill.className = 'status-pill signalr-up';
+          signalRText.textContent = 'Realtime: Đã kết nối';
+        }
       } catch (err) {
-        console.warn("SignalR SystemAlertHub connection error:", err);
+        if (signalRPill) {
+          signalRPill.className = 'status-pill signalr-down';
+          signalRText.textContent = 'Realtime: Ngoại tuyến (Polling 5s)';
+        }
       }
     }
   </script>
