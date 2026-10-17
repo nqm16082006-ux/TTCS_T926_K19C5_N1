@@ -480,7 +480,7 @@
       card.innerHTML = `
         <div class="flex items-start gap-4 p-5">
           <div class="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
-            <img src="${escapeHtml(eventImage)}" alt="${escapeHtml(t.eventTitle || 'Sự kiện')}" class="w-full h-full object-cover">
+            <img src="${escapeHtml(eventImage)}" alt="${escapeHtml(t.eventTitle || 'Sự kiện')}" class="w-full h-full object-cover" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=600&q=80';">
           </div>
           <div class="flex-1 min-w-0">
             <h4 class="text-sm sm:text-base font-bold text-slate-900 truncate">${escapeHtml(t.eventTitle || 'Sự kiện')}</h4>

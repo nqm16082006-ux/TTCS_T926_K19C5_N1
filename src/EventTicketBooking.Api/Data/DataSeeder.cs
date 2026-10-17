@@ -194,6 +194,17 @@ namespace EventTicketBooking.Api.Data
                     {
                         logger?.LogWarning(ex, "Could not normalize statuses in DB.");
                     }
+
+                    try
+                    {
+                        using var s61Cmd = conn.CreateCommand();
+                        s61Cmd.CommandText = "ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"ReminderSentAt\" timestamp with time zone;";
+                        await s61Cmd.ExecuteNonQueryAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger?.LogWarning(ex, "Could not ensure ReminderSentAt column on orders table.");
+                    }
                 }
 
                 // 1. Kiểm tra nếu bảng Roles chưa có dữ liệu thì seed 5 roles

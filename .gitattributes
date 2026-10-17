@@ -1,0 +1,27 @@
+﻿# Auto detect text files and perform line ending normalization
+* text=auto
+
+# Source code files
+*.cs text diff=csharp
+*.html text diff=html
+*.css text diff=css
+*.js text
+*.json text
+*.md text
+*.sql text
+*.xml text
+*.props text
+*.targets text
+*.csproj text
+*.sln text eol=crlf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.dll binary
+*.exe binary

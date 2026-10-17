@@ -1323,6 +1323,7 @@ namespace EventTicketBooking.Api.Controllers
                 RefundFailureReason = failureReason,
                 RefundUpdatedAt = latestRefund?.UpdatedAt ?? refundReq?.UpdatedAt,
                 RefundRetryCount = retryCount,
+                ReminderSentAt = order.ReminderSentAt,
                 Items = order.OrderItems?.Select(oi => new OrderItemDto
                 {
                     Id = oi.Id,
