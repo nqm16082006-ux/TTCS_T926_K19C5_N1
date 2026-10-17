@@ -36,6 +36,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<RefundRequest> RefundRequests { get; set; } = null!;
         public DbSet<Refund> Refunds { get; set; } = null!;
         public DbSet<SystemAlert> SystemAlerts { get; set; } = null!;
+        public DbSet<ReconciliationSession> ReconciliationSessions { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -530,6 +531,18 @@ namespace EventTicketBooking.Api.Data
 
                 entity.HasIndex(a => a.LastUpdatedAt)
                     .HasDatabaseName("IX_SystemAlerts_LastUpdatedAt");
+            });
+
+            modelBuilder.Entity<ReconciliationSession>(entity =>
+            {
+                entity.ToTable("reconciliation_sessions");
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.SessionCode).IsRequired().HasMaxLength(100);
+                entity.Property(x => x.SourceType).IsRequired().HasMaxLength(50);
+                entity.Property(x => x.Status).IsRequired().HasMaxLength(50);
+                entity.Property(x => x.ExecutedBy).HasMaxLength(200);
+                entity.HasIndex(x => x.SessionCode);
+                entity.HasIndex(x => x.ExecutedAt);
             });
         }
 
