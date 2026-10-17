@@ -36,18 +36,21 @@ namespace EventTicketBooking.Api.Controllers
         private readonly IOrderAuditService _orderAuditService;
         private readonly IHubContext<SeatStatusHub>? _hubContext;
         private readonly IRefundService _refundService;
+        private readonly IDiscountCodeService _discountCodeService;
 
         public EventController(
             AppDbContext context,
             IOrderAuditService? orderAuditService = null,
             IHubContext<SeatStatusHub>? hubContext = null,
             IRefundService? refundService = null,
-            IPaymentGateway? paymentGateway = null)
+            IPaymentGateway? paymentGateway = null,
+            IDiscountCodeService? discountCodeService = null)
         {
             _context = context;
             _orderAuditService = orderAuditService ?? new OrderAuditService(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
             _hubContext = hubContext;
             _refundService = refundService ?? new RefundService(context, _orderAuditService, paymentGateway);
+            _discountCodeService = discountCodeService ?? new DiscountCodeService(context);
         }
 
         /// <summary>
@@ -1293,6 +1296,12 @@ namespace EventTicketBooking.Api.Controllers
                         order.Status = OrderStatus.Cancelled;
                         order.CancelReason = OrderCancelReasons.ShowtimeCancelled;
                         order.UpdatedAt = now;
+
+                        // Story S-56: Giải phóng lượt sử dụng mã giảm giá của đơn chờ
+                        if (order.DiscountCodeId.HasValue)
+                        {
+                            await _discountCodeService.ReleaseDiscountReservationAsync(order);
+                        }
 
                         if (order.OrderItems != null && order.OrderItems.Any())
                         {

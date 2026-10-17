@@ -184,6 +184,7 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ICheckinEx
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ISeatMapPdfExportService, EventTicketBooking.Api.Services.Implementations.SeatMapPdfExportService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ICheckinStatisticsService, EventTicketBooking.Api.Services.Implementations.CheckinStatisticsService>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IDiscountCodeService, EventTicketBooking.Api.Services.Implementations.DiscountCodeService>();
 builder.Services.AddHttpClient();
 
 

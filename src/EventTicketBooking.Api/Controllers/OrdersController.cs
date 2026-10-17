@@ -38,6 +38,7 @@ namespace EventTicketBooking.Api.Controllers
         private readonly RefundPolicyOptions _refundPolicy;
         private readonly IHubContext<SeatStatusHub>? _hubContext;
         private readonly IConnectionMultiplexer? _redis;
+        private readonly EventTicketBooking.Api.Services.Interfaces.IDiscountCodeService _discountCodeService;
 
         public OrdersController(
             AppDbContext context,
@@ -49,7 +50,8 @@ namespace EventTicketBooking.Api.Controllers
             IOptions<RefundPolicyOptions>? refundPolicy = null,
             IHubContext<SeatStatusHub>? hubContext = null,
             IConnectionMultiplexer? redis = null,
-            EventTicketBooking.Api.Services.Interfaces.IRefundService? refundService = null)
+            EventTicketBooking.Api.Services.Interfaces.IRefundService? refundService = null,
+            EventTicketBooking.Api.Services.Interfaces.IDiscountCodeService? discountCodeService = null)
         {
             _context = context;
             _logger = logger;
@@ -63,6 +65,7 @@ namespace EventTicketBooking.Api.Controllers
             _redis = redis;
             _refundService = refundService ?? new EventTicketBooking.Api.Services.Implementations.RefundService(
                 context, _orderAuditService, paymentGateway, Microsoft.Extensions.Logging.Abstractions.NullLogger<EventTicketBooking.Api.Services.Implementations.RefundService>.Instance, hubContext, redis);
+            _discountCodeService = discountCodeService ?? new EventTicketBooking.Api.Services.Implementations.DiscountCodeService(context);
         }
 
         /// <summary>
@@ -210,7 +213,10 @@ namespace EventTicketBooking.Api.Controllers
                     ShowtimeId = showtimeId,
                     Status = OrderStatus.Pending,
                     ExpiresAt = paymentExpiry,
-                    OrderItems = orderItems
+                    OrderItems = orderItems,
+                    OriginalAmount = (int)totalPrice,
+                    DiscountAmount = 0,
+                    TotalAmount = (int)totalPrice
                 };
 
                 order.CalculateTotal();
@@ -371,6 +377,7 @@ namespace EventTicketBooking.Api.Controllers
                         .ThenInclude(s => s.SeatCategory)
                 .Include(o => o.PaymentTransaction)
                 .Include(o => o.Refunds)
+                .Include(o => o.DiscountCode)
                 .FirstOrDefaultAsync(o => o.Id == orderId);
 
             if (order == null)
@@ -420,6 +427,39 @@ namespace EventTicketBooking.Api.Controllers
             Response.Headers["Pragma"] = "no-cache";
 
             return Ok(ApiResponse<OrderStatusResponseDto>.SuccessResult(new OrderStatusResponseDto { Status = order.Status.ToString() }, "Lấy trạng thái thành công."));
+        }
+
+        /// <summary>
+        /// S-56: Áp dụng mã giảm giá theo sự kiện cho đơn hàng chờ thanh toán.
+        /// POST /api/v1/orders/{orderId}/apply-discount
+        /// </summary>
+        [HttpPost("{orderId:guid}/apply-discount")]
+        [RequireRole]
+        [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ApplyDiscount(Guid orderId, [FromBody] EventTicketBooking.Api.DTOs.DiscountCodes.ApplyDiscountRequest request)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(ApiResponse<object>.FailureResult("Vui lòng đăng nhập."));
+
+            var (success, message, orderDto, statusCode) = await _discountCodeService.ApplyDiscountCodeAsync(orderId, request?.Code ?? string.Empty, userId);
+            if (!success)
+            {
+                return statusCode switch
+                {
+                    StatusCodes.Status404NotFound => NotFound(ApiResponse<object>.FailureResult(message)),
+                    StatusCodes.Status403Forbidden => StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult(message)),
+                    StatusCodes.Status400BadRequest => BadRequest(ApiResponse<object>.FailureResult(message)),
+                    StatusCodes.Status409Conflict => Conflict(ApiResponse<object>.FailureResult(message)),
+                    _ => StatusCode(statusCode, ApiResponse<object>.FailureResult(message))
+                };
+            }
+
+            return Ok(ApiResponse<OrderDto>.SuccessResult(orderDto!, message));
         }
 
         /// <summary>
@@ -1299,6 +1339,10 @@ namespace EventTicketBooking.Api.Controllers
                 CustomerEmail = order.User?.Email,
                 Status = order.Status.ToString(),
                 TotalAmount = order.TotalAmount,
+                OriginalAmount = order.OriginalAmount > 0 ? order.OriginalAmount : order.TotalAmount,
+                DiscountAmount = order.DiscountAmount,
+                DiscountCode = order.DiscountCode?.Code ?? (order.DiscountCodeSnapshot != null ? order.DiscountCodeSnapshot.Split('|')[0] : null),
+                DiscountCodeId = order.DiscountCodeId,
                 SeatCount = order.OrderItems?.Count ?? 0,
                 SeatNames = seatNames,
                 CreatedAt = order.CreatedAt,

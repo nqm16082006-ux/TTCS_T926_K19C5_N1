@@ -17,6 +17,10 @@ namespace EventTicketBooking.Api.DTOs
         public string? CustomerEmail { get; set; }
         public string Status { get; set; } = null!;
         public int TotalAmount { get; set; }
+        public int OriginalAmount { get; set; }
+        public int DiscountAmount { get; set; }
+        public string? DiscountCode { get; set; }
+        public Guid? DiscountCodeId { get; set; }
         public int SeatCount { get; set; }
         public List<string> SeatNames { get; set; } = new();
         public DateTimeOffset CreatedAt { get; set; }
