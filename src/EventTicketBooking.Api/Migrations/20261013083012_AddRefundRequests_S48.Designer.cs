@@ -631,7 +631,6 @@ namespace EventTicketBooking.Api.Migrations
                     b.ToTable("refund_requests", (string)null);
                 });
 
-
             modelBuilder.Entity("EventTicketBooking.Api.Models.Role", b =>
                 {
                     b.Property<Guid>("Id")
@@ -784,10 +783,6 @@ namespace EventTicketBooking.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(10);
-
-                    b.Property<string>("Name")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("SeatingMapImageUrl")
                         .HasColumnType("text");
@@ -1091,18 +1086,6 @@ namespace EventTicketBooking.Api.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("EventTicketBooking.Api.Models.RefundRequest", b =>
-                {
-                    b.HasOne("EventTicketBooking.Api.Models.Order", "Order")
-                        .WithMany()
-                        .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Order");
-                });
-
-
             modelBuilder.Entity("EventTicketBooking.Api.Models.OrderItem", b =>
                 {
                     b.HasOne("EventTicketBooking.Api.Models.Order", "Order")
@@ -1137,6 +1120,17 @@ namespace EventTicketBooking.Api.Migrations
                 {
                     b.HasOne("EventTicketBooking.Api.Models.Order", "Order")
                         .WithMany("Refunds")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("EventTicketBooking.Api.Models.RefundRequest", b =>
+                {
+                    b.HasOne("EventTicketBooking.Api.Models.Order", "Order")
+                        .WithMany()
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
