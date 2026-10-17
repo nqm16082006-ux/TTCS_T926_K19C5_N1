@@ -163,6 +163,11 @@ namespace EventTicketBooking.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("AllowTicketTransfer")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -201,6 +206,11 @@ namespace EventTicketBooking.Api.Migrations
 
                     b.Property<int>("TotalSeats")
                         .HasColumnType("integer");
+
+                    b.Property<int>("TransferCutoffHours")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(2);
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -304,6 +314,9 @@ namespace EventTicketBooking.Api.Migrations
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ReminderSentAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("ShowtimeId")
@@ -1004,6 +1017,12 @@ namespace EventTicketBooking.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<Guid?>("CurrentUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LastTransferredAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("OrderItemId")
                         .HasColumnType("uuid");
 
@@ -1012,7 +1031,14 @@ namespace EventTicketBooking.Api.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<int>("TransferCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.HasKey("Id");
+
+                    b.HasIndex("CurrentUserId");
 
                     b.HasIndex("OrderItemId")
                         .IsUnique()
@@ -1061,7 +1087,69 @@ namespace EventTicketBooking.Api.Migrations
 
                     b.HasIndex("StaffUserId");
 
-                    b.ToTable("TicketReadmissions", (string)null);
+                    b.ToTable("TicketReadmissions");
+                });
+
+            modelBuilder.Entity("EventTicketBooking.Api.Models.TicketTransfer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("FromUserEmail")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid>("FromUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("NewTicketCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("OldTicketCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ToUserEmail")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid>("ToUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FromUserId");
+
+                    b.HasIndex("OldTicketCode");
+
+                    b.HasIndex("TicketId");
+
+                    b.HasIndex("ToUserId");
+
+                    b.ToTable("ticket_transfers", (string)null);
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.User", b =>
@@ -1357,11 +1445,18 @@ namespace EventTicketBooking.Api.Migrations
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.Ticket", b =>
                 {
+                    b.HasOne("EventTicketBooking.Api.Models.User", "CurrentUser")
+                        .WithMany()
+                        .HasForeignKey("CurrentUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("EventTicketBooking.Api.Models.OrderItem", "OrderItem")
                         .WithOne("Ticket")
                         .HasForeignKey("EventTicketBooking.Api.Models.Ticket", "OrderItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("CurrentUser");
 
                     b.Navigation("OrderItem");
                 });
@@ -1381,6 +1476,33 @@ namespace EventTicketBooking.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("OrderItem");
+                });
+
+            modelBuilder.Entity("EventTicketBooking.Api.Models.TicketTransfer", b =>
+                {
+                    b.HasOne("EventTicketBooking.Api.Models.User", "FromUser")
+                        .WithMany()
+                        .HasForeignKey("FromUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EventTicketBooking.Api.Models.Ticket", "Ticket")
+                        .WithMany()
+                        .HasForeignKey("TicketId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EventTicketBooking.Api.Models.User", "ToUser")
+                        .WithMany()
+                        .HasForeignKey("ToUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FromUser");
+
+                    b.Navigation("Ticket");
+
+                    b.Navigation("ToUser");
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.UserRole", b =>

@@ -87,6 +87,22 @@ namespace EventTicketBooking.Api.DTOs.Payment
     }
 
     /// <summary>
+    /// DTO an toàn cho khách hàng xem thông tin hoàn tiền đơn hàng của mình (Story S-48).
+    /// Tuyệt đối KHÔNG chứa ErrorCode nội bộ, ErrorMessage gateway, retry internals, accounting notes, lock/worker internals.
+    /// </summary>
+    public class CustomerRefundDto
+    {
+        public Guid Id { get; set; }
+        public Guid OrderId { get; set; }
+        public int Amount { get; set; }
+        public string Currency { get; set; } = "VND";
+        public string Status { get; set; } = string.Empty;
+        public string? CustomerStatusText { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset? UpdatedAt { get; set; }
+    }
+
+    /// <summary>
     /// DTO trả về thông tin chi tiết lệnh hoàn tiền cho Kế toán / Quản trị viên.
     /// </summary>
     public class RefundDetailDto

@@ -383,7 +383,7 @@
         `Tổng tiền: ${formatVnd(order.totalAmount)} • Số lượng vé: ${itemsCount} vé • Tạo lúc: ${formatDateTime(order.createdAt)}`;
 
       const link = document.getElementById('linkViewOrderDetails');
-      link.href = `order-details.html?orderId=${encodeURIComponent(order.id)}`;
+      link.href = `order-details.html?id=${encodeURIComponent(order.id)}`;
     }
 
     function updateCounts() {
