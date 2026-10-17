@@ -18,5 +18,11 @@ namespace EventTicketBooking.Api.Options
         /// Thời gian khóa tạm thời tính bằng phút (Quy định cứng S-02: 15 phút).
         /// </summary>
         public int LockoutMinutes { get; set; } = 15;
+
+        /// <summary>
+        /// Bắt buộc ngắt dịch vụ xác thực (Fail-closed) khi Redis không khả dụng.
+        /// Mặc định: true (Production / Tests). Trong môi trường Development không có Redis: false (cho phép fallback xác thực CSDL Cloud).
+        /// </summary>
+        public bool FailClosedOnRedisDown { get; set; } = true;
     }
 }
