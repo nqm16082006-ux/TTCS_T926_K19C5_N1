@@ -115,20 +115,37 @@ redisOptions.ConnectRetry = 5;
 // StackExchange.Redis sẽ tự động reconnect trong background khi Redis online trở lại.
 StackExchange.Redis.IConnectionMultiplexer redisMultiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(redisOptions);
 
-// Đăng ký instance ConnectionMultiplexer thật làm Singleton trong DI (TUYỆT ĐỐI KHÔNG đăng ký null).
+// Đăng ký instance ConnectionMultiplexer thật làm Singleton trong DI.
 builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(redisMultiplexer);
 
-// Cấu hình IDistributedCache sử dụng Redis cho caching nghiệp vụ chung.
-// LƯU Ý BẢO MẬT: AuthService và S-02 Login Lockout / Anti-Bruteforce trực tiếp sử dụng
-// IConnectionMultiplexer (Fail-Closed). Tuyệt đối không fallback sang in-memory cache cho Auth.
-builder.Services.AddStackExchangeRedisCache(options =>
+// Cấu hình IDistributedCache: Nếu Redis online -> Dùng Redis; Nếu Redis offline -> Dùng MemoryCache để tránh timeout 14s
+if (redisMultiplexer.IsConnected)
 {
-    options.Configuration = redisConnection;
-    options.InstanceName = "EventTicket_";
-});
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnection;
+        options.InstanceName = "EventTicket_";
+    });
+}
+else
+{
+    Console.WriteLine("[INFO] Redis không khả dụng lúc khởi động. Tự động sử dụng Memory Cache cho IDistributedCache để đảm bảo tốc độ phản hồi tức thì.");
+    builder.Services.AddDistributedMemoryCache();
+}
 
 // Đăng ký dịch vụ băm mật khẩu Argon2id (TTKN-20)
 builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IPasswordHasher, EventTicketBooking.Api.Services.Implementations.Argon2PasswordHasher>();
+
+// Cấu hình bảo mật xác thực (Story S-02)
+builder.Services.Configure<EventTicketBooking.Api.Options.AuthSecurityOptions>(options =>
+{
+    builder.Configuration.GetSection(EventTicketBooking.Api.Options.AuthSecurityOptions.SectionName).Bind(options);
+    if (builder.Environment.IsDevelopment())
+    {
+        // Trong môi trường Local Development, cho phép tự động fallback khi Redis chưa khởi động
+        options.FailClosedOnRedisDown = false;
+    }
+});
 
 // Đăng ký dịch vụ Token và Authentication (TTKN-25)
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITokenService, EventTicketBooking.Api.Services.Implementations.TokenService>();

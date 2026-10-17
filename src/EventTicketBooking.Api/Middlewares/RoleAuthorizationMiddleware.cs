@@ -53,6 +53,7 @@ namespace EventTicketBooking.Api.Middlewares
             // S-02 Hardening: KHÔNG wildcard /hubs/* để tránh vô tình bypass các hub nhạy cảm mới trong tương lai.
             var path = context.Request.Path;
             bool isAuditedSpecialRoute = path.Equals("/metrics", StringComparison.OrdinalIgnoreCase) ||
+                                         path.StartsWithSegments("/api/public", StringComparison.OrdinalIgnoreCase) ||
                                          path.Equals("/hubs/seat-status", StringComparison.OrdinalIgnoreCase) ||
                                          path.StartsWithSegments("/hubs/seat-status", StringComparison.OrdinalIgnoreCase) ||
                                          path.Equals("/hubs/system-alerts", StringComparison.OrdinalIgnoreCase) ||
