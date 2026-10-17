@@ -716,6 +716,41 @@
       align-items: center;
       gap: 4px;
     }
+
+    /* Toast Notification */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .toast-msg {
+      pointer-events: auto;
+      min-width: 280px;
+      max-width: 440px;
+      padding: 12px 18px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #ffffff;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      transition: all 0.3s ease;
+    }
+    .toast-msg.success { background: #059669; border: 1px solid #10b981; }
+    .toast-msg.error { background: #dc2626; border: 1px solid #ef4444; }
+    .toast-msg.info { background: #0284c7; border: 1px solid #38bdf8; }
+    @keyframes toastSlideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
   </style>
 </head>
 <body>
@@ -1093,7 +1128,56 @@
 
   </main>
 
-  <!-- MODAL: Xác nhận đã hoàn tiền thủ công cho khách -->
+  <!-- MODAL: Xác nhận tiếp nhận xử lý hoàn tiền (S-48) -->
+  <div class="modal-backdrop" id="modalConfirmAssign">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-user-check" style="color:#0284c7;"></i> Xác Nhận Tiếp Nhận Xử Lý Hoàn Tiền (S-48)</h3>
+        <button class="modal-close" onclick="closeAssignModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px; color:#475569; margin-bottom:14px;">
+          Vui lòng kiểm tra kỹ thông tin lệnh hoàn tiền trước khi tiếp nhận vào quy trình xử lý kế toán:
+        </p>
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-bottom:14px; display:flex; flex-direction:column; gap:10px; font-size:12.5px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#64748b;">Hành động sắp thực hiện:</span>
+            <strong style="color:#0284c7; font-weight:700;" id="assignModalAction">Kế toán tiếp nhận xử lý hồ sơ hoàn tiền</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#64748b;">Mã Refund (Refund ID):</span>
+            <code style="font-family:'JetBrains Mono', monospace; font-size:12px; color:#0f172a; font-weight:700;" id="assignModalRefundId">--</code>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#64748b;">Mã Đơn Hàng (Order ID):</span>
+            <strong style="font-size:13px; color:#0f172a;" id="assignModalOrderId">#000000</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#64748b;">Số tiền cần hoàn (Amount):</span>
+            <strong style="font-size:14px; color:#0284c7;" id="assignModalAmount">0 ₫</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#64748b;">Trạng thái hiện tại (Current Status):</span>
+            <span id="assignModalStatus"><span class="badge-status pending"><i class="fa-solid fa-triangle-exclamation"></i> Chờ xử lý</span></span>
+          </div>
+          <div>
+            <span style="color:#64748b; display:block; margin-bottom:4px;">Lý do gateway (Gateway Reason):</span>
+            <div style="background:#fff1f2; border:1px solid #fecdd3; border-radius:8px; padding:8px 12px; color:#9f1239; font-size:12px; font-weight:600;" id="assignModalGatewayReason">
+              --
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-action btn-outline" onclick="closeAssignModal()">Huỷ bỏ</button>
+        <button class="btn-action btn-primary" id="btnConfirmAssign" onclick="submitAssignAccounting()">
+          <i class="fa-solid fa-check"></i> Xác Nhận Tiếp Nhận
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Xác nhận đã hoàn tiền thủ công cho khách (S-48) -->
   <div class="modal-backdrop" id="modalResolveAccounting">
     <div class="modal-card">
       <div class="modal-header">
@@ -1101,14 +1185,30 @@
         <button class="modal-close" onclick="closeResolveModal()">&times;</button>
       </div>
       <div class="modal-body">
-        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px; margin-bottom:16px;">
-          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-            <span style="font-size:12.5px; color:#64748b;">Mã đơn hàng:</span>
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px; margin-bottom:16px; display:flex; flex-direction:column; gap:8px; font-size:12.5px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#64748b;">Hành động sắp thực hiện:</span>
+            <strong style="color:#16a34a; font-weight:700;" id="modalResolveAction">Hoàn tất đối soát và xác nhận đã hoàn tiền thủ công cho khách hàng</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#64748b;">Mã Refund (Refund ID):</span>
+            <code style="font-family:'JetBrains Mono', monospace; font-size:11.5px; color:#0f172a; font-weight:700;" id="modalResolveRefundId">--</code>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#64748b;">Mã đơn hàng (Order ID):</span>
             <strong style="font-size:13px; color:#0f172a;" id="modalOrderCode">#000000</strong>
           </div>
-          <div style="display:flex; justify-content:space-between;">
-            <span style="font-size:12.5px; color:#64748b;">Số tiền cần hoàn:</span>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#64748b;">Số tiền cần hoàn (Amount):</span>
             <strong style="font-size:14px; color:#16a34a;" id="modalRefundAmount">0 ₫</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#64748b;">Trạng thái hiện tại (Current Status):</span>
+            <span id="modalResolveCurrentStatus">--</span>
+          </div>
+          <div>
+            <span style="color:#64748b; display:block; margin-bottom:2px;">Lý do gateway (Gateway Reason):</span>
+            <div style="background:#fff1f2; border:1px solid #fecdd3; border-radius:6px; padding:6px 10px; color:#9f1239; font-size:11.5px; font-weight:600;" id="modalResolveGatewayReason">--</div>
           </div>
         </div>
 
@@ -1233,18 +1333,27 @@
         </div>
       </div>
       <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
-        <a id="detailLinkOrder" href="#" target="_blank" class="btn-action btn-outline" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-          <i class="fa-solid fa-arrow-up-right-from-square"></i> Xem đơn hàng
-        </a>
-        <button class="btn-action btn-primary" onclick="closeRefundDetailModal()">Đóng</button>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <a id="detailLinkOrder" href="#" target="_blank" class="btn-action btn-outline" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> Xem đơn hàng
+          </a>
+          <a id="detailLinkAuditLogs" href="#" target="_blank" class="btn-action btn-outline" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+            <i class="fa-solid fa-clock-rotate-left"></i> Nhật ký kiểm toán
+          </a>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <div id="detailActionContainer" style="display:inline-flex; gap:8px;"></div>
+          <button class="btn-action btn-outline" onclick="closeRefundDetailModal()">Đóng</button>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
-    let rawRefundsList = [];
-    let currentFilter = 'ALL';
-    let targetRefundIdToResolve = null;
+    var rawRefundsList = [];
+    var currentFilter = 'ALL';
+    var targetRefundIdToResolve = null;
+    var targetRefundIdToAssign = null;
 
     function switchAuditorTab(tab) {
       const tabOverview = document.getElementById('tabOverview');
@@ -1356,32 +1465,61 @@
 
     async function loadManualRefunds() {
       const tbody = document.getElementById('refundsTableBody');
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="11" style="text-align:center; padding: 36px; color: var(--text-muted);">
-            <i class="fa-solid fa-spinner fa-spin" style="font-size: 20px; display:block; margin-bottom:8px;"></i>
-            Đang tải danh sách hoàn tiền cần kế toán xử lý...
-          </td>
-        </tr>
-      `;
+      if (tbody && (!rawRefundsList || rawRefundsList.length === 0)) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="11" style="text-align:center; padding: 36px; color: var(--text-muted);">
+              <i class="fa-solid fa-spinner fa-spin" style="font-size: 20px; display:block; margin-bottom:8px;"></i>
+              Đang tải danh sách hoàn tiền cần kế toán xử lý...
+            </td>
+          </tr>
+        `;
+      }
 
       try {
         const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
-        const res = await fetch('/api/v1/payments/refunds/manual-review', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.message || 'Không tải được dữ liệu hoàn tiền. Vui lòng thử lại.');
+        const refundMap = new Map();
+
+        // 1. Fetch manual-review list
+        try {
+          const resManual = await fetch('/api/v1/payments/refunds/manual-review', { headers });
+          if (resManual.ok) {
+            const jsonManual = await resManual.json();
+            (jsonManual.data || []).forEach(item => refundMap.set(item.id, item));
+          }
+        } catch (e) {
+          console.warn('Could not fetch manual-review refunds:', e);
         }
 
-        const json = await res.json();
-        rawRefundsList = json.data || [];
+        // 2. Fetch all refunds list to include RetryScheduled, AccountingResolved, Succeeded
+        try {
+          const resAll = await fetch('/api/v1/payments/refunds?take=100', { headers });
+          if (resAll.ok) {
+            const jsonAll = await resAll.json();
+            (jsonAll.data || []).forEach(item => {
+              if (!refundMap.has(item.id)) {
+                refundMap.set(item.id, item);
+              }
+            });
+          }
+        } catch (e) {
+          console.warn('Could not fetch all refunds:', e);
+        }
+
+        const mergedList = Array.from(refundMap.values());
+
+        // Sort newest first
+        mergedList.sort((a, b) => {
+          const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+          const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+          return timeB - timeA;
+        });
+
+        rawRefundsList = mergedList;
         updateMetricsAndBadges(rawRefundsList);
-        renderRefundsTable(rawRefundsList);
+        filterRefunds();
 
         // Check query param orderId to highlight
         const urlParams = new URLSearchParams(window.location.search);
@@ -1398,14 +1536,16 @@
 
       } catch (err) {
         console.error(err);
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="11" style="text-align:center; padding: 32px; color: #dc2626;">
-              <i class="fa-solid fa-circle-exclamation" style="font-size: 20px; display:block; margin-bottom:8px;"></i>
-              Không tải được dữ liệu hoàn tiền. Vui lòng thử lại.
-            </td>
-          </tr>
-        `;
+        if (tbody && (!rawRefundsList || rawRefundsList.length === 0)) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="11" style="text-align:center; padding: 32px; color: #dc2626;">
+                <i class="fa-solid fa-circle-exclamation" style="font-size: 20px; display:block; margin-bottom:8px;"></i>
+                Không tải được dữ liệu hoàn tiền. Vui lòng thử lại.
+              </td>
+            </tr>
+          `;
+        }
       }
     }
 
@@ -1527,6 +1667,44 @@
       });
     }
 
+    function isAuditorOrAdmin() {
+      try {
+        const userInfoRaw = localStorage.getItem('user_info');
+        if (!userInfoRaw) return false;
+        const user = JSON.parse(userInfoRaw);
+        const roles = (user.roles || []).map(r => (r || '').toLowerCase());
+        return roles.includes('auditor') || roles.includes('admin');
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function showToast(message, type = 'success') {
+      try {
+        let container = document.getElementById('toastContainer');
+        if (!container) {
+          container = document.createElement('div');
+          container.id = 'toastContainer';
+          container.className = 'toast-container';
+          document.body.appendChild(container);
+        }
+        const toast = document.createElement('div');
+        toast.className = `toast-msg ${type}`;
+        const icon = type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-info');
+        toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${escapeHtml(message)}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(10px)';
+          setTimeout(() => {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+          }, 300);
+        }, 4500);
+      } catch (e) {
+        console.log(message);
+      }
+    }
+
     function openRefundDetailModal(refundId) {
       const r = rawRefundsList.find(x => x.id === refundId);
       if (!r) return;
@@ -1560,7 +1738,7 @@
 
       let accountingStateText = 'Chờ phân công xử lý';
       if (r.status === 'AccountingProcessing') accountingStateText = 'Đang trong quy trình đối soát & hoàn tiền';
-      else if (r.status === 'AccountingResolved') accountingStateText = 'Đã hoàn tất chuyển khoản cho khách hàng';
+      else if (r.status === 'AccountingResolved' || r.status === 'Succeeded') accountingStateText = 'Đã hoàn tất chuyển khoản cho khách hàng';
       document.getElementById('detailAccountingState').textContent = accountingStateText;
 
       document.getElementById('detailCreatedAt').textContent = r.createdAt ? formatDateTime(r.createdAt) : '—';
@@ -1569,6 +1747,32 @@
       const linkOrder = document.getElementById('detailLinkOrder');
       if (linkOrder) {
         linkOrder.href = `./order-details.html?id=${encodeURIComponent(r.orderId)}`;
+      }
+
+      const linkAudit = document.getElementById('detailLinkAuditLogs');
+      if (linkAudit) {
+        linkAudit.href = `./order-audit-logs.html?orderId=${encodeURIComponent(r.orderId)}`;
+      }
+
+      const containerAction = document.getElementById('detailActionContainer');
+      if (containerAction) {
+        let actionButtons = '';
+        if (isAuditorOrAdmin()) {
+          if (r.status === 'ManualReviewRequired') {
+            actionButtons = `
+              <button class="btn-action btn-primary" onclick="closeRefundDetailModal(); openAssignModal('${r.id}');">
+                <i class="fa-solid fa-user-check"></i> Tiếp nhận
+              </button>
+            `;
+          } else if (r.status === 'AccountingProcessing') {
+            actionButtons = `
+              <button class="btn-action btn-primary" style="background:#16a34a; border-color:#16a34a;" onclick="closeRefundDetailModal(); openResolveModal('${r.id}');">
+                <i class="fa-solid fa-check-double"></i> Hoàn tất
+              </button>
+            `;
+          }
+        }
+        containerAction.innerHTML = actionButtons;
       }
 
       const modal = document.getElementById('modalRefundDetail');
@@ -1595,6 +1799,8 @@
         return;
       }
 
+      const isStaff = isAuditorOrAdmin();
+
       tbody.innerHTML = list.map(r => {
         let statusBadge = '';
         if (r.status === 'ManualReviewRequired') {
@@ -1615,32 +1821,55 @@
         const lastAttemptStr = r.lastAttemptedAt ? formatDateTime(r.lastAttemptedAt) : '—';
         const nextRetryStr = r.nextRetryAt ? formatDateTime(r.nextRetryAt) : '—';
 
-        // Action buttons
+        // Action buttons based on status & role authorization
         let actionsHtml = `<div style="display:flex; justify-content:flex-end; gap:6px;">`;
-        actionsHtml += `
-          <button class="btn-sm btn-sm-outline" onclick="openRefundDetailModal('${r.id}')" title="Xem chi tiết lệnh hoàn tiền">
-            <i class="fa-solid fa-circle-info"></i> Chi tiết
-          </button>
-        `;
+
         if (r.status === 'ManualReviewRequired') {
+          if (isStaff) {
+            actionsHtml += `
+              <button class="btn-sm btn-sm-primary" onclick="openAssignModal('${r.id}')" title="Kế toán tiếp nhận xử lý hồ sơ này">
+                <i class="fa-solid fa-user-check"></i> Tiếp nhận
+              </button>
+            `;
+          }
           actionsHtml += `
-            <button class="btn-sm btn-sm-primary" onclick="assignAccounting('${r.id}')" title="Kế toán tiếp nhận xử lý hồ sơ này">
-              <i class="fa-solid fa-user-check"></i> Tiếp nhận
+            <button class="btn-sm btn-sm-outline" onclick="openRefundDetailModal('${r.id}')" title="Xem chi tiết lệnh hoàn tiền">
+              <i class="fa-solid fa-circle-info"></i> Chi tiết
             </button>
+            <a href="./order-details.html?id=${encodeURIComponent(r.orderId)}" target="_blank" class="btn-sm btn-sm-outline" title="Xem chi tiết đơn hàng">
+              <i class="fa-solid fa-eye"></i> Xem đơn
+            </a>
+          `;
+        } else if (r.status === 'AccountingProcessing') {
+          if (isStaff) {
+            actionsHtml += `
+              <button class="btn-sm btn-sm-success" onclick="openResolveModal('${r.id}')" title="Bấm để xác nhận hoàn tất hoàn tiền thủ công cho khách hàng">
+                <i class="fa-solid fa-check-double"></i> Hoàn tất
+              </button>
+            `;
+          }
+          actionsHtml += `
+            <button class="btn-sm btn-sm-outline" onclick="openRefundDetailModal('${r.id}')" title="Xem chi tiết lệnh hoàn tiền">
+              <i class="fa-solid fa-circle-info"></i> Chi tiết
+            </button>
+            <a href="./order-details.html?id=${encodeURIComponent(r.orderId)}" target="_blank" class="btn-sm btn-sm-outline" title="Xem chi tiết đơn hàng">
+              <i class="fa-solid fa-eye"></i> Xem đơn
+            </a>
+          `;
+        } else {
+          // AccountingResolved, Succeeded, RetryScheduled, or other non-actionable status
+          // Auditor/staff and customers only get read-only actions (Chi tiết, Xem đơn)
+          actionsHtml += `
+            <button class="btn-sm btn-sm-outline" onclick="openRefundDetailModal('${r.id}')" title="Xem chi tiết lệnh hoàn tiền">
+              <i class="fa-solid fa-circle-info"></i> Chi tiết
+            </button>
+            <a href="./order-details.html?id=${encodeURIComponent(r.orderId)}" target="_blank" class="btn-sm btn-sm-outline" title="Xem chi tiết đơn hàng">
+              <i class="fa-solid fa-eye"></i> Xem đơn
+            </a>
           `;
         }
-        if (r.status === 'ManualReviewRequired' || r.status === 'AccountingProcessing') {
-          actionsHtml += `
-            <button class="btn-sm btn-sm-success" onclick="openResolveModal('${r.id}', '${r.orderCode || ''}', ${r.amount || 0})" title="Bấm để xác nhận đã hoàn tiền thủ công cho khách hàng">
-              <i class="fa-solid fa-check-double"></i> Hoàn tiền S-48
-            </button>
-          `;
-        }
-        actionsHtml += `
-          <a href="./order-details.html?id=${encodeURIComponent(r.orderId)}" target="_blank" class="btn-sm btn-sm-outline" title="Xem chi tiết đơn hàng">
-            <i class="fa-solid fa-eye"></i> Xem đơn
-          </a>
-        </div>`;
+
+        actionsHtml += `</div>`;
 
         return `
           <tr id="row-${r.orderId}">
@@ -1691,37 +1920,121 @@
       }).join('');
     }
 
-    async function assignAccounting(refundId) {
-      if (!confirm('Bạn có chắc chắn muốn tiếp nhận xử lý hồ sơ hoàn tiền này không?')) return;
+    function openAssignModal(refundId) {
+      const r = rawRefundsList.find(x => x.id === refundId);
+      if (!r) return;
+      targetRefundIdToAssign = refundId;
+
+      const elAction = document.getElementById('assignModalAction');
+      if (elAction) elAction.textContent = 'Kế toán tiếp nhận xử lý hồ sơ hoàn tiền (Chuyển sang AccountingProcessing)';
+
+      const elRefundId = document.getElementById('assignModalRefundId');
+      if (elRefundId) elRefundId.textContent = r.id;
+
+      const elOrderId = document.getElementById('assignModalOrderId');
+      if (elOrderId) elOrderId.textContent = '#' + (r.orderCode || (r.orderId ? r.orderId.substring(0, 8) : '—'));
+
+      const elAmount = document.getElementById('assignModalAmount');
+      if (elAmount) elAmount.textContent = formatCurrency(r.amount || 0);
+
+      const elStatus = document.getElementById('assignModalStatus');
+      if (elStatus) elStatus.innerHTML = '<span class="badge-status pending"><i class="fa-solid fa-triangle-exclamation"></i> Chờ xử lý (ManualReviewRequired)</span>';
+
+      const elGatewayReason = document.getElementById('assignModalGatewayReason');
+      if (elGatewayReason) elGatewayReason.textContent = r.errorMessage || r.reason || r.errorCode || 'Lỗi kết nối cổng thanh toán / Timeout';
+
+      const modal = document.getElementById('modalConfirmAssign');
+      if (modal) modal.classList.add('active');
+    }
+
+    function closeAssignModal() {
+      const modal = document.getElementById('modalConfirmAssign');
+      if (modal) modal.classList.remove('active');
+      targetRefundIdToAssign = null;
+    }
+
+    async function submitAssignAccounting() {
+      if (!targetRefundIdToAssign) return;
+      const btn = document.getElementById('btnConfirmAssign');
+      const originalText = btn ? btn.innerHTML : '';
+
       try {
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang tiếp nhận...`;
+        }
+
         const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
-        const res = await fetch(`/api/v1/payments/refunds/${encodeURIComponent(refundId)}/assign-accounting`, {
+        const res = await fetch(`/api/v1/payments/refunds/${encodeURIComponent(targetRefundIdToAssign)}/assign-accounting`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
 
-        const result = await res.json();
+        const result = await res.json().catch(() => ({}));
         if (!res.ok) {
-          alert(result.message || 'Tiếp nhận xử lý không thành công.');
+          showToast(result.message || 'Tiếp nhận xử lý không thành công.', 'error');
           return;
         }
 
-        alert('✅ Đã tiếp nhận hồ sơ hoàn tiền thành công! Trạng thái đã chuyển sang [Đang xử lý].');
+        closeAssignModal();
+        showToast(result.message || '✅ Đã tiếp nhận hồ sơ hoàn tiền thành công! Trạng thái chuyển sang [Đang xử lý].', 'success');
         await loadManualRefunds();
       } catch (err) {
         console.error(err);
-        alert(err.message || 'Lỗi khi tiếp nhận xử lý.');
+        showToast(err.message || 'Lỗi kết nối khi tiếp nhận xử lý.', 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+        }
       }
     }
 
+    // Alias for backward compatibility
+    function assignAccounting(refundId) {
+      openAssignModal(refundId);
+    }
+
     function openResolveModal(refundId, orderCode, amount) {
+      const r = rawRefundsList.find(x => x.id === refundId) || {
+        id: refundId,
+        orderCode: orderCode,
+        amount: amount,
+        status: 'AccountingProcessing'
+      };
+
       targetRefundIdToResolve = refundId;
-      document.getElementById('modalOrderCode').textContent = '#' + (orderCode || refundId.substring(0, 8));
-      document.getElementById('modalRefundAmount').textContent = formatCurrency(amount);
-      document.getElementById('txtManualTxCode').value = '';
-      document.getElementById('txtResolveNotes').value = '';
+
+      const elAction = document.getElementById('modalResolveAction');
+      if (elAction) elAction.textContent = 'Hoàn tất đối soát và xác nhận đã hoàn tiền thủ công cho khách hàng';
+
+      const elRefundId = document.getElementById('modalResolveRefundId');
+      if (elRefundId) elRefundId.textContent = r.id;
+
+      const elOrderCode = document.getElementById('modalOrderCode');
+      if (elOrderCode) elOrderCode.textContent = '#' + (r.orderCode || (r.orderId ? r.orderId.substring(0, 8) : '—'));
+
+      const elAmount = document.getElementById('modalRefundAmount');
+      if (elAmount) elAmount.textContent = formatCurrency(r.amount || amount || 0);
+
+      const elStatus = document.getElementById('modalResolveCurrentStatus');
+      if (elStatus) {
+        elStatus.innerHTML = r.status === 'AccountingProcessing'
+          ? '<span class="badge-status processing"><i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý (AccountingProcessing)</span>'
+          : `<span class="badge-status pending">${escapeHtml(r.status || 'Chờ xử lý')}</span>`;
+      }
+
+      const elGatewayReason = document.getElementById('modalResolveGatewayReason');
+      if (elGatewayReason) elGatewayReason.textContent = r.errorMessage || r.reason || r.errorCode || 'Lỗi cổng thanh toán / Timeout';
+
+      const inputTx = document.getElementById('txtManualTxCode');
+      if (inputTx) inputTx.value = '';
+
+      const inputNotes = document.getElementById('txtResolveNotes');
+      if (inputNotes) inputNotes.value = '';
+
       const modal = document.getElementById('modalResolveAccounting');
       if (modal) {
         modal.classList.add('active');
@@ -1738,21 +2051,25 @@
 
     async function submitResolveAccounting() {
       if (!targetRefundIdToResolve) return;
-      const txCode = document.getElementById('txtManualTxCode').value.trim();
-      const notes = document.getElementById('txtResolveNotes').value.trim();
+      const inputTx = document.getElementById('txtManualTxCode');
+      const txCode = inputTx ? inputTx.value.trim() : '';
+      const inputNotes = document.getElementById('txtResolveNotes');
+      const notes = inputNotes ? inputNotes.value.trim() : '';
 
       if (!txCode) {
-        alert('Vui lòng nhập Mã Giao Dịch Ngân Hàng / Mã Tham Chiếu Chuyển Tiền để lưu vết đối soát.');
-        document.getElementById('txtManualTxCode').focus();
+        showToast('Vui lòng nhập Mã Giao Dịch Ngân Hàng / Mã Tham Chiếu Chuyển Tiền để lưu vết đối soát.', 'error');
+        if (inputTx) inputTx.focus();
         return;
       }
 
       const btn = document.getElementById('btnConfirmResolve');
-      const originalText = btn.innerHTML;
+      const originalText = btn ? btn.innerHTML : '';
 
       try {
-        btn.disabled = true;
-        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...`;
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...`;
+        }
 
         const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
         const res = await fetch(`/api/v1/payments/refunds/${encodeURIComponent(targetRefundIdToResolve)}/resolve-accounting`, {
@@ -1767,22 +2084,24 @@
           })
         });
 
-        const result = await res.json();
+        const result = await res.json().catch(() => ({}));
         if (!res.ok) {
-          alert(result.message || 'Xác nhận hoàn tiền thủ công không thành công.');
+          showToast(result.message || 'Xác nhận hoàn tiền thủ công không thành công.', 'error');
           return;
         }
 
-        alert('🎉 Chúc mừng! Hồ sơ hoàn tiền đã được xử lý hoàn tất thành công (Trạng thái: AccountingResolved).');
         closeResolveModal();
+        showToast(result.message || '🎉 Chúc mừng! Hồ sơ hoàn tiền đã được xử lý hoàn tất thành công (AccountingResolved).', 'success');
         await loadManualRefunds();
 
       } catch (err) {
         console.error(err);
-        alert(err.message || 'Lỗi khi gửi xác nhận hoàn tiền.');
+        showToast(err.message || 'Lỗi khi gửi xác nhận hoàn tiền.', 'error');
       } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+        }
       }
     }
 

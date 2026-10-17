@@ -24,7 +24,7 @@ function createDOMContext(customStorage = {}, search = '') {
   function createElement() {
     const classes = new Set();
     const attrs = new Map();
-    return {
+    const node = {
       textContent: '',
       innerHTML: '',
       title: '',
@@ -42,8 +42,13 @@ function createDOMContext(customStorage = {}, search = '') {
       },
       setAttribute: (k, v) => attrs.set(k, String(v)),
       getAttribute: k => attrs.get(k) || null,
-      removeAttribute: k => attrs.delete(k)
+      removeAttribute: k => attrs.delete(k),
+      appendChild: child => { child.parentNode = node; return child; },
+      remove: () => {},
+      removeChild: () => {},
+      focus: () => {}
     };
+    return node;
   }
 
   const localStorageStore = new Map(Object.entries(customStorage));
@@ -70,6 +75,8 @@ function createDOMContext(customStorage = {}, search = '') {
   };
 
   const documentObj = {
+    body: createElement(),
+    createElement: () => createElement(),
     getElementById: id => {
       if (!elements.has(id)) elements.set(id, createElement());
       return elements.get(id);
@@ -395,12 +402,264 @@ test('12. customer view does not see internal accounting actions or tech details
 });
 
 // =========================================================================
-// 13. Scripts parse successfully in all modified pages
+// 14. Auditor table renders action buttons strictly according to status
 // =========================================================================
-test('13. all modified HTML inline scripts parse cleanly via vm.Script', () => {
+test('14. auditor table renders action buttons strictly according to status', () => {
+  const { context, elements } = createDOMContext(
+    { user_info: JSON.stringify({ roles: ['Auditor'] }) },
+    ''
+  );
+  vm.runInContext(extractScript(auditorHtml), context);
+
+  // 1. ManualReviewRequired has Tiếp nhận, Chi tiết, Xem đơn; NO Hoàn tất
+  const manualItem = [{
+    id: 'ref-manual-1',
+    orderId: 'ord-1',
+    orderCode: 'ORD001',
+    amount: 300000,
+    status: 'ManualReviewRequired',
+    retryCount: 3,
+    attemptCount: 3
+  }];
+  context.rawRefundsList = manualItem;
+  context.renderRefundsTable(manualItem);
+  let html = elements.get('refundsTableBody').innerHTML;
+  assert.ok(html.includes('Tiếp nhận'), 'ManualReviewRequired must have Tiếp nhận button');
+  assert.ok(html.includes('openAssignModal'), 'ManualReviewRequired must open assign modal');
+  assert.ok(html.includes('Chi tiết'), 'ManualReviewRequired must have Chi tiết button');
+  assert.ok(html.includes('Xem đơn'), 'ManualReviewRequired must have Xem đơn button');
+  assert.ok(!html.includes('openResolveModal'), 'ManualReviewRequired must NOT have Hoàn tất button');
+
+  // 2. AccountingProcessing has Hoàn tất, Chi tiết, Xem đơn; NO Tiếp nhận
+  const processingItem = [{
+    id: 'ref-proc-1',
+    orderId: 'ord-2',
+    orderCode: 'ORD002',
+    amount: 450000,
+    status: 'AccountingProcessing',
+    retryCount: 3,
+    attemptCount: 3
+  }];
+  context.rawRefundsList = processingItem;
+  context.renderRefundsTable(processingItem);
+  html = elements.get('refundsTableBody').innerHTML;
+  assert.ok(html.includes('Hoàn tất'), 'AccountingProcessing must have Hoàn tất button');
+  assert.ok(html.includes('openResolveModal'), 'AccountingProcessing must open resolve modal');
+  assert.ok(html.includes('Chi tiết'), 'AccountingProcessing must have Chi tiết button');
+  assert.ok(html.includes('Xem đơn'), 'AccountingProcessing must have Xem đơn button');
+  assert.ok(!html.includes('openAssignModal'), 'AccountingProcessing must NOT have Tiếp nhận button');
+
+  // 3. AccountingResolved and Succeeded have NO mutation action (chỉ Chi tiết, Xem đơn)
+  const resolvedItems = [
+    { id: 'ref-res-1', orderId: 'ord-3', orderCode: 'ORD003', amount: 200000, status: 'AccountingResolved' },
+    { id: 'ref-suc-1', orderId: 'ord-4', orderCode: 'ORD004', amount: 150000, status: 'Succeeded' }
+  ];
+  context.rawRefundsList = resolvedItems;
+  context.renderRefundsTable(resolvedItems);
+  html = elements.get('refundsTableBody').innerHTML;
+  assert.ok(!html.includes('openAssignModal'), 'Resolved/Succeeded must NOT have Tiếp nhận button');
+  assert.ok(!html.includes('openResolveModal'), 'Resolved/Succeeded must NOT have Hoàn tất button');
+  assert.ok(html.includes('Chi tiết'), 'Resolved/Succeeded must have Chi tiết button');
+  assert.ok(html.includes('Xem đơn'), 'Resolved/Succeeded must have Xem đơn button');
+
+  // 4. RetryScheduled has NO mutation action (kế toán không xử lý khi đang retry tự động)
+  const retryItem = [{
+    id: 'ref-ret-1',
+    orderId: 'ord-5',
+    orderCode: 'ORD005',
+    amount: 500000,
+    status: 'RetryScheduled',
+    retryCount: 1,
+    attemptCount: 1
+  }];
+  context.rawRefundsList = retryItem;
+  context.renderRefundsTable(retryItem);
+  html = elements.get('refundsTableBody').innerHTML;
+  assert.ok(!html.includes('openAssignModal'), 'RetryScheduled must NOT have Tiếp nhận button');
+  assert.ok(!html.includes('openResolveModal'), 'RetryScheduled must NOT have Hoàn tất button');
+  assert.ok(html.includes('Chi tiết'), 'RetryScheduled must have Chi tiết button');
+  assert.ok(html.includes('Xem đơn'), 'RetryScheduled must have Xem đơn button');
+});
+
+// =========================================================================
+// 15. Customer cannot see mutation actions in auditor table
+// =========================================================================
+test('15. customer role does not see mutation actions in auditor table', () => {
+  const { context, elements } = createDOMContext(
+    { user_info: JSON.stringify({ roles: ['Customer'] }) },
+    ''
+  );
+  vm.runInContext(extractScript(auditorHtml), context);
+
+  const sampleList = [
+    { id: 'ref-1', orderId: 'ord-1', orderCode: 'ORD1', amount: 500000, status: 'ManualReviewRequired' },
+    { id: 'ref-2', orderId: 'ord-2', orderCode: 'ORD2', amount: 600000, status: 'AccountingProcessing' }
+  ];
+
+  context.rawRefundsList = sampleList;
+  context.renderRefundsTable(sampleList);
+
+  const html = elements.get('refundsTableBody').innerHTML;
+  assert.ok(!html.includes('openAssignModal'), 'Customer must not see Tiếp nhận button');
+  assert.ok(!html.includes('openResolveModal'), 'Customer must not see Hoàn tất button');
+  assert.ok(html.includes('Chi tiết'), 'Customer can still see Chi tiết');
+  assert.ok(html.includes('Xem đơn'), 'Customer can still see Xem đơn');
+});
+
+// =========================================================================
+// 16. Modal confirm for assign accounting displays 6 required fields
+// =========================================================================
+test('16. modal confirm for assign accounting displays 6 required fields', () => {
+  const { context, elements } = createDOMContext(
+    { user_info: JSON.stringify({ roles: ['Auditor'] }) },
+    ''
+  );
+  vm.runInContext(extractScript(auditorHtml), context);
+
+  const sample = {
+    id: 'ref-confirm-assign-1234',
+    orderId: 'ord-guid-9999',
+    orderCode: 'ORD777888',
+    amount: 750000,
+    status: 'ManualReviewRequired',
+    errorCode: 'GATEWAY_TIMEOUT',
+    errorMessage: 'Cổng thanh toán không phản hồi sau 3 lần thử',
+    reason: 'Hủy vé sự kiện do bận việc'
+  };
+
+  context.rawRefundsList = [sample];
+  context.openAssignModal(sample.id);
+
+  // 1. Action to be performed
+  const actionText = elements.get('assignModalAction').textContent;
+  assert.ok(actionText.length > 0);
+  assert.ok(actionText.includes('tiếp nhận') || actionText.includes('Tiếp nhận'));
+
+  // 2. Refund ID
+  assert.equal(elements.get('assignModalRefundId').textContent, sample.id);
+
+  // 3. Order ID / Order Code
+  assert.ok(elements.get('assignModalOrderId').textContent.includes('ORD777888'));
+
+  // 4. Amount
+  assert.ok(elements.get('assignModalAmount').textContent.includes('750.000'));
+
+  // 5. Current status
+  assert.ok(elements.get('assignModalStatus').innerHTML.includes('ManualReviewRequired') ||
+            elements.get('assignModalStatus').innerHTML.includes('Chờ xử lý'));
+
+  // 6. Gateway reason
+  assert.ok(elements.get('assignModalGatewayReason').textContent.includes('Cổng thanh toán không phản hồi'));
+
+  // Modal is marked active
+  assert.ok(elements.get('modalConfirmAssign').classList.contains('active'));
+});
+
+// =========================================================================
+// 17. Modal confirm for resolve accounting displays 6 required fields
+// =========================================================================
+test('17. modal confirm for resolve accounting displays 6 required fields', () => {
+  const { context, elements } = createDOMContext(
+    { user_info: JSON.stringify({ roles: ['Auditor'] }) },
+    ''
+  );
+  vm.runInContext(extractScript(auditorHtml), context);
+
+  const sample = {
+    id: 'ref-confirm-resolve-5678',
+    orderId: 'ord-guid-4321',
+    orderCode: 'ORD555666',
+    amount: 1200000,
+    status: 'AccountingProcessing',
+    errorCode: 'ACCOUNT_FROZEN',
+    errorMessage: 'Tài khoản nhận tiền bị khóa bởi ngân hàng',
+    reason: 'Yêu cầu hoàn trả vé'
+  };
+
+  context.rawRefundsList = [sample];
+  context.openResolveModal(sample.id);
+
+  // 1. Action to be performed
+  const actionText = elements.get('modalResolveAction').textContent;
+  assert.ok(actionText.length > 0);
+  assert.ok(actionText.includes('hoàn tiền thủ công') || actionText.includes('Hoàn tất'));
+
+  // 2. Refund ID
+  assert.equal(elements.get('modalResolveRefundId').textContent, sample.id);
+
+  // 3. Order ID / Order Code
+  assert.ok(elements.get('modalOrderCode').textContent.includes('ORD555666'));
+
+  // 4. Amount
+  assert.ok(elements.get('modalRefundAmount').textContent.includes('1.200.000'));
+
+  // 5. Current status
+  assert.ok(elements.get('modalResolveCurrentStatus').innerHTML.includes('AccountingProcessing') ||
+            elements.get('modalResolveCurrentStatus').innerHTML.includes('Đang xử lý'));
+
+  // 6. Gateway reason
+  assert.ok(elements.get('modalResolveGatewayReason').textContent.includes('Tài khoản nhận tiền bị khóa'));
+
+  // Modal is marked active
+  assert.ok(elements.get('modalResolveAccounting').classList.contains('active'));
+});
+
+// =========================================================================
+// 18. API failure preserves old status without faking UI state
+// =========================================================================
+test('18. API failure preserves old status without faking UI state', async () => {
+  const fetchCalls = [];
+  const { context, elements } = createDOMContext(
+    { user_info: JSON.stringify({ roles: ['Auditor'] }) },
+    ''
+  );
+
+  // Mock fetch that fails for assign-accounting
+  context.fetch = async (url, opts) => {
+    fetchCalls.push({ url, method: opts?.method });
+    if (url.includes('assign-accounting')) {
+      return {
+        ok: false,
+        status: 400,
+        json: async () => ({ message: 'Không thể tiếp nhận lệnh ở trạng thái này.' })
+      };
+    }
+    return { ok: true, status: 200, json: async () => ({ data: [] }) };
+  };
+
+  vm.runInContext(extractScript(auditorHtml), context);
+
+  const sample = {
+    id: 'ref-error-test',
+    orderId: 'ord-error-test',
+    orderCode: 'ORDERR',
+    amount: 100000,
+    status: 'ManualReviewRequired'
+  };
+  context.rawRefundsList = [sample];
+  context.renderRefundsTable([sample]);
+
+  // Open modal and attempt submit
+  context.openAssignModal(sample.id);
+  await context.submitAssignAccounting();
+
+  // Assert API call was made to real endpoint
+  assert.equal(fetchCalls.length, 1);
+  assert.ok(fetchCalls[0].url.includes('/api/v1/payments/refunds/ref-error-test/assign-accounting'));
+  assert.equal(fetchCalls[0].method, 'POST');
+
+  // Status in rawRefundsList has NOT changed falsely
+  assert.equal(context.rawRefundsList[0].status, 'ManualReviewRequired');
+});
+
+// =========================================================================
+// 19. Scripts parse successfully in all modified pages
+// =========================================================================
+test('19. all modified HTML inline scripts parse cleanly via vm.Script', () => {
+  const reloadedAuditorHtml = fs.readFileSync(path.join(root, 'auditor.html'), 'utf8');
   const pages = [
     { name: 'order-details.html', html: orderDetailsHtml },
-    { name: 'auditor.html', html: auditorHtml },
+    { name: 'auditor.html', html: reloadedAuditorHtml },
     { name: 'my-orders.html', html: myOrdersHtml },
     { name: 'order-audit-logs.html', html: orderAuditLogsHtml }
   ];
