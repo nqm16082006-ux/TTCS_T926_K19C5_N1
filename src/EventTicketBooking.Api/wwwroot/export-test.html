@@ -466,6 +466,11 @@
     });
 
     function switchTab(tab) {
+      if (tab === 's62') {
+        const showId = document.getElementById('showtimeSelect').value || new URLSearchParams(location.search).get('showId') || '';
+        location.href = './checkin-export.html?showId=' + encodeURIComponent(showId);
+        return;
+      }
       const tabS60 = document.getElementById('tabContentS60');
       const tabS62 = document.getElementById('tabContentS62');
       const btnS60 = document.getElementById('tabBtnS60');
