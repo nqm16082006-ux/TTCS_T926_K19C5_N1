@@ -254,7 +254,7 @@
     // Button actions
     document.getElementById('btnRefresh').addEventListener('click', () => loadStats());
     document.getElementById('btnExportCsv').addEventListener('click', () => {
-      window.location.href = `${API_BASE}/api/v1/checkin/showtimes/${encodeURIComponent(showtimeId)}/export-csv`;
+      window.location.href = `./checkin-export.html?showId=${encodeURIComponent(showtimeId)}`;
     });
     document.getElementById('btnFullscreen').addEventListener('click', () => {
       if (!document.fullscreenElement) {

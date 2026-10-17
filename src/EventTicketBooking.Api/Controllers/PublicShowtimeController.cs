@@ -51,6 +51,7 @@ namespace EventTicketBooking.Api.Controllers
         /// GET /api/public/showtimes?cursor={cursor}&limit={limit}
         /// </summary>
         [HttpGet("events")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetOnSaleEvents(string? cursor = null, int limit = 50)
         {
             limit = Math.Clamp(limit, 1, 50);

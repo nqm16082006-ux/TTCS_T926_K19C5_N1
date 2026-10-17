@@ -1,111 +1,102 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
+using System.Security.Claims;
+using EventTicketBooking.Api.Data;
 using EventTicketBooking.Api.DTOs;
 using EventTicketBooking.Api.Middlewares;
 using EventTicketBooking.Api.Services;
 using EventTicketBooking.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
-namespace EventTicketBooking.Api.Controllers
+namespace EventTicketBooking.Api.Controllers;
+
+[ApiController]
+[Route("api/shows/{showId:guid}/checkins")]
+[RequireRole("Admin", "Organizer")]
+public class ShowsCheckinController(
+    ICheckinExportService exportService,
+    ILogger<ShowsCheckinController> logger,
+    AppDbContext db) : ControllerBase
 {
-    /// <summary>
-    /// Controller phục vụ quản lý và xuất danh sách soát vé theo suất diễn (Story S-62).
-    /// </summary>
-    [ApiController]
-    [Route("api/shows/{showId}/checkins")]
-    [RequireRole("Admin", "Staff", "Organizer")]
-    public class ShowsCheckinController : ControllerBase
+    private async Task<IActionResult?> CheckAccess(Guid showId, CancellationToken ct)
     {
-        private readonly ICheckinExportService _checkinExportService;
-        private readonly ILogger<ShowsCheckinController> _logger;
-
-        public ShowsCheckinController(
-            ICheckinExportService checkinExportService,
-            ILogger<ShowsCheckinController> logger)
+        if (showId == Guid.Empty) return BadRequest(new { message = "Mã suất diễn không hợp lệ." });
+        if (User.Identity?.IsAuthenticated != true) return Unauthorized();
+        if (!User.IsInRole("Admin") && !User.IsInRole("Organizer")) return Forbid();
+        var show = await db.Showtimes.AsNoTracking().Where(s => s.Id == showId)
+            .Select(s => new { s.Event.OwnerId }).SingleOrDefaultAsync(ct);
+        if (show == null) return NotFound(new { message = "Không tìm thấy suất diễn." });
+        var id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("id") ?? User.FindFirstValue("sub");
+        if (!User.IsInRole("Admin") && (!Guid.TryParse(id, out var userId) || userId != show.OwnerId))
         {
-            _checkinExportService = checkinExportService ?? throw new ArgumentNullException(nameof(checkinExportService));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            SecurityAuditLogger.LogOwnershipDenied(HttpContext, "ShowsCheckinExport", showId.ToString());
+            return StatusCode(403, new { message = "Bạn không có quyền xuất dữ liệu của sự kiện này." });
         }
-
-        /// <summary>
-        /// Story S-62: Xuất danh sách khách vào cửa theo suất diễn ra tệp CSV chuẩn UTF-8 có BOM.
-        /// Cho phép lọc theo GateName / DoorName / GateId / DoorId và OnlyConflicts.
-        /// Trả về file download với filename: danh-sach-checkin-suat-{showId}.csv.
-        /// </summary>
-        [HttpGet("export-csv")]
-        public async Task<IActionResult> ExportCheckinListCsv(
-            [FromRoute] Guid showId,
-            [FromQuery] string? gateName = null,
-            [FromQuery] string? doorName = null,
-            [FromQuery] string? gateId = null,
-            [FromQuery] string? doorId = null,
-            [FromQuery] bool? onlyConflicts = null,
-            [FromQuery] bool includeNotCheckedIn = false,
-            CancellationToken cancellationToken = default)
-        {
-            if (showId == Guid.Empty)
-            {
-                return BadRequest(new { Message = "Mã suất diễn không hợp lệ." });
-            }
-
-            // Story S-02: Kiểm tra Event Ownership cho vai trò Organizer
-            if (User.IsInRole("Organizer") && !User.IsInRole("Admin"))
-            {
-                var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                                  ?? User.FindFirst("id")?.Value
-                                  ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
-
-                if (!Guid.TryParse(userIdClaim, out var currentUserId))
-                {
-                    return Unauthorized(new { Message = "Vui lòng đăng nhập để tiếp tục." });
-                }
-
-                var db = HttpContext.RequestServices.GetRequiredService<EventTicketBooking.Api.Data.AppDbContext>();
-                var showtime = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
-                    db.Showtimes.Include(s => s.Event), s => s.Id == showId, cancellationToken);
-
-                if (showtime == null)
-                {
-                    return NotFound(new { Message = $"Không tìm thấy suất diễn với ID {showId}." });
-                }
-
-                if (showtime.Event == null || showtime.Event.OwnerId != currentUserId)
-                {
-                    SecurityAuditLogger.LogOwnershipDenied(HttpContext, "ShowsCheckinExport", showId.ToString());
-                    return StatusCode(StatusCodes.Status403Forbidden, new { Message = "Bạn không có quyền xuất dữ liệu soát vé của sự kiện này." });
-                }
-            }
-
-            var query = new ExportCheckinListQuery
-            {
-                ShowId = showId,
-                GateName = gateName,
-                DoorName = doorName,
-                GateId = gateId,
-                DoorId = doorId,
-                OnlyConflicts = onlyConflicts,
-                IncludeNotCheckedIn = includeNotCheckedIn
-            };
-
-            try
-            {
-                var csvBytes = await _checkinExportService.ExportCheckinCsvAsync(query, cancellationToken);
-                var filename = $"danh-sach-checkin-suat-{showId}.csv";
-                return File(csvBytes, "text/csv; charset=utf-8", filename);
-            }
-            catch (System.Collections.Generic.KeyNotFoundException ex)
-            {
-                return NotFound(new { Message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lỗi khi xuất danh sách soát vé cho suất diễn {ShowId}", showId);
-                return StatusCode(StatusCodes.Status500InternalServerError, new { Message = "Đã xảy ra lỗi khi tạo tệp CSV xuất danh sách soát vé." });
-            }
-        }
+        return null;
     }
+
+    [HttpGet("export-csv")]
+    [HttpGet("/api/v1/checkin/showtimes/{showId:guid}/export-csv")]
+    public async Task<IActionResult> ExportCheckinListCsv(
+        Guid showId, string? gateName = null, string? doorName = null,
+        string? gateId = null, string? doorId = null, bool? onlyConflicts = null,
+        bool includeNotCheckedIn = false, CancellationToken cancellationToken = default,
+        bool includeScanLog = false)
+    {
+        var denied = await CheckAccess(showId, cancellationToken);
+        if (denied != null) return denied;
+        var query = Query(showId, gateName ?? doorName ?? gateId ?? doorId, onlyConflicts, includeNotCheckedIn, includeScanLog);
+        var rows = await exportService.GetCheckinExportDataAsync(query, cancellationToken);
+        logger.LogInformation("Checkin export: show {ShowId}, actor {Actor}, audit {Audit}, rows {Count}",
+            showId, User.FindFirstValue(ClaimTypes.NameIdentifier), includeScanLog, rows.Count);
+        Response.Headers.CacheControl = "no-store";
+        return File(exportService.GenerateCsvBytes(rows), "text/csv; charset=utf-8", $"danh-sach-checkin-suat-{showId}.csv");
+    }
+
+    [HttpGet("export-excel")]
+    public async Task<IActionResult> ExportExcel(Guid showId, string? gateName = null,
+        bool? onlyConflicts = null, bool includeScanLog = false, CancellationToken cancellationToken = default)
+    {
+        var denied = await CheckAccess(showId, cancellationToken);
+        if (denied != null) return denied;
+        var rows = await exportService.GetCheckinExportDataAsync(Query(showId, gateName, onlyConflicts, false, includeScanLog), cancellationToken);
+        var show = await db.Showtimes.AsNoTracking().Where(s => s.Id == showId)
+            .Select(s => new { s.Event.Title, s.Name, s.StartTime }).SingleAsync(cancellationToken);
+        var filters = (includeScanLog ? "Nhật ký đối soát" : "Danh sách đã vào cửa")
+            + (string.IsNullOrWhiteSpace(gateName) ? " · Tất cả cửa" : $" · Cửa: {gateName.Trim()}")
+            + (onlyConflicts == true ? " · Chỉ dòng có xung đột" : "");
+        Response.Headers.CacheControl = "no-store";
+        logger.LogInformation("Checkin XLSX export: show {ShowId}, actor {Actor}, rows {Count}", showId,
+            User.FindFirstValue(ClaimTypes.NameIdentifier), rows.Count);
+        return File(CheckinWorkbookWriter.Create(rows, show.Title, show.Name ?? show.StartTime.ToString("dd/MM/yyyy"), filters),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"danh-sach-checkin-suat-{showId}.xlsx");
+    }
+
+    [HttpGet("export-preview")]
+    public async Task<IActionResult> Preview(Guid showId, string? gateName = null,
+        bool? onlyConflicts = null, bool includeScanLog = false, CancellationToken cancellationToken = default)
+    {
+        var denied = await CheckAccess(showId, cancellationToken);
+        if (denied != null) return denied;
+        var rows = await exportService.GetCheckinExportDataAsync(Query(showId, gateName, onlyConflicts, false, includeScanLog), cancellationToken);
+        Response.Headers.CacheControl = "no-store";
+        return Ok(new
+        {
+            items = rows.Take(200),
+            totalRows = rows.Count,
+            admittedCount = rows.Count(r => r.Result == "Đã vào"),
+            uniqueTickets = rows.Where(r => r.Result == "Đã vào").Select(r => r.TicketCode).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            conflictCount = rows.Count(r => r.IsConflict),
+            timeZone = "Asia/Ho_Chi_Minh",
+            previewLimit = 200
+        });
+    }
+
+    private static ExportCheckinListQuery Query(Guid id, string? gate, bool? conflicts, bool notCheckedIn, bool audit) => new()
+    {
+        ShowId = id,
+        GateName = gate,
+        OnlyConflicts = conflicts,
+        IncludeNotCheckedIn = notCheckedIn,
+        IncludeScanLog = audit
+    };
 }

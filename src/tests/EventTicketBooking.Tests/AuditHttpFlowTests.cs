@@ -68,6 +68,7 @@ public class AuditHttpFlowTests
         }
         await app.StartAsync();
         using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/public/events")).StatusCode);
         var tokenService = new TokenService(builder.Configuration);
         void Authenticate(User user) => client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenService.GenerateAccessToken(user, user.UserRoles.Select(ur => ur.Role.Name)));
         async Task<HttpResponseMessage> Import(string content, string action = "import")
