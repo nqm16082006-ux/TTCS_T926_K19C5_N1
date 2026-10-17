@@ -87,6 +87,8 @@ public sealed class MonitoringMetricsTests
         {
             Id = showtimeId,
             AvailableSeats = 100,
+            StartTime = DateTime.UtcNow.AddDays(1),
+            EndTime = DateTime.UtcNow.AddDays(1).AddHours(2),
             Event = new Event { Id = Guid.NewGuid(), Title = "Test Event", MaxTicketsPerUser = 5 }
         };
         showtime.ChangeStatus(ShowtimeStatus.OnSale);
@@ -136,6 +138,8 @@ public sealed class MonitoringMetricsTests
         {
             Id = showtimeId,
             AvailableSeats = 100,
+            StartTime = DateTime.UtcNow.AddDays(1),
+            EndTime = DateTime.UtcNow.AddDays(1).AddHours(2),
             Event = new Event { Id = Guid.NewGuid(), Title = "Test Event", MaxTicketsPerUser = 5 }
         };
         showtime.ChangeStatus(ShowtimeStatus.OnSale);
@@ -189,6 +193,8 @@ public sealed class MonitoringMetricsTests
             {
                 Id = showtimeId,
                 AvailableSeats = 100,
+                StartTime = DateTime.UtcNow.AddDays(1),
+                EndTime = DateTime.UtcNow.AddDays(1).AddHours(2),
                 Event = new Event { Id = Guid.NewGuid(), Title = "Test Event", MaxTicketsPerUser = 5 }
             };
             showtime.ChangeStatus(ShowtimeStatus.OnSale);

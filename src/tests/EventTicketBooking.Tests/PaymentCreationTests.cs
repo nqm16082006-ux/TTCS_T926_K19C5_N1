@@ -63,6 +63,32 @@ namespace EventTicketBooking.Tests
         }
 
         #region TEST 1: Create payment với Order hợp lệ
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Payment_AfterSaleCloses_AllowsExistingOrderOnlyBeforeShowEnd(bool ended)
+        {
+            var order = CreateTestOrder();
+            var show = new Showtime
+            {
+                Id = _defaultShowtimeId,
+                AvailableSeats = 1,
+                StartTime = DateTime.UtcNow.AddHours(-2),
+                EndTime = ended ? DateTime.UtcNow.AddMinutes(-1) : DateTime.UtcNow.AddHours(1),
+                SalesEndTime = DateTime.UtcNow.AddMinutes(-1)
+            };
+            show.ChangeStatus(ShowtimeStatus.OnSale);
+            show.ChangeStatus(ShowtimeStatus.Closed);
+            _context.Showtimes.Add(show);
+            await _context.SaveChangesAsync();
+            var gateway = new FakePaymentGateway { ShouldSucceed = true };
+            var service = new PaymentService(_context, gateway, NullLogger<PaymentService>.Instance,
+                new Moq.Mock<EventTicketBooking.Api.BackgroundServices.ITicketEmailQueue>().Object);
+            var result = await service.CreatePaymentForOrderAsync(order.Id, _defaultUserId);
+            Assert.Equal(!ended, result.Success);
+            if (ended) Assert.Empty(gateway.RecordedCreationRequests);
+        }
+
         [Fact]
         public async Task Test1_CreatePayment_ValidOrder_ReturnsSuccessAndPaymentUrl()
         {
@@ -373,6 +399,13 @@ namespace EventTicketBooking.Tests
             var forbiddenResult = await controller.CreatePayment(order.Id) as ObjectResult;
             Assert.NotNull(forbiddenResult);
             Assert.Equal(StatusCodes.Status403Forbidden, forbiddenResult.StatusCode);
+
+            // 4. Task T-41: Đơn hết hạn thì trả HTTP 409 Conflict
+            var expiredOrder = CreateTestOrder(totalAmount: 200000, expiryMinutes: -10);
+            controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(identity);
+            var conflictResult = await controller.CreatePayment(expiredOrder.Id) as ObjectResult;
+            Assert.NotNull(conflictResult);
+            Assert.Equal(StatusCodes.Status409Conflict, conflictResult.StatusCode);
         }
         #endregion
     }

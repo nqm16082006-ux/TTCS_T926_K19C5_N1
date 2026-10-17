@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html class="h-full" lang="vi">
 <head>
+  <link rel="stylesheet" href="./event-description.css">
+  <script src="./event-description.js"></script>
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
   <title id="pageTitle">Chi tiết Sự kiện - EventPulse</title>
@@ -234,13 +236,13 @@
               <!-- 2 Artist/Gallery Images -->
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md pt-space-xs">
                 <div class="relative overflow-hidden rounded-lg group h-44 bg-surface-container">
-                  <img id="galleryImg1" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=80" alt="Nghệ sĩ biểu diễn">
+                  <img id="galleryImg1" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=80" alt="Nghệ sĩ biểu diễn" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&q=80';">
                   <div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/90 via-transparent to-transparent flex items-end p-3">
                     <span class="font-label-md text-label-md text-surface-bright">Dàn Nghệ Sĩ Khách Mời Đỉnh Cao</span>
                   </div>
                 </div>
                 <div class="relative overflow-hidden rounded-lg group h-44 bg-surface-container">
-                  <img id="galleryImg2" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" src="https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=800&q=80" alt="Không gian sân khấu">
+                  <img id="galleryImg2" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" src="https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=800&q=80" alt="Không gian sân khấu" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=80';">
                   <div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/90 via-transparent to-transparent flex items-end p-3">
                     <span class="font-label-md text-label-md text-surface-bright">Không Gian Sân Khấu Hiện Đại</span>
                   </div>
@@ -821,7 +823,7 @@
       const descEl = document.getElementById('eventDescription');
       if (ev.description && ev.description.trim()) {
         // Nếu có thẻ HTML hoặc text thuần
-        descEl.innerHTML = `<p class="leading-relaxed">${escapeHtml(ev.description).replace(/\n\n/g, '</p><p class="leading-relaxed">').replace(/\n/g, '<br>')}</p>`;
+        descEl.innerHTML = formatEventDescription(ev.description);
       } else {
         descEl.innerHTML = `
           <p>Chưa có thông tin giới thiệu sự kiện.</p>
@@ -857,6 +859,7 @@
     }
 
     function renderShowtimes(showtimes, eventId, activeShowtimeId, defaultMin, defaultMax) {
+      showtimes = (showtimes || []).filter(s => (s.status === 'OnSale' || s.status === 2) && new Date(s.endTime) > new Date() && new Date(s.salesEndTime || s.startTime) > new Date());
       const container = document.getElementById('showtimesContainer');
       const countBadge = document.getElementById('totalShowtimesCount');
       container.innerHTML = '';
@@ -905,7 +908,7 @@
                   <span class="font-headline-sm text-headline-sm text-on-surface font-semibold">${dt.dayName}, ${dt.date}</span>
                 </div>
                 <p class="font-body-sm text-body-sm text-on-surface-variant font-medium">
-                  ${idx === 0 ? 'Suất diễn chính • Khán phòng trung tâm' : 'Suất diễn bổ sung • Giữ chỗ trực tiếp'}
+                  ${escapeHtml(st.name || 'Chọn lịch này để tiếp tục đặt vé')}
                 </p>
               </div>
               <span class="px-2.5 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm flex items-center gap-1 font-bold shrink-0">

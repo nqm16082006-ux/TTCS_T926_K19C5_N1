@@ -16,8 +16,10 @@ namespace EventTicketBooking.Tests;
 
 public sealed class OrdersControllerTests
 {
-    [Fact]
-    public async Task CreateOrderFromHolds_AllowsCurrentUsersHeldSeatWithInMemoryDatabase()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CreateOrderFromHolds_AllowsCurrentUsersHeldSeatWithInMemoryDatabase(bool nearShowEnd)
     {
         var userId = Guid.NewGuid();
         var eventId = Guid.NewGuid();
@@ -54,6 +56,12 @@ public sealed class OrdersControllerTests
             EndTime = DateTime.UtcNow.AddDays(1).AddHours(2),
             AvailableSeats = 1
         };
+        if (nearShowEnd)
+        {
+            showtime.StartTime = DateTime.UtcNow.AddHours(-1);
+            showtime.EndTime = DateTime.UtcNow.AddMinutes(2);
+            showtime.SalesEndTime = showtime.EndTime;
+        }
         showtime.ChangeStatus(ShowtimeStatus.OnSale);
         var ev = new Event
         {
@@ -104,5 +112,7 @@ public sealed class OrdersControllerTests
         var order = Assert.IsType<OrderDto>(response.Data);
         Assert.Equal(100_000, order.TotalAmount);
         Assert.Equal(seatId, Assert.Single(order.Items).SeatId);
+        Assert.True(context.Orders.Single().ExpiresAt.UtcDateTime <= showtime.EndTime);
+        if (nearShowEnd) Assert.Equal(showtime.EndTime, context.Orders.Single().ExpiresAt.UtcDateTime);
     }
 }

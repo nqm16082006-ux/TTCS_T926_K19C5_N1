@@ -53,21 +53,24 @@ public class AuditHttpFlowTests
         var customer = new User { Username = "customer", Email = "customer@audit.test", PasswordHash = "hash", IsActive = true };
         var stranger = new User { Username = "stranger", Email = "stranger@audit.test", PasswordHash = "hash", IsActive = true };
         var organizerRole = new Role { Name = "Organizer" };
+        var customerRole = new Role { Name = "Customer" };
         owner.UserRoles.Add(new UserRole { UserId = owner.Id, RoleId = organizerRole.Id, Role = organizerRole });
         stranger.UserRoles.Add(new UserRole { UserId = stranger.Id, RoleId = organizerRole.Id, Role = organizerRole });
+        customer.UserRoles.Add(new UserRole { UserId = customer.Id, RoleId = customerRole.Id, Role = customerRole });
         var ev = new Event { OwnerId = owner.Id, Title = "Audit concert", Location = "Venue", TotalSeats = 1 };
         var show = new Showtime { EventId = ev.Id, StartTime = DateTime.UtcNow.AddDays(1), EndTime = DateTime.UtcNow.AddDays(1).AddHours(1), AvailableSeats = 1 };
         using (var scope = app.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await db.Database.EnsureCreatedAsync();
-            db.AddRange(owner, customer, stranger, ev, show);
+            db.AddRange(owner, customer, stranger, ev, show, organizerRole, customerRole);
             await db.SaveChangesAsync();
         }
         await app.StartAsync();
         using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/public/events")).StatusCode);
         var tokenService = new TokenService(builder.Configuration);
-        void Authenticate(User user) => client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenService.GenerateAccessToken(user, Array.Empty<string>()));
+        void Authenticate(User user) => client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenService.GenerateAccessToken(user, user.UserRoles.Select(ur => ur.Role.Name)));
         async Task<HttpResponseMessage> Import(string content, string action = "import")
         {
             using var form = new MultipartFormDataContent();
@@ -135,19 +138,18 @@ public class AuditHttpFlowTests
             Assert.Equal("PAID", (await db.PaymentTransactions.SingleAsync()).Status);
         }
         Authenticate(stranger);
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsync($"/api/events/{ev.Id}/duplicate", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync($"/api/events/{ev.Id}/showtimes/{show.Id}/duplicate", new { startTime = show.StartTime.AddDays(1), endTime = show.EndTime.AddDays(1) })).StatusCode);
         Authenticate(owner);
-        var duplicated = await client.PostAsync($"/api/events/{ev.Id}/duplicate", null);
+        var duplicated = await client.PostAsJsonAsync($"/api/events/{ev.Id}/showtimes/{show.Id}/duplicate", new { startTime = show.StartTime.AddDays(1), endTime = show.EndTime.AddDays(1) });
         Assert.Equal(HttpStatusCode.Created, duplicated.StatusCode);
         var copyId = (await duplicated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data").GetProperty("id").GetGuid();
         Assert.NotEqual(ev.Id, copyId);
         using (var scope = app.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var copy = await db.Events.Include(e => e.Showtimes).ThenInclude(s => s.SeatCategories).SingleAsync(e => e.Id == copyId);
-            Assert.EndsWith(" (Bản sao)", copy.Title);
-            Assert.Equal(owner.Id, copy.OwnerId);
-            var copiedShow = Assert.Single(copy.Showtimes);
+            var copiedShow = await db.Showtimes.Include(s => s.SeatCategories).SingleAsync(s => s.Id == copyId);
+            Assert.Equal(ev.Id, copiedShow.EventId);
+            Assert.Equal(1, await db.Events.CountAsync());
             Assert.Equal(ShowtimeStatus.Draft, copiedShow.Status);
             Assert.NotEqual(show.Id, copiedShow.Id);
             var copiedCategory = Assert.Single(copiedShow.SeatCategories);

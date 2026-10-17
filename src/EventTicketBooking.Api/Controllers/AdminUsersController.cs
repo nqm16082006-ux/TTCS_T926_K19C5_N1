@@ -55,8 +55,8 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(ApiResponse<object>.FailureResult("Email không hợp lệ."));
             if (string.IsNullOrWhiteSpace(dto.Password) || dto.Password.Length < 8)
                 return BadRequest(ApiResponse<object>.FailureResult("Mật khẩu phải có ít nhất 8 ký tự."));
-            if (dto.Roles == null || dto.Roles.Count == 0 || dto.Roles.Any(string.IsNullOrWhiteSpace))
-                return BadRequest(ApiResponse<object>.FailureResult("Tài khoản nhân viên phải có ít nhất một vai trò."));
+            if (dto.Roles == null || dto.Roles.Count != 1 || string.IsNullOrWhiteSpace(dto.Roles[0]))
+                return BadRequest(ApiResponse<object>.FailureResult("Tài khoản người dùng phải có đúng 1 vai trò duy nhất."));
 
             if (await _context.Users.AnyAsync(u => u.Username == username))
                 return BadRequest(ApiResponse<object>.FailureResult("Tên đăng nhập đã tồn tại."));
@@ -211,9 +211,9 @@ namespace EventTicketBooking.Api.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> UpdateUserRoles(Guid id, [FromBody] UpdateUserRolesDto dto)
         {
-            if (dto.Roles == null || dto.Roles.Count == 0 || dto.Roles.Any(string.IsNullOrWhiteSpace))
+            if (dto.Roles == null || dto.Roles.Count != 1 || string.IsNullOrWhiteSpace(dto.Roles[0]))
             {
-                return BadRequest(ApiResponse<object>.FailureResult("Người dùng phải có ít nhất một vai trò."));
+                return BadRequest(ApiResponse<object>.FailureResult("Người dùng phải có đúng 1 vai trò duy nhất."));
             }
 
             var user = await _context.Users
@@ -261,20 +261,15 @@ namespace EventTicketBooking.Api.Controllers
                 return BadRequest(ApiResponse<object>.FailureResult($"Các vai trò không tồn tại trong hệ thống: {string.Join(", ", invalidNames)}"));
             }
 
-            // Cập nhật quan hệ UserRoles
-            var targetRoleIds = matchedRoles.Select(r => r.Id).ToHashSet();
-            _context.UserRoles.RemoveRange(user.UserRoles.Where(ur => !targetRoleIds.Contains(ur.RoleId)).ToList());
-
-            foreach (var role in matchedRoles)
+            // Cập nhật quan hệ UserRoles: REPLACE toàn bộ vai trò cũ bằng 1 vai trò mới duy nhất
+            var targetRole = matchedRoles[0];
+            _context.UserRoles.RemoveRange(user.UserRoles);
+            _context.UserRoles.Add(new UserRole
             {
-                if (user.UserRoles.Any(ur => ur.RoleId == role.Id)) continue;
-                _context.UserRoles.Add(new UserRole
-                {
-                    UserId = user.Id,
-                    RoleId = role.Id,
-                    AssignedAt = DateTime.UtcNow
-                });
-            }
+                UserId = user.Id,
+                RoleId = targetRole.Id,
+                AssignedAt = DateTime.UtcNow
+            });
 
             // S-28: Ghi Audit Log cho mọi thay đổi role (Actor lấy từ identity đã xác thực).
             _context.AuditLogs.Add(new AuditLog

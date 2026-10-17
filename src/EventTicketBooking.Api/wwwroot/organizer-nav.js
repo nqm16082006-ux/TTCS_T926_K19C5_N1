@@ -18,8 +18,40 @@
   }
 
   function init() {
+    fixStaleLogosAndLabels();
     initOrganizerHeaderAndSidebar();
     highlightActiveNav();
+    // Chạy lại sau khi DOM load động để quét sạch mọi phần tử còn sót
+    setTimeout(fixStaleLogosAndLabels, 300);
+    setTimeout(fixStaleLogosAndLabels, 1000);
+  }
+
+  function fixStaleLogosAndLabels() {
+    // 1. Tự động thay thế mọi thẻ img logo vỡ thành vector badge ticket icon
+    try {
+      document.querySelectorAll('img[alt*="EventPulse"], a[href*="public-events"] img').forEach(function (img) {
+        const badge = document.createElement('div');
+        badge.className = 'w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center shadow-sm shrink-0';
+        badge.innerHTML = '<span class="material-symbols-outlined text-[20px]">confirmation_number</span>';
+        img.replaceWith(badge);
+      });
+    } catch (e) {
+      console.warn('Error replacing stale logo:', e);
+    }
+
+    // 2. Tự động xóa sạch (S-61) trên mọi nút bấm, tooltip và text
+    try {
+      document.querySelectorAll('button, a, span, p, div, strong').forEach(function (el) {
+        if (el.children.length === 0 && el.textContent && el.textContent.includes('(S-61)')) {
+          el.textContent = el.textContent.replace(/\s*\(S-61\)/g, '');
+        }
+        if (el.title && el.title.includes('(S-61)')) {
+          el.title = el.title.replace(/\s*\(S-61\)/g, '');
+        }
+      });
+    } catch (e) {
+      console.warn('Error cleaning (S-61):', e);
+    }
   }
 
   if (document.readyState === 'loading') {

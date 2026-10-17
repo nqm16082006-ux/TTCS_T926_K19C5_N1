@@ -30,6 +30,11 @@ namespace EventTicketBooking.Api.Models
         /// </summary>
         public string? CancelReason { get; set; }
 
+        /// <summary>
+        /// Thời điểm đã gửi email nhắc nhở 24h trước giờ diễn (Story S-61). Null nếu chưa gửi.
+        /// </summary>
+        public DateTimeOffset? ReminderSentAt { get; set; }
+
         public User User { get; set; } = null!;
         public Showtime Showtime { get; set; } = null!;
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();

@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Xuất danh sách vào cửa · EventPulse</title><link rel="stylesheet" href="checkin-export.css?v=xlsx1"><script src="checkin-export.js?v=xlsx1" defer></script></head>
+<body><main><header><a href="events.html">← Quản lý sự kiện</a><span>EventPulse · Báo cáo</span></header>
+<h1>Xuất danh sách vào cửa</h1><p class="intro">Đối chiếu lượt vào cửa theo từng suất diễn. Thời gian hiển thị theo giờ Việt Nam (UTC+7).</p>
+<section aria-label="Bộ lọc xuất danh sách"><form id="exportForm"><div class="fields">
+<label>Suất diễn<select id="showtime" required><option value="">Đang tải suất diễn…</option></select></label>
+<label>Nội dung xuất<select id="mode"><option value="admitted">Danh sách đã vào cửa</option><option value="audit">Nhật ký đối soát (gồm lượt xung đột)</option></select></label>
+<label>Cửa / cổng<input id="gate" placeholder="Tất cả cửa" maxlength="200"></label></div>
+<label class="check"><input type="checkbox" id="conflicts"> Chỉ lấy bản ghi có cờ xung đột</label>
+<p id="modeHelp">Mỗi dòng là một lượt vào cửa thành công. Lượt vào lại được duyệt không tự động được coi là xung đột.</p>
+<div class="actions"><button id="preview" type="submit">Xem trước</button><button id="download" type="button">Tải CSV</button><button id="downloadExcel" type="button">Tải Excel (.xlsx)</button></div></form></section>
+<p id="status" role="status" aria-live="polite">Đang kiểm tra phiên đăng nhập…</p><p id="loginPrompt" hidden><a href="login.html">Đăng nhập</a> bằng tài khoản Admin hoặc Ban tổ chức sở hữu sự kiện.</p>
+<section id="results" hidden><div id="summary" class="summary"></div><p id="previewNote"></p><div class="table-wrap"><table><thead><tr><th>Mã vé</th><th>Ghế</th><th>Giờ vào / quét (UTC+7)</th><th>Cửa</th><th>Loại lượt</th><th>Kết quả</th><th>Xung đột</th><th>Ghi chú</th></tr></thead><tbody id="rows"></tbody></table></div></section>
+</main></body></html>

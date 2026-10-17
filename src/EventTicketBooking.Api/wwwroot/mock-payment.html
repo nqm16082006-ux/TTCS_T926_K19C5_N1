@@ -232,7 +232,6 @@
 
     document.getElementById('orderCodeLabel').textContent = `MÃ ĐƠN: ${orderId.substring(0, 8).toUpperCase()}`;
     document.getElementById('orderTransferContent').textContent = `PAY ${orderId.substring(0, 8).toUpperCase()}`;
-    document.getElementById('totalAmountText').textContent = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(parseInt(initialAmount) || 0);
 
     async function loadOrder() {
       if (!orderId) return;

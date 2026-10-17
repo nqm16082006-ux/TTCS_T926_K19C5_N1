@@ -4,14 +4,17 @@ using Microsoft.EntityFrameworkCore;
 using DotNetEnv;
 using Prometheus;
 
-// Nạp file .env ở thư mục gốc hoặc thư mục hiện tại nếu có
-if (File.Exists(".env"))
+// Nạp file .env ở thư mục hiện tại hoặc các thư mục cha
+var envSearchDir = new DirectoryInfo(Directory.GetCurrentDirectory());
+while (envSearchDir != null)
 {
-    Env.Load(".env");
-}
-else if (File.Exists("../../.env"))
-{
-    Env.Load("../../.env");
+    var envCandidate = Path.Combine(envSearchDir.FullName, ".env");
+    if (File.Exists(envCandidate))
+    {
+        Env.Load(envCandidate);
+        break;
+    }
+    envSearchDir = envSearchDir.Parent;
 }
 
 // Cho phép Npgsql xử lý DateTime linh hoạt (cả Local và UTC)
@@ -90,27 +93,34 @@ builder.Services.AddScoped<SeatImportService>();
 // Chuỗi kết nối Redis (đọc từ biến môi trường hoặc configuration)
 string? redisConnection = Environment.GetEnvironmentVariable("ConnectionStrings__Redis")
                           ?? builder.Configuration.GetConnectionString("Redis")
-                          ?? "localhost:6379";
+                          ?? "127.0.0.1:6379";
 
-bool isRedisAvailable = false;
-StackExchange.Redis.IConnectionMultiplexer? redisMultiplexer = null;
+StackExchange.Redis.ConfigurationOptions redisOptions;
 try
 {
-    var redisOptions = StackExchange.Redis.ConfigurationOptions.Parse(redisConnection);
-    redisOptions.ConnectTimeout = 800;
-    redisOptions.SyncTimeout = 800;
-    redisOptions.AbortOnConnectFail = false;
-    redisMultiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(redisOptions);
-    isRedisAvailable = redisMultiplexer.IsConnected;
+    redisOptions = StackExchange.Redis.ConfigurationOptions.Parse(redisConnection);
 }
-catch
+catch (Exception ex)
 {
-    isRedisAvailable = false;
+    Console.WriteLine($"[FATAL] Cú pháp chuỗi kết nối Redis không hợp lệ: '{redisConnection}'. Lỗi: {ex.Message}");
+    throw;
 }
 
-if (isRedisAvailable && redisMultiplexer != null)
+redisOptions.AbortOnConnectFail = false;
+redisOptions.ConnectTimeout = 5000;
+redisOptions.SyncTimeout = 5000;
+redisOptions.ConnectRetry = 5;
+
+// Khởi tạo ConnectionMultiplexer duy nhất với AbortOnConnectFail = false.
+// StackExchange.Redis sẽ tự động reconnect trong background khi Redis online trở lại.
+StackExchange.Redis.IConnectionMultiplexer redisMultiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(redisOptions);
+
+// Đăng ký instance ConnectionMultiplexer thật làm Singleton trong DI.
+builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(redisMultiplexer);
+
+// Cấu hình IDistributedCache: Nếu Redis online -> Dùng Redis; Nếu Redis offline -> Dùng MemoryCache để tránh timeout 14s
+if (redisMultiplexer.IsConnected)
 {
-    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(redisMultiplexer);
     builder.Services.AddStackExchangeRedisCache(options =>
     {
         options.Configuration = redisConnection;
@@ -119,14 +129,23 @@ if (isRedisAvailable && redisMultiplexer != null)
 }
 else
 {
-    redisMultiplexer?.Dispose();
-    Console.WriteLine("[INFO] Redis không kết nối được. Tự động sử dụng Memory Cache.");
-    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp => null!);
+    Console.WriteLine("[INFO] Redis không khả dụng lúc khởi động. Tự động sử dụng Memory Cache cho IDistributedCache để đảm bảo tốc độ phản hồi tức thì.");
     builder.Services.AddDistributedMemoryCache();
 }
 
 // Đăng ký dịch vụ băm mật khẩu Argon2id (TTKN-20)
 builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IPasswordHasher, EventTicketBooking.Api.Services.Implementations.Argon2PasswordHasher>();
+
+// Cấu hình bảo mật xác thực (Story S-02)
+builder.Services.Configure<EventTicketBooking.Api.Options.AuthSecurityOptions>(options =>
+{
+    builder.Configuration.GetSection(EventTicketBooking.Api.Options.AuthSecurityOptions.SectionName).Bind(options);
+    if (builder.Environment.IsDevelopment())
+    {
+        // Trong môi trường Local Development, cho phép tự động fallback khi Redis chưa khởi động
+        options.FailClosedOnRedisDown = false;
+    }
+});
 
 // Đăng ký dịch vụ Token và Authentication (TTKN-25)
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITokenService, EventTicketBooking.Api.Services.Implementations.TokenService>();
@@ -140,6 +159,9 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ISeatHoldS
 
 // Đăng ký dịch vụ Nhật ký thao tác đơn hàng và vé (Story S-49)
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IOrderAuditService, EventTicketBooking.Api.Services.Implementations.OrderAuditService>();
+
+// Đăng ký dịch vụ Xoá và Ẩn danh dữ liệu cá nhân (Story S-53)
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IDataDeletionService, EventTicketBooking.Api.Services.Implementations.DataDeletionService>();
 
 // Đăng ký dịch vụ Giám sát và Cảnh báo (Story S-43)
 builder.Services.AddSingleton<EventTicketBooking.Api.Metrics.IAppMetrics, EventTicketBooking.Api.Metrics.PrometheusAppMetrics>();
@@ -173,12 +195,17 @@ else
     throw new InvalidOperationException("Unsupported payment provider.");
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IPaymentService, EventTicketBooking.Api.Services.Implementations.PaymentService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IRefundService, EventTicketBooking.Api.Services.Implementations.RefundService>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IReconciliationService, EventTicketBooking.Api.Services.Implementations.ReconciliationService>();
 
 // Đăng ký cấu hình và dịch vụ ký số mã QR vé điện tử (Story S-26)
 builder.Services.Configure<EventTicketBooking.Api.Options.TicketQrOptions>(builder.Configuration.GetSection(EventTicketBooking.Api.Options.TicketQrOptions.SectionName));
 builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IQrSignatureService, EventTicketBooking.Api.Services.Implementations.QrSignatureService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITicketService, EventTicketBooking.Api.Services.Implementations.TicketService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ICheckinExportService, EventTicketBooking.Api.Services.Implementations.CheckinExportService>();
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ISeatMapPdfExportService, EventTicketBooking.Api.Services.Implementations.SeatMapPdfExportService>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ICheckinStatisticsService, EventTicketBooking.Api.Services.Implementations.CheckinStatisticsService>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITicketTransferService, EventTicketBooking.Api.Services.Implementations.TicketTransferService>();
 builder.Services.AddHttpClient();
 
 
@@ -237,6 +264,11 @@ builder.Services.Configure<EventTicketBooking.Api.Options.AccountingOptions>(bui
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IAccountingNotificationService, EventTicketBooking.Api.Services.Implementations.AccountingNotificationService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IRefundService, EventTicketBooking.Api.Services.Implementations.RefundService>();
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.RefundProcessingWorker>();
+builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.ShowtimeSaleExpiryWorker>();
+
+// Story S-61: Dịch vụ & Job nền nhắc người mua trước 24 giờ diễn qua email và cập nhật khi đổi giờ
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IShowtimeReminderService, EventTicketBooking.Api.Services.Implementations.ShowtimeReminderService>();
+builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.ShowtimeReminderWorker>();
 
 var app = builder.Build();
 app.UseForwardedHeaders();
@@ -281,7 +313,20 @@ if (app.Environment.IsDevelopment())
 
 // Bật phục vụ static files cho wwwroot (login.html)
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (ctx.File.Name.EndsWith(".html", StringComparison.OrdinalIgnoreCase) ||
+            ctx.File.Name.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.CacheControl] = "no-cache, no-store, must-revalidate, max-age=0";
+            ctx.Context.Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.Pragma] = "no-cache";
+            ctx.Context.Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.Expires] = "0";
+            ctx.Context.Response.Headers["Clear-Site-Data"] = "\"cache\"";
+        }
+    }
+});
 var uploadsPath = builder.Configuration["Uploads:Path"];
 if (!string.IsNullOrWhiteSpace(uploadsPath))
 {
@@ -341,5 +386,6 @@ app.MapControllers();
 app.MapMetrics("/metrics");
 app.MapHub<EventTicketBooking.Api.Hubs.SeatStatusHub>("/hubs/seat-status");
 app.MapHub<EventTicketBooking.Api.Hubs.SystemAlertHub>("/hubs/system-alerts");
+app.MapHub<EventTicketBooking.Api.Hubs.CheckinLiveHub>("/hubs/checkin-live");
 
 app.Run();

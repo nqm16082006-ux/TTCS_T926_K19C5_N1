@@ -39,6 +39,12 @@ namespace EventTicketBooking.Api.DTOs
 
         /// <summary>Story S-45: thời điểm cập nhật cuối của yêu cầu hoàn tiền.</summary>
         public DateTimeOffset? RefundUpdatedAt { get; set; }
+
+        /// <summary>Story S-48: số lần đã retry hoàn tiền thất bại (0..3).</summary>
+        public int RefundRetryCount { get; set; }
+
+        /// <summary>Story S-61: thời điểm đã gửi email nhắc nhở 24h trước giờ diễn.</summary>
+        public DateTimeOffset? ReminderSentAt { get; set; }
     }
 
     public class OrderItemDto
