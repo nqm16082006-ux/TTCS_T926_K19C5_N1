@@ -256,7 +256,7 @@
         <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./events.html?action=seats" onclick="openFirstEventSeats();return false;" id="nav-cau-hinh-ghe">
           <span class="material-symbols-outlined text-[20px]">chair</span>Cấu hình ghế &amp; bảng giá
         </a>
-        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./export-test.html" id="nav-xuat-checkin">
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./checkin-export.html" id="nav-xuat-checkin">
           <span class="material-symbols-outlined text-[20px]">file_download</span>Xuất danh sách Check-in
         </a>
       </nav>
@@ -1271,7 +1271,7 @@
                 <a href="./create-event.html?id=${e.id}" class="p-2 rounded-lg text-outline hover:text-primary hover:bg-surface-container transition-colors inline-flex items-center justify-center" title="Chỉnh sửa sự kiện">
                   <span class="material-symbols-outlined text-[20px]">edit</span>
                 </a>
-                <a href="./export-test.html?showId=${showtimes.length > 0 ? encodeURIComponent(showtimes[0].id) : ''}" class="p-2 rounded-lg text-outline hover:text-emerald-700 hover:bg-emerald-50 transition-colors inline-flex items-center justify-center" title="Xuất danh sách check-in CSV (S-62)">
+                <a href="./checkin-export.html?showId=${showtimes.length > 0 ? encodeURIComponent(showtimes[0].id) : ''}" class="p-2 rounded-lg text-outline hover:text-emerald-700 hover:bg-emerald-50 transition-colors inline-flex items-center justify-center" title="Xuất danh sách check-in CSV (S-62)">
                   <span class="material-symbols-outlined text-[20px]">file_download</span>
                 </a>
                 <div class="relative inline-block text-left">
@@ -1343,7 +1343,7 @@
                 <span class="material-symbols-outlined text-[16px]">visibility</span>
                 <span>Xem chi tiết (${showtimeCount} suất)</span>
               </a>
-              <a href="./export-test.html?showId=${showtimes.length > 0 ? encodeURIComponent(showtimes[0].id) : ''}" class="h-9 px-3 rounded-lg bg-surface-container hover:bg-emerald-50 hover:text-emerald-700 text-on-surface font-label-md text-label-md flex items-center justify-center transition" title="Xuất danh sách check-in CSV (S-62)">
+              <a href="./checkin-export.html?showId=${showtimes.length > 0 ? encodeURIComponent(showtimes[0].id) : ''}" class="h-9 px-3 rounded-lg bg-surface-container hover:bg-emerald-50 hover:text-emerald-700 text-on-surface font-label-md text-label-md flex items-center justify-center transition" title="Xuất danh sách check-in CSV (S-62)">
                 <span class="material-symbols-outlined text-[18px]">file_download</span>
               </a>
               <a href="./create-event.html?id=${e.id}" class="h-9 px-3 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md flex items-center justify-center transition" title="Chỉnh sửa sự kiện">
@@ -1411,7 +1411,7 @@
       } else if (action === 'export-csv') {
         const ev = currentEvents.find(e => e.id === activeMenuEventId);
         const showId = ev && ev.showtimes && ev.showtimes.length > 0 ? ev.showtimes[0].id : '';
-        window.location.href = `./export-test.html?showId=${encodeURIComponent(showId)}`;
+        window.location.href = `./checkin-export.html?showId=${encodeURIComponent(showId)}`;
       } else if (action === 'showtimes') {
         window.location.href = `./event-detail.html?id=${activeMenuEventId}`;
       } else if (action === 'seats') {

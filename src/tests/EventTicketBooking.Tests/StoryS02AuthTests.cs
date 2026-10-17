@@ -553,10 +553,12 @@ namespace EventTicketBooking.Tests
             await _db.SaveChangesAsync();
 
             var mockExportService = new Mock<ICheckinExportService>();
-            mockExportService.Setup(s => s.ExportCheckinCsvAsync(It.IsAny<ExportCheckinListQuery>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(Encoding.UTF8.GetBytes("header\r\ndata"));
+            mockExportService.Setup(s => s.GetCheckinExportDataAsync(It.IsAny<ExportCheckinListQuery>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<CheckinExportItemDto>());
+            mockExportService.Setup(s => s.GenerateCsvBytes(It.IsAny<IEnumerable<CheckinExportItemDto>>()))
+                .Returns(Encoding.UTF8.GetBytes("header\r\ndata"));
 
-            var controller = new ShowsCheckinController(mockExportService.Object, NullLogger<ShowsCheckinController>.Instance);
+            var controller = new ShowsCheckinController(mockExportService.Object, NullLogger<ShowsCheckinController>.Instance, _db);
             controller.ControllerContext = new ControllerContext
             {
                 HttpContext = new DefaultHttpContext
@@ -574,6 +576,9 @@ namespace EventTicketBooking.Tests
 
             var result = await controller.ExportCheckinListCsv(showtime.Id);
             Assert.IsType<FileContentResult>(result);
+            var excel = Assert.IsType<FileContentResult>(await controller.ExportExcel(showtime.Id));
+            Assert.EndsWith(".xlsx", excel.FileDownloadName);
+            Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", excel.ContentType);
         }
 
         [Fact]
@@ -589,7 +594,7 @@ namespace EventTicketBooking.Tests
             await _db.SaveChangesAsync();
 
             var mockExportService = new Mock<ICheckinExportService>();
-            var controller = new ShowsCheckinController(mockExportService.Object, NullLogger<ShowsCheckinController>.Instance);
+            var controller = new ShowsCheckinController(mockExportService.Object, NullLogger<ShowsCheckinController>.Instance, _db);
             controller.ControllerContext = new ControllerContext
             {
                 HttpContext = new DefaultHttpContext
@@ -608,6 +613,8 @@ namespace EventTicketBooking.Tests
             var result = await controller.ExportCheckinListCsv(showtime.Id);
             var statusResult = Assert.IsType<ObjectResult>(result);
             Assert.Equal(StatusCodes.Status403Forbidden, statusResult.StatusCode);
+            Assert.Equal(StatusCodes.Status403Forbidden,
+                Assert.IsType<ObjectResult>(await controller.ExportExcel(showtime.Id)).StatusCode);
         }
 
         [Fact]

@@ -400,6 +400,103 @@ namespace EventTicketBooking.Api.Data
                         await context.Seats.AddRangeAsync(seatsList2);
                         await context.SaveChangesAsync();
                     }
+
+                    // Event 3: Đại Nhạc Hội Quốc Tế 2026 (Demo Sơ Đồ 3.000 Ghế S-60 / TTKN-127)
+                    if (!await context.Events.AnyAsync(e => e.Title.Contains("3.000 Ghế")))
+                    {
+                        var event3 = new Event
+                        {
+                            Id = Guid.NewGuid(),
+                            OwnerId = organizer.Id,
+                            Title = "Đại Nhạc Hội Quốc Tế 2026 (Demo Sơ Đồ 3.000 Ghế)",
+                            Description = "Sự kiện quy mô lớn kiểm thử hiệu năng sơ đồ ghế và xuất báo cáo PDF 3.000 chỗ (Story S-60 / TTKN-127).",
+                            Location = "Sân vận động Quốc gia Mỹ Đình (Sơ đồ Đại trà 3.000 chỗ)",
+                            ImageUrl = "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=1200&q=80",
+                            StartTime = DateTime.UtcNow.AddDays(20),
+                            EndTime = DateTime.UtcNow.AddDays(20).AddHours(4),
+                            TotalSeats = 3000,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+
+                        var showtime3 = new Showtime
+                        {
+                            Id = Guid.NewGuid(),
+                            EventId = event3.Id,
+                            StartTime = event3.StartTime,
+                            EndTime = event3.EndTime,
+                            AvailableSeats = 3000
+                        };
+                        showtime3.ChangeStatus(ShowtimeStatus.OnSale);
+
+                        var catStandard = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime3.Id, Name = "Vé Tiêu Chuẩn", Price = 500000 };
+                        var catVip = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime3.Id, Name = "Vé VIP", Price = 1500000 };
+
+                        showtime3.SeatCategories.Add(catStandard);
+                        showtime3.SeatCategories.Add(catVip);
+                        event3.Showtimes.Add(showtime3);
+
+                        await context.Events.AddAsync(event3);
+                        await context.SaveChangesAsync();
+
+                        // Tạo 50 hàng (R01..R50), mỗi hàng 60 ghế = 3.000 ghế
+                        var seatsList3 = new List<Seat>(3000);
+                        for (int rIdx = 1; rIdx <= 50; rIdx++)
+                        {
+                            var rowCode = $"R{rIdx:D2}";
+                            var cat = rIdx <= 15 ? catVip : catStandard;
+                            for (int num = 1; num <= 60; num++)
+                            {
+                                seatsList3.Add(new Seat
+                                {
+                                    Id = Guid.NewGuid(),
+                                    ShowtimeId = showtime3.Id,
+                                    SeatCategoryId = cat.Id,
+                                    Row = rowCode,
+                                    SeatNumber = num
+                                });
+                            }
+                        }
+                        await context.Seats.AddRangeAsync(seatsList3);
+                        await context.SaveChangesAsync();
+
+                        var buyer = await context.Users.FirstOrDefaultAsync(u => u.Username == "buyer") ?? organizer;
+
+                        // 1.000 ghế SOLD (Đã bán)
+                        var soldSeats = seatsList3.Take(1000).ToList();
+                        var order = new Order
+                        {
+                            Id = Guid.NewGuid(),
+                            UserId = buyer.Id,
+                            ShowtimeId = showtime3.Id,
+                            Status = OrderStatus.Paid,
+                            TotalAmount = 500000 * 1000,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        var orderItems = soldSeats.Select(s => new OrderItem
+                        {
+                            Id = Guid.NewGuid(),
+                            OrderId = order.Id,
+                            SeatId = s.Id,
+                            Price = 500000
+                        }).ToList();
+                        order.OrderItems = orderItems;
+                        await context.Orders.AddAsync(order);
+
+                        // 300 ghế HELD (Đang giữ chỗ)
+                        var heldSeats = seatsList3.Skip(1000).Take(300).ToList();
+                        var holds = heldSeats.Select(s => new SeatHolds
+                        {
+                            SeatId = s.Id,
+                            UserId = buyer.Id,
+                            Status = "ACTIVE",
+                            HeldAt = DateTime.UtcNow,
+                            ExpiresAt = DateTime.UtcNow.AddHours(2)
+                        }).ToList();
+                        await context.SeatHold.AddRangeAsync(holds);
+                        await context.SaveChangesAsync();
+                    }
                 }
             }
             catch (Exception ex)

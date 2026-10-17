@@ -50,6 +50,11 @@ namespace EventTicketBooking.Api.Services.Implementations
                 .ToListAsync(cancellationToken);
 
             var orderItemIds = tickets.Select(t => t.OrderItemId).Distinct().ToList();
+            var orderIds = tickets.Select(t => t.OrderItem.OrderId).Distinct().ToList();
+            var orderHistory = (await _context.OrderAuditLogs.AsNoTracking()
+                .Where(a => orderIds.Contains(a.OrderId) && a.EntityType == "ORDER")
+                .OrderBy(a => a.Timestamp).ToListAsync(cancellationToken))
+                .ToLookup(a => a.OrderId);
 
             // 2. Lấy các bản ghi cho vào bổ sung (Story S-31)
             var readmissions = await _context.TicketReadmissions
@@ -101,25 +106,23 @@ namespace EventTicketBooking.Api.Services.Implementations
                     bool isConflict = false;
                     var conflictNotes = new List<string>();
 
-                    // Kiểm tra xung đột 1: Đơn hàng chưa thanh toán, bị hủy hoặc quá hạn nhưng vẫn được quét
-                    if (!isOrderPaid && order != null)
+                    // A later cancellation/refund does not invalidate an earlier paid admission.
+                    var admissionStatus = order == null ? (OrderStatus?)null : StatusAt(order, oi!.CheckInTime, orderHistory[order.Id]);
+                    if (admissionStatus != OrderStatus.Paid && order != null)
                     {
                         isConflict = true;
-                        conflictNotes.Add($"Đơn hàng trạng thái {order.Status} nhưng có dữ liệu vào cửa");
+                        conflictNotes.Add($"Đơn hàng trạng thái {admissionStatus} tại thời điểm vào cửa");
                     }
-
-                    // Kiểm tra xung đột 2: Vé quét lại nhiều lần (có các lượt vào bổ sung)
-                    if (readmissionCount > 0)
+                    else if (order?.Status == OrderStatus.Cancelled)
                     {
-                        isConflict = true;
-                        conflictNotes.Add($"Vé quét lại nhiều lần ({readmissionCount} lượt vào bổ sung)");
+                        conflictNotes.Add("Đơn hàng đã được hủy sau lượt vào; lượt vào được ghi nhận khi đơn đã thanh toán");
                     }
 
                     // Kiểm tra xung đột 3: Có bản ghi xung đột ngoại tuyến cho mã vé này
                     if (hasOfflineConflicts && itemOfflineRecords != null)
                     {
                         isConflict = true;
-                        var offlineReasons = string.Join("; ", itemOfflineRecords.Where(r => r.IsConflict).Select(r => r.ConflictReason ?? "Xung đột quét offline").Distinct());
+                        var offlineReasons = string.Join("; ", itemOfflineRecords.Where(r => r.IsConflict).Select(r => ConflictDescription(r.ConflictReason)).Distinct());
                         conflictNotes.Add($"Xung đột ngoại tuyến: {offlineReasons}");
                     }
 
@@ -128,7 +131,8 @@ namespace EventTicketBooking.Api.Services.Implementations
                         TicketCode = t.TicketCode ?? string.Empty,
                         SeatNumber = seatCode,
                         CheckinTime = oi!.CheckInTime,
-                        GateName = oi.CheckInGate ?? "Cổng chính",
+                        GateName = oi.CheckInGate ?? string.Empty,
+                        EntryType = itemOfflineRecords?.Any(r => !r.IsConflict && r.Status == "SYNCED") == true ? "Offline" : "Lần đầu",
                         IsConflict = isConflict,
                         ConflictNote = conflictNotes.Count > 0 ? string.Join(" | ", conflictNotes) : null,
                         OrderStatus = order?.Status.ToString()
@@ -141,14 +145,20 @@ namespace EventTicketBooking.Api.Services.Implementations
                     int index = 1;
                     foreach (var readm in itemReadmissions)
                     {
+                        var admissionStatus = order == null ? (OrderStatus?)null : StatusAt(order, readm.AdmittedAt, orderHistory[order.Id]);
+                        var statusNote = admissionStatus != OrderStatus.Paid
+                            ? $" | Đơn hàng trạng thái {admissionStatus} tại thời điểm vào lại"
+                            : order?.Status == OrderStatus.Cancelled ? " | Đơn hàng đã được hủy sau lượt vào" : "";
                         result.Add(new CheckinExportItemDto
                         {
                             TicketCode = t.TicketCode ?? string.Empty,
                             SeatNumber = seatCode,
                             CheckinTime = readm.AdmittedAt,
                             GateName = readm.Gate,
-                            IsConflict = true,
-                            ConflictNote = $"Vào bổ sung lần {index++}: {readm.Reason} (NV: {readm.StaffName})",
+                            IsConflict = admissionStatus != OrderStatus.Paid,
+                            EntryType = "Vào lại được duyệt",
+                            Result = "Đã vào",
+                            ConflictNote = $"Vào bổ sung lần {index++}: {readm.Reason} (NV: {readm.StaffName}){statusNote}",
                             OrderStatus = order?.Status.ToString()
                         });
                     }
@@ -162,7 +172,9 @@ namespace EventTicketBooking.Api.Services.Implementations
                         TicketCode = t.TicketCode ?? string.Empty,
                         SeatNumber = seatCode,
                         CheckinTime = null,
-                        GateName = "Chưa vào",
+                        GateName = string.Empty,
+                        EntryType = "Chưa vào",
+                        Result = "Chưa vào",
                         IsConflict = !isOrderPaid,
                         ConflictNote = !isOrderPaid && order != null ? $"Đơn hàng {order.Status}" : null,
                         OrderStatus = order?.Status.ToString()
@@ -170,24 +182,26 @@ namespace EventTicketBooking.Api.Services.Implementations
                 }
             }
 
-            // 5. Thêm các bản ghi xung đột ngoại tuyến mà không liên kết được với OrderItem của suất này (ví dụ vé sai suất diễn hoặc vé giả)
-            var knownTicketCodes = new HashSet<string>(tickets.Select(t => (t.TicketCode ?? string.Empty).Trim()), StringComparer.OrdinalIgnoreCase);
-            var foreignOfflineRecords = offlineRecords
-                .Where(r => r.IsConflict && !knownTicketCodes.Contains((r.TicketCode ?? string.Empty).Trim()))
-                .ToList();
-
-            foreach (var offRec in foreignOfflineRecords)
+            // Rejected offline scans are audit attempts, never successful admissions.
+            if (query.IncludeScanLog)
             {
-                result.Add(new CheckinExportItemDto
+                var seatsByCode = tickets.ToDictionary(t => t.TicketCode.Trim(),
+                    t => t.OrderItem.Seat == null ? "N/A" : $"{t.OrderItem.Seat.Row}{t.OrderItem.Seat.SeatNumber}",
+                    StringComparer.OrdinalIgnoreCase);
+                foreach (var record in offlineRecords.Where(r => r.IsConflict).DistinctBy(r => r.Id))
                 {
-                    TicketCode = offRec.TicketCode,
-                    SeatNumber = "N/A",
-                    CheckinTime = offRec.ScannedAtDevice,
-                    GateName = offRec.GateName,
-                    IsConflict = true,
-                    ConflictNote = $"Vé sai suất diễn hoặc vé ngoại tuyến không hợp lệ ({offRec.ConflictReason ?? "Xung đột"})",
-                    OrderStatus = "Unknown"
-                });
+                    result.Add(new CheckinExportItemDto
+                    {
+                        TicketCode = record.TicketCode,
+                        SeatNumber = seatsByCode.GetValueOrDefault(record.TicketCode.Trim(), "N/A"),
+                        CheckinTime = record.ScannedAtDevice,
+                        GateName = record.GateName,
+                        EntryType = "Quét offline",
+                        Result = "Xung đột",
+                        IsConflict = true,
+                        ConflictNote = ConflictDescription(record.ConflictReason)
+                    });
+                }
             }
 
             // 6. Lọc theo cổng nếu có
@@ -232,8 +246,9 @@ namespace EventTicketBooking.Api.Services.Implementations
             // Nhờ đó Excel trên Windows/macOS sẽ mở tệp hiển thị chuẩn 100% tiếng Việt có dấu mà không vỡ font
             using (var writer = new StreamWriter(memoryStream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true)))
             {
+                writer.NewLine = "\r\n";
                 // Dòng tiêu đề chuẩn hóa
-                writer.WriteLine("Mã vé,Số ghế,Thời gian vào,Cửa vào,Cờ xung đột,Ghi chú xung đột");
+                writer.WriteLine("Mã vé,Số ghế,Thời gian vào (UTC+7),Cửa vào,Cờ xung đột,Ghi chú xung đột,Loại lượt,Kết quả");
 
                 foreach (var item in items)
                 {
@@ -250,7 +265,9 @@ namespace EventTicketBooking.Api.Services.Implementations
                         EscapeCsv(formattedTime),
                         EscapeCsv(item.GateName),
                         item.IsConflict ? "Có" : "Không",
-                        EscapeCsv(item.ConflictNote)
+                        EscapeCsv(item.ConflictNote),
+                        EscapeCsv(item.EntryType),
+                        EscapeCsv(item.Result)
                     );
 
                     writer.WriteLine(line);
@@ -266,9 +283,33 @@ namespace EventTicketBooking.Api.Services.Implementations
             return GenerateCsvBytes(data);
         }
 
+        private static OrderStatus StatusAt(Order order, DateTimeOffset? time, IEnumerable<OrderAuditLog> history)
+        {
+            if (!time.HasValue) return order.Status;
+            var transitions = history.Where(a => Enum.TryParse<OrderStatus>(a.NewStatus, true, out _)).ToList();
+            var preceding = transitions.LastOrDefault(a => a.Timestamp <= time.Value);
+            if (preceding != null && Enum.TryParse<OrderStatus>(preceding.NewStatus, true, out var status)) return status;
+            var following = transitions.FirstOrDefault(a => a.Timestamp > time.Value);
+            if (following != null && Enum.TryParse<OrderStatus>(following.OldStatus, true, out status)) return status;
+            // Legacy data without history retains the conservative current-state check.
+            return order.Status;
+        }
+
+        private static string ConflictDescription(string? reason) => reason switch
+        {
+            "DIFFERENT_GATE_CONFLICT" => "Vé được quét tại nhiều cửa",
+            "SHOWTIME_MISMATCH" => "Vé không thuộc suất diễn này",
+            "TICKET_NOT_FOUND" => "Không tìm thấy vé",
+            null or "" => "Xung đột ngoại tuyến",
+            _ => reason
+        };
+
         private static string EscapeCsv(string? value)
         {
             if (string.IsNullOrEmpty(value)) return string.Empty;
+            var trimmed = value.TrimStart();
+            if (trimmed.Length > 0 && ("=+-@".Contains(trimmed[0]) || value[0] is '\t' or '\r' or '\n'))
+                value = "'" + value;
 
             // Nếu giá trị chứa dấu phẩy, nháy kép, xuống dòng -> bọc trong nháy kép và nhân đôi ký tự nháy kép (RFC 4180)
             if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))

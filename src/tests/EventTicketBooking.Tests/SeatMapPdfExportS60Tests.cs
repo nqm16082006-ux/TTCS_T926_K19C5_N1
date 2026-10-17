@@ -284,5 +284,62 @@ namespace EventTicketBooking.Tests
             var fileResult = Assert.IsType<FileContentResult>(actionResult);
             Assert.Equal("application/pdf", fileResult.ContentType);
         }
+
+        [Fact]
+        public void GenerateSeatMapPdf_StressTest_3000Seats_FitsExactlyOnePage()
+        {
+            // Arrange: Giả lập 3.000 ghế (50 hàng x 60 cột)
+            var seats = new List<SeatMapExportItemDto>();
+            int cols = 60;
+            int rows = 50; // 50 * 60 = 3000 seats
+
+            for (int r = 0; r < rows; r++)
+            {
+                // Đặt tên hàng: A..Z, sau đó AA..AZ
+                string rowName = r < 26
+                    ? ((char)('A' + r)).ToString()
+                    : $"A{(char)('A' + (r - 26))}";
+
+                for (int c = 1; c <= cols; c++)
+                {
+                    string status = (r * cols + c) % 4 == 0 ? "SOLD" : ((r * cols + c) % 5 == 0 ? "HELD" : "AVAILABLE");
+                    seats.Add(new SeatMapExportItemDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Row = rowName,
+                        SeatNumber = c,
+                        CategoryName = "Standard",
+                        Price = 250000,
+                        Status = status
+                    });
+                }
+            }
+
+            var data = new SeatMapExportDataDto
+            {
+                ShowtimeId = Guid.NewGuid(),
+                ShowtimeName = "Suất diễn Quy mô Lớn (3.000 Chỗ)",
+                StartTime = DateTime.UtcNow.AddDays(10),
+                EndTime = DateTime.UtcNow.AddDays(10).AddHours(4),
+                EventTitle = "Sân Vận Động Mỹ Đình - Mega Concert 3000 Chỗ",
+                Location = "Sân Vận Động Quốc Gia Mỹ Đình, Hà Nội",
+                Seats = seats
+            };
+
+            // Act: Render PDF
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var pdfBytes = _service.GenerateSeatMapPdf(data);
+            stopwatch.Stop();
+
+            // Assert
+            Assert.NotNull(pdfBytes);
+            Assert.True(pdfBytes.Length > 0, "Dung lượng file PDF 3000 ghế phải lớn hơn 0");
+            Assert.True(stopwatch.ElapsedMilliseconds < 10000, $"Thời gian kết xuất 3000 ghế phải < 10s (thực tế: {stopwatch.ElapsedMilliseconds}ms)");
+
+            // Kiểm tra số trang trong PDF: Đúng 1 trang duy nhất (/Type /Page)
+            var pdfContentString = Encoding.ASCII.GetString(pdfBytes);
+            int pageCount = System.Text.RegularExpressions.Regex.Matches(pdfContentString, @"/Type\s*/Page\b").Count;
+            Assert.Equal(1, pageCount);
+        }
     }
 }
