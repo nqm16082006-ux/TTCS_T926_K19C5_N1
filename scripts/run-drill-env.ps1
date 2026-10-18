@@ -588,15 +588,26 @@ try {
         }
     }
 
-    # Snapshot sau phiên & đối chiếu bảo toàn container ngoài phiên
-    $snapshotAfterRaw = docker ps -a --format '{{.ID}} | {{.Names}} | {{.Status}} | {{.Ports}}'
-    Set-Content -Path (Join-Path $EvidenceDir "docker_snapshot_after.txt") -Value $snapshotAfterRaw
-    $afterMap = Parse-DockerSnapshot -SnapshotLines ($snapshotAfterRaw -split "`r?`n")
-    $snapshotCompare = Compare-DockerSnapshots -BeforeMap $beforeMap -AfterMap $afterMap
-    if ($snapshotCompare.IsIdentical) {
-        Write-Host "[ISOLATION CONFIRMED] $($snapshotCompare.Message)"
-    } else {
-        Write-Warning "[ISOLATION ALERT] $($snapshotCompare.Message)"
+    # Snapshot sau phiên & đối chiếu bảo toàn container ngoài phiên.
+    # Chỉ đối chiếu khi đã ghi nhận snapshot trước phiên (preflight có thể abort trước khi chụp);
+    # lỗi ở bước này không được ném ra ngoài finally — ghi nhận vào cleanupPassed thay vì crash.
+    try {
+        $snapshotAfterRaw = docker ps -a --format '{{.ID}} | {{.Names}} | {{.Status}} | {{.Ports}}'
+        Set-Content -Path (Join-Path $EvidenceDir "docker_snapshot_after.txt") -Value $snapshotAfterRaw
+        if ($beforeMap.Count -gt 0) {
+            $afterMap = Parse-DockerSnapshot -SnapshotLines ($snapshotAfterRaw -split "`r?`n")
+            $snapshotCompare = Compare-DockerSnapshots -BeforeMap $beforeMap -AfterMap $afterMap
+            if ($snapshotCompare.IsIdentical) {
+                Write-Host "[ISOLATION CONFIRMED] $($snapshotCompare.Message)"
+            } else {
+                Write-Warning "[ISOLATION ALERT] $($snapshotCompare.Message)"
+                $cleanupPassed = $false
+            }
+        } else {
+            Write-Warning "[ISOLATION SKIP] Khong co snapshot truoc phien (preflight abort truoc khi ghi nhan) — bo qua doi chieu bao toan container."
+        }
+    } catch {
+        Write-Warning "[ISOLATION ALERT] Khong the doi chieu snapshot container: $($_.Exception.Message)"
         $cleanupPassed = $false
     }
 
