@@ -1567,7 +1567,7 @@
       const btn = document.getElementById('btnSubmitCreateDiscount');
 
       const code = document.getElementById('orgDiscountCodeInput').value.trim();
-      const discountType = document.getElementById('orgDiscountTypeSelect').value;
+      const selectedType = document.getElementById('orgDiscountTypeSelect').value;
       const discountValue = parseInt(document.getElementById('orgDiscountValueInput').value, 10);
       const usageLimit = parseInt(document.getElementById('orgDiscountUsageLimitInput').value, 10);
       const expiresAtInput = document.getElementById('orgDiscountExpiresAtInput').value;
@@ -1575,6 +1575,18 @@
       if (!code || !expiresAtInput) {
         alertDiv.className = 'sm:col-span-2 p-3 rounded-lg text-sm font-semibold bg-rose-100 text-rose-800';
         alertDiv.textContent = 'Vui lòng điền đầy đủ các trường bắt buộc.';
+        alertDiv.classList.remove('hidden');
+        return;
+      }
+
+      const discountTypeValue =
+        selectedType === 'Percent' ? 0 :
+        selectedType === 'FixedAmount' ? 1 :
+        null;
+
+      if (discountTypeValue === null) {
+        alertDiv.className = 'sm:col-span-2 p-3 rounded-lg text-sm font-semibold bg-rose-100 text-rose-800';
+        alertDiv.textContent = 'Vui lòng chọn loại giảm giá hợp lệ.';
         alertDiv.classList.remove('hidden');
         return;
       }
@@ -1593,7 +1605,7 @@
           },
           body: JSON.stringify({
             code,
-            discountType,
+            discountType: discountTypeValue,
             discountValue,
             usageLimit,
             expiresAt
@@ -1602,8 +1614,18 @@
 
         const result = await res.json().catch(() => ({}));
         if (!res.ok || !result.success) {
+          let errorMsg = result.message;
+          if (!errorMsg && result.errors && typeof result.errors === 'object') {
+            const firstErrKey = Object.keys(result.errors)[0];
+            const firstErrVal = result.errors[firstErrKey];
+            if (Array.isArray(firstErrVal) && firstErrVal.length > 0) {
+              errorMsg = firstErrVal[0];
+            } else if (typeof firstErrVal === 'string') {
+              errorMsg = firstErrVal;
+            }
+          }
           alertDiv.className = 'sm:col-span-2 p-3 rounded-lg text-sm font-semibold bg-rose-100 text-rose-800';
-          alertDiv.textContent = result.message || 'Tạo mã giảm giá thất bại.';
+          alertDiv.textContent = (typeof errorMsg === 'string' && errorMsg.trim()) ? errorMsg.trim() : 'Tạo mã giảm giá thất bại.';
           alertDiv.classList.remove('hidden');
         } else {
           alertDiv.className = 'sm:col-span-2 p-3 rounded-lg text-sm font-semibold bg-emerald-100 text-emerald-800';

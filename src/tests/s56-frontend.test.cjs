@@ -7,6 +7,7 @@ const vm = require('node:vm');
 const root = path.join(__dirname, '../EventTicketBooking.Api/wwwroot');
 const orderDetailsHtml = fs.readFileSync(path.join(root, 'order-details.html'), 'utf8');
 const eventDetailHtml = fs.readFileSync(path.join(root, 'event-detail.html'), 'utf8');
+const seatMapHtml = fs.readFileSync(path.join(root, 'seat-map.html'), 'utf8');
 
 function extractScript(html) {
   let combined = '';
@@ -36,6 +37,7 @@ function createDOMContext(customStorage = {}, search = '') {
       classList: {
         add: (...vals) => vals.forEach(v => classes.add(v)),
         remove: (...vals) => vals.forEach(v => classes.delete(v)),
+        replace: (oldVal, newVal) => { classes.delete(oldVal); classes.add(newVal); },
         toggle: (v, force) => {
           if (force === undefined) {
             if (classes.has(v)) classes.delete(v); else classes.add(v);
@@ -152,7 +154,12 @@ function createDOMContext(customStorage = {}, search = '') {
     storage,
     windowObj,
     getFetchCalls: () => fetchCalls,
-    setFetch: fn => { context.fetch = fn; }
+    setFetch: fn => {
+      context.fetch = async (url, options = {}) => {
+        fetchCalls.push({ url: String(url), options });
+        return fn(url, options);
+      };
+    }
   };
 }
 
@@ -381,3 +388,718 @@ test('7. event-detail script loadDiscountCodes renders discount code items', asy
   assert.ok(renderedHtml.includes('50.000'), 'Fixed amount formatted');
   assert.ok(renderedHtml.includes('10 / 10'), 'Full usage rendered');
 });
+
+// =========================================================================
+// 8. Organizer CreateDiscount maps Percent -> 0 and does NOT send string
+// =========================================================================
+test('8. handleCreateDiscountSubmit maps Percent to numeric 0 and does not send string enum', async () => {
+  const { context, document, setFetch } = createDOMContext(
+    { access_token: 'org_token_123' },
+    '?id=e1234567-0000-0000-0000-000000000000'
+  );
+
+  let capturedBody = null;
+  setFetch(async (url, options) => {
+    if (url.includes('/discount-codes')) {
+      capturedBody = JSON.parse(options.body);
+      return {
+        ok: true,
+        json: async () => ({
+          success: true,
+          message: 'Tạo mã thành công',
+          data: { code: capturedBody.code }
+        })
+      };
+    }
+    return { ok: true, json: async () => ({}) };
+  });
+
+  const script = extractScript(eventDetailHtml);
+  vm.runInContext(script, context);
+
+  document.getElementById('orgDiscountCodeInput').value = 'PERCENT10';
+  document.getElementById('orgDiscountTypeSelect').value = 'Percent';
+  document.getElementById('orgDiscountValueInput').value = '10';
+  document.getElementById('orgDiscountUsageLimitInput').value = '100';
+  document.getElementById('orgDiscountExpiresAtInput').value = '2026-12-31T23:59';
+  document.getElementById('formCreateDiscount').reset = () => {};
+
+  await context.handleCreateDiscountSubmit({ preventDefault: () => {} });
+
+  assert.ok(capturedBody, 'API was called');
+  assert.strictEqual(capturedBody.discountType, 0, 'discountType must be numeric 0 for Percent');
+  assert.notStrictEqual(capturedBody.discountType, 'Percent', 'discountType must not be string');
+  assert.strictEqual(capturedBody.code, 'PERCENT10');
+  assert.strictEqual(capturedBody.discountValue, 10);
+});
+
+// =========================================================================
+// 9. Organizer CreateDiscount maps FixedAmount -> 1 and does NOT send string
+// =========================================================================
+test('9. handleCreateDiscountSubmit maps FixedAmount to numeric 1 and does not send string enum', async () => {
+  const { context, document, setFetch } = createDOMContext(
+    { access_token: 'org_token_123' },
+    '?id=e1234567-0000-0000-0000-000000000000'
+  );
+
+  let capturedBody = null;
+  setFetch(async (url, options) => {
+    if (url.includes('/discount-codes')) {
+      capturedBody = JSON.parse(options.body);
+      return {
+        ok: true,
+        json: async () => ({
+          success: true,
+          message: 'Tạo mã thành công',
+          data: { code: capturedBody.code }
+        })
+      };
+    }
+    return { ok: true, json: async () => ({}) };
+  });
+
+  const script = extractScript(eventDetailHtml);
+  vm.runInContext(script, context);
+
+  document.getElementById('orgDiscountCodeInput').value = 'FIXED50';
+  document.getElementById('orgDiscountTypeSelect').value = 'FixedAmount';
+  document.getElementById('orgDiscountValueInput').value = '50000';
+  document.getElementById('orgDiscountUsageLimitInput').value = '20';
+  document.getElementById('orgDiscountExpiresAtInput').value = '2026-12-31T23:59';
+  document.getElementById('formCreateDiscount').reset = () => {};
+
+  await context.handleCreateDiscountSubmit({ preventDefault: () => {} });
+
+  assert.ok(capturedBody, 'API was called');
+  assert.strictEqual(capturedBody.discountType, 1, 'discountType must be numeric 1 for FixedAmount');
+  assert.notStrictEqual(capturedBody.discountType, 'FixedAmount', 'discountType must not be string');
+  assert.strictEqual(capturedBody.code, 'FIXED50');
+  assert.strictEqual(capturedBody.discountValue, 50000);
+});
+
+// =========================================================================
+// 10. Organizer CreateDiscount displays safe backend error message
+// =========================================================================
+test('10. handleCreateDiscountSubmit safely displays backend error message and validation errors', async () => {
+  const { context, document, setFetch } = createDOMContext(
+    { access_token: 'org_token_123' },
+    '?id=e1234567-0000-0000-0000-000000000000'
+  );
+
+  // Subtest 10a: API error message
+  setFetch(async () => ({
+    ok: false,
+    json: async () => ({
+      success: false,
+      message: 'Mã giảm giá đã tồn tại trên sự kiện này.'
+    })
+  }));
+
+  const script = extractScript(eventDetailHtml);
+  vm.runInContext(script, context);
+
+  document.getElementById('orgDiscountCodeInput').value = 'DUPLICATE';
+  document.getElementById('orgDiscountTypeSelect').value = 'Percent';
+  document.getElementById('orgDiscountValueInput').value = '5';
+  document.getElementById('orgDiscountUsageLimitInput').value = '10';
+  document.getElementById('orgDiscountExpiresAtInput').value = '2026-12-31T23:59';
+
+  await context.handleCreateDiscountSubmit({ preventDefault: () => {} });
+
+  const alertDiv = document.getElementById('orgCreateDiscountAlert');
+  assert.strictEqual(alertDiv.textContent, 'Mã giảm giá đã tồn tại trên sự kiện này.');
+
+  // Subtest 10b: Validation error object
+  setFetch(async () => ({
+    ok: false,
+    json: async () => ({
+      title: 'One or more validation errors occurred.',
+      errors: {
+        Code: ['Mã giảm giá tối đa 50 ký tự']
+      }
+    })
+  }));
+
+  await context.handleCreateDiscountSubmit({ preventDefault: () => {} });
+  assert.strictEqual(alertDiv.textContent, 'Mã giảm giá tối đa 50 ký tự');
+});
+
+// =========================================================================
+// 11. Discount input visibility is role-neutral and based on own payable order
+// =========================================================================
+test('11. discount input visibility is role-neutral and based on own payable order', async () => {
+  const script = extractScript(orderDetailsHtml);
+
+  // Case A: Customer user + own Pending order -> input VISIBLE
+  {
+    const { context, document } = createDOMContext(
+      {
+        access_token: 'cust_token',
+        user_info: JSON.stringify({ id: 'cust-1', email: 'cust1@example.com', roles: ['Customer'] })
+      },
+      '?id=order-1'
+    );
+    vm.runInContext(script, context);
+
+    const pendingOrder = {
+      id: 'order-1',
+      userId: 'cust-1',
+      customerEmail: 'cust1@example.com',
+      status: 'Pending',
+      expiresAt: new Date(Date.now() + 600000).toISOString(),
+      originalAmount: 100000,
+      discountAmount: 0,
+      totalAmount: 100000,
+      discountCode: null
+    };
+
+    context.renderOrder(pendingOrder);
+    assert.strictEqual(
+      document.getElementById('discountInputSection').classList.contains('hidden'),
+      false,
+      'Customer with own active pending order should see discount input'
+    );
+  }
+
+  // Case B: Organizer user + own Pending order -> input VISIBLE
+  {
+    const { context, document } = createDOMContext(
+      {
+        access_token: 'org_token',
+        user_info: JSON.stringify({ id: 'org-1', email: 'org1@example.com', roles: ['Organizer'] })
+      },
+      '?id=order-2'
+    );
+    vm.runInContext(script, context);
+
+    const pendingOrder = {
+      id: 'order-2',
+      userId: 'org-1',
+      customerEmail: 'org1@example.com',
+      status: 'Pending',
+      expiresAt: new Date(Date.now() + 600000).toISOString(),
+      originalAmount: 100000,
+      discountAmount: 0,
+      totalAmount: 100000,
+      discountCode: null
+    };
+
+    context.renderOrder(pendingOrder);
+    assert.strictEqual(
+      document.getElementById('discountInputSection').classList.contains('hidden'),
+      false,
+      'Organizer buying for themselves with active pending order should see discount input'
+    );
+  }
+
+  // Case C: Admin user + own Pending order -> input VISIBLE
+  {
+    const { context, document } = createDOMContext(
+      {
+        access_token: 'admin_token',
+        user_info: JSON.stringify({ id: 'admin-1', email: 'admin1@example.com', roles: ['Admin'] })
+      },
+      '?id=order-3'
+    );
+    vm.runInContext(script, context);
+
+    const pendingOrder = {
+      id: 'order-3',
+      userId: 'admin-1',
+      customerEmail: 'admin1@example.com',
+      status: 'Pending',
+      expiresAt: new Date(Date.now() + 600000).toISOString(),
+      originalAmount: 100000,
+      discountAmount: 0,
+      totalAmount: 100000,
+      discountCode: null
+    };
+
+    context.renderOrder(pendingOrder);
+    assert.strictEqual(
+      document.getElementById('discountInputSection').classList.contains('hidden'),
+      false,
+      'Admin buying for themselves with active pending order should see discount input'
+    );
+  }
+
+  // Case D: Admin user viewing someone else\'s Pending order -> input HIDDEN & apply denied
+  {
+    const { context, document } = createDOMContext(
+      {
+        access_token: 'admin_token',
+        user_info: JSON.stringify({ id: 'admin-1', email: 'admin1@example.com', roles: ['Admin'] })
+      },
+      '?id=order-4'
+    );
+    vm.runInContext(script, context);
+    await new Promise(r => setTimeout(r, 10));
+
+    const otherOrder = {
+      id: 'order-4',
+      userId: 'other-cust',
+      customerEmail: 'other@example.com',
+      status: 'Pending',
+      expiresAt: new Date(Date.now() + 600000).toISOString(),
+      originalAmount: 100000,
+      discountAmount: 0,
+      totalAmount: 100000,
+      discountCode: null
+    };
+
+    context.renderOrder(otherOrder);
+    assert.strictEqual(
+      document.getElementById('discountInputSection').classList.contains('hidden'),
+      true,
+      'Admin inspecting someone else order must NOT see discount input'
+    );
+
+    // Attempting applyDiscountCode on non-owner order must be rejected
+    document.getElementById('discountCodeInput').value = 'TRYDISCOUNT';
+    await context.applyDiscountCode();
+
+    const errDiv = document.getElementById('discountError');
+    const errMsg = document.getElementById('discountErrorMsg');
+    assert.strictEqual(errDiv.classList.contains('hidden'), false);
+    assert.strictEqual(errMsg.textContent, 'Bạn không có quyền thao tác đơn này.');
+  }
+
+  // Case E: Customer user viewing another user\'s order -> input HIDDEN & apply denied
+  {
+    const { context, document } = createDOMContext(
+      {
+        access_token: 'cust_token',
+        user_info: JSON.stringify({ id: 'cust-1', email: 'cust1@example.com', roles: ['Customer'] })
+      },
+      '?id=order-5'
+    );
+    vm.runInContext(script, context);
+    await new Promise(r => setTimeout(r, 10));
+
+    const otherOrder = {
+      id: 'order-5',
+      userId: 'cust-2',
+      customerEmail: 'cust2@example.com',
+      status: 'Pending',
+      expiresAt: new Date(Date.now() + 600000).toISOString(),
+      originalAmount: 100000,
+      discountAmount: 0,
+      totalAmount: 100000,
+      discountCode: null
+    };
+
+    context.renderOrder(otherOrder);
+    assert.strictEqual(
+      document.getElementById('discountInputSection').classList.contains('hidden'),
+      true,
+      'Customer inspecting someone else order must NOT see discount input'
+    );
+
+    document.getElementById('discountCodeInput').value = 'TRYDISCOUNT';
+    await context.applyDiscountCode();
+
+    const errDiv = document.getElementById('discountError');
+    const errMsg = document.getElementById('discountErrorMsg');
+    assert.strictEqual(errDiv.classList.contains('hidden'), false);
+    assert.strictEqual(errMsg.textContent, 'Bạn không có quyền thao tác đơn này.');
+  }
+
+  // Case F: Paid order -> input HIDDEN
+  {
+    const { context, document } = createDOMContext(
+      {
+        access_token: 'cust_token',
+        user_info: JSON.stringify({ id: 'cust-1', email: 'cust1@example.com', roles: ['Customer'] })
+      },
+      '?id=order-6'
+    );
+    vm.runInContext(script, context);
+
+    const paidOrder = {
+      id: 'order-6',
+      userId: 'cust-1',
+      customerEmail: 'cust1@example.com',
+      status: 'Paid',
+      expiresAt: new Date(Date.now() + 600000).toISOString(),
+      originalAmount: 100000,
+      discountAmount: 0,
+      totalAmount: 100000,
+      discountCode: null
+    };
+
+    context.renderOrder(paidOrder);
+    assert.strictEqual(
+      document.getElementById('discountInputSection').classList.contains('hidden'),
+      true,
+      'Paid order must hide discount input'
+    );
+  }
+
+  // Case G: Expired order -> input HIDDEN
+  {
+    const { context, document } = createDOMContext(
+      {
+        access_token: 'cust_token',
+        user_info: JSON.stringify({ id: 'cust-1', email: 'cust1@example.com', roles: ['Customer'] })
+      },
+      '?id=order-7'
+    );
+    vm.runInContext(script, context);
+
+    const expiredOrder = {
+      id: 'order-7',
+      userId: 'cust-1',
+      customerEmail: 'cust1@example.com',
+      status: 'Pending',
+      expiresAt: new Date(Date.now() - 600000).toISOString(),
+      originalAmount: 100000,
+      discountAmount: 0,
+      totalAmount: 100000,
+      discountCode: null
+    };
+
+    context.renderOrder(expiredOrder);
+    assert.strictEqual(
+      document.getElementById('discountInputSection').classList.contains('hidden'),
+      true,
+      'Expired order must hide discount input'
+    );
+  }
+
+  // Case H: Already discounted order -> show badge, hide input
+  {
+    const { context, document } = createDOMContext(
+      {
+        access_token: 'cust_token',
+        user_info: JSON.stringify({ id: 'cust-1', email: 'cust1@example.com', roles: ['Customer'] })
+      },
+      '?id=order-8'
+    );
+    vm.runInContext(script, context);
+
+    const discountedOrder = {
+      id: 'order-8',
+      userId: 'cust-1',
+      customerEmail: 'cust1@example.com',
+      status: 'Pending',
+      expiresAt: new Date(Date.now() + 600000).toISOString(),
+      originalAmount: 100000,
+      discountAmount: 20000,
+      totalAmount: 80000,
+      discountCode: 'PROMO20'
+    };
+
+    context.renderOrder(discountedOrder);
+    assert.strictEqual(
+      document.getElementById('discountInputSection').classList.contains('hidden'),
+      true,
+      'Already discounted order must hide discount input'
+    );
+    assert.strictEqual(
+      document.getElementById('discountAppliedSection').classList.contains('hidden'),
+      false,
+      'Already discounted order must show applied badge section'
+    );
+    assert.strictEqual(
+      document.getElementById('appliedCodeText').textContent,
+      'PROMO20'
+    );
+  }
+});
+
+// =========================================================================
+// 12. Seat-map redirects to order-details.html checkout screen
+// =========================================================================
+test('12. seat-map redirects to order-details.html checkout screen upon creating pending order', () => {
+  assert.ok(
+    seatMapHtml.includes("window.location.href = `./order-details.html?id=${encodeURIComponent(order.id)}`"),
+    'seat-map should redirect to order-details.html?id= after creating order'
+  );
+});
+
+// =========================================================================
+// 13. Discount section appears before payment action in order-details.html
+// =========================================================================
+test('13. discount section appears before payment action in order-details.html', () => {
+  const discountInputIdx = orderDetailsHtml.indexOf('id="discountInputSection"');
+  const discountAppliedIdx = orderDetailsHtml.indexOf('id="discountAppliedSection"');
+  const repayBtnIdx = orderDetailsHtml.indexOf('id="btnRepay"');
+
+  assert.ok(discountInputIdx > 0, 'discountInputSection must exist');
+  assert.ok(discountAppliedIdx > 0, 'discountAppliedSection must exist');
+  assert.ok(repayBtnIdx > 0, 'btnRepay must exist');
+
+  assert.ok(
+    discountInputIdx < repayBtnIdx,
+    'discountInputSection must appear before btnRepay'
+  );
+  assert.ok(
+    discountAppliedIdx < repayBtnIdx,
+    'discountAppliedSection must appear before btnRepay'
+  );
+});
+
+// =========================================================================
+// 14. 400/401/403/404/network errors rendered separately without stack traces
+// =========================================================================
+test('14. applyDiscountCode renders 400, 401, 403, 404, and network errors separately', async () => {
+  const script = extractScript(orderDetailsHtml);
+
+  // Subtest 14a: 401 Unauthorized
+  {
+    const { context, document, setFetch } = createDOMContext(
+      { access_token: 'valid_token' },
+      '?id=order-401'
+    );
+    vm.runInContext(script, context);
+    await new Promise(r => setTimeout(r, 10));
+
+    setFetch(async () => ({
+      status: 401,
+      ok: false,
+      json: async () => ({ success: false, message: 'Unauthorized' })
+    }));
+
+    document.getElementById('discountCodeInput').value = 'CODE401';
+    await context.applyDiscountCode();
+
+    const errDiv = document.getElementById('discountError');
+    const errMsg = document.getElementById('discountErrorMsg');
+    assert.strictEqual(errDiv.classList.contains('hidden'), false);
+    assert.strictEqual(errMsg.textContent, 'Phiên đăng nhập đã hết hạn.');
+  }
+
+  // Subtest 14b: 403 Forbidden
+  {
+    const { context, document, setFetch } = createDOMContext(
+      { access_token: 'valid_token' },
+      '?id=order-403'
+    );
+    vm.runInContext(script, context);
+    await new Promise(r => setTimeout(r, 10));
+
+    setFetch(async () => ({
+      status: 403,
+      ok: false,
+      json: async () => ({ success: false, message: 'Forbidden' })
+    }));
+
+    document.getElementById('discountCodeInput').value = 'CODE403';
+    await context.applyDiscountCode();
+
+    const errDiv = document.getElementById('discountError');
+    const errMsg = document.getElementById('discountErrorMsg');
+    assert.strictEqual(errDiv.classList.contains('hidden'), false);
+    assert.strictEqual(errMsg.textContent, 'Bạn không có quyền thao tác đơn này.');
+  }
+
+  // Subtest 14c: 404 Not Found (Invalid or wrong event)
+  {
+    const { context, document, setFetch } = createDOMContext(
+      { access_token: 'valid_token' },
+      '?id=order-404'
+    );
+    vm.runInContext(script, context);
+    await new Promise(r => setTimeout(r, 10));
+
+    setFetch(async () => ({
+      status: 404,
+      ok: false,
+      json: async () => ({ success: false, message: 'Not Found' })
+    }));
+
+    document.getElementById('discountCodeInput').value = 'NOTFOUND';
+    await context.applyDiscountCode();
+
+    const errDiv = document.getElementById('discountError');
+    const errMsg = document.getElementById('discountErrorMsg');
+    assert.strictEqual(errDiv.classList.contains('hidden'), false);
+    assert.strictEqual(
+      errMsg.textContent,
+      'Mã giảm giá không hợp lệ hoặc không áp dụng cho sự kiện này.'
+    );
+  }
+
+  // Subtest 14d: 400 Bad Request with safe backend business message
+  {
+    const { context, document, setFetch } = createDOMContext(
+      { access_token: 'valid_token' },
+      '?id=order-400'
+    );
+    vm.runInContext(script, context);
+    await new Promise(r => setTimeout(r, 10));
+
+    setFetch(async () => ({
+      status: 400,
+      ok: false,
+      json: async () => ({
+        success: false,
+        message: 'Mã giảm giá đã hết lượt sử dụng hoặc đã hết hạn.'
+      })
+    }));
+
+    document.getElementById('discountCodeInput').value = 'EXPIRED';
+    await context.applyDiscountCode();
+
+    const errDiv = document.getElementById('discountError');
+    const errMsg = document.getElementById('discountErrorMsg');
+    assert.strictEqual(errDiv.classList.contains('hidden'), false);
+    assert.strictEqual(
+      errMsg.textContent,
+      'Mã giảm giá đã hết lượt sử dụng hoặc đã hết hạn.'
+    );
+  }
+
+  // Subtest 14e: Network error / connection failure
+  {
+    const { context, document, setFetch } = createDOMContext(
+      { access_token: 'valid_token' },
+      '?id=order-net'
+    );
+    vm.runInContext(script, context);
+    await new Promise(r => setTimeout(r, 10));
+
+    setFetch(async (url) => {
+      if (String(url).includes('apply-discount')) {
+        throw new TypeError('Failed to fetch');
+      }
+      return { ok: true, json: async () => ({ success: true, data: [] }) };
+    });
+
+    document.getElementById('discountCodeInput').value = 'NETERR';
+    await context.applyDiscountCode();
+
+    const errDiv = document.getElementById('discountError');
+    const errMsg = document.getElementById('discountErrorMsg');
+    assert.strictEqual(errDiv.classList.contains('hidden'), false);
+    assert.strictEqual(
+      errMsg.textContent,
+      'Không thể kết nối máy chủ. Vui lòng thử lại.'
+    );
+  }
+
+  // Subtest 14f: 500 Server error
+  {
+    const { context, document, setFetch } = createDOMContext(
+      { access_token: 'valid_token' },
+      '?id=order-500'
+    );
+    vm.runInContext(script, context);
+    await new Promise(r => setTimeout(r, 10));
+
+    setFetch(async () => ({
+      status: 500,
+      ok: false,
+      json: async () => ({ success: false, message: 'Internal Server Error' })
+    }));
+
+    document.getElementById('discountCodeInput').value = 'CODE500';
+    await context.applyDiscountCode();
+
+    const errDiv = document.getElementById('discountError');
+    const errMsg = document.getElementById('discountErrorMsg');
+    assert.strictEqual(errDiv.classList.contains('hidden'), false);
+    assert.strictEqual(
+      errMsg.textContent,
+      'Không thể kết nối máy chủ. Vui lòng thử lại.'
+    );
+  }
+});
+
+// =========================================================================
+// 15. Applied code updates price summary and badge
+// =========================================================================
+test('15. applied code updates price summary, badge, and hides discount input', async () => {
+  const script = extractScript(orderDetailsHtml);
+  const { context, document, setFetch } = createDOMContext(
+    { access_token: 'valid_token' },
+    '?id=order-applied'
+  );
+  vm.runInContext(script, context);
+
+  const updatedOrder = {
+    id: 'order-applied',
+    status: 'Pending',
+    expiresAt: new Date(Date.now() + 600000).toISOString(),
+    originalAmount: 1000000,
+    discountAmount: 200000,
+    totalAmount: 800000,
+    discountCode: 'SALE20'
+  };
+
+  setFetch(async () => ({
+    status: 200,
+    ok: true,
+    json: async () => ({
+      success: true,
+      message: 'Áp dụng mã giảm giá thành công.',
+      data: updatedOrder
+    })
+  }));
+
+  document.getElementById('discountCodeInput').value = 'SALE20';
+  await context.applyDiscountCode();
+
+  // Input section should be hidden
+  assert.strictEqual(
+    document.getElementById('discountInputSection').classList.contains('hidden'),
+    true
+  );
+  // Applied section should be visible
+  assert.strictEqual(
+    document.getElementById('discountAppliedSection').classList.contains('hidden'),
+    false
+  );
+  assert.strictEqual(
+    document.getElementById('appliedCodeText').textContent,
+    'SALE20'
+  );
+  // Price rows
+  assert.strictEqual(
+    document.getElementById('discountRow').classList.contains('hidden'),
+    false
+  );
+  assert.ok(
+    document.getElementById('discountAmountDisplay').textContent.includes('200.000')
+  );
+  assert.ok(
+    document.getElementById('totalAmountDisplay').textContent.includes('800.000')
+  );
+});
+
+// =========================================================================
+// 16. Payment action uses server-authoritative TotalAmount flow
+// =========================================================================
+test('16. checkout payment action requests payment without sending client-tampered amount', async () => {
+  const script = extractScript(orderDetailsHtml);
+  const { context, document, getFetchCalls, setFetch } = createDOMContext(
+    { access_token: 'valid_token' },
+    '?id=order-pay'
+  );
+  vm.runInContext(script, context);
+
+  setFetch(async (url, options) => {
+    return {
+      status: 200,
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          paymentUrl: 'https://payment-gateway.example/pay/123'
+        }
+      })
+    };
+  });
+
+  const btnElement = document.getElementById('btnRepay');
+  await context.handleRepayment('order-pay', btnElement);
+
+  const paymentCall = getFetchCalls().find(c => c.url.includes('/payments/orders/order-pay'));
+  assert.ok(paymentCall, 'handleRepayment must call payment endpoint for the order');
+  assert.strictEqual(paymentCall.options.method, 'POST');
+  assert.strictEqual(paymentCall.options.headers['Authorization'], 'Bearer valid_token');
+  // Confirm NO client-side amount was passed in request body
+  const body = paymentCall.options.body ? JSON.parse(paymentCall.options.body) : null;
+  assert.strictEqual(body, null, 'Client must NOT send custom amount; server is authoritative');
+});
+

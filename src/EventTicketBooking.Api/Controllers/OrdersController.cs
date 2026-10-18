@@ -1470,6 +1470,7 @@ namespace EventTicketBooking.Api.Controllers
             return new OrderDto
             {
                 Id = order.Id,
+                UserId = order.UserId,
                 ShowtimeId = order.ShowtimeId,
                 EventId = order.Showtime?.EventId,
                 EventTitle = order.Showtime?.Event?.Title,

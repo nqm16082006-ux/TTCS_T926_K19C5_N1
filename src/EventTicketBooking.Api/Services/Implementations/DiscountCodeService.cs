@@ -514,6 +514,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             return new OrderDto
             {
                 Id = order.Id,
+                UserId = order.UserId,
                 ShowtimeId = order.ShowtimeId,
                 EventId = order.Showtime?.EventId,
                 EventTitle = order.Showtime?.Event?.Title,

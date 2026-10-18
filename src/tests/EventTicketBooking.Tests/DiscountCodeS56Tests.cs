@@ -337,6 +337,138 @@ namespace EventTicketBooking.Tests
             Assert.Equal(StatusCodes.Status403Forbidden, statusCode);
         }
 
+        // 7b. Organizer có thể apply mã cho chính đơn hàng của mình (role-neutral own order)
+        [Fact]
+        public async Task Test07b_OrganizerCanApplyDiscountToOwnOrder()
+        {
+            using var context = CreateInMemoryContext();
+            var (_, ev, showtime, _) = await SeedOrderScenarioAsync(context, price: 500000);
+            var service = new DiscountCodeService(context);
+
+            var createReq = new CreateDiscountCodeRequest
+            {
+                Code = "ORGOWN10",
+                DiscountType = DiscountType.Percent,
+                DiscountValue = 10,
+                UsageLimit = 10,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+            };
+            await service.CreateDiscountCodeAsync(ev.Id, createReq, ev.OwnerId);
+
+            // Organizer tự mua vé và tạo đơn cho chính mình
+            var organizerOrder = new Order
+            {
+                Id = Guid.NewGuid(),
+                UserId = ev.OwnerId,
+                ShowtimeId = showtime.Id,
+                Status = OrderStatus.Pending,
+                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15),
+                OriginalAmount = 500000,
+                DiscountAmount = 0,
+                TotalAmount = 500000,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            context.Orders.Add(organizerOrder);
+            await context.SaveChangesAsync();
+
+            var (applySuccess, _, updatedOrder, statusCode) = await service.ApplyDiscountCodeAsync(organizerOrder.Id, "ORGOWN10", ev.OwnerId);
+            Assert.True(applySuccess);
+            Assert.Equal(StatusCodes.Status200OK, statusCode);
+            Assert.NotNull(updatedOrder);
+            Assert.Equal(450000, updatedOrder.TotalAmount);
+            Assert.Equal(50000, updatedOrder.DiscountAmount);
+        }
+
+        // 7c. Admin có thể apply mã cho chính đơn hàng của mình (role-neutral own order)
+        [Fact]
+        public async Task Test07c_AdminCanApplyDiscountToOwnOrder()
+        {
+            using var context = CreateInMemoryContext();
+            var (_, ev, showtime, _) = await SeedOrderScenarioAsync(context, price: 500000);
+            var adminUser = new User
+            {
+                Id = Guid.NewGuid(),
+                Username = "admin_user",
+                Email = "admin@example.com",
+                PasswordHash = "hash"
+            };
+            context.Users.Add(adminUser);
+
+            var service = new DiscountCodeService(context);
+            var createReq = new CreateDiscountCodeRequest
+            {
+                Code = "ADMINOWN10",
+                DiscountType = DiscountType.Percent,
+                DiscountValue = 10,
+                UsageLimit = 10,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+            };
+            await service.CreateDiscountCodeAsync(ev.Id, createReq, ev.OwnerId);
+
+            // Admin tự mua vé và tạo đơn cho chính mình
+            var adminOrder = new Order
+            {
+                Id = Guid.NewGuid(),
+                UserId = adminUser.Id,
+                ShowtimeId = showtime.Id,
+                Status = OrderStatus.Pending,
+                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15),
+                OriginalAmount = 500000,
+                DiscountAmount = 0,
+                TotalAmount = 500000,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            context.Orders.Add(adminOrder);
+            await context.SaveChangesAsync();
+
+            var (applySuccess, _, updatedOrder, statusCode) = await service.ApplyDiscountCodeAsync(adminOrder.Id, "ADMINOWN10", adminUser.Id);
+            Assert.True(applySuccess);
+            Assert.Equal(StatusCodes.Status200OK, statusCode);
+            Assert.NotNull(updatedOrder);
+            Assert.Equal(450000, updatedOrder.TotalAmount);
+            Assert.Equal(50000, updatedOrder.DiscountAmount);
+        }
+
+        // 7d. Admin / Organizer KHÔNG được phép apply mã lên đơn của người khác (bảo vệ ownership tuyệt đối)
+        [Fact]
+        public async Task Test07d_AdminOrOrganizerCannotApplyToAnotherUsersOrder()
+        {
+            using var context = CreateInMemoryContext();
+            var (customer, ev, _, customerOrder) = await SeedOrderScenarioAsync(context, price: 500000);
+            var adminUser = new User
+            {
+                Id = Guid.NewGuid(),
+                Username = "super_admin",
+                Email = "superadmin@example.com",
+                PasswordHash = "hash"
+            };
+            context.Users.Add(adminUser);
+            await context.SaveChangesAsync();
+
+            var service = new DiscountCodeService(context);
+            var createReq = new CreateDiscountCodeRequest
+            {
+                Code = "PROTECT10",
+                DiscountType = DiscountType.Percent,
+                DiscountValue = 10,
+                UsageLimit = 10,
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+            };
+            await service.CreateDiscountCodeAsync(ev.Id, createReq, ev.OwnerId);
+
+            // 1. Organizer thử apply lên đơn của Customer -> 403 Forbidden
+            var (orgApplySuccess, _, _, orgStatus) = await service.ApplyDiscountCodeAsync(customerOrder.Id, "PROTECT10", ev.OwnerId);
+            Assert.False(orgApplySuccess);
+            Assert.Equal(StatusCodes.Status403Forbidden, orgStatus);
+
+            // 2. Admin thử apply lên đơn của Customer -> 403 Forbidden
+            var (adminApplySuccess, _, _, adminStatus) = await service.ApplyDiscountCodeAsync(customerOrder.Id, "PROTECT10", adminUser.Id);
+            Assert.False(adminApplySuccess);
+            Assert.Equal(StatusCodes.Status403Forbidden, adminStatus);
+        }
+
         // 8. Organizer khác không quản lý code của Event
         [Fact]
         public async Task Test08_OtherOrganizerCannotManageEventCodes()
