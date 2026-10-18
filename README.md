@@ -177,3 +177,29 @@ TTCS_T926_K19C5_N1/
 ## Sơ đồ ghế hiện tại
 
 Giao diện sử dụng DOM/CSS, có lọc khu vực, màu theo hạng vé và phóng to/thu nhỏ. File mẫu 3.000 ghế: data/seat-map-3000.json. Các số đo hiệu năng cần kiểm tra trên môi trường triển khai thực tế.
+
+---
+
+## 📊 Giám Sát và Cảnh Báo Hệ Thống (S43 Monitoring Dashboard)
+
+Hệ thống tích hợp dashboard giám sát trực tiếp trên giao diện web không phụ thuộc vào Grafana hay Prometheus ngoài. Toàn bộ telemetry được ghi nhận liên tục từ traffic thật và lưu trữ đồng bộ vào PostgreSQL dùng chung.
+
+### Khởi chạy & Truy cập Dashboard
+
+1. **Khởi chạy ứng dụng**:
+   ```powershell
+   dotnet run --project src\EventTicketBooking.Api
+   ```
+2. **Đăng nhập**: Sử dụng tài khoản nội bộ có vai trò `Admin`.
+3. **Mở Dashboard**:
+   ```
+   http://localhost:5012/admin-monitoring.html
+   ```
+   *(Trang `/monitoring.html` tự động chuyển hướng về `/admin-monitoring.html`)*
+
+### Đặc điểm Kiến trúc
+
+- **Nguồn dữ liệu (Data Source)**: PostgreSQL monitoring tables (`RequestTelemetries`, `MonitoringEvents`, `MonitoringAlerts`).
+- **Thời gian thực & Bền vững (Persistence)**: Hai developer chạy app khác process hoặc khác máy kết nối cùng shared database đều nhìn thấy chung telemetry; dữ liệu không bị mất khi restart server.
+- **Không ghi dữ liệu nhạy cảm**: Tuyệt đối không lưu query string, JWT/token, Authorization header, cookie hoặc thông tin thanh toán vào telemetry.
+

@@ -79,8 +79,16 @@ else
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[INFO] Không thể kết nối PostgreSQL ({ex.Message}). Fallback sang InMemoryDatabase cho môi trường local.");
-        builder.Services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase("EventTicketBooking"));
+        var allowFallback = builder.Configuration.GetValue<bool>("Database:AllowInMemoryFallback");
+        if (allowFallback)
+        {
+            Console.WriteLine($"[INFO] Không thể kết nối PostgreSQL ({ex.Message}). Fallback sang InMemoryDatabase cho môi trường local.");
+            builder.Services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase("EventTicketBooking"));
+        }
+        else
+        {
+            throw new InvalidOperationException($"CRITICAL DATABASE ERROR: Failed to connect to PostgreSQL ({ex.Message}). Startup aborted because in-memory fallback is disabled.", ex);
+        }
     }
 }
 
@@ -163,8 +171,21 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IOrderAudi
 // Đăng ký dịch vụ Xoá và Ẩn danh dữ liệu cá nhân (Story S-53)
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IDataDeletionService, EventTicketBooking.Api.Services.Implementations.DataDeletionService>();
 
-// Đăng ký dịch vụ Giám sát và Cảnh báo (Story S-43)
-builder.Services.AddSingleton<EventTicketBooking.Api.Metrics.IAppMetrics, EventTicketBooking.Api.Metrics.PrometheusAppMetrics>();
+// Đăng ký dịch vụ Giám sát và Cảnh báo (Story S-43 No-Grafana Shared PostgreSQL)
+builder.Services.Configure<EventTicketBooking.Api.Options.MonitoringOptions>(
+    builder.Configuration.GetSection(EventTicketBooking.Api.Options.MonitoringOptions.SectionName));
+builder.Services.AddSingleton<EventTicketBooking.Api.Monitoring.ITelemetryChannel, EventTicketBooking.Api.Monitoring.TelemetryChannel>();
+builder.Services.AddSingleton<EventTicketBooking.Api.Metrics.IAppMetrics>(sp =>
+{
+    var channel = sp.GetRequiredService<EventTicketBooking.Api.Monitoring.ITelemetryChannel>();
+    var env = sp.GetRequiredService<IHostEnvironment>();
+    var prometheus = new EventTicketBooking.Api.Metrics.PrometheusAppMetrics();
+    return new EventTicketBooking.Api.Monitoring.DatabaseAppMetrics(channel, env, prometheus);
+});
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IMonitoringService, EventTicketBooking.Api.Services.Implementations.MonitoringService>();
+builder.Services.AddHostedService<EventTicketBooking.Api.Monitoring.TelemetryBatchWriterHostedService>();
+builder.Services.AddHostedService<EventTicketBooking.Api.Monitoring.MonitoringAlertEvaluationHostedService>();
+builder.Services.AddHttpClient<EventTicketBooking.Api.Services.Interfaces.IPrometheusMetricsService, EventTicketBooking.Api.Services.Implementations.PrometheusMetricsService>();
 
 // T-44 (S-19): Đọc cấu hình cổng thanh toán từ biến môi trường hoặc appsettings
 var paymentProvider = builder.Configuration["PaymentSettings:Provider"]
@@ -308,8 +329,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 
-    // Tự động seed 5 roles và 2 tài khoản demo khi khởi động ở môi trường Dev (TTKN-20)
-    await DataSeeder.SeedAsync(app.Services);
+    // Tự động seed 5 roles và 2 tài khoản demo khi khởi động ở môi trường Dev (TTKN-20) nếu được cấu hình
+    var shouldSeedDemo = app.Configuration.GetValue<bool>("Database:SeedDemoData");
+    if (shouldSeedDemo)
+    {
+        await DataSeeder.SeedAsync(app.Services, app.Configuration);
+    }
 }
 
 // Bật phục vụ static files cho wwwroot (login.html)
@@ -340,6 +365,7 @@ if (!string.IsNullOrWhiteSpace(uploadsPath))
 }
 
 app.UseRouting();
+app.UseMiddleware<EventTicketBooking.Api.Middlewares.RequestTelemetryMiddleware>();
 
 // S-43: Bảo vệ endpoint /metrics bằng Bearer token trước khi MapMetrics xử lý
 app.Use(async (context, next) =>

@@ -40,6 +40,9 @@ namespace EventTicketBooking.Api.Data
         public DbSet<DataDeletionRequest> DataDeletionRequests { get; set; } = null!;
         public DbSet<ReconciliationSession> ReconciliationSessions { get; set; } = null!;
         public DbSet<TicketTransfer> TicketTransfers { get; set; } = null!;
+        public DbSet<RequestTelemetry> RequestTelemetries { get; set; } = null!;
+        public DbSet<MonitoringEvent> MonitoringEvents { get; set; } = null!;
+        public DbSet<MonitoringAlert> MonitoringAlerts { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -661,6 +664,43 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(x => x.ExecutedBy).HasMaxLength(200);
                 entity.HasIndex(x => x.SessionCode);
                 entity.HasIndex(x => x.ExecutedAt);
+            });
+
+            // S-43: Bảng lưu vết lưu lượng HTTP Request thực tế vào Shared PostgreSQL
+            modelBuilder.Entity<RequestTelemetry>(entity =>
+            {
+                entity.ToTable("RequestTelemetries");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Method).IsRequired().HasMaxLength(10);
+                entity.Property(e => e.Route).IsRequired().HasMaxLength(300);
+                entity.Property(e => e.Environment).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.InstanceId).HasMaxLength(100);
+                entity.HasIndex(e => e.OccurredAtUtc);
+                entity.HasIndex(e => new { e.OccurredAtUtc, e.StatusCode });
+            });
+
+            // S-43: Bảng lưu vết sự kiện nghiệp vụ (SeatConflict, WebhookRejected) vào Shared PostgreSQL
+            modelBuilder.Entity<MonitoringEvent>(entity =>
+            {
+                entity.ToTable("MonitoringEvents");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Type).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Category).HasMaxLength(50);
+                entity.Property(e => e.ReferenceId).HasMaxLength(100);
+                entity.Property(e => e.Environment).IsRequired().HasMaxLength(50);
+                entity.HasIndex(e => e.OccurredAtUtc);
+                entity.HasIndex(e => new { e.OccurredAtUtc, e.Type });
+            });
+
+            // S-43: Bảng lưu cảnh báo hệ thống được đánh giá tự động dựa trên metrics
+            modelBuilder.Entity<MonitoringAlert>(entity =>
+            {
+                entity.ToTable("MonitoringAlerts");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Metric).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Severity).IsRequired().HasMaxLength(20);
+                entity.HasIndex(e => e.IsActive);
+                entity.HasIndex(e => new { e.IsActive, e.Metric });
             });
         }
 
