@@ -120,6 +120,28 @@ CRON_TZ=Asia/Ho_Chi_Minh
 0 2 * * * cd /app && pwsh -NoProfile -File ./scripts/backup-db.ps1 -LogFile /var/log/eventpulse_backup.log >> /var/log/eventpulse_backup.log 2>&1
 ```
 
+### 4.4. Chạy PostgreSQL client qua Docker (máy Windows không cài client)
+
+Khi máy chạy backup/restore **không cài PostgreSQL client**, các script có thể dùng client trong image `postgres:18-alpine` (pg_dump/pg_restore/psql 18.6) qua Docker Desktop:
+
+- **Chọn chế độ:** tham số `-PgToolMode Docker` (backup-db.ps1 / restore-drill.ps1) hoặc biến môi trường `S55_PG_TOOL_MODE=Docker` (mặc định `Native` — tương thích ngược hoàn toàn với cách chạy executable trực tiếp).
+- **Image tùy chỉnh:** `-PgDockerImage <image>` (mặc định `postgres:18-alpine`; image phải chứa pg_dump/pg_restore/psql).
+- **Điều kiện tiên quyết:** Docker Desktop đang chạy, `docker` trong PATH, thư mục backup nằm trong vùng Docker Desktop cho phép mount (mặc định ổ `C:`).
+- **Cơ chế an toàn của Docker mode:**
+  - Mật khẩu **KHÔNG xuất hiện trên command line**: ghi vào `--env-file` tạm trong `%TEMP%`, xóa ngay trong khối `finally`. Thư mục env-file được đặt ACL giới hạn (chỉ user hiện tại + SYSTEM, không kế thừa); password chứa ký tự xuống dòng (CR/LF) bị **từ chối** để chống injection vào biến môi trường container. Mỗi lần chạy Docker mode, script quét xóa các thư mục `s55_pgenv_*` cũ hơn 24 giờ còn sót do các lần trước bị kết thúc cứng (bỏ qua reparse point/junction, chỉ xóa đúng mẫu trong TEMP). Giới hạn: nếu chính lần chạy hiện tại bị kill cứng, env-file của lần đó vẫn còn cho đến lần chạy kế tiếp.
+  - Chỉ mount **một** thư mục làm việc cần thiết tại `/s55work` (BackupDir với pg_dump; thư mục chứa dump ở chế độ chỉ đọc với pg_restore); đường dẫn host trong tham số được remap sang `/s55work/...`.
+  - Host `localhost`/`127.0.0.1`/`::1` được chuyển thành `host.docker.internal` (Docker Desktop Windows không hỗ trợ `--network host`).
+  - SSL `verify-full`/`verify-ca`: tự đặt `PGSSLROOTCERT=system`; nếu image báo `root certificate file ... does not exist`, tạo image riêng có `ca-certificates` và truyền qua `-PgDockerImage`.
+  - Timeout vẫn có hiệu lực: nếu container treo, script chạy `docker rm -f <container>` trước khi hủy tiến trình; container chạy với `--rm --name s55_<tool>_<id>` nên không để lại container lâu dài.
+  - Khi lệnh trong container thất bại, stderr của docker/pg tool được gộp vào thông báo lỗi (đã che mật khẩu) để chẩn đoán.
+- **Ví dụ:**
+  ```powershell
+  .\scripts\backup-db.ps1 -PgToolMode Docker
+  .\scripts\restore-drill.ps1 -PgToolMode Docker -KeepDrillDb
+  ```
+- **Lưu ý:** `run-drill-env.ps1` chạy restore-drill bên trong runner container (đã có sẵn pg tools) — runbook luôn ép `-PgToolMode Native` cho bước này để tránh docker-in-docker.
+- **Phạm vi kiểm chứng:** đã xác minh runtime cơ chế wrapper (`pg_dump --version`/`psql --version` qua Docker trả về PostgreSQL 18.6) và 23 test offline; **chưa** chạy backup/restore thật qua Docker mode — thuộc bước xác minh trước lần backup offsite đầu tiên.
+
 ---
 
 ## 5. Hướng dẫn Diễn tập Khôi phục (Disaster Recovery Drill)
@@ -130,6 +152,9 @@ Script sẽ tự động chọn bản backup hợp lệ mới nhất, tạo data
 ```powershell
 .\scripts\restore-drill.ps1
 ```
+
+> [!IMPORTANT]
+> **Bắt buộc cung cấp connection string đích (N1 — fail-closed):** script **KHÔNG fallback** về `localhost` mặc định. Phải có một trong ba: tham số `-TargetConnectionString`, biến `TARGET_PG_CONNECTION` hoặc `ConnectionStrings__DefaultConnection`; thiếu cả ba, script dừng ngay với lỗi rõ ràng trước mọi thao tác kết nối/ghi/xóa database (tránh diễn tập nhầm vào PostgreSQL local đang dùng chung). Runbook `run-drill-env.ps1` tự truyền `TARGET_PG_CONNECTION` của môi trường tạm nên không cần cấu hình thêm.
 
 ### 5.2. Chạy diễn tập với file backup cụ thể và giữ lại database để soi dữ liệu
 ```powershell
@@ -255,6 +280,16 @@ Manifest được nâng cấp lên Version 2.0 để liên kết chặt chẽ gi
 ```
 *Ghi chú:* Thuộc tính `sha256` được duy trì song song với `plaintextSha256` để đảm bảo tính tương thích ngược 100% với các công cụ kiểm thử Version 1.0.
 
+### 8.2b. Lưu ý Định dạng Tên Object của `rclone lsjson` (trước lần upload đầu)
+
+Retention offsite đã xử lý **cả hai** dạng tên object mà `rclone lsjson` có thể trả về (có hoặc không kèm prefix `s55/`), chỉ coi object nằm **trực tiếp** trong prefix là thuộc namespace backup; object trong thư mục con của prefix được bảo vệ tuyệt đối. Tuy nhiên, trước lần upload thật đầu tiên, hãy chạy một lệnh **chỉ đọc** để xác nhận định dạng thực tế (trong phiên đã cấu hình credentials):
+
+```powershell
+& 'C:\Users\ADMIN\tools\rclone\rclone.exe' lsjson "R2:s55-postgres-backup/s55" --s3-provider Cloudflare --s3-access-key-id $env:R2_ACCESS_KEY_ID --s3-secret-access-key $env:R2_SECRET_ACCESS_KEY --s3-endpoint "https://$env:R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+```
+
+Kết quả phải hiển thị `Name` có hoặc không có tiền tố `s55/` — cả hai đều được script hỗ trợ; nếu có dạng khác, dừng và báo lại trước khi bật retention.
+
 ### 8.3. Quy trình Upload và Xác minh Ngoại vi R2 (Download & Hash Verification)
 1. Upload file mã hóa `.dump.age` và manifest `.json` lên Cloudflare R2 qua công cụ `rclone` (S3 API).
 2. **Không tin cậy mù quáng vào mã thoát (exit code 0):** Script tải ngược file mã hóa từ R2 về một thư mục tạm biệt lập.
@@ -265,6 +300,7 @@ Manifest được nâng cấp lên Version 2.0 để liên kết chặt chẽ gi
 ### 8.4. Chính sách Retention Offsite 14 Bản Độc lập (Fail-Safe & Namespace Isolation)
 - **Giữ tối đa 14 bản backup hợp lệ gần nhất** trên Cloudflare R2.
 - **Quy tắc an toàn sống còn (Fail-Safe):** Nếu việc upload hoặc xác minh bản mới gặp lỗi (`IsUploadFailed = $true`), hệ thống lập tức hủy tác vụ retention, **tuyệt đối không xóa bản backup thứ 15 hoặc bất kỳ object cũ nào**.
+- **Retention lỗi sau khi upload đã VerifiedUploaded (F5):** lỗi retention transient (mạng/quyền) chỉ cảnh báo `[OFFSITE RETENTION FAILED]` và trả về trạng thái `RetentionFailedNonBlocking` — bản backup vẫn được tính là thành công (đã upload + xác minh); người vận hành cần chạy lại retention thủ công. Ngược lại, retention **không bao giờ** chạy khi upload/verification chưa thành công.
 - **Cách ly Namespace (Namespace Guard):** Hệ thống chỉ nhận diện và xử lý các object khớp đúng quy ước `eventpulse_backup_\d{8}_\d{6}\.(dump\.age|json)`. Mọi object ngoài namespace (như file sao lưu của hệ thống khác, file log, thư mục khác trong bucket) được bảo vệ tuyệt đối 100%, không bao giờ bị xóa nhầm.
 
 ### 8.5. Ma trận Phân định Cấu hình & Hiện trạng Kiểm thử
@@ -304,7 +340,9 @@ Khi triển khai trên máy chủ Production, Quản trị viên thực hiện c
    [System.Environment]::SetEnvironmentVariable('R2_BUCKET_NAME', 'your-private-backup-bucket', 'Machine')
    [System.Environment]::SetEnvironmentVariable('R2_ACCESS_KEY_ID', 'your_r2_token_access_key', 'Machine')
    [System.Environment]::SetEnvironmentVariable('R2_SECRET_ACCESS_KEY', 'your_r2_token_secret_key', 'Machine')
+   [System.Environment]::SetEnvironmentVariable('R2_PREFIX', 'your-prefix', 'Machine') # tuy chon; mac dinh 'database-backups'
    ```
+   *Thứ tự ưu tiên prefix:* tham số `-R2Prefix` → biến `R2_PREFIX` → mặc định `database-backups`. Dấu `/` thừa ở đầu/cuối prefix được tự động chuẩn hóa.
 
 3. **Cài đặt công cụ khách trên máy chủ:**
    - Cài đặt `age` CLI: [https://github.com/FiloSottile/age/releases](https://github.com/FiloSottile/age/releases)
