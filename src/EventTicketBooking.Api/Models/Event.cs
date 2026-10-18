@@ -15,6 +15,8 @@ namespace EventTicketBooking.Api.Models
         public DateTime EndTime { get; set; }
         public int TotalSeats { get; set; }
         public int MaxTicketsPerUser { get; set; } = 10;
+        public bool AllowTicketTransfer { get; set; } = true;
+        public int TransferCutoffHours { get; set; } = 2;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

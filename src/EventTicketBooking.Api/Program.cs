@@ -79,8 +79,16 @@ else
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[INFO] Không thể kết nối PostgreSQL ({ex.Message}). Fallback sang InMemoryDatabase cho môi trường local.");
-        builder.Services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase("EventTicketBooking"));
+        var allowFallback = builder.Configuration.GetValue<bool>("Database:AllowInMemoryFallback");
+        if (allowFallback)
+        {
+            Console.WriteLine($"[INFO] Không thể kết nối PostgreSQL ({ex.Message}). Fallback sang InMemoryDatabase cho môi trường local.");
+            builder.Services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase("EventTicketBooking"));
+        }
+        else
+        {
+            throw new InvalidOperationException($"CRITICAL DATABASE ERROR: Failed to connect to PostgreSQL ({ex.Message}). Startup aborted because in-memory fallback is disabled.", ex);
+        }
     }
 }
 
@@ -115,20 +123,37 @@ redisOptions.ConnectRetry = 5;
 // StackExchange.Redis sẽ tự động reconnect trong background khi Redis online trở lại.
 StackExchange.Redis.IConnectionMultiplexer redisMultiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(redisOptions);
 
-// Đăng ký instance ConnectionMultiplexer thật làm Singleton trong DI (TUYỆT ĐỐI KHÔNG đăng ký null).
+// Đăng ký instance ConnectionMultiplexer thật làm Singleton trong DI.
 builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(redisMultiplexer);
 
-// Cấu hình IDistributedCache sử dụng Redis cho caching nghiệp vụ chung.
-// LƯU Ý BẢO MẬT: AuthService và S-02 Login Lockout / Anti-Bruteforce trực tiếp sử dụng
-// IConnectionMultiplexer (Fail-Closed). Tuyệt đối không fallback sang in-memory cache cho Auth.
-builder.Services.AddStackExchangeRedisCache(options =>
+// Cấu hình IDistributedCache: Nếu Redis online -> Dùng Redis; Nếu Redis offline -> Dùng MemoryCache để tránh timeout 14s
+if (redisMultiplexer.IsConnected)
 {
-    options.Configuration = redisConnection;
-    options.InstanceName = "EventTicket_";
-});
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnection;
+        options.InstanceName = "EventTicket_";
+    });
+}
+else
+{
+    Console.WriteLine("[INFO] Redis không khả dụng lúc khởi động. Tự động sử dụng Memory Cache cho IDistributedCache để đảm bảo tốc độ phản hồi tức thì.");
+    builder.Services.AddDistributedMemoryCache();
+}
 
 // Đăng ký dịch vụ băm mật khẩu Argon2id (TTKN-20)
 builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IPasswordHasher, EventTicketBooking.Api.Services.Implementations.Argon2PasswordHasher>();
+
+// Cấu hình bảo mật xác thực (Story S-02)
+builder.Services.Configure<EventTicketBooking.Api.Options.AuthSecurityOptions>(options =>
+{
+    builder.Configuration.GetSection(EventTicketBooking.Api.Options.AuthSecurityOptions.SectionName).Bind(options);
+    if (builder.Environment.IsDevelopment())
+    {
+        // Trong môi trường Local Development, cho phép tự động fallback khi Redis chưa khởi động
+        options.FailClosedOnRedisDown = false;
+    }
+});
 
 // Đăng ký dịch vụ Token và Authentication (TTKN-25)
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITokenService, EventTicketBooking.Api.Services.Implementations.TokenService>();
@@ -143,8 +168,24 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ISeatHoldS
 // Đăng ký dịch vụ Nhật ký thao tác đơn hàng và vé (Story S-49)
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IOrderAuditService, EventTicketBooking.Api.Services.Implementations.OrderAuditService>();
 
-// Đăng ký dịch vụ Giám sát và Cảnh báo (Story S-43)
-builder.Services.AddSingleton<EventTicketBooking.Api.Metrics.IAppMetrics, EventTicketBooking.Api.Metrics.PrometheusAppMetrics>();
+// Đăng ký dịch vụ Xoá và Ẩn danh dữ liệu cá nhân (Story S-53)
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IDataDeletionService, EventTicketBooking.Api.Services.Implementations.DataDeletionService>();
+
+// Đăng ký dịch vụ Giám sát và Cảnh báo (Story S-43 No-Grafana Shared PostgreSQL)
+builder.Services.Configure<EventTicketBooking.Api.Options.MonitoringOptions>(
+    builder.Configuration.GetSection(EventTicketBooking.Api.Options.MonitoringOptions.SectionName));
+builder.Services.AddSingleton<EventTicketBooking.Api.Monitoring.ITelemetryChannel, EventTicketBooking.Api.Monitoring.TelemetryChannel>();
+builder.Services.AddSingleton<EventTicketBooking.Api.Metrics.IAppMetrics>(sp =>
+{
+    var channel = sp.GetRequiredService<EventTicketBooking.Api.Monitoring.ITelemetryChannel>();
+    var env = sp.GetRequiredService<IHostEnvironment>();
+    var prometheus = new EventTicketBooking.Api.Metrics.PrometheusAppMetrics();
+    return new EventTicketBooking.Api.Monitoring.DatabaseAppMetrics(channel, env, prometheus);
+});
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IMonitoringService, EventTicketBooking.Api.Services.Implementations.MonitoringService>();
+builder.Services.AddHostedService<EventTicketBooking.Api.Monitoring.TelemetryBatchWriterHostedService>();
+builder.Services.AddHostedService<EventTicketBooking.Api.Monitoring.MonitoringAlertEvaluationHostedService>();
+builder.Services.AddHttpClient<EventTicketBooking.Api.Services.Interfaces.IPrometheusMetricsService, EventTicketBooking.Api.Services.Implementations.PrometheusMetricsService>();
 
 // T-44 (S-19): Đọc cấu hình cổng thanh toán từ biến môi trường hoặc appsettings
 var paymentProvider = builder.Configuration["PaymentSettings:Provider"]
@@ -185,6 +226,8 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ICheckinEx
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ISeatMapPdfExportService, EventTicketBooking.Api.Services.Implementations.SeatMapPdfExportService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ICheckinStatisticsService, EventTicketBooking.Api.Services.Implementations.CheckinStatisticsService>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IDiscountCodeService, EventTicketBooking.Api.Services.Implementations.DiscountCodeService>();
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITicketTransferService, EventTicketBooking.Api.Services.Implementations.TicketTransferService>();
 builder.Services.AddHttpClient();
 
 
@@ -245,6 +288,10 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IRefundSer
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.RefundProcessingWorker>();
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.ShowtimeSaleExpiryWorker>();
 
+// Story S-61: Dịch vụ & Job nền nhắc người mua trước 24 giờ diễn qua email và cập nhật khi đổi giờ
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IShowtimeReminderService, EventTicketBooking.Api.Services.Implementations.ShowtimeReminderService>();
+builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.ShowtimeReminderWorker>();
+
 var app = builder.Build();
 app.UseForwardedHeaders();
 
@@ -282,13 +329,30 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 
-    // Tự động seed 5 roles và 2 tài khoản demo khi khởi động ở môi trường Dev (TTKN-20)
-    await DataSeeder.SeedAsync(app.Services);
+    // Tự động seed 5 roles và 2 tài khoản demo khi khởi động ở môi trường Dev (TTKN-20) nếu được cấu hình
+    var shouldSeedDemo = app.Configuration.GetValue<bool>("Database:SeedDemoData");
+    if (shouldSeedDemo)
+    {
+        await DataSeeder.SeedAsync(app.Services, app.Configuration);
+    }
 }
 
 // Bật phục vụ static files cho wwwroot (login.html)
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (ctx.File.Name.EndsWith(".html", StringComparison.OrdinalIgnoreCase) ||
+            ctx.File.Name.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.CacheControl] = "no-cache, no-store, must-revalidate, max-age=0";
+            ctx.Context.Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.Pragma] = "no-cache";
+            ctx.Context.Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.Expires] = "0";
+            ctx.Context.Response.Headers["Clear-Site-Data"] = "\"cache\"";
+        }
+    }
+});
 var uploadsPath = builder.Configuration["Uploads:Path"];
 if (!string.IsNullOrWhiteSpace(uploadsPath))
 {
@@ -301,6 +365,7 @@ if (!string.IsNullOrWhiteSpace(uploadsPath))
 }
 
 app.UseRouting();
+app.UseMiddleware<EventTicketBooking.Api.Middlewares.RequestTelemetryMiddleware>();
 
 // S-43: Bảo vệ endpoint /metrics bằng Bearer token trước khi MapMetrics xử lý
 app.Use(async (context, next) =>

@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace EventTicketBooking.Api.DTOs
 {
     public class OrderDto
     {
         public Guid Id { get; set; }
+        public Guid? UserId { get; set; }
         public Guid ShowtimeId { get; set; }
         public Guid? EventId { get; set; }
         public string? EventTitle { get; set; }
@@ -17,6 +19,10 @@ namespace EventTicketBooking.Api.DTOs
         public string? CustomerEmail { get; set; }
         public string Status { get; set; } = null!;
         public int TotalAmount { get; set; }
+        public int OriginalAmount { get; set; }
+        public int DiscountAmount { get; set; }
+        public string? DiscountCode { get; set; }
+        public Guid? DiscountCodeId { get; set; }
         public int SeatCount { get; set; }
         public List<string> SeatNames { get; set; } = new();
         public DateTimeOffset CreatedAt { get; set; }
@@ -34,14 +40,45 @@ namespace EventTicketBooking.Api.DTOs
         /// <summary>Story S-45: số tiền hoàn (VND).</summary>
         public int? RefundAmount { get; set; }
 
-        /// <summary>Story S-45: lý do hoàn tiền thất bại.</summary>
+        /// <summary>Story S-45: lý do hoàn tiền thất bại (chỉ dành cho Auditor/Admin, ẩn với Customer để tránh lộ gateway error/credentials).</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? RefundFailureReason { get; set; }
 
         /// <summary>Story S-45: thời điểm cập nhật cuối của yêu cầu hoàn tiền.</summary>
         public DateTimeOffset? RefundUpdatedAt { get; set; }
 
-        /// <summary>Story S-48: số lần đã retry hoàn tiền thất bại (0..3).</summary>
-        public int RefundRetryCount { get; set; }
+        /// <summary>Story S-48: ID của bản ghi yêu cầu hoàn tiền (RefundRequest) để khách hàng/admin có thể tra cứu/sao chép.</summary>
+        public Guid? RefundRequestId { get; set; }
+
+        /// <summary>Story S-48: thời điểm tạo yêu cầu hoàn tiền.</summary>
+        public DateTimeOffset? RefundCreatedAt { get; set; }
+
+        /// <summary>Story S-48: số lần đã retry hoàn tiền thất bại (0..3) - chỉ dành cho Auditor/Admin.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? RefundRetryCount { get; set; }
+
+        /// <summary>Story S-48: số lần đã thử hoàn tiền qua cổng thanh toán (AttemptCount) - chỉ dành cho Auditor/Admin.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? RefundAttemptCount { get; set; }
+
+        /// <summary>Story S-48: thời điểm thử hoàn tiền gần nhất - chỉ dành cho Auditor/Admin.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public DateTimeOffset? RefundLastAttemptedAt { get; set; }
+
+        /// <summary>Story S-48: thời điểm dự kiến tự động thử lại kế tiếp (nếu ở trạng thái RetryScheduled) - chỉ dành cho Auditor/Admin.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public DateTimeOffset? RefundNextRetryAt { get; set; }
+
+        /// <summary>Story S-48: mã lỗi trả về từ cổng thanh toán - chỉ dành cho Auditor/Admin.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? RefundErrorCode { get; set; }
+
+        /// <summary>Story S-48: thông điệp lỗi chi tiết từ cổng thanh toán - chỉ dành cho Auditor/Admin.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? RefundErrorMessage { get; set; }
+
+        /// <summary>Story S-61: thời điểm đã gửi email nhắc nhở 24h trước giờ diễn.</summary>
+        public DateTimeOffset? ReminderSentAt { get; set; }
     }
 
     public class OrderItemDto

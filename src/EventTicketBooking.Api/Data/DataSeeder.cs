@@ -16,15 +16,16 @@ namespace EventTicketBooking.Api.Data
     /// </summary>
     public static class DataSeeder
     {
-        public static async Task SeedAsync(IServiceProvider serviceProvider)
+        public static async Task SeedAsync(IServiceProvider serviceProvider, Microsoft.Extensions.Configuration.IConfiguration? configuration = null)
         {
             using var scope = serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
             var logger = scope.ServiceProvider.GetService<ILogger<AppDbContext>>();
+            configuration ??= scope.ServiceProvider.GetService<Microsoft.Extensions.Configuration.IConfiguration>();
 
-            // Migration failures must stop startup rather than be swallowed as seed warnings.
-            if (context.Database.IsRelational())
+            var autoMigrate = configuration?.GetValue<bool>("Database:AutoMigrate") ?? false;
+            if (autoMigrate && context.Database.IsRelational())
             {
                 await context.Database.MigrateAsync();
             }
@@ -193,6 +194,17 @@ namespace EventTicketBooking.Api.Data
                     catch (Exception ex)
                     {
                         logger?.LogWarning(ex, "Could not normalize statuses in DB.");
+                    }
+
+                    try
+                    {
+                        using var s61Cmd = conn.CreateCommand();
+                        s61Cmd.CommandText = "ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"ReminderSentAt\" timestamp with time zone;";
+                        await s61Cmd.ExecuteNonQueryAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger?.LogWarning(ex, "Could not ensure ReminderSentAt column on orders table.");
                     }
                 }
 

@@ -23,17 +23,20 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly ILogger<ExpiredOrderCleanupService> _logger;
         private readonly IHubContext<SeatStatusHub>? _hubContext;
         private readonly IOrderAuditService _orderAuditService;
+        private readonly IDiscountCodeService _discountCodeService;
 
         public ExpiredOrderCleanupService(
             AppDbContext dbContext,
             ILogger<ExpiredOrderCleanupService> logger,
             IHubContext<SeatStatusHub>? hubContext = null,
-            IOrderAuditService? orderAuditService = null)
+            IOrderAuditService? orderAuditService = null,
+            IDiscountCodeService? discountCodeService = null)
         {
             _dbContext = dbContext;
             _logger = logger;
             _hubContext = hubContext;
             _orderAuditService = orderAuditService ?? new OrderAuditService(dbContext, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
+            _discountCodeService = discountCodeService ?? new DiscountCodeService(dbContext);
         }
 
         public async Task<int> CleanupExpiredOrdersAsync(DateTimeOffset? fakeNow = null, CancellationToken cancellationToken = default)
@@ -109,6 +112,12 @@ namespace EventTicketBooking.Api.Services.Implementations
                         "job:ExpiredOrderCleanupWorker",
                         null,
                         "Job nền quét và huỷ đơn hàng do quá hạn thời gian thanh toán.");
+
+                    // Story S-56: Giải phóng lượt sử dụng mã giảm giá nếu đơn hàng có áp dụng
+                    if (order.DiscountCodeId.HasValue)
+                    {
+                        await _discountCodeService.ReleaseDiscountReservationAsync(order, cancellationToken);
+                    }
 
                     if (order.OrderItems != null && order.OrderItems.Any())
                     {

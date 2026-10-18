@@ -25,6 +25,7 @@ namespace EventTicketBooking.Api.Controllers
     /// </summary>
     [ApiController]
     [Route("api/public")]
+    [AllowAnonymous]
     public class PublicShowtimeController : ControllerBase
     {
         private readonly AppDbContext _context;

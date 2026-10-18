@@ -20,6 +20,10 @@ namespace EventTicketBooking.Api.Models
         public Guid ShowtimeId { get; set; }
         public OrderStatus Status { get; set; } = OrderStatus.Pending;
         public int TotalAmount { get; set; }
+        public int OriginalAmount { get; set; }
+        public int DiscountAmount { get; set; }
+        public Guid? DiscountCodeId { get; set; }
+        public string? DiscountCodeSnapshot { get; set; }
         public DateTimeOffset ExpiresAt { get; set; }
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -30,16 +34,25 @@ namespace EventTicketBooking.Api.Models
         /// </summary>
         public string? CancelReason { get; set; }
 
+        /// <summary>
+        /// Thời điểm đã gửi email nhắc nhở 24h trước giờ diễn (Story S-61). Null nếu chưa gửi.
+        /// </summary>
+        public DateTimeOffset? ReminderSentAt { get; set; }
+
         public User User { get; set; } = null!;
         public Showtime Showtime { get; set; } = null!;
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
         public PaymentTransaction? PaymentTransaction { get; set; }
         public ICollection<Refund> Refunds { get; set; } = new List<Refund>();
-
+        public DiscountCode? DiscountCode { get; set; }
 
         public void CalculateTotal()
         {
-            TotalAmount = OrderItems?.Sum(oi => oi.Price) ?? 0;
+            if (OriginalAmount == 0 && OrderItems != null && OrderItems.Count > 0)
+            {
+                OriginalAmount = OrderItems.Sum(oi => oi.Price);
+            }
+            TotalAmount = Math.Max(0, OriginalAmount - DiscountAmount);
         }
     }
 }
