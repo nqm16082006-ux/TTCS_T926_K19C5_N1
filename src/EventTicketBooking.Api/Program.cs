@@ -27,7 +27,12 @@ var listenPort = int.TryParse(builder.Configuration["PORT"], out var configuredP
                  configuredPort is > 0 and <= 65535
     ? configuredPort
     : 5012;
-builder.WebHost.UseUrls($"http://0.0.0.0:{listenPort}");
+var bindHost = builder.Configuration["BIND_HOST"] ?? builder.Configuration["HOST"] ?? "0.0.0.0";
+var customUrls = builder.Configuration["ASPNETCORE_URLS"];
+if (string.IsNullOrWhiteSpace(customUrls))
+{
+    builder.WebHost.UseUrls($"http://{bindHost}:{listenPort}");
+}
 
 var publicUrl = builder.Configuration["App:PublicBaseUrl"] ?? builder.Configuration["RENDER_EXTERNAL_URL"];
 if (!string.IsNullOrWhiteSpace(publicUrl))
@@ -307,8 +312,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 
-    // Tự động seed 5 roles và 2 tài khoản demo khi khởi động ở môi trường Dev (TTKN-20)
-    await DataSeeder.SeedAsync(app.Services);
+    // S-55: Kiểm tra cấu hình AutoSeed và AutoMigrate trước khi gọi DataSeeder
+    bool autoSeed = builder.Configuration.GetValue<bool?>("Database:AutoSeed") ?? true;
+    bool autoMigrate = builder.Configuration.GetValue<bool?>("Database:AutoMigrate") ?? false;
+    if (autoSeed || autoMigrate)
+    {
+        await DataSeeder.SeedAsync(app.Services);
+    }
 }
 
 // Bật phục vụ static files cho wwwroot (login.html)

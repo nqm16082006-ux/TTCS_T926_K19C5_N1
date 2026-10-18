@@ -12,3 +12,5 @@ data
 src/tests
 **/wwwroot/uploads
 *.sql
+# S-55: khong bao gio dua dump backup / bang chung drill vao image
+artifacts

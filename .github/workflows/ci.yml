@@ -42,3 +42,21 @@ jobs:
 
       - name: Run Tests
         run: dotnet test EventTicketBooking.sln --no-build --configuration Release --verbosity normal
+
+  # S-55: Offline tests for backup/restore/drill scripts (no DB, no Docker, no cloud credentials required)
+  s55-offline-tests:
+    name: S-55 Backup/DR Offline Tests (PowerShell)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run S-55 offline test suites
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./tests/test-backup-retention-s55.ps1
+          ./tests/test-s55-blockers-offline.ps1
+          ./tests/test-s55-guards-offline.ps1
+          ./tests/test-s55-phase3-offline.ps1
+          Write-Host "TAT CA BO TEST S-55 OFFLINE DEU PASS."
