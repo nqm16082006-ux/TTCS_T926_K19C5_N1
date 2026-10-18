@@ -38,6 +38,12 @@ param(
     [string]$PsqlPath,
 
     [Parameter()]
+    [string]$PgToolMode = "",
+
+    [Parameter()]
+    [string]$PgDockerImage = "",
+
+    [Parameter()]
     [int]$VerifyTimeoutSeconds = 300,
 
     [Parameter()]
@@ -74,7 +80,7 @@ param(
     [string]$R2SecretAccessKey,
 
     [Parameter()]
-    [string]$R2Prefix = "database-backups",
+    [string]$R2Prefix = "",
 
     [Parameter()]
     [string]$AgeExePath,
@@ -103,6 +109,12 @@ if ([string]::IsNullOrWhiteSpace($BackupDir)) {
 # Nạp module dùng chung S-55 (Get-PgToolExecutable, Parse-PgConnectionString, Invoke-PgSqlQuery, Invoke-ProcessWithTimeout, Test-S55BackupValidity, Assert-SafeDrillEnvironment)
 . (Join-Path $PSScriptRoot "s55-common.ps1")
 
+# S-55 Docker mode: chon Native hoac Docker cho pg_dump/pg_restore/psql
+# (tham so -PgToolMode, hoac env S55_PG_TOOL_MODE; mac dinh Native).
+$effectivePgToolMode = Resolve-S55PgToolMode -ToolMode $PgToolMode
+Set-S55PgToolMode -Mode $effectivePgToolMode -DockerImage $PgDockerImage
+Write-Host "[TOOL MODE] PostgreSQL client mode: $effectivePgToolMode"
+
 $transcriptStarted = $false
 if (-not [string]::IsNullOrWhiteSpace($LogFile)) {
     try {
@@ -130,8 +142,32 @@ function Invoke-PgDumpWithTimeout {
         [string[]]$DumpArgs,
 
         [Parameter()]
-        [int]$TimeoutSeconds = 300
+        [int]$TimeoutSeconds = 300,
+
+        [Parameter()]
+        [hashtable]$ConnParams,
+
+        [Parameter()]
+        [string]$HostDir,
+
+        [Parameter()]
+        [scriptblock]$MockCommandBlock
     )
+
+    # Docker mode: uy quyen cho Invoke-PgToolCommand (mount HostDir -> /s55work,
+    # mat khau qua --env-file tam, remap duong dan -f ve container).
+    if ($script:S55PgToolMode -eq 'Docker') {
+        Write-Host "[EXEC] Dang thuc thi pg_dump trong Docker container (Timeout: $TimeoutSeconds giay)..."
+        $res = Invoke-PgToolCommand -ToolName "pg_dump" `
+            -ToolArgs $DumpArgs `
+            -ConnParams $ConnParams `
+            -Mode 'Docker' `
+            -DockerImage $script:S55PgDockerImage `
+            -HostDir $HostDir `
+            -TimeoutSeconds $TimeoutSeconds `
+            -MockCommandBlock $MockCommandBlock
+        return $res.ExitCode
+    }
 
     Write-Host "[EXEC] Dang thuc thi pg_dump (Timeout: $TimeoutSeconds giay)..."
 
@@ -265,6 +301,45 @@ function Invoke-BackupRetention {
 }
 
 # ==============================================================================
+# HÀM BỔ TRỢ: RETENTION R2 SAU KHI UPLOAD DA VERIFIEDUPLOADED (F5)
+# Loi retention transient (mang, quyen) KHONG duoc bien ban backup da upload
+# va xac minh thanh thanh "that bai" — chi canh bao va tra trang thai ro rang.
+# ==============================================================================
+function Invoke-S55RemoteRetentionSafe {
+    param(
+        [Parameter(Mandatory)]
+        [hashtable]$R2Config,
+
+        [Parameter()]
+        [int]$RetentionLimit = 14,
+
+        [Parameter()]
+        [string]$RcloneExePath,
+
+        [Parameter()]
+        [scriptblock]$MockCommandBlock
+    )
+
+    try {
+        return Invoke-R2RemoteRetention -R2Config $R2Config `
+            -RetentionLimit $RetentionLimit `
+            -IsUploadFailed $false `
+            -RcloneExePath $RcloneExePath `
+            -MockCommandBlock $MockCommandBlock
+    } catch {
+        Write-Warning "[OFFSITE RETENTION FAILED] Khong the thuc thi retention tren R2: $($_.Exception.Message)"
+        Write-Warning "[OFFSITE RETENTION FAILED] Ban backup moi da upload va xac minh (VerifiedUploaded) — loi nay KHONG lam mat ban backup. Co the con ton dong object cu qua han; hay chay lai retention thu cong sau khi xu ly nguyen nhan."
+        return @{
+            Status        = "RetentionFailedNonBlocking"
+            RetainedCount = 0
+            DeletedCount  = 0
+            DeletedFiles  = @()
+            Error         = $_.Exception.Message
+        }
+    }
+}
+
+# ==============================================================================
 # NẾU CHỈ KIỂM THỬ RETENTION (CHẾ ĐỘ TEST CÔ LẬP)
 # ==============================================================================
 if ($TestOnlyRetention) {
@@ -306,6 +381,10 @@ if ($TestOnlyOffsite) {
             $inp = $OffsiteTestInputs.RetentionTest
             return Invoke-R2RemoteRetention -R2Config $inp.Config -RetentionLimit $inp.Limit -IsUploadFailed $inp.IsUploadFailed -MockCommandBlock $inp.MockBlock
         }
+        if ($OffsiteTestInputs.ContainsKey("RetentionSafeTest")) {
+            $inp = $OffsiteTestInputs.RetentionSafeTest
+            return Invoke-S55RemoteRetentionSafe -R2Config $inp.Config -RetentionLimit $inp.Limit -RcloneExePath $inp.RcloneExe -MockCommandBlock $inp.MockBlock
+        }
     }
     return @{ Status = "OffsiteTestReady" }
 }
@@ -318,22 +397,34 @@ Write-Host " S-55: SAO LUU CO SO DU LIEU POSTGRESQL (DAILY BACKUP SCRIPT)"
 Write-Host "=================================================================="
 
 # 1. Kiểm tra công cụ pg_dump và pg_restore
-$resolvedPgDump = Get-PgToolExecutable -ToolName "pg_dump" -ExplicitPath $PgDumpPath
-$resolvedPgRestore = Get-PgToolExecutable -ToolName "pg_restore" -ExplicitPath $PgRestorePath
+if ($effectivePgToolMode -eq 'Docker') {
+    # Docker mode: client chay trong container, khong can cai PostgreSQL tren may
+    if (-not (Get-Command $script:S55PgDockerExe -ErrorAction SilentlyContinue)) {
+        Write-Error "[LOI MOI TRUONG] PgToolMode=Docker nhung khong tim thay '$($script:S55PgDockerExe)' trong PATH. Vui long kiem tra Docker."
+        exit 1
+    }
+    $versionResult = Invoke-PgToolCommand -ToolName "pg_dump" -ToolArgs @('--version') `
+        -Mode 'Docker' -DockerImage $script:S55PgDockerImage -CaptureOutput -TimeoutSeconds 600
+    $pgDumpVersion = (($versionResult.Output -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 1) -join '').Trim()
+    Write-Host "[TOOL CHECK] Docker mode: pg_dump qua image '$($script:S55PgDockerImage)' — $pgDumpVersion"
+} else {
+    $resolvedPgDump = Get-PgToolExecutable -ToolName "pg_dump" -ExplicitPath $PgDumpPath
+    $resolvedPgRestore = Get-PgToolExecutable -ToolName "pg_restore" -ExplicitPath $PgRestorePath
 
-if (-not $resolvedPgDump) {
-    Write-Error "[LOI MOI TRUONG] Khong tim thay 'pg_dump' trong PATH hoac cac thu muc mac dinh. Vui long cai dat PostgreSQL 16 Client Tools hoac cung cap qua -PgDumpPath."
-    exit 1
+    if (-not $resolvedPgDump) {
+        Write-Error "[LOI MOI TRUONG] Khong tim thay 'pg_dump' trong PATH hoac cac thu muc mac dinh. Vui long cai dat PostgreSQL 18 Client Tools, cung cap qua -PgDumpPath, hoac chay che do Docker (-PgToolMode Docker)."
+        exit 1
+    }
+
+    if (-not $resolvedPgRestore) {
+        Write-Error "[LOI MOI TRUONG] Khong tim thay 'pg_restore' trong PATH hoac cac thu muc mac dinh. Vui long cai dat PostgreSQL 18 Client Tools, cung cap qua -PgRestorePath, hoac chay che do Docker (-PgToolMode Docker)."
+        exit 1
+    }
+
+    $pgDumpVersion = & $resolvedPgDump --version
+    Write-Host "[TOOL CHECK] Da tim thay pg_dump: $resolvedPgDump"
+    Write-Host "[TOOL CHECK] Phien ban: $pgDumpVersion"
 }
-
-if (-not $resolvedPgRestore) {
-    Write-Error "[LOI MOI TRUONG] Khong tim thay 'pg_restore' trong PATH hoac cac thu muc mac dinh. Vui long cai dat PostgreSQL 16 Client Tools hoac cung cap qua -PgRestorePath."
-    exit 1
-}
-
-$pgDumpVersion = & $resolvedPgDump --version
-Write-Host "[TOOL CHECK] Da tim thay pg_dump: $resolvedPgDump"
-Write-Host "[TOOL CHECK] Phien ban: $pgDumpVersion"
 
 # 2. Xác định Connection String an toàn
 if ([string]::IsNullOrWhiteSpace($ConnectionString)) {
@@ -415,7 +506,7 @@ try {
         }
     }
 
-    Invoke-PgDumpWithTimeout -PgDumpExe $resolvedPgDump -DumpArgs $dumpArgs -TimeoutSeconds $DumpTimeoutSeconds | Out-Null
+    Invoke-PgDumpWithTimeout -PgDumpExe $resolvedPgDump -DumpArgs $dumpArgs -TimeoutSeconds $DumpTimeoutSeconds -ConnParams $pgParams -HostDir $BackupDir | Out-Null
 
     if (-not (Test-Path -LiteralPath $stagingDumpFilePath)) {
         throw "Khong tim thay file backup tam sau khi pg_dump hoan thanh."
@@ -428,7 +519,7 @@ try {
 
     # 4. Xác minh tính toàn vẹn của file dump bằng pg_restore -l (TOC List)
     Write-Host "[VERIFY] Dang kiem tra cau truc archive bang pg_restore -l (timeout: $VerifyTimeoutSeconds giay)..."
-    $restoreTest = Invoke-ProcessWithTimeout -FilePath $resolvedPgRestore -Arguments @("-l", $stagingDumpFilePath) -TimeoutSeconds $VerifyTimeoutSeconds
+    $restoreTest = Invoke-PgProcessWithTimeout -ToolName "pg_restore" -ToolArgs @("-l", $stagingDumpFilePath) -NativeExePath $resolvedPgRestore -TimeoutSeconds $VerifyTimeoutSeconds -HostDir $BackupDir -ReadOnlyHostDir
 
     if ($restoreTest.TimedOut) {
         throw "pg_restore -l vuot qua timeout $VerifyTimeoutSeconds giay va da bi terminate an toan (H3)."
@@ -444,7 +535,8 @@ try {
     # 5.1 (Tùy chọn) Ghi baseline row counts vào manifest nếu có psql — phục vụ đối chiếu sau restore
     $tableRowCounts = $null
     $resolvedPsql = Get-PgToolExecutable -ToolName "psql" -ExplicitPath $PsqlPath
-    if ($resolvedPsql) {
+    # Docker mode: psql co san trong image; Native: chi ghi baseline khi co psql
+    if (($effectivePgToolMode -eq 'Docker') -or ($null -ne $resolvedPsql)) {
         try {
             Write-Host "[BASELINE] Dang ghi nhan so dong tung bang vao manifest (psql)..."
             $getTablesQuery = "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name;"
@@ -550,7 +642,7 @@ try {
             BucketName      = if (-not [string]::IsNullOrWhiteSpace($R2BucketName)) { $R2BucketName } else { $env:R2_BUCKET_NAME }
             AccessKeyId     = if (-not [string]::IsNullOrWhiteSpace($R2AccessKeyId)) { $R2AccessKeyId } else { $env:R2_ACCESS_KEY_ID }
             SecretAccessKey = if (-not [string]::IsNullOrWhiteSpace($R2SecretAccessKey)) { $R2SecretAccessKey } else { $env:R2_SECRET_ACCESS_KEY }
-            Prefix          = if (-not [string]::IsNullOrWhiteSpace($R2Prefix)) { $R2Prefix } else { $env:R2_PREFIX }
+            Prefix          = Resolve-S55R2Prefix -R2Prefix $R2Prefix
         }
 
         $uploadResult = Invoke-R2BackupUpload -EncryptedFilePath $finalEncryptedFilePath `
@@ -561,12 +653,12 @@ try {
 
         Write-Host "[OFFSITE] Upload va xac minh remote hoan tat: $($uploadResult.OffsiteStatus)"
 
-        # Thực thi retention trên R2
-        $remoteRetentionResult = Invoke-R2RemoteRetention -R2Config $effectiveR2Config `
-                                                          -RetentionLimit $MaxRetention `
-                                                          -IsUploadFailed $false `
-                                                          -RcloneExePath $RcloneExePath `
-                                                          -MockCommandBlock $OffsiteMockCommandBlock
+        # Thực thi retention trên R2 — sau khi upload đã VerifiedUploaded (F5):
+        # lỗi retention transient chỉ cảnh báo, không biến backup thành "thất bại".
+        $remoteRetentionResult = Invoke-S55RemoteRetentionSafe -R2Config $effectiveR2Config `
+                                                               -RetentionLimit $MaxRetention `
+                                                               -RcloneExePath $RcloneExePath `
+                                                               -MockCommandBlock $OffsiteMockCommandBlock
         Write-Host "[OFFSITE RETENTION] Ket qua retention tren R2: $($remoteRetentionResult.Status) (Giu: $($remoteRetentionResult.RetainedCount), Xoa: $($remoteRetentionResult.DeletedCount))"
     }
 

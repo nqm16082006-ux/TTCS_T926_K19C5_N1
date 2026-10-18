@@ -61,6 +61,12 @@ param(
     [string]$AgeExePath,
 
     [Parameter()]
+    [string]$PgToolMode = "",
+
+    [Parameter()]
+    [string]$PgDockerImage = "",
+
+    [Parameter()]
     [scriptblock]$AgeMockCommandBlock,
 
     [Parameter()]
@@ -80,6 +86,12 @@ if ([string]::IsNullOrWhiteSpace($BackupDir)) {
 
 # Nạp module dùng chung S-55 (Get-PgToolExecutable, Parse-PgConnectionString, Invoke-PgSqlQuery, Invoke-ProcessWithTimeout, Test-S55BackupValidity)
 . (Join-Path $PSScriptRoot "s55-common.ps1")
+
+# S-55 Docker mode: chon Native hoac Docker cho pg_restore/psql
+# (tham so -PgToolMode, hoac env S55_PG_TOOL_MODE; mac dinh Native).
+$effectivePgToolMode = Resolve-S55PgToolMode -ToolMode $PgToolMode
+Set-S55PgToolMode -Mode $effectivePgToolMode -DockerImage $PgDockerImage
+Write-Host "[TOOL MODE] PostgreSQL client mode: $effectivePgToolMode"
 
 # ==============================================================================
 # HÀM BỔ TRỢ: KIỂM TRA NGƯỠNG RTO (<= 900 GIÂY)
@@ -374,6 +386,27 @@ function Assert-SafeDrillEnvironment {
 }
 
 # ==============================================================================
+# HÀM BỔ TRỢ: PHÂN GIẢI CONNECTION STRING ĐÍCH CỦA DRILL — FAIL-CLOSED (N1)
+# Thu tu: tham so -TargetConnectionString -> env TARGET_PG_CONNECTION ->
+# env ConnectionStrings__DefaultConnection. Thieu ca ba -> nem loi ngay,
+# KHONG fallback ve localhost de tranh ket noi nham database local dang dung chung.
+# ==============================================================================
+function Resolve-S55TargetConnection {
+    param([string]$TargetConnectionString)
+
+    if (-not [string]::IsNullOrWhiteSpace($TargetConnectionString)) { return $TargetConnectionString }
+    if (-not [string]::IsNullOrWhiteSpace($env:TARGET_PG_CONNECTION)) {
+        Write-Host "[TARGET DETECT] Dung TARGET_PG_CONNECTION tu bien moi truong."
+        return $env:TARGET_PG_CONNECTION
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:ConnectionStrings__DefaultConnection)) {
+        Write-Host "[TARGET DETECT] Dung ConnectionStrings__DefaultConnection tu bien moi truong."
+        return $env:ConnectionStrings__DefaultConnection
+    }
+    throw "[LOI CAU HINH] Thieu connection string dich cho dien tap: hay truyen -TargetConnectionString, hoac dat bien moi truong TARGET_PG_CONNECTION / ConnectionStrings__DefaultConnection. KHONG fallback ve localhost de tranh ket noi nham database local dang dung chung."
+}
+
+# ==============================================================================
 # NẾU CHỈ KIỂM THỬ VALIDATION (CHẾ ĐỘ TEST CÔ LẬP KHÔNG DÙNG DATABASE)
 # ==============================================================================
 if ($TestOnlyValidation) {
@@ -405,6 +438,12 @@ if ($TestOnlyValidation) {
                                                  -FkCount $TestValidationInputs.IntegrityTest.FkCount `
                                                  -IndexCount $TestValidationInputs.IntegrityTest.IndexCount
         }
+        if ($TestValidationInputs.ContainsKey("TargetConnectionTest")) {
+            $inp = $TestValidationInputs.TargetConnectionTest
+            $paramValue = ""
+            if ($inp.ContainsKey("ParamValue")) { $paramValue = $inp.ParamValue }
+            return Resolve-S55TargetConnection -TargetConnectionString $paramValue
+        }
     }
     return @{ Status = "TestModeReady" }
 }
@@ -418,18 +457,28 @@ Write-Host "=================================================================="
 
 $startTime = Get-Date
 
-# 1. Kiểm tra công cụ pg_restore và psql
-$resolvedPgRestore = Get-PgToolExecutable -ToolName "pg_restore" -ExplicitPath $PgRestorePath
-$resolvedPsql = Get-PgToolExecutable -ToolName "psql" -ExplicitPath $PsqlPath
+# 1. Kiểm tra công cụ pg_restore và psql (Native) hoặc docker (Docker mode)
+$resolvedPgRestore = $null
+$resolvedPsql = $null
+if ($effectivePgToolMode -eq 'Docker') {
+    if (-not (Get-Command $script:S55PgDockerExe -ErrorAction SilentlyContinue)) {
+        Write-Error "[LOI MOI TRUONG] PgToolMode=Docker nhung khong tim thay '$($script:S55PgDockerExe)' trong PATH. Vui long kiem tra Docker."
+        exit 1
+    }
+    Write-Host "[TOOL CHECK] Docker mode: pg_restore/psql chay trong image '$($script:S55PgDockerImage)'."
+} else {
+    $resolvedPgRestore = Get-PgToolExecutable -ToolName "pg_restore" -ExplicitPath $PgRestorePath
+    $resolvedPsql = Get-PgToolExecutable -ToolName "psql" -ExplicitPath $PsqlPath
 
-if (-not $resolvedPgRestore) {
-    Write-Error "[LOI MOI TRUONG] Khong tim thay 'pg_restore'. Vui long kiem tra PATH hoac -PgRestorePath."
-    exit 1
-}
+    if (-not $resolvedPgRestore) {
+        Write-Error "[LOI MOI TRUONG] Khong tim thay 'pg_restore'. Vui long kiem tra PATH, -PgRestorePath, hoac chay che do Docker (-PgToolMode Docker)."
+        exit 1
+    }
 
-if (-not $resolvedPsql) {
-    Write-Error "[LOI MOI TRUONG] Khong tim thay 'psql'. Vui long kiem tra PATH hoac -PsqlPath."
-    exit 1
+    if (-not $resolvedPsql) {
+        Write-Error "[LOI MOI TRUONG] Khong tim thay 'psql'. Vui long kiem tra PATH, -PsqlPath, hoac chay che do Docker (-PgToolMode Docker)."
+        exit 1
+    }
 }
 
 # 2. Xác định file dump cần khôi phục & Xác minh Manifest + SHA-256 (H2 Guard)
@@ -518,7 +567,7 @@ if ($DumpFile.EndsWith(".age")) {
 
 # 3. Xác minh tính đọc được của file dump trước khi làm việc bằng pg_restore -l
 Write-Host "[VERIFY] Dang kiem tra cau truc archive bang pg_restore -l (timeout: $VerifyTimeoutSeconds giay)..."
-$tocTest = Invoke-ProcessWithTimeout -FilePath $resolvedPgRestore -Arguments @("-l", $restoreDumpFile) -TimeoutSeconds $VerifyTimeoutSeconds
+$tocTest = Invoke-PgProcessWithTimeout -ToolName "pg_restore" -ToolArgs @("-l", $restoreDumpFile) -NativeExePath $resolvedPgRestore -TimeoutSeconds $VerifyTimeoutSeconds -HostDir (Split-Path -Parent $restoreDumpFile) -ReadOnlyHostDir
 if ($tocTest.TimedOut) {
     Write-Error "[LOI TOAN VEN] pg_restore -l vuot qua timeout $VerifyTimeoutSeconds giay va da bi terminate (H3). Dung dien tap."
     exit 1
@@ -529,14 +578,11 @@ if ($tocTest.ExitCode -ne 0) {
 }
 
 # 4. Xác định cấu hình đích & Nguồn để phòng vệ an toàn
+# N1: KHONG fallback im lang ve connection string mac dinh. Thieu ca
+# -TargetConnectionString, TARGET_PG_CONNECTION lan ConnectionStrings__DefaultConnection
+# -> nem loi ngay TRUOC moi thao tac ket noi/ghi/xoa database (fail-closed).
 if ([string]::IsNullOrWhiteSpace($TargetConnectionString)) {
-    if (-not [string]::IsNullOrWhiteSpace($env:TARGET_PG_CONNECTION)) {
-        $TargetConnectionString = $env:TARGET_PG_CONNECTION
-    } elseif (-not [string]::IsNullOrWhiteSpace($env:ConnectionStrings__DefaultConnection)) {
-        $TargetConnectionString = $env:ConnectionStrings__DefaultConnection
-    } else {
-        $TargetConnectionString = "Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=postgres_password_123"
-    }
+    $TargetConnectionString = Resolve-S55TargetConnection -TargetConnectionString $TargetConnectionString
 }
 
 $targetParams = Parse-PgConnectionString -RawConnection $TargetConnectionString
@@ -615,7 +661,7 @@ try {
         $restoreDumpFile
     )
 
-    $restoreProcess = Invoke-ProcessWithTimeout -FilePath $resolvedPgRestore -Arguments $restoreArgs -TimeoutSeconds $RestoreTimeoutSeconds
+    $restoreProcess = Invoke-PgProcessWithTimeout -ToolName "pg_restore" -ToolArgs $restoreArgs -NativeExePath $resolvedPgRestore -ConnParams $targetParams -TimeoutSeconds $RestoreTimeoutSeconds -HostDir (Split-Path -Parent $restoreDumpFile) -ReadOnlyHostDir
     if ($restoreProcess.TimedOut) {
         throw "[LOI RESTORE TIMEOUT] pg_restore vuot qua $RestoreTimeoutSeconds giay va da bi terminate an toan (H3)."
     }

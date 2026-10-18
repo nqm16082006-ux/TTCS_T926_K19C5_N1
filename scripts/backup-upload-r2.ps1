@@ -44,7 +44,7 @@ param(
     [string]$R2SecretAccessKey,
 
     [Parameter()]
-    [string]$R2Prefix = "database-backups",
+    [string]$R2Prefix = "",
 
     [Parameter()]
     [int]$MaxRetention = 14,
@@ -100,12 +100,17 @@ function Validate-R2Config {
         throw "[LOI CAU HINH R2] SecretAccessKey khong duoc chua khoang trang."
     }
 
+    # Thu tu uu tien prefix: Config.Prefix -> env R2_PREFIX -> mac dinh 'database-backups'
+    $effectivePrefix = $Config.Prefix
+    if ([string]::IsNullOrWhiteSpace($effectivePrefix)) { $effectivePrefix = $env:R2_PREFIX }
+    if ([string]::IsNullOrWhiteSpace($effectivePrefix)) { $effectivePrefix = "database-backups" }
+
     return @{
         AccountId       = $accountId
         BucketName      = $bucketName
         AccessKeyId     = $Config.AccessKeyId.Trim()
         SecretAccessKey = $Config.SecretAccessKey.Trim()
-        Prefix          = if (-not [string]::IsNullOrWhiteSpace($Config.Prefix)) { $Config.Prefix.Trim().Trim('/') } else { "" }
+        Prefix          = $effectivePrefix.Trim().Trim('/')
         Endpoint        = if (-not [string]::IsNullOrWhiteSpace($Config.Endpoint)) { $Config.Endpoint.Trim() } else { "https://$accountId.r2.cloudflarestorage.com" }
     }
 }
@@ -776,17 +781,28 @@ function Invoke-R2RemoteRetention {
     }
 
     # 1. Chi loc cac object thuoc namespace backup cua ung dung: eventpulse_backup_yyyyMMdd_HHmmss.(dump.age|json)
+    # F4: rclone lsjson co the tra ve Name co hoac khong kem prefix (tuy cach goi/phien ban).
+    # Chuan hoa bang cach boc prefix neu co, chi chap nhan object nam TRUC TIEP trong
+    # prefix (khong co thu muc con) — object trong thu muc con duoc coi la ngoai
+    # namespace va khong bao gio bi xoa.
     $backupDumpMap = @{}
     $backupManifestMap = @{}
     $foreignFiles = @()
+    $prefixNormalized = $prefix.Trim('/')
 
     foreach ($obj in $remoteObjects) {
         $objName = if ($obj -is [hashtable]) { $obj['Name'] } else { $obj.Name }
         $objSize = if ($obj -is [hashtable]) { $obj['Size'] } else { $obj.Size }
-        if ($objName -match '^eventpulse_backup_(\d{8}_\d{6})\.dump\.age$') {
+        $relName = $objName
+        if (-not [string]::IsNullOrWhiteSpace($prefixNormalized)) {
+            if ($objName.StartsWith($prefixNormalized + '/', [System.StringComparison]::OrdinalIgnoreCase)) {
+                $relName = $objName.Substring($prefixNormalized.Length + 1)
+            }
+        }
+        if ($relName -match '^eventpulse_backup_(\d{8}_\d{6})\.dump\.age$') {
             $ts = $Matches[1]
             $backupDumpMap[$ts] = [PSCustomObject]@{ Name = $objName; Size = $objSize }
-        } elseif ($objName -match '^eventpulse_backup_(\d{8}_\d{6})\.json$') {
+        } elseif ($relName -match '^eventpulse_backup_(\d{8}_\d{6})\.json$') {
             $ts = $Matches[1]
             $backupManifestMap[$ts] = [PSCustomObject]@{ Name = $objName; Size = $objSize }
         } else {
@@ -829,8 +845,15 @@ function Invoke-R2RemoteRetention {
 
         foreach ($item in $toDelete) {
             Write-Host "[R2 RETENTION] Dang xoa ban backup offsite cu qua han: $($item.DumpName) va $($item.ManifestName)"
-            $targetDump = "$remotePathPrefix/$($item.DumpName)"
-            $targetManifest = "$remotePathPrefix/$($item.ManifestName)"
+            # F4: Dung nguyen duong dan tu lsjson (da bao gom prefix neu rclone tra ve),
+            # tranh noi prefix 2 lan khi Name da co prefix.
+            if (-not [string]::IsNullOrWhiteSpace($prefixNormalized) -and $item.DumpName.StartsWith($prefixNormalized + '/', [System.StringComparison]::OrdinalIgnoreCase)) {
+                $targetDump = "R2:$bucket/$($item.DumpName)"
+                $targetManifest = "R2:$bucket/$($item.ManifestName)"
+            } else {
+                $targetDump = "$remotePathPrefix/$($item.DumpName)"
+                $targetManifest = "$remotePathPrefix/$($item.ManifestName)"
+            }
 
             Invoke-RcloneCommand -Arguments @("deletefile", $targetDump) -R2Config $validatedConfig -RcloneExePath $RcloneExePath -MockCommandBlock $MockCommandBlock | Out-Null
             Invoke-RcloneCommand -Arguments @("deletefile", $targetManifest) -R2Config $validatedConfig -RcloneExePath $RcloneExePath -MockCommandBlock $MockCommandBlock | Out-Null

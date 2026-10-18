@@ -529,6 +529,59 @@ Run-Phase3Test 'R2 Retention: 16 ban backup hop le -> Xoa dung 2 ban cu nhat (ca
     }
 }
 
+Run-Phase3Test 'F4.1: R2 Retention nhan dang object CO prefix (vd s55/eventpulse_...) va xoa dung target khong nhan doi prefix' {
+    $deletedTargets = @()
+    $mockObjects = @()
+    $baseDate = (Get-Date).AddDays(-16)
+    for ($i = 1; $i -le 16; $i++) {
+        $ts = $baseDate.AddHours($i * 2).ToString("yyyyMMdd_HHmmss")
+        $mockObjects += @{ Name = "s55/eventpulse_backup_$ts.dump.age"; Size = 2048; ModTime = $baseDate.AddHours($i * 2).ToString("o") }
+        $mockObjects += @{ Name = "s55/eventpulse_backup_$ts.json"; Size = 512; ModTime = $baseDate.AddHours($i * 2).ToString("o") }
+    }
+    $retResult = Invoke-R2RemoteRetention -R2Config @{ AccountId = '0123456789abcdef0123456789abcdef'; BucketName = 's55-postgres-backup'; AccessKeyId = 'k'; SecretAccessKey = 's'; Prefix = 's55' } -RetentionLimit 14 -IsUploadFailed $false -MockCommandBlock {
+        param($Command, $Arguments, $R2Config)
+        if ($Arguments[0] -eq "lsjson") { return $mockObjects }
+        if ($Arguments[0] -eq "deletefile") {
+            $deletedTargets += $Arguments[1]
+            return @{ ExitCode = 0 }
+        }
+    }
+    if ($retResult.TotalValidCount -ne 16) { throw "TotalValidCount sai: $($retResult.TotalValidCount)" }
+    if ($retResult.DeletedCount -ne 4) { throw "DeletedCount sai: $($retResult.DeletedCount)" }
+    foreach ($t in $deletedTargets) {
+        if ($t -match '/s55/s55/') { throw "Prefix bi nhan doi trong target xoa: $t" }
+        if ($t -notmatch '^R2:s55-postgres-backup/s55/eventpulse_backup_') { throw "Target xoa sai dang: $t" }
+    }
+}
+
+Run-Phase3Test 'F4.2: Object trong thu muc con cua prefix (s55/sub/...) -> coi la ngoai namespace, KHONG bao gio xoa' {
+    $deletedTargets = @()
+    $mockObjects = @()
+    $baseDate = (Get-Date).AddDays(-16)
+    for ($i = 1; $i -le 15; $i++) {
+        $ts = $baseDate.AddHours($i * 2).ToString("yyyyMMdd_HHmmss")
+        $mockObjects += @{ Name = "eventpulse_backup_$ts.dump.age"; Size = 2048; ModTime = $baseDate.AddHours($i * 2).ToString("o") }
+        $mockObjects += @{ Name = "eventpulse_backup_$ts.json"; Size = 512; ModTime = $baseDate.AddHours($i * 2).ToString("o") }
+    }
+    # File co ten giong backup nhung nam trong thu muc con -> phai la foreign
+    $mockObjects += @{ Name = 's55/sub/eventpulse_backup_19990101_000000.dump.age'; Size = 2048; ModTime = $baseDate.AddHours(30).ToString("o") }
+    $mockObjects += @{ Name = 's55/sub/eventpulse_backup_19990101_000000.json'; Size = 512; ModTime = $baseDate.AddHours(30).ToString("o") }
+
+    $retResult = Invoke-R2RemoteRetention -R2Config @{ AccountId = '0123456789abcdef0123456789abcdef'; BucketName = 's55-postgres-backup'; AccessKeyId = 'k'; SecretAccessKey = 's'; Prefix = 's55' } -RetentionLimit 14 -IsUploadFailed $false -MockCommandBlock {
+        param($Command, $Arguments, $R2Config)
+        if ($Arguments[0] -eq "lsjson") { return $mockObjects }
+        if ($Arguments[0] -eq "deletefile") {
+            $deletedTargets += $Arguments[1]
+            return @{ ExitCode = 0 }
+        }
+    }
+    if ($retResult.TotalValidCount -ne 15) { throw "So ban hop le phai la 15 (khong tinh thu muc con): $($retResult.TotalValidCount)" }
+    if ($retResult.ForeignCount -lt 2) { throw "Object thu muc con phai duoc dem la foreign: $($retResult.ForeignCount)" }
+    foreach ($t in $deletedTargets) {
+        if ($t -match '/sub/') { throw "Object trong thu muc con bi xoa nham: $t" }
+    }
+}
+
 Run-Phase3Test 'R2 Retention: Khi upload that bai (IsUploadFailed=$true) -> ABORT, bao toan 100% backup thu 15 khong bi xoa' {
     $deleteInvoked = $false
     $retResult = Invoke-R2RemoteRetention -R2Config $mockR2Cfg -RetentionLimit 14 -IsUploadFailed $true -MockCommandBlock {

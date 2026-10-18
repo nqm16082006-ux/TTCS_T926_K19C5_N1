@@ -222,6 +222,9 @@ try {
         "-DumpFile '$containerDumpPath'",
         "-TargetDatabase '$targetDbName'",
         "-KeepDrillDb",
+        # Runner chay TRONG container da co san pg tools -> bat buoc Native,
+        # tranh S55_PG_TOOL_MODE=Docker cua host gay docker-in-docker.
+        "-PgToolMode Native",
         "-ResultFile '$containerResultPath'"
     )
     if (-not [string]::IsNullOrWhiteSpace($AgeIdentityFile)) {

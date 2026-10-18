@@ -767,6 +767,91 @@ Run-AssertTest 'Blocker H3.2: Tien trinh pg_dump treo vuot qua thoi han -> Kill 
 }
 
 # ==============================================================================
+# NHOM 9: N1 — KHONG FALLBACK IM LANG VE CONNECTION STRING MAC DINH
+# ==============================================================================
+Write-Host "`n--- [NHOM 9] N1: FAIL-CLOSED TARGET CONNECTION (KHONG FALLBACK LOCALHOST) ---"
+
+Run-AssertTest 'N1.1: Tham so -TargetConnectionString duoc uu tien hon env' {
+    $oldTarget = $env:TARGET_PG_CONNECTION
+    $oldDefault = $env:ConnectionStrings__DefaultConnection
+    try {
+        $env:TARGET_PG_CONNECTION = 'Host=env-target;Port=5432;Database=postgres;Username=postgres;Password=envpw'
+        $env:ConnectionStrings__DefaultConnection = 'Host=env-default;Port=5432;Database=postgres;Username=postgres;Password=envpw'
+        $res = & $restoreScript -TestOnlyValidation -TestValidationInputs @{
+            TargetConnectionTest = @{ ParamValue = 'Host=param-target;Port=5432;Database=postgres;Username=postgres;Password=parampw' }
+        }
+        if ($res -ne 'Host=param-target;Port=5432;Database=postgres;Username=postgres;Password=parampw') {
+            throw "Tham so khong duoc uu tien: $res"
+        }
+    } finally {
+        $env:TARGET_PG_CONNECTION = $oldTarget
+        $env:ConnectionStrings__DefaultConnection = $oldDefault
+    }
+}
+
+Run-AssertTest 'N1.2: Tham so rong + TARGET_PG_CONNECTION -> dung env TARGET' {
+    $oldTarget = $env:TARGET_PG_CONNECTION
+    $oldDefault = $env:ConnectionStrings__DefaultConnection
+    try {
+        $env:TARGET_PG_CONNECTION = 'Host=env-target;Port=5432;Database=postgres;Username=postgres;Password=envpw'
+        Remove-Item env:ConnectionStrings__DefaultConnection -ErrorAction SilentlyContinue
+        $res = & $restoreScript -TestOnlyValidation -TestValidationInputs @{ TargetConnectionTest = @{ ParamValue = '' } }
+        if ($res -ne 'Host=env-target;Port=5432;Database=postgres;Username=postgres;Password=envpw') {
+            throw "Khong dung env TARGET: $res"
+        }
+    } finally {
+        $env:TARGET_PG_CONNECTION = $oldTarget
+        $env:ConnectionStrings__DefaultConnection = $oldDefault
+    }
+}
+
+Run-AssertTest 'N1.3: Tham so rong + khong TARGET + ConnectionStrings__DefaultConnection -> dung env Default' {
+    $oldTarget = $env:TARGET_PG_CONNECTION
+    $oldDefault = $env:ConnectionStrings__DefaultConnection
+    try {
+        Remove-Item env:TARGET_PG_CONNECTION -ErrorAction SilentlyContinue
+        $env:ConnectionStrings__DefaultConnection = 'Host=env-default;Port=5432;Database=postgres;Username=postgres;Password=envpw'
+        $res = & $restoreScript -TestOnlyValidation -TestValidationInputs @{ TargetConnectionTest = @{ ParamValue = '' } }
+        if ($res -ne 'Host=env-default;Port=5432;Database=postgres;Username=postgres;Password=envpw') {
+            throw "Khong dung env Default: $res"
+        }
+    } finally {
+        $env:TARGET_PG_CONNECTION = $oldTarget
+        $env:ConnectionStrings__DefaultConnection = $oldDefault
+    }
+}
+
+Run-AssertTest 'N1.4: Thieu ca ba -> NEM LOI fail-closed, KHONG fallback localhost, KHONG ket noi' {
+    $oldTarget = $env:TARGET_PG_CONNECTION
+    $oldDefault = $env:ConnectionStrings__DefaultConnection
+    try {
+        Remove-Item env:TARGET_PG_CONNECTION -ErrorAction SilentlyContinue
+        Remove-Item env:ConnectionStrings__DefaultConnection -ErrorAction SilentlyContinue
+        $caught = $null
+        try {
+            & $restoreScript -TestOnlyValidation -TestValidationInputs @{ TargetConnectionTest = @{ ParamValue = '' } } | Out-Null
+        } catch { $caught = $_.Exception.Message }
+        if ($null -eq $caught) { throw "Phai nem loi khi thieu cau hinh" }
+        if ($caught -notmatch 'KHONG fallback') { throw "Thieu cam ket fail-closed trong loi: $caught" }
+        if ($caught -match 'Host=localhost;Port=5432') { throw "Loi khong duoc chua chuoi fallback cu: $caught" }
+        if ($caught -match 'postgres_password_123') { throw "Loi khong duoc chua mat khau dev mac dinh: $caught" }
+    } finally {
+        $env:TARGET_PG_CONNECTION = $oldTarget
+        $env:ConnectionStrings__DefaultConnection = $oldDefault
+    }
+}
+
+Run-AssertTest 'N1.5: Main flow cua restore-drill goi Resolve-S55TargetConnection (khong con fallback cu)' {
+    $content = Get-Content -LiteralPath $restoreScript -Raw
+    if ($content -notmatch 'Resolve-S55TargetConnection -TargetConnectionString \$TargetConnectionString') {
+        throw "Main flow khong dung helper fail-closed"
+    }
+    if ($content -match 'Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=postgres_password_123') {
+        throw "Van con fallback connection string mac dinh trong restore-drill.ps1!"
+    }
+}
+
+# ==============================================================================
 # TONG KET BO KIEM THU
 # ==============================================================================
 Write-Host "`n=================================================================="
