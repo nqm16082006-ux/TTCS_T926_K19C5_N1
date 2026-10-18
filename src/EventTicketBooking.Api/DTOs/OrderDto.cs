@@ -7,6 +7,7 @@ namespace EventTicketBooking.Api.DTOs
     public class OrderDto
     {
         public Guid Id { get; set; }
+        public Guid? UserId { get; set; }
         public Guid ShowtimeId { get; set; }
         public Guid? EventId { get; set; }
         public string? EventTitle { get; set; }
@@ -18,6 +19,10 @@ namespace EventTicketBooking.Api.DTOs
         public string? CustomerEmail { get; set; }
         public string Status { get; set; } = null!;
         public int TotalAmount { get; set; }
+        public int OriginalAmount { get; set; }
+        public int DiscountAmount { get; set; }
+        public string? DiscountCode { get; set; }
+        public Guid? DiscountCodeId { get; set; }
         public int SeatCount { get; set; }
         public List<string> SeatNames { get; set; } = new();
         public DateTimeOffset CreatedAt { get; set; }

@@ -36,6 +36,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<RefundRequest> RefundRequests { get; set; } = null!;
         public DbSet<Refund> Refunds { get; set; } = null!;
         public DbSet<SystemAlert> SystemAlerts { get; set; } = null!;
+        public DbSet<DiscountCode> DiscountCodes { get; set; } = null!;
         public DbSet<DataDeletionRequest> DataDeletionRequests { get; set; } = null!;
         public DbSet<ReconciliationSession> ReconciliationSessions { get; set; } = null!;
         public DbSet<TicketTransfer> TicketTransfers { get; set; } = null!;
@@ -256,6 +257,16 @@ namespace EventTicketBooking.Api.Data
                 // Story S-45: lý do huỷ đơn (PAYMENT_CANCELLED / CUSTOMER_REFUND)
                 entity.Property(o => o.CancelReason).HasMaxLength(30);
 
+                // Story S-56: Mã giảm giá
+                entity.Property(o => o.OriginalAmount).IsRequired().HasDefaultValue(0);
+                entity.Property(o => o.DiscountAmount).IsRequired().HasDefaultValue(0);
+                entity.Property(o => o.DiscountCodeSnapshot).HasMaxLength(500);
+
+                entity.HasOne(o => o.DiscountCode)
+                      .WithMany()
+                      .HasForeignKey(o => o.DiscountCodeId)
+                      .OnDelete(DeleteBehavior.SetNull);
+
                 // Story S-61: thời điểm gửi email nhắc nhở 24h trước giờ diễn
                 entity.Property(o => o.ReminderSentAt);
 
@@ -274,6 +285,34 @@ namespace EventTicketBooking.Api.Data
                       .IsUnique()
                       .HasFilter(Database.IsNpgsql() ? "\"Status\" = 'Pending'" : "\"Status\" = 'Pending'")
                       .HasDatabaseName("IX_orders_UserId_ShowtimeId_Pending");
+            });
+
+            // Cấu hình bảng DiscountCodes (Story S-56)
+            modelBuilder.Entity<DiscountCode>(entity =>
+            {
+                entity.ToTable("DiscountCodes");
+                entity.HasKey(d => d.Id);
+                entity.Property(d => d.Code).IsRequired().HasMaxLength(50);
+                entity.Property(d => d.DiscountType).HasConversion<string>().HasMaxLength(20);
+                entity.Property(d => d.DiscountValue).IsRequired();
+                entity.Property(d => d.UsageLimit).IsRequired();
+                entity.Property(d => d.UsedCount).IsRequired().HasDefaultValue(0);
+                entity.Property(d => d.ExpiresAt).IsRequired();
+                entity.Property(d => d.IsActive).IsRequired().HasDefaultValue(true);
+                entity.Property(d => d.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(d => d.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(d => d.Event)
+                      .WithMany()
+                      .HasForeignKey(d => d.EventId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(d => d.CreatedByUser)
+                      .WithMany()
+                      .HasForeignKey(d => d.CreatedByUserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(d => new { d.EventId, d.Code }).IsUnique();
             });
 
             // Cấu hình bảng OrderItems

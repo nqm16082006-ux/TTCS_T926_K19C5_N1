@@ -412,6 +412,12 @@
               <span class="material-symbols-outlined text-[18px]">tune</span>
               <span>Cấu hình chung &amp; Đơn vị tổ chức</span>
             </button>
+            <!-- Tab 4: Discount Codes (Story S-56) -->
+            <button id="tabBtnDiscounts" onclick="switchTab('discounts')" class="flex items-center gap-space-xs px-4 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-all" type="button">
+              <span class="material-symbols-outlined text-[18px]">loyalty</span>
+              <span>Mã giảm giá</span>
+              <span id="tabCountDiscounts" class="ml-1 px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-code-mono text-label-sm">0</span>
+            </button>
           </nav>
           <div class="hidden xl:flex items-center gap-space-xs pr-2 text-on-surface-variant font-label-sm text-label-sm">
             <span class="material-symbols-outlined text-[16px] text-tertiary">check_circle</span>
@@ -660,6 +666,85 @@
                     <div class="font-label-md text-label-md text-on-surface font-semibold mb-1">Quy định vé &amp; Hoàn tiền</div>
                     <p class="text-body-sm text-on-surface-variant">Khách có thể huỷ vé trước giờ chiếu tối thiểu 24 giờ và được hoàn 90% số tiền đã thanh toán. Ghế của vé đã huỷ sẽ tự động quay lại kho bán (trở lại trạng thái trống trên sơ đồ) để tiếp tục mở bán cho khách khác. (Giá trị demo 24 giờ / 90% đang chờ Product duyệt; chưa phải chính sách chính thức.)</p>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB 4 CONTENT: DISCOUNT CODES (Story S-56) -->
+            <div id="tabContentDiscounts" class="hidden flex-col gap-space-lg">
+              <!-- Create Discount Code Form Card -->
+              <div class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-outline-variant/20 space-y-4">
+                <div class="flex items-center justify-between">
+                  <h3 class="font-headline-md text-headline-md text-on-surface font-bold flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">add_circle</span>
+                    <span>Tạo mã giảm giá mới</span>
+                  </h3>
+                </div>
+                <form id="formCreateDiscount" onsubmit="handleCreateDiscountSubmit(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label for="orgDiscountCodeInput" class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Mã giảm giá (Code) *</label>
+                    <input id="orgDiscountCodeInput" type="text" maxlength="50" required placeholder="Ví dụ: SALE10, EARLYBIRD" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface uppercase font-mono font-bold focus:outline-none focus:ring-2 focus:ring-primary">
+                  </div>
+                  <div>
+                    <label for="orgDiscountTypeSelect" class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Loại giảm giá *</label>
+                    <select id="orgDiscountTypeSelect" onchange="handleOrgDiscountTypeChange()" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-semibold focus:outline-none focus:ring-2 focus:ring-primary">
+                      <option value="Percent">Phần trăm (%)</option>
+                      <option value="FixedAmount">Số tiền cố định (VNĐ)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label id="orgDiscountValueLabel" for="orgDiscountValueInput" class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Giá trị giảm (%) *</label>
+                    <input id="orgDiscountValueInput" type="number" min="1" max="100" required placeholder="1 - 100" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-semibold focus:outline-none focus:ring-2 focus:ring-primary">
+                  </div>
+                  <div>
+                    <label for="orgDiscountUsageLimitInput" class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Số lượt sử dụng *</label>
+                    <input id="orgDiscountUsageLimitInput" type="number" min="1" required placeholder="Ví dụ: 100" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-semibold focus:outline-none focus:ring-2 focus:ring-primary">
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label for="orgDiscountExpiresAtInput" class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Hạn dùng (Hết hạn lúc) *</label>
+                    <input id="orgDiscountExpiresAtInput" type="datetime-local" required class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-semibold focus:outline-none focus:ring-2 focus:ring-primary">
+                  </div>
+                  <div id="orgCreateDiscountAlert" class="sm:col-span-2 hidden p-3 rounded-lg text-sm font-semibold"></div>
+                  <div class="sm:col-span-2 flex justify-end">
+                    <button id="btnSubmitCreateDiscount" type="submit" class="px-5 py-2.5 rounded-lg bg-primary hover:bg-on-primary-fixed-variant text-on-primary font-label-md text-label-md font-semibold transition shadow-sm flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[18px]">save</span>
+                      <span>Lưu mã giảm giá</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Discount Codes List Table Card -->
+              <div class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-outline-variant/20 space-y-4">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h3 class="font-headline-md text-headline-md text-on-surface font-bold">Danh sách mã giảm giá</h3>
+                    <p class="text-body-sm text-on-surface-variant">Các mã giảm giá áp dụng cho sự kiện này</p>
+                  </div>
+                  <button onclick="loadDiscountCodes(currentEventId)" class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">refresh</span>
+                    <span>Làm mới</span>
+                  </button>
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-outline-variant/20">
+                  <table class="w-full text-left">
+                    <thead class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase">
+                      <tr>
+                        <th class="px-4 py-3">Mã (Code)</th>
+                        <th class="px-4 py-3">Loại</th>
+                        <th class="px-4 py-3">Giá trị</th>
+                        <th class="px-4 py-3">Đã dùng / Giới hạn</th>
+                        <th class="px-4 py-3">Hạn dùng</th>
+                        <th class="px-4 py-3">Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody id="discountCodesTableBody" class="divide-y divide-outline-variant/20 text-on-surface text-sm">
+                      <tr>
+                        <td colspan="6" class="px-4 py-6 text-center text-on-surface-variant">Đang tải dữ liệu...</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -1359,16 +1444,18 @@
       const btnShowtimes = document.getElementById('tabBtnShowtimes');
       const btnInfo = document.getElementById('tabBtnInfo');
       const btnSettings = document.getElementById('tabBtnSettings');
+      const btnDiscounts = document.getElementById('tabBtnDiscounts');
 
       const contentShowtimes = document.getElementById('tabContentShowtimes');
       const contentInfo = document.getElementById('tabContentInfo');
       const contentSettings = document.getElementById('tabContentSettings');
+      const contentDiscounts = document.getElementById('tabContentDiscounts');
 
       // Reset tabs
-      [btnShowtimes, btnInfo, btnSettings].forEach(b => {
+      [btnShowtimes, btnInfo, btnSettings, btnDiscounts].filter(Boolean).forEach(b => {
         b.className = 'flex items-center gap-space-xs px-4 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-all';
       });
-      [contentShowtimes, contentInfo, contentSettings].forEach(c => {
+      [contentShowtimes, contentInfo, contentSettings, contentDiscounts].filter(Boolean).forEach(c => {
         c.classList.add('hidden');
         c.classList.remove('flex');
       });
@@ -1385,6 +1472,176 @@
         btnSettings.className = 'flex items-center gap-space-xs px-4 py-2 rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg shadow-sm transition-all';
         contentSettings.classList.remove('hidden');
         contentSettings.classList.add('flex');
+      } else if (tab === 'discounts') {
+        if (btnDiscounts) btnDiscounts.className = 'flex items-center gap-space-xs px-4 py-2 rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg shadow-sm transition-all';
+        if (contentDiscounts) {
+          contentDiscounts.classList.remove('hidden');
+          contentDiscounts.classList.add('flex');
+        }
+        if (currentEventId) {
+          loadDiscountCodes(currentEventId);
+        }
+      }
+    }
+
+    function handleOrgDiscountTypeChange() {
+      const typeSelect = document.getElementById('orgDiscountTypeSelect');
+      const valInput = document.getElementById('orgDiscountValueInput');
+      const valLabel = document.getElementById('orgDiscountValueLabel');
+      if (!typeSelect || !valInput || !valLabel) return;
+
+      if (typeSelect.value === 'Percent') {
+        valLabel.textContent = 'Giá trị giảm (%) *';
+        valInput.min = '1';
+        valInput.max = '100';
+        valInput.placeholder = '1 - 100';
+      } else {
+        valLabel.textContent = 'Số tiền giảm (VNĐ) *';
+        valInput.min = '1000';
+        valInput.removeAttribute('max');
+        valInput.placeholder = 'Ví dụ: 50000';
+      }
+    }
+
+    async function loadDiscountCodes(eventId) {
+      const tbody = document.getElementById('discountCodesTableBody');
+      const countBadge = document.getElementById('tabCountDiscounts');
+      if (!tbody) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/events/${eventId}/discount-codes`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const result = await res.json().catch(() => ({}));
+
+        if (!res.ok || !result.success) {
+          tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center text-rose-600 font-semibold">${result.message || 'Lỗi tải mã giảm giá'}</td></tr>`;
+          return;
+        }
+
+        const codes = result.data || [];
+        if (countBadge) countBadge.textContent = codes.length;
+
+        if (codes.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center text-on-surface-variant font-medium">Chưa có mã giảm giá nào cho sự kiện này.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = codes.map(c => {
+          const isExpired = new Date(c.expiresAt).getTime() <= new Date().getTime();
+          const isExhausted = c.usedCount >= c.usageLimit;
+          const statusBadge = !c.isActive 
+            ? `<span class="px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-600">Ngừng hoạt động</span>`
+            : isExpired
+            ? `<span class="px-2 py-0.5 rounded text-xs font-bold bg-rose-100 text-rose-700">Đã hết hạn</span>`
+            : isExhausted
+            ? `<span class="px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-700">Hết lượt</span>`
+            : `<span class="px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-700">Đang hoạt động</span>`;
+
+          const valText = c.discountType === 'Percent'
+            ? `${c.discountValue}%`
+            : `${Number(c.discountValue).toLocaleString('vi-VN')} đ`;
+
+          const typeText = c.discountType === 'Percent' ? 'Phần trăm' : 'Cố định';
+          const expiresDate = new Date(c.expiresAt).toLocaleString('vi-VN');
+
+          return `
+            <tr class="hover:bg-surface-container-low/50 transition">
+              <td class="px-4 py-3 font-mono font-bold text-primary">${c.code}</td>
+              <td class="px-4 py-3 font-medium text-on-surface-variant">${typeText}</td>
+              <td class="px-4 py-3 font-bold text-on-surface">${valText}</td>
+              <td class="px-4 py-3 font-semibold">${c.usedCount} / ${c.usageLimit}</td>
+              <td class="px-4 py-3 text-on-surface-variant text-xs">${expiresDate}</td>
+              <td class="px-4 py-3">${statusBadge}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center text-rose-600 font-semibold">Lỗi kết nối máy chủ.</td></tr>`;
+      }
+    }
+
+    async function handleCreateDiscountSubmit(e) {
+      e.preventDefault();
+      const alertDiv = document.getElementById('orgCreateDiscountAlert');
+      const btn = document.getElementById('btnSubmitCreateDiscount');
+
+      const code = document.getElementById('orgDiscountCodeInput').value.trim();
+      const selectedType = document.getElementById('orgDiscountTypeSelect').value;
+      const discountValue = parseInt(document.getElementById('orgDiscountValueInput').value, 10);
+      const usageLimit = parseInt(document.getElementById('orgDiscountUsageLimitInput').value, 10);
+      const expiresAtInput = document.getElementById('orgDiscountExpiresAtInput').value;
+
+      if (!code || !expiresAtInput) {
+        alertDiv.className = 'sm:col-span-2 p-3 rounded-lg text-sm font-semibold bg-rose-100 text-rose-800';
+        alertDiv.textContent = 'Vui lòng điền đầy đủ các trường bắt buộc.';
+        alertDiv.classList.remove('hidden');
+        return;
+      }
+
+      const discountTypeValue =
+        selectedType === 'Percent' ? 0 :
+        selectedType === 'FixedAmount' ? 1 :
+        null;
+
+      if (discountTypeValue === null) {
+        alertDiv.className = 'sm:col-span-2 p-3 rounded-lg text-sm font-semibold bg-rose-100 text-rose-800';
+        alertDiv.textContent = 'Vui lòng chọn loại giảm giá hợp lệ.';
+        alertDiv.classList.remove('hidden');
+        return;
+      }
+
+      const expiresAt = new Date(expiresAtInput).toISOString();
+
+      alertDiv.classList.add('hidden');
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/events/${currentEventId}/discount-codes`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({
+            code,
+            discountType: discountTypeValue,
+            discountValue,
+            usageLimit,
+            expiresAt
+          })
+        });
+
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok || !result.success) {
+          let errorMsg = result.message;
+          if (!errorMsg && result.errors && typeof result.errors === 'object') {
+            const firstErrKey = Object.keys(result.errors)[0];
+            const firstErrVal = result.errors[firstErrKey];
+            if (Array.isArray(firstErrVal) && firstErrVal.length > 0) {
+              errorMsg = firstErrVal[0];
+            } else if (typeof firstErrVal === 'string') {
+              errorMsg = firstErrVal;
+            }
+          }
+          alertDiv.className = 'sm:col-span-2 p-3 rounded-lg text-sm font-semibold bg-rose-100 text-rose-800';
+          alertDiv.textContent = (typeof errorMsg === 'string' && errorMsg.trim()) ? errorMsg.trim() : 'Tạo mã giảm giá thất bại.';
+          alertDiv.classList.remove('hidden');
+        } else {
+          alertDiv.className = 'sm:col-span-2 p-3 rounded-lg text-sm font-semibold bg-emerald-100 text-emerald-800';
+          alertDiv.textContent = 'Tạo mã giảm giá thành công!';
+          alertDiv.classList.remove('hidden');
+          document.getElementById('formCreateDiscount').reset();
+          handleOrgDiscountTypeChange();
+          loadDiscountCodes(currentEventId);
+          setTimeout(() => alertDiv.classList.add('hidden'), 3000);
+        }
+      } catch (err) {
+        alertDiv.className = 'sm:col-span-2 p-3 rounded-lg text-sm font-semibold bg-rose-100 text-rose-800';
+        alertDiv.textContent = 'Lỗi kết nối máy chủ.';
+        alertDiv.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
       }
     }
 

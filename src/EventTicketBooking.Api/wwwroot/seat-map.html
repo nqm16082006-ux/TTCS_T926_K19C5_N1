@@ -1572,15 +1572,8 @@
           // Xóa lưu tạm giữ chỗ
           sessionStorage.removeItem(`eventpulse_held_${showtimeId}`);
           sessionStorage.removeItem(`pending_seats_${showtimeId}`);
-          // Điều hướng sang trang thanh toán giả lập
-          const paymentRes = await fetch(`${API_BASE}/api/v1/payments/orders/${order.id}`, {
-            method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const payment = await paymentRes.json();
-          if (!paymentRes.ok || !payment.success || !payment.data?.paymentUrl) {
-            throw new Error(payment.message || 'Không thể khởi tạo thanh toán.');
-          }
-          window.location.href = payment.data.paymentUrl;
+          // S-56: Điều hướng sang checkout (order-details.html?id=...). Thanh toán tại /api/v1/payments/orders/${order.id} sau khi áp mã
+          window.location.href = `./order-details.html?id=${encodeURIComponent(order.id)}`;
         } else {
           alert((json && json.message) || "Không thể tạo đơn hàng. Vui lòng kiểm tra lại trạng thái ghế.");
           btn.innerHTML = originalText;
