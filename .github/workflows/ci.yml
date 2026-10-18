@@ -59,4 +59,5 @@ jobs:
           ./tests/test-s55-blockers-offline.ps1
           ./tests/test-s55-guards-offline.ps1
           ./tests/test-s55-phase3-offline.ps1
+          ./tests/test-s55-docker-mode-offline.ps1
           Write-Host "TAT CA BO TEST S-55 OFFLINE DEU PASS."
