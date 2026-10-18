@@ -36,18 +36,24 @@ namespace EventTicketBooking.Api.Controllers
         private readonly IOrderAuditService _orderAuditService;
         private readonly IHubContext<SeatStatusHub>? _hubContext;
         private readonly IRefundService _refundService;
+        private readonly IDiscountCodeService _discountCodeService;
+        private readonly IShowtimeReminderService? _reminderService;
 
         public EventController(
             AppDbContext context,
             IOrderAuditService? orderAuditService = null,
             IHubContext<SeatStatusHub>? hubContext = null,
             IRefundService? refundService = null,
-            IPaymentGateway? paymentGateway = null)
+            IPaymentGateway? paymentGateway = null,
+            IDiscountCodeService? discountCodeService = null,
+            IShowtimeReminderService? reminderService = null)
         {
             _context = context;
             _orderAuditService = orderAuditService ?? new OrderAuditService(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
             _hubContext = hubContext;
             _refundService = refundService ?? new RefundService(context, _orderAuditService, paymentGateway);
+            _discountCodeService = discountCodeService ?? new DiscountCodeService(context);
+            _reminderService = reminderService;
         }
 
         /// <summary>
@@ -610,6 +616,10 @@ namespace EventTicketBooking.Api.Controllers
             var startTimeUtc = dto.StartTime.Kind == DateTimeKind.Utc ? dto.StartTime : dto.StartTime.ToUniversalTime();
             var endTimeUtc = dto.EndTime.Kind == DateTimeKind.Utc ? dto.EndTime : dto.EndTime.ToUniversalTime();
 
+            var oldStartTime = showtime.StartTime;
+            var oldEndTime = showtime.EndTime;
+            var isTimeChanged = (oldStartTime != startTimeUtc || oldEndTime != endTimeUtc);
+
             if (dto.Name != null) showtime.Name = string.IsNullOrWhiteSpace(dto.Name) ? null : dto.Name.Trim();
             showtime.SalesEndTime = dto.SalesEndTime?.ToUniversalTime() ?? startTimeUtc;
             showtime.StartTime = startTimeUtc;
@@ -624,6 +634,28 @@ namespace EventTicketBooking.Api.Controllers
             }
 
             await _context.SaveChangesAsync();
+
+            // Story S-61: Nếu đổi giờ diễn, tự động gửi email cập nhật tới tất cả người mua vé đã thanh toán
+            if (isTimeChanged)
+            {
+                var reminderService = _reminderService ?? HttpContext?.RequestServices?.GetService<IShowtimeReminderService>();
+                if (reminderService != null)
+                {
+                    try
+                    {
+                        await reminderService.SendShowtimeRescheduledNotificationsAsync(
+                            showtime.Id,
+                            oldStartTime,
+                            oldEndTime,
+                            startTimeUtc,
+                            endTimeUtc);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[WARNING] Lỗi gửi email thông báo đổi giờ diễn: {ex.Message}");
+                    }
+                }
+            }
 
             var responseDto = new ShowtimeResponseDto
             {
@@ -641,6 +673,60 @@ namespace EventTicketBooking.Api.Controllers
             };
 
             return Ok(ApiResponse<ShowtimeResponseDto>.SuccessResult(responseDto, "Cập nhật suất diễn thành công."));
+        }
+
+        /// <summary>
+        /// Gửi email nhắc nhở trước 24 giờ cho suất diễn (Story S-61).
+        /// POST /api/events/{eventId}/showtimes/{showtimeId}/send-reminders
+        /// </summary>
+        [HttpPost("{eventId:guid}/showtimes/{showtimeId:guid}/send-reminders")]
+        [RequireRole("Organizer", "Admin")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> SendShowtimeReminders(Guid eventId, Guid showtimeId, [FromQuery] bool force = false)
+        {
+            var currentUserId = GetCurrentUserId();
+            if (!currentUserId.HasValue) return Unauthorized();
+
+            var ev = await _context.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+            if (ev == null) return NotFound(ApiResponse<object>.FailureResult("Sự kiện không tồn tại."));
+
+            var isAdmin = await IsCurrentUserAdminAsync(currentUserId.Value);
+            if (!isAdmin && ev.OwnerId != currentUserId.Value)
+            {
+                SecurityAuditLogger.LogOwnershipDenied(HttpContext, "Event", eventId.ToString());
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.FailureResult("Forbidden: Bạn không có quyền thao tác trên sự kiện này."));
+            }
+
+            var showtime = await _context.Showtimes.FirstOrDefaultAsync(s => s.Id == showtimeId && s.EventId == eventId);
+            if (showtime == null) return NotFound(ApiResponse<object>.FailureResult("Suất diễn không tồn tại."));
+
+            var reminderService = _reminderService ?? HttpContext.RequestServices?.GetService<IShowtimeReminderService>();
+            if (reminderService == null)
+            {
+                return StatusCode(500, ApiResponse<object>.FailureResult("Dịch vụ nhắc nhở chưa sẵn sàng."));
+            }
+
+            int count = await reminderService.SendReminderForShowtimeAsync(showtimeId, force);
+            return Ok(ApiResponse<object>.SuccessResult(new { SentCount = count }, $"Đã gửi email nhắc nhở cho {count} người mua vé."));
+        }
+
+        /// <summary>
+        /// Quét và gửi email nhắc nhở 24h cho tất cả suất diễn sắp tới (Story S-61 - Admin).
+        /// POST /api/events/trigger-reminders
+        /// </summary>
+        [HttpPost("trigger-reminders")]
+        [RequireRole("Admin")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> TriggerAllUpcomingReminders()
+        {
+            var reminderService = _reminderService ?? HttpContext.RequestServices?.GetService<IShowtimeReminderService>();
+            if (reminderService == null)
+            {
+                return StatusCode(500, ApiResponse<object>.FailureResult("Dịch vụ nhắc nhở chưa sẵn sàng."));
+            }
+
+            int count = await reminderService.SendUpcomingShowtimeRemindersAsync();
+            return Ok(ApiResponse<object>.SuccessResult(new { SentCount = count }, $"Đã quét và gửi thành công {count} email nhắc nhở."));
         }
 
         /// <summary>
@@ -1293,6 +1379,12 @@ namespace EventTicketBooking.Api.Controllers
                         order.Status = OrderStatus.Cancelled;
                         order.CancelReason = OrderCancelReasons.ShowtimeCancelled;
                         order.UpdatedAt = now;
+
+                        // Story S-56: Giải phóng lượt sử dụng mã giảm giá của đơn chờ
+                        if (order.DiscountCodeId.HasValue)
+                        {
+                            await _discountCodeService.ReleaseDiscountReservationAsync(order);
+                        }
 
                         if (order.OrderItems != null && order.OrderItems.Any())
                         {

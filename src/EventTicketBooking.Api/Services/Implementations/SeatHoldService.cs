@@ -29,6 +29,7 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly ILogger<SeatHoldService> _logger;
         private readonly IHubContext<SeatStatusHub>? _hubContext;
         private readonly IAppMetrics? _metrics;
+        private readonly IDiscountCodeService _discountCodeService;
 
         public const int DefaultHoldTtlSeconds = 600; // 10 phút
 
@@ -37,13 +38,15 @@ namespace EventTicketBooking.Api.Services.Implementations
             ILogger<SeatHoldService> logger,
             IHubContext<SeatStatusHub>? hubContext = null,
             IConnectionMultiplexer? redis = null,
-            IAppMetrics? metrics = null)
+            IAppMetrics? metrics = null,
+            IDiscountCodeService? discountCodeService = null)
         {
             _context = context;
             _logger = logger;
             _hubContext = hubContext;
             _redis = redis;
             _metrics = metrics;
+            _discountCodeService = discountCodeService ?? new DiscountCodeService(context);
         }
 
         public async Task<HoldSeatsResult> HoldSeatsAsync(
@@ -407,6 +410,12 @@ namespace EventTicketBooking.Api.Services.Implementations
                     var oldStatus = order.Status.ToString();
                     order.Status = OrderStatus.Cancelled;
                     order.UpdatedAt = DateTimeOffset.UtcNow;
+
+                    // Story S-56: Giải phóng lượt sử dụng mã giảm giá nếu đơn hàng huỷ do bỏ chọn ghế cuối
+                    if (order.DiscountCodeId.HasValue)
+                    {
+                        await _discountCodeService.ReleaseDiscountReservationAsync(order, cancellationToken);
+                    }
 
                     _context.OrderAuditLogs.Add(new OrderAuditLog
                     {

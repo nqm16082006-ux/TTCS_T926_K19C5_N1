@@ -451,11 +451,11 @@
               <span class="material-symbols-outlined text-[18px]">qr_code_2</span>
               <span>Xem vé điện tử (QR)</span>
             </button>
-            <a href="./order-details.html?orderId=${order.id}&cancel=1" class="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
+            <a href="./order-details.html?id=${order.id}&cancel=1" class="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
               <span class="material-symbols-outlined text-[18px]">undo</span>
               <span>Huỷ &amp; hoàn tiền</span>
             </a>
-            <a href="./order-details.html?orderId=${order.id}" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
+            <a href="./order-details.html?id=${order.id}" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
               <span class="material-symbols-outlined text-[18px]">receipt</span>
               <span>Chi tiết</span>
             </a>
@@ -466,11 +466,11 @@
           `;
         } else if (order.status === 'Pending') {
           actionButtonsHtml = `
-            <a href="./order-details.html?orderId=${order.id}" class="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-primary hover:from-indigo-700 hover:to-primary text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm shadow-indigo-500/20 transition flex items-center gap-1.5 active:scale-95">
+            <a href="./order-details.html?id=${order.id}" class="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-primary hover:from-indigo-700 hover:to-primary text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm shadow-indigo-500/20 transition flex items-center gap-1.5 active:scale-95">
               <span class="material-symbols-outlined text-[18px]">credit_card</span>
               <span>Thanh toán ngay</span>
             </a>
-            <a href="./order-details.html?orderId=${order.id}" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
+            <a href="./order-details.html?id=${order.id}" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
               <span class="material-symbols-outlined text-[18px]">info</span>
               <span>Chi tiết</span>
             </a>
@@ -481,7 +481,7 @@
           `;
         } else {
           actionButtonsHtml = `
-            <a href="./order-details.html?orderId=${order.id}" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
+            <a href="./order-details.html?id=${order.id}" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition flex items-center gap-1">
               <span class="material-symbols-outlined text-[18px]">receipt_long</span>
               <span>Xem lại chi tiết</span>
             </a>
@@ -552,12 +552,12 @@
             <!-- Left: Event Image & Details -->
             <div class="flex items-start gap-4 flex-1 min-w-0">
               <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200 shadow-2xs">
-                <img src="${escapeHtml(eventImage)}" alt="${escapeHtml(order.eventTitle || 'Sự kiện')}" class="w-full h-full object-cover">
+                <img src="${escapeHtml(eventImage)}" alt="${escapeHtml(order.eventTitle || 'Sự kiện')}" class="w-full h-full object-cover" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=600&q=80';">
               </div>
 
               <div class="flex-1 min-w-0">
                 <h4 class="text-base sm:text-lg font-bold text-slate-900 truncate hover:text-primary transition">
-                  <a href="./order-details.html?orderId=${order.id}">${escapeHtml(order.eventTitle || 'Sự kiện chưa xác định')}</a>
+                  <a href="./order-details.html?id=${order.id}">${escapeHtml(order.eventTitle || 'Sự kiện chưa xác định')}</a>
                 </h4>
                 
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 font-medium mt-1">

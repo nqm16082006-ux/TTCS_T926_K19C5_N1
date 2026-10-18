@@ -148,10 +148,12 @@
       <!-- Logo Header -->
       <div class="h-16 px-space-md flex items-center justify-between bg-surface-container-low">
         <a href="./public-events.html" class="flex items-center gap-space-sm">
-          <img alt="EventPulse Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WTV6ECUtEUhk0z2OhrYrHSztCKcv9GeCNfmcT273KDmrGfvnfNjO-uFn7ATWOsV48K8VSD8RgaP6nA7UlHLZRqTI0Wp1hsKNBB2hCGvimywycHDhMKaCFgxRaIhinj6vXjrz4KX-RWUcFVmjpPY8KdEXLAiptD9n7k51M75Sc6w1aBY7AIYj55cuIhMogpGjtAb-tv4r8Mg5sBZlRk4SsC6WzXyCEM8aHQAZ3bI3WnX8ogB38-mTpVIKT9">
+          <div class="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center shadow-sm shrink-0">
+            <span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+          </div>
           <div class="flex flex-col">
-            <span class="font-headline-sm text-headline-sm text-primary leading-tight">EventPulse</span>
-            <span class="font-label-sm text-label-sm text-secondary tracking-wider uppercase">Ban Tổ Chức</span>
+            <span class="font-headline-sm text-headline-sm text-primary leading-tight font-extrabold">EventPulse</span>
+            <span class="font-label-sm text-label-sm text-secondary tracking-wider uppercase font-semibold">Ban Tổ Chức</span>
           </div>
         </a>
       </div>
@@ -190,7 +192,7 @@
         <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./events.html?action=seats" id="nav-cau-hinh-ghe">
           <span class="material-symbols-outlined text-[20px]">chair</span>Cấu hình ghế &amp; bảng giá
         </a>
-        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./export-test.html" id="nav-xuat-checkin">
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./checkin-export.html" id="nav-xuat-checkin">
           <span class="material-symbols-outlined text-[20px]">file_download</span>Xuất danh sách Check-in
         </a>
       </nav>
@@ -564,7 +566,7 @@
               <!-- Venue Static Location Map Preview -->
               <div class="flex flex-col gap-2" id="venueMapContainer">
                 <span class="font-label-sm text-label-sm text-outline font-bold">Bản đồ định vị tự động:</span>
-                <div class="w-full h-44 bg-cover bg-center rounded-lg shadow-inner relative overflow-hidden flex items-end p-space-md" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDh1wUkIat7_Ws8JbjqzMVY3LEHRNpsSx0yrLAZrzfet-NKcganyDzQMCbrEMcs3RSgo9VMfbo_MS4UB3DwPRp-BCjbpLu40CHRr_0fijpLkuGlU0AFHx6BpzMU70lf2X2aiPQU7DRU6Iymqq-YMZHTu-KRORswPWolEuIwflfb8Dsieldy72Ral_veCeZNGSSWM-QfT6pGZVEnAWD7GnVS_6yaBoWdezPxKDGZMQuOR1ZhLJ1us4Q1iQ')">
+                <div class="w-full h-44 bg-cover bg-center rounded-lg shadow-inner relative overflow-hidden flex items-end p-space-md" style="background-image: url('https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80')">
                   <div class="bg-surface-container-lowest/90 backdrop-blur-md px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-2">
                     <span class="material-symbols-outlined text-[16px] text-primary">pin_drop</span>
                     <span class="font-label-sm text-label-sm text-on-surface font-semibold" id="mapCoordinatesLabel">Tọa độ: 21.0069° N, 105.7865° E (Đã khớp địa chỉ thực tế)</span>
@@ -783,7 +785,7 @@
                 </div>
 
                 <div class="relative group rounded-xl overflow-hidden shadow-sm bg-surface-container-low aspect-[3/4] flex flex-col items-center justify-center text-center border border-outline-variant/30">
-                  <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" id="posterImgPreview" src="https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80" alt="Poster sự kiện" onerror="handlePosterImageError()">
+                  <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" id="posterImgPreview" src="https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80" alt="Poster sự kiện" referrerpolicy="no-referrer" onerror="handlePosterImageError()">
                   
                   <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent flex flex-col justify-end p-4 text-left">
                     <span class="px-2.5 py-1 rounded-full bg-black/70 text-white font-label-sm text-label-sm w-fit mb-2 backdrop-blur-md max-w-[240px] truncate" id="posterFileNameLabel">
@@ -871,7 +873,7 @@
 
       <div class="rounded-2xl overflow-hidden shadow-lg border border-outline-variant/30 bg-surface-container-lowest">
         <div class="relative h-64 w-full bg-black">
-          <img id="modalPreviewImg" class="w-full h-full object-cover" src="" alt="Poster preview">
+          <img id="modalPreviewImg" class="w-full h-full object-cover" src="" alt="Poster preview" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80';">
           <div class="absolute top-3 left-3 px-3 py-1 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-tertiary font-bold text-xs shadow">
             Đang mở bán
           </div>
@@ -915,7 +917,7 @@
   <script>
     const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:5012' : '';
     let token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
-    let currentPosterUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuD5BeuDSNhed6YSukUGH4tRPe-CcJL2BEEqSGi2zphmeHuFOkA9hM5bBeH63-Us_Pf0DWJjisfton9WHqAbFBhkCE-cj9J9u8nIhsL8K8a_kU3dTUEkMEFyGNmiDbxL9kIgPnsSF8Mxgd4MgMNvu3Vh52Ba5C8bdJyg_SzQa4PjZYki1XqdLIQA2w7gs14DkCCRkiBgpQHapoqDtIf3UJcUsd2Qrr5aoSCvJzuNfqFfFWuMMZ2zNMb91w";
+    let currentPosterUrl = "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80";
     let isSubmitting = false;
     let editEventId = null;
 

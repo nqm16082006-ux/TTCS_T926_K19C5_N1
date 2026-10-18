@@ -21,7 +21,7 @@ namespace EventTicketBooking.Tests
     {
         private readonly AppDbContext _context;
         private readonly CheckinExportService _service;
-        private readonly TicketCheckInController _controller;
+        private readonly ShowsCheckinController _controller;
         private readonly Guid _userId = Guid.NewGuid();
 
         public CheckinExportS62Tests()
@@ -36,17 +36,13 @@ namespace EventTicketBooking.Tests
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, _userId.ToString()),
-                new Claim(ClaimTypes.Role, "Staff")
+                new Claim(ClaimTypes.Role, "Admin")
             };
             var identity = new ClaimsIdentity(claims, "TestAuthType");
             var principal = new ClaimsPrincipal(identity);
 
-            _controller = new TicketCheckInController(
-                _context,
-                Microsoft.Extensions.Logging.Abstractions.NullLogger<TicketCheckInController>.Instance,
-                null,
-                null,
-                _service)
+            _controller = new ShowsCheckinController(_service,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<ShowsCheckinController>.Instance, _context)
             {
                 ControllerContext = new ControllerContext
                 {
@@ -141,11 +137,11 @@ namespace EventTicketBooking.Tests
             Assert.Equal(2, result.Count);
 
             var primary = result.First(r => r.GateName == "Cổng 1");
-            Assert.True(primary.IsConflict);
-            Assert.Contains("quét lại nhiều lần", primary.ConflictNote);
+            Assert.False(primary.IsConflict);
+            Assert.Null(primary.ConflictNote);
 
             var second = result.First(r => r.GateName == "Cổng 2");
-            Assert.True(second.IsConflict);
+            Assert.False(second.IsConflict);
             Assert.Contains("Vào bổ sung", second.ConflictNote);
             Assert.Contains("Khách ra ngoài nghe điện thoại", second.ConflictNote);
         }
@@ -272,9 +268,8 @@ namespace EventTicketBooking.Tests
             // Decode as string
             var csvString = Encoding.UTF8.GetString(bytes);
             var lines = csvString.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-
             // Kiểm tra Header (bỏ qua ký tự BOM \uFEFF ở đầu)
-            Assert.Equal("Mã vé,Số ghế,Thời gian vào,Cửa vào,Cờ xung đột,Ghi chú xung đột", lines[0].TrimStart('\uFEFF'));
+            Assert.Equal("Mã vé,Số ghế,Thời gian vào (UTC+7),Cửa vào,Cờ xung đột,Ghi chú xung đột,Loại lượt,Kết quả", lines[0].TrimStart('\uFEFF'));
 
             // Kiểm tra dòng 1
             Assert.Contains("TC-001,VIP-01,2026-10-11 19:30:00,Cổng VIP,Không,", lines[1]);
@@ -356,12 +351,116 @@ namespace EventTicketBooking.Tests
             var actionResult = await _controller.ExportCheckinListCsv(showtime.Id);
             var fileResult = Assert.IsType<FileContentResult>(actionResult);
 
-            var rootDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../.."));
-            var outputPath = Path.Combine(rootDir, "danh-sach-checkin-test.csv");
-            await File.WriteAllBytesAsync(outputPath, fileResult.FileContents);
-
-            Assert.True(File.Exists(outputPath));
             Assert.True(fileResult.FileContents.Length > 100);
+        }
+
+        [Fact]
+        public async Task Audit_ExportsConflictAtItsOwnGate_WithoutDuplicatingAdmission()
+        {
+            var (show, ticket) = await SeedShowtimeWithTicketAsync(OrderStatus.Paid, true, "Gate A", "A", 1);
+            _context.OfflineCheckInRecords.AddRange(
+                new OfflineCheckInRecord
+                {
+                    OrderItemId = ticket.OrderItemId,
+                    TicketCode = ticket.TicketCode,
+                    ShowtimeId = show.Id,
+                    GateName = "Gate A",
+                    ScannedAtDevice = DateTimeOffset.UtcNow,
+                    Status = "SYNCED"
+                },
+                new OfflineCheckInRecord
+                {
+                    OrderItemId = ticket.OrderItemId,
+                    TicketCode = ticket.TicketCode,
+                    ShowtimeId = show.Id,
+                    GateName = "Gate B",
+                    ScannedAtDevice = DateTimeOffset.UtcNow,
+                    IsConflict = true,
+                    ConflictReason = "DIFFERENT_GATE_CONFLICT",
+                    Status = "CONFLICT"
+                });
+            await _context.SaveChangesAsync();
+            var admitted = await _service.GetCheckinExportDataAsync(new() { ShowId = show.Id });
+            Assert.Single(admitted);
+            Assert.True(admitted[0].IsConflict);
+            Assert.Equal("Đã vào", admitted[0].Result);
+            var audit = await _service.GetCheckinExportDataAsync(new() { ShowId = show.Id, IncludeScanLog = true });
+            Assert.Equal(2, audit.Count);
+            var conflict = await _service.GetCheckinExportDataAsync(new()
+            { ShowId = show.Id, IncludeScanLog = true, GateName = "Gate B", OnlyConflicts = true });
+            Assert.Equal("Xung đột", Assert.Single(conflict).Result);
+        }
+
+        [Fact]
+        public async Task Default_ExcludesTicketsNotAdmitted()
+        {
+            var (show, _) = await SeedShowtimeWithTicketAsync(OrderStatus.Paid, false, "", "A", 1);
+            Assert.Empty(await _service.GetCheckinExportDataAsync(new() { ShowId = show.Id }));
+        }
+
+        [Theory]
+        [InlineData("=1+1")]
+        [InlineData(" +SUM(A1)")]
+        [InlineData("@SUM(A1)")]
+        [InlineData("-1+2")]
+        [InlineData("\tformula")]
+        public void Csv_NeutralizesExcelFormulas(string value)
+        {
+            var csv = Encoding.UTF8.GetString(_service.GenerateCsvBytes(new[] {
+                new CheckinExportItemDto { TicketCode = value, GateName = "Gate, A", ConflictNote = "First\nSecond" }
+            }));
+            Assert.Contains("'" + value, csv);
+            Assert.Contains("\"First\nSecond\"", csv);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task CancellationAfterAdmission_DoesNotInvalidateHistory(bool cancelBeforeReadmission)
+        {
+            var (show, ticket) = await SeedShowtimeWithTicketAsync(OrderStatus.Cancelled, true, "Gate A", "A", 1);
+            var item = await _context.OrderItems.SingleAsync(i => i.Id == ticket.OrderItemId);
+            var admittedAt = item.CheckInTime!.Value;
+            _context.OrderAuditLogs.Add(new OrderAuditLog
+            {
+                OrderId = item.OrderId,
+                EntityType = "ORDER",
+                Action = "SHOWTIME_CANCELLED",
+                OldStatus = "Paid",
+                NewStatus = "Cancelled",
+                Timestamp = admittedAt.AddMinutes(10)
+            });
+            _context.TicketReadmissions.Add(new TicketReadmission
+            {
+                OrderItemId = item.Id,
+                Gate = "Gate B",
+                StaffName = "Staff",
+                AdmittedAt = admittedAt.AddMinutes(cancelBeforeReadmission ? 20 : 5),
+                Reason = "Approved"
+            });
+            await _context.SaveChangesAsync();
+            var rows = await _service.GetCheckinExportDataAsync(new() { ShowId = show.Id });
+            var main = rows.Single(r => r.GateName == "Gate A");
+            Assert.False(main.IsConflict);
+            Assert.Contains("hủy sau lượt vào", main.ConflictNote);
+            Assert.Equal(cancelBeforeReadmission, rows.Single(r => r.GateName == "Gate B").IsConflict);
+        }
+
+        [Fact]
+        public async Task CancellationBeforeAdmission_IsStillConflict()
+        {
+            var (show, ticket) = await SeedShowtimeWithTicketAsync(OrderStatus.Cancelled, true, "Gate A", "A", 1);
+            var item = await _context.OrderItems.SingleAsync(i => i.Id == ticket.OrderItemId);
+            _context.OrderAuditLogs.Add(new OrderAuditLog
+            {
+                OrderId = item.OrderId,
+                EntityType = "ORDER",
+                OldStatus = "Paid",
+                NewStatus = "Cancelled",
+                Timestamp = item.CheckInTime!.Value.AddMinutes(-10)
+            });
+            await _context.SaveChangesAsync();
+            Assert.True(Assert.Single(await _service.GetCheckinExportDataAsync(new() { ShowId = show.Id })).IsConflict);
         }
 
         private async Task<(Showtime showtime, Ticket ticket)> SeedShowtimeWithTicketAsync(
