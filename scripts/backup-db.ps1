@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     S-55: Script sao lưu cơ sở dữ liệu PostgreSQL an toàn và tự động thực thi chính sách retention 14 bản.
 
@@ -20,7 +20,7 @@ param(
     [string]$ConnectionString,
 
     [Parameter()]
-    [string]$BackupDir = (Join-Path $PSScriptRoot "..\artifacts\database-backups"),
+    [string]$BackupDir = "",
 
     [Parameter()]
     [int]$MaxRetention = 14,
@@ -93,6 +93,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# $PSScriptRoot trong param default khong duoc nap dung gio trong PowerShell 5.1
+# (advanced script), nen tinh duong dan o day de tuong thich ca 5.1 lan 7.x.
+if ([string]::IsNullOrWhiteSpace($BackupDir)) {
+    $BackupDir = Join-Path $PSScriptRoot "..\artifacts\database-backups"
+}
 
 # Nạp module dùng chung S-55 (Get-PgToolExecutable, Parse-PgConnectionString, Invoke-PgSqlQuery, Invoke-ProcessWithTimeout, Test-S55BackupValidity, Assert-SafeDrillEnvironment)
 . (Join-Path $PSScriptRoot "s55-common.ps1")
