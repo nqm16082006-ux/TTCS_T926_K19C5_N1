@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     S-55: Đăng ký / kiểm tra lịch backup hằng ngày 02:00 (giờ địa phương máy chủ) qua Windows Task Scheduler.
 
@@ -19,7 +19,7 @@ param(
     [string]$TaskName = "EventPulse_Daily_Database_Backup",
 
     [Parameter()]
-    [string]$ScriptPath = (Join-Path $PSScriptRoot "backup-db.ps1"),
+    [string]$ScriptPath = "",
 
     [Parameter()]
     [string]$BackupArgs = "",
@@ -41,6 +41,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# $PSScriptRoot trong param default khong duoc nap dung gio trong PowerShell 5.1
+# (advanced script), nen tinh duong dan o day de tuong thich ca 5.1 lan 7.x.
+if ([string]::IsNullOrWhiteSpace($ScriptPath)) {
+    $ScriptPath = Join-Path $PSScriptRoot "backup-db.ps1"
+}
 
 Write-Host "=================================================================="
 Write-Host " S-55: CAU HINH LICH BACKUP HANG NGAY (WINDOWS TASK SCHEDULER)"

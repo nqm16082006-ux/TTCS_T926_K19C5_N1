@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     S-55: RUNBOOK DIỄN TẬP KHÔI PHỤC END-TO-END (RESTORE DRILL + API SMOKE TEST)
 
@@ -23,7 +23,7 @@ param(
     [string]$DumpFile,
 
     [Parameter()]
-    [string]$BackupDir = (Join-Path $PSScriptRoot "..\artifacts\database-backups"),
+    [string]$BackupDir = "",
 
     [Parameter()]
     [int]$PgPort = 5544,
@@ -32,7 +32,7 @@ param(
     [int]$ApiPort = 5013,
 
     [Parameter()]
-    [string]$EvidenceDir = (Join-Path $PSScriptRoot "..\artifacts\drill-evidence"),
+    [string]$EvidenceDir = "",
 
     [Parameter()]
     [int]$RunnerTimeoutSeconds = 600,
@@ -60,6 +60,15 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# $PSScriptRoot trong param default khong duoc nap dung gio trong PowerShell 5.1
+# (advanced script), nen tinh duong dan o day de tuong thich ca 5.1 lan 7.x.
+if ([string]::IsNullOrWhiteSpace($BackupDir)) {
+    $BackupDir = Join-Path $PSScriptRoot "..\artifacts\database-backups"
+}
+if ([string]::IsNullOrWhiteSpace($EvidenceDir)) {
+    $EvidenceDir = Join-Path $PSScriptRoot "..\artifacts\drill-evidence"
+}
 
 # Nạp module dùng chung S-55 (Test-S55BackupValidity) và test helpers (Docker snapshot)
 . (Join-Path $PSScriptRoot "s55-common.ps1")

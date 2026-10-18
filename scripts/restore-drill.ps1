@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     S-55: Script diễn tập khôi phục (Restore Drill) vào cơ sở dữ liệu tạm thời và kiểm tra tính toàn vẹn đa cấp độ.
 
@@ -19,7 +19,7 @@ param(
     [string]$DumpFile,
 
     [Parameter()]
-    [string]$BackupDir = (Join-Path $PSScriptRoot "..\artifacts\database-backups"),
+    [string]$BackupDir = "",
 
     [Parameter()]
     [string]$TargetConnectionString,
@@ -71,6 +71,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# $PSScriptRoot trong param default khong duoc nap dung gio trong PowerShell 5.1
+# (advanced script), nen tinh duong dan o day de tuong thich ca 5.1 lan 7.x.
+if ([string]::IsNullOrWhiteSpace($BackupDir)) {
+    $BackupDir = Join-Path $PSScriptRoot "..\artifacts\database-backups"
+}
 
 # Nạp module dùng chung S-55 (Get-PgToolExecutable, Parse-PgConnectionString, Invoke-PgSqlQuery, Invoke-ProcessWithTimeout, Test-S55BackupValidity)
 . (Join-Path $PSScriptRoot "s55-common.ps1")
