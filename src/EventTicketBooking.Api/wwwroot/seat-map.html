@@ -259,6 +259,21 @@
                   <p class="font-label-sm text-label-sm text-outline mt-1 uppercase tracking-wider font-semibold">Tầm nhìn trực diện sân khấu</p>
                 </div>
 
+                <!-- Story S-59: Sold Out Waitlist Alert Banner -->
+                <div id="soldOutWaitlistBanner" class="hidden mb-4 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 backdrop-blur text-amber-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+                  <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-amber-400 text-2xl flex-shrink-0">event_busy</span>
+                    <div>
+                      <p class="font-bold text-white text-sm">Suất diễn này hiện đã hết ghế trống</p>
+                      <p class="text-xs text-amber-200/80">Bạn có thể đăng ký vào danh sách chờ. Khi có ghế được nhả về kho (do huỷ đơn/vé hoặc hết hạn giữ chỗ), hệ thống sẽ gửi email ưu tiên cho bạn.</p>
+                    </div>
+                  </div>
+                  <button id="btnOpenWaitlistModal" type="button" onclick="openWaitlistModalFromSeatMap()" class="flex-shrink-0 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs tracking-wide transition shadow flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[16px]">hourglass_top</span>
+                    <span>Đăng ký danh sách chờ</span>
+                  </button>
+                </div>
+
                 <!-- Seat Grid Matrix Scroll Container -->
                 <div id="ticketTiersSummaryPills" class="tier-filters" aria-label="Lọc theo hạng vé"></div>
                 <div class="map-hint"><span>Màu ghế thể hiện hạng vé • Chọn ghế để xem giá</span><span>Kéo thanh cuộn để xem các hàng và ghế phía bên phải ↔</span></div>
@@ -480,11 +495,90 @@
           Thời gian giữ chỗ 10 phút của quý khách đã kết thúc. Để đảm bảo cơ hội cho mọi khán giả, các ghế đã được tự động nhả về hệ thống. Quý khách vui lòng chọn lại ghế nếu muốn tiếp tục đặt vé.
         </p>
         <button onclick="closeExpiredModal()" class="w-full h-11 rounded-xl bg-primary hover:bg-primary-container text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md transition">
-          <span>Đã hiểu, chọn lại ghế</span>
-        </button>
-      </div>
-    </div>
-  </main>
+           <span>Đã hiểu, chọn lại ghế</span>
+         </button>
+       </div>
+     </div>
+
+     <!-- Modal: Đăng Ký Danh Sách Chờ (Story S-59) -->
+     <div id="waitlistSeatMapModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4">
+       <div class="relative w-full max-w-md bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
+         <div class="bg-gradient-to-r from-amber-600 to-amber-700 px-6 py-5 text-white flex items-center justify-between">
+           <div class="flex items-center gap-3">
+             <div class="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white">
+               <span class="material-symbols-outlined text-[24px]">playlist_add</span>
+             </div>
+             <div>
+               <h3 class="font-extrabold text-lg tracking-tight">Đăng Ký Danh Sách Chờ</h3>
+               <p class="text-xs text-amber-100 font-medium">Nhận email ngay khi có ghế về kho</p>
+             </div>
+           </div>
+           <button type="button" onclick="closeSeatMapWaitlistModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer">
+             <span class="material-symbols-outlined text-[20px]">close</span>
+           </button>
+         </div>
+
+         <div class="p-6 space-y-4">
+           <div class="p-3.5 rounded-xl bg-amber-50 text-xs text-amber-900 border border-amber-200/70 space-y-1">
+             <p class="font-bold text-amber-800 text-sm flex items-center gap-1.5">
+               <span class="material-symbols-outlined text-[18px]">event</span>
+               <span id="smWaitlistTitle">Suất diễn</span>
+             </p>
+             <p class="text-[11px] text-amber-800/80 pt-1 border-t border-amber-200/50">
+               ⚡ Khi có ghế về kho do khán giả huỷ đơn hay hết hạn giữ chỗ, người chờ nhận email theo đúng thứ tự đăng ký.
+             </p>
+           </div>
+
+           <div class="flex items-center justify-between px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-surface-container-high/40 text-xs">
+             <span class="text-on-surface-variant font-medium">Số người đang chờ hiện tại:</span>
+             <span class="font-bold text-primary font-code-mono text-sm" id="smWaitlistQueueCount">Đang tải...</span>
+           </div>
+
+           <form id="smWaitlistForm" onsubmit="submitSeatMapWaitlist(event)" class="space-y-3">
+             <div>
+               <label class="block text-xs font-bold text-on-surface mb-1">Họ và tên</label>
+               <input type="text" id="smWaitlistFullName" placeholder="Nguyễn Văn A" class="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/60 focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm outline-none transition">
+             </div>
+
+             <div>
+               <label class="block text-xs font-bold text-on-surface mb-1">Email nhận thông báo <span class="text-error">*</span></label>
+               <input type="email" id="smWaitlistEmail" required placeholder="example@email.com" class="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/60 focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm outline-none transition">
+             </div>
+
+             <div>
+               <label class="block text-xs font-bold text-on-surface mb-1">Số điện thoại (tuỳ chọn)</label>
+               <input type="tel" id="smWaitlistPhone" placeholder="0912 345 678" class="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/60 focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm outline-none transition">
+             </div>
+
+             <div id="smWaitlistAlert" class="hidden p-3 rounded-lg text-xs font-medium"></div>
+
+             <div class="flex items-center justify-end gap-2 pt-2">
+               <button type="button" onclick="closeSeatMapWaitlistModal()" class="h-10 px-4 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs transition cursor-pointer">
+                 Đóng
+               </button>
+               <button type="submit" id="btnSmSubmitWaitlist" class="h-10 px-5 rounded-lg bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer">
+                 <span class="material-symbols-outlined text-[16px]">send</span>
+                 <span>Xác nhận đăng ký</span>
+               </button>
+             </div>
+           </form>
+
+           <div id="smWaitlistSuccessView" class="hidden py-4 text-center space-y-3">
+             <div class="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-3xl">
+               <span class="material-symbols-outlined text-[36px]">check_circle</span>
+             </div>
+             <h4 class="font-bold text-base text-on-surface" id="smWaitlistSuccessTitle">Đăng ký thành công!</h4>
+             <p class="text-xs text-on-surface-variant max-w-xs mx-auto" id="smWaitlistSuccessMsg"></p>
+             <div class="pt-2">
+               <button type="button" onclick="closeSeatMapWaitlistModal()" class="h-10 px-6 rounded-lg bg-primary hover:bg-primary-container text-white font-bold text-xs transition shadow-sm cursor-pointer">
+                 Hoàn tất
+               </button>
+             </div>
+           </div>
+         </div>
+       </div>
+     </div>
+   </main>
 
   <!-- Footer -->
   <footer class="w-full bg-surface-container-low shadow-[0_-1px_6px_rgba(0,0,0,0.02)] mt-auto">
@@ -534,6 +628,78 @@
       </div>
     </div>
   </footer>
+
+  <!-- Story S-59: Modal Đăng ký Danh sách chờ khi hết vé trên Seat Map -->
+  <div id="waitlistSeatMapModal" class="fixed inset-0 z-50 hidden bg-black/60 backdrop-blur-sm items-center justify-center p-4">
+    <div class="bg-surface-container-lowest dark:bg-slate-900 border border-outline-variant/30 rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-on-surface">
+      <button onclick="closeSeatMapWaitlistModal()" class="absolute top-4 right-4 p-1.5 rounded-full text-on-surface-variant hover:bg-surface-container-high transition">
+        <span class="material-symbols-outlined text-[20px]">close</span>
+      </button>
+
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center">
+          <span class="material-symbols-outlined text-2xl">hourglass_top</span>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-on-surface">Đăng ký Danh sách chờ</h3>
+          <p id="smWaitlistTitle" class="text-xs text-on-surface-variant truncate max-w-[260px]">Đang tải sự kiện...</p>
+        </div>
+      </div>
+
+      <div id="smWaitlistAlert" class="hidden mb-4 p-3 rounded-lg text-xs font-medium"></div>
+
+      <!-- Form View -->
+      <form id="smWaitlistForm" onsubmit="submitSeatMapWaitlist(event)" class="space-y-3.5">
+        <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
+          <p class="font-semibold flex items-center gap-1.5 text-amber-400 mb-1">
+            <span class="material-symbols-outlined text-[16px]">info</span>
+            Quy trình thông báo tự động (FIFO)
+          </p>
+          <p>Khi có người huỷ vé hoặc phiên giữ chỗ hết hạn làm vé trở lại kho, hệ thống sẽ tự động gửi email thông báo kèm đường dẫn đặt vé ưu tiên theo thứ tự đăng ký.</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-on-surface-variant mb-1">Email nhận thông báo *</label>
+          <input type="email" id="smWaitlistEmail" required placeholder="name@example.com" class="w-full px-3 py-2 text-sm rounded-lg bg-surface-container-high border border-outline-variant focus:outline-none focus:border-primary text-on-surface">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-on-surface-variant mb-1">Họ và tên</label>
+          <input type="text" id="smWaitlistFullName" placeholder="Nguyễn Văn A" class="w-full px-3 py-2 text-sm rounded-lg bg-surface-container-high border border-outline-variant focus:outline-none focus:border-primary text-on-surface">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-on-surface-variant mb-1">Số điện thoại (tùy chọn)</label>
+          <input type="tel" id="smWaitlistPhone" placeholder="0901234567" class="w-full px-3 py-2 text-sm rounded-lg bg-surface-container-high border border-outline-variant focus:outline-none focus:border-primary text-on-surface">
+        </div>
+
+        <div class="pt-2 flex items-center justify-between text-xs text-on-surface-variant">
+          <span>Người đang chờ: <strong id="smWaitlistQueueCount" class="text-amber-400">0</strong></span>
+          <div class="flex gap-2">
+            <button type="button" onclick="closeSeatMapWaitlistModal()" class="px-3 py-2 rounded-lg text-xs font-semibold hover:bg-surface-container-high transition">Đóng</button>
+            <button type="submit" id="btnSmSubmitWaitlist" class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs transition flex items-center gap-1.5 shadow">
+              <span class="material-symbols-outlined text-[16px]">send</span>
+              <span>Xác nhận đăng ký</span>
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <!-- Success View -->
+      <div id="smWaitlistSuccessView" class="hidden text-center py-4 space-y-3">
+        <div class="w-12 h-12 mx-auto rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+          <span class="material-symbols-outlined text-3xl">check_circle</span>
+        </div>
+        <h4 id="smWaitlistSuccessTitle" class="text-sm font-bold text-on-surface">Đăng ký chờ thành công!</h4>
+        <p id="smWaitlistSuccessMsg" class="text-xs text-on-surface-variant"></p>
+        <div class="pt-2">
+          <button type="button" onclick="closeSeatMapWaitlistModal()" class="px-4 py-2 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition">
+            Đã hiểu
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- SignalR Client -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
@@ -1009,6 +1175,19 @@
       const colHeader = document.getElementById('columnHeaderIndex');
       rowsContainer.innerHTML = '';
       colHeader.innerHTML = '';
+
+      // Story S-59: Kiểm tra nếu toàn bộ ghế đã hết (không còn ghế AVAILABLE nào)
+      const availableSeatsCount = allSeats.filter(s => s.status === 'AVAILABLE').length;
+      const soldOutBanner = document.getElementById('soldOutWaitlistBanner');
+      if (soldOutBanner) {
+        if (allSeats.length > 0 && availableSeatsCount === 0) {
+          soldOutBanner.classList.remove('hidden');
+          soldOutBanner.classList.add('flex');
+        } else {
+          soldOutBanner.classList.add('hidden');
+          soldOutBanner.classList.remove('flex');
+        }
+      }
 
       // Group seats by Row (A, B, C...)
       const rowGroups = {};
@@ -2016,6 +2195,119 @@
 
     window.addEventListener('beforeunload', releasePassOnExit);
     window.addEventListener('pagehide', releasePassOnExit);
+
+    // --- Waitlist Handler for Seat Map (Story S-59) ---
+    async function openWaitlistModalFromSeatMap() {
+      const modal = document.getElementById('waitlistSeatMapModal');
+      const titleEl = document.getElementById('smWaitlistTitle');
+      const countEl = document.getElementById('smWaitlistQueueCount');
+      const alertEl = document.getElementById('smWaitlistAlert');
+      const formEl = document.getElementById('smWaitlistForm');
+      const successEl = document.getElementById('smWaitlistSuccessView');
+
+      titleEl.textContent = eventTitle || 'Suất diễn EventPulse';
+      alertEl.classList.add('hidden');
+      alertEl.textContent = '';
+      formEl.classList.remove('hidden');
+      successEl.classList.add('hidden');
+
+      const userStr = localStorage.getItem('user_info');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user.email) document.getElementById('smWaitlistEmail').value = user.email;
+          if (user.fullName || user.username) document.getElementById('smWaitlistFullName').value = user.fullName || user.username;
+        } catch (_) {}
+      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      countEl.textContent = 'Đang kiểm tra...';
+      try {
+        const emailVal = document.getElementById('smWaitlistEmail').value;
+        const res = await fetch(`/api/waitlist/status?showtimeId=${encodeURIComponent(showtimeId)}${emailVal ? `&email=${encodeURIComponent(emailVal)}` : ''}`);
+        const data = await res.json();
+        if (data.success && data.data) {
+          countEl.textContent = `${data.data.totalWaiting} người`;
+          if (data.data.isUserWaiting && data.data.userQueuePosition) {
+            alertEl.className = 'p-3 rounded-lg text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200';
+            alertEl.innerHTML = `ℹ️ Bạn đã nằm trong danh sách chờ của suất này (<strong>Vị trí #${data.data.userQueuePosition}</strong>). Hệ thống sẽ gửi email ngay khi có ghế trống.`;
+            alertEl.classList.remove('hidden');
+          }
+        } else {
+          countEl.textContent = '0 người';
+        }
+      } catch (e) {
+        countEl.textContent = 'Chưa xác định';
+      }
+    }
+
+    function closeSeatMapWaitlistModal() {
+      const modal = document.getElementById('waitlistSeatMapModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    async function submitSeatMapWaitlist(e) {
+      e.preventDefault();
+      const email = document.getElementById('smWaitlistEmail').value.trim();
+      const fullName = document.getElementById('smWaitlistFullName').value.trim();
+      const phoneNumber = document.getElementById('smWaitlistPhone').value.trim();
+      const btn = document.getElementById('btnSmSubmitWaitlist');
+      const alertEl = document.getElementById('smWaitlistAlert');
+      const formEl = document.getElementById('smWaitlistForm');
+      const successEl = document.getElementById('smWaitlistSuccessView');
+
+      if (!email) {
+        alertEl.className = 'p-3 rounded-lg text-xs font-medium bg-red-50 text-red-700 border border-red-200';
+        alertEl.textContent = 'Vui lòng nhập địa chỉ email nhận thông báo.';
+        alertEl.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>Đang xử lý...</span>';
+      alertEl.classList.add('hidden');
+
+      try {
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/waitlist', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            showtimeId,
+            email,
+            fullName,
+            phoneNumber
+          })
+        });
+
+        const json = await res.json();
+        if (res.ok && json.success) {
+          formEl.classList.add('hidden');
+          successEl.classList.remove('hidden');
+          document.getElementById('smWaitlistSuccessTitle').textContent = json.data?.isExisting ? 'Bạn đã có trong danh sách!' : 'Đăng ký chờ thành công!';
+          document.getElementById('smWaitlistSuccessMsg').innerHTML = `Vị trí hàng đợi ưu tiên: <strong class="text-amber-700 text-sm">#${json.data?.queuePosition || 1}</strong> (${json.data?.totalWaiting || 1} người chờ).<br><span class="text-on-surface-variant text-[11px] mt-1 block">Email thông báo sẽ tự động gửi tới <strong>${escapeHtml(email)}</strong> ngay khi có vé nhả về kho.</span>`;
+        } else {
+          alertEl.className = 'p-3 rounded-lg text-xs font-medium bg-red-50 text-red-700 border border-red-200';
+          alertEl.textContent = json.message || 'Không thể đăng ký danh sách chờ. Vui lòng thử lại sau.';
+          alertEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        alertEl.className = 'p-3 rounded-lg text-xs font-medium bg-red-50 text-red-700 border border-red-200';
+        alertEl.textContent = 'Lỗi kết nối tới máy chủ. Vui lòng kiểm tra lại mạng.';
+        alertEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">send</span><span>Xác nhận đăng ký</span>';
+      }
+    }
   </script>
 </body>
 </html>

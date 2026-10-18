@@ -78,5 +78,18 @@ public interface IEmailService
         System.Collections.Generic.IEnumerable<string> seatNames,
         string? orderId = null,
         string? directions = null);
+
+    /// <summary>
+    /// Gửi email thông báo cho người trong danh sách chờ khi có vé/ghế mới về kho do huỷ hoặc hết hạn (Story S-59).
+    /// </summary>
+    Task<bool> SendWaitlistSeatAvailableEmailAsync(
+        string toEmail,
+        string toName,
+        string eventTitle,
+        string location,
+        string showtime,
+        int availableSeatsCount,
+        string bookingUrl);
 }
+
 

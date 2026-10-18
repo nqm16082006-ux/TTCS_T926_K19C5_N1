@@ -1351,11 +1351,16 @@
                   <span class="material-symbols-outlined text-[16px] text-indigo-600" aria-hidden="true">notifications_active</span>
                   <span>Gửi nhắc nhở</span>
                 </button>
+                <button type="button" onclick="openOrganizerWaitlistModal('${s.id}', '${label}')" class="px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs active:scale-95" title="Xem danh sách khách hàng đăng ký chờ suất diễn">
+                  <span class="material-symbols-outlined text-[16px] text-amber-600" aria-hidden="true">hourglass_top</span>
+                  <span>Xem danh sách chờ</span>
+                </button>
               </div>
               <div class="st-secondary-actions">
                 <details class="st-more"><summary><span class="material-symbols-outlined" aria-hidden="true">more_horiz</span>Thao tác khác</summary>
                   <div class="st-more-menu">
                     <button type="button" onclick="sendShowtimeReminderPrompt('${s.id}')"><span class="material-symbols-outlined text-indigo-600" aria-hidden="true">notifications_active</span>Gửi email nhắc nhở trước 24h</button>
+                    <button type="button" onclick="openOrganizerWaitlistModal('${s.id}', '${label}')"><span class="material-symbols-outlined text-amber-600" aria-hidden="true">playlist_add_check</span>Xem danh sách chờ</button>
                     <button type="button" onclick="openEditShowtimeModal('${s.id}')"><span class="material-symbols-outlined" aria-hidden="true">edit_calendar</span>Chỉnh sửa suất diễn</button>
                     <a href="./export-test.html?showId=${encodeURIComponent(s.id)}"><span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>Xuất sơ đồ ghế (PDF)</a>
                     <a href="./checkin-export.html?showId=${encodeURIComponent(s.id)}"><span class="material-symbols-outlined" aria-hidden="true">file_download</span>Xuất danh sách soát vé (CSV)</a>
@@ -2280,7 +2285,168 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
     }
+
+    // --- Organizer Waitlist Viewer Logic (Story S-59) ---
+    let currentWaitlistShowtimeId = null;
+
+    async function openOrganizerWaitlistModal(showtimeId, showtimeLabel) {
+      currentWaitlistShowtimeId = showtimeId;
+      const modal = document.getElementById('organizerWaitlistModal');
+      const titleEl = document.getElementById('organizerWaitlistTitle');
+      const bodyEl = document.getElementById('organizerWaitlistTableBody');
+      const countEl = document.getElementById('organizerWaitlistTotalCount');
+      const emptyEl = document.getElementById('organizerWaitlistEmpty');
+      const tableWrapper = document.getElementById('organizerWaitlistTableWrapper');
+
+      titleEl.textContent = `Danh sách chờ: ${showtimeLabel || 'Suất diễn'}`;
+      bodyEl.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-outline">Đang tải danh sách chờ...</td></tr>';
+      emptyEl.classList.add('hidden');
+      tableWrapper.classList.remove('hidden');
+      modal.classList.add('active');
+
+      try {
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+        const res = await fetch(`/api/waitlist/showtime/${showtimeId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        const json = await res.json();
+        if (res.ok && json.success) {
+          const list = json.data || [];
+          countEl.textContent = `${list.length} người đăng ký`;
+
+          if (list.length === 0) {
+            tableWrapper.classList.add('hidden');
+            emptyEl.classList.remove('hidden');
+            return;
+          }
+
+          bodyEl.innerHTML = list.map((item, idx) => {
+            const isWaiting = item.status === 'WAITING';
+            const statusBadge = isWaiting
+              ? `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Đang chờ (#${item.queuePosition})</span>`
+              : `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Đã gửi email</span>`;
+
+            const createdStr = item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : '--';
+            const notifiedStr = item.notifiedAt ? new Date(item.notifiedAt).toLocaleString('vi-VN') : 'Chưa';
+
+            return `
+              <tr class="border-b border-surface-container-high/40 hover:bg-surface-container-low/60 transition text-xs">
+                <td class="py-2.5 px-3 font-code-mono font-bold text-on-surface">#${idx + 1}</td>
+                <td class="py-2.5 px-3 font-semibold text-on-surface">${escapeHtml(item.fullName || 'Khách vãng lai')}</td>
+                <td class="py-2.5 px-3 font-code-mono text-primary font-medium">${escapeHtml(item.email)}</td>
+                <td class="py-2.5 px-3 text-on-surface-variant">${escapeHtml(item.phoneNumber || '--')}</td>
+                <td class="py-2.5 px-3">${statusBadge}</td>
+                <td class="py-2.5 px-3 text-outline font-code-mono text-[11px]">${createdStr}</td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          bodyEl.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-error">${json.message || 'Không thể tải danh sách chờ.'}</td></tr>`;
+        }
+      } catch (err) {
+        bodyEl.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-error">Lỗi kết nối máy chủ.</td></tr>';
+      }
+    }
+
+    function closeOrganizerWaitlistModal() {
+      const modal = document.getElementById('organizerWaitlistModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    async function triggerWaitlistNotify() {
+      if (!currentWaitlistShowtimeId) return;
+      if (!confirm('Bạn có chắc muốn gửi email thông báo vé mở lại cho những người đang chờ trong danh sách này?')) return;
+
+      const btn = document.getElementById('btnTriggerNotify');
+      btn.disabled = true;
+      btn.textContent = 'Đang gửi...';
+
+      try {
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+        const res = await fetch(`/api/waitlist/showtime/${currentWaitlistShowtimeId}/notify?seatsCount=5`, {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        const json = await res.json();
+        if (res.ok && json.success) {
+          showAlert(json.message || 'Đã gửi thông báo thành công!', 'success');
+          // Tải lại danh sách
+          openOrganizerWaitlistModal(currentWaitlistShowtimeId, '');
+        } else {
+          showAlert(json.message || 'Không thể gửi email thông báo.', 'error');
+        }
+      } catch (e) {
+        showAlert('Lỗi kết nối khi gửi thông báo.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Gửi email cho người chờ';
+      }
+    }
   </script>
+
+  <!-- Modal Quản lý danh sách chờ cho Ban tổ chức (Story S-59) -->
+  <div id="organizerWaitlistModal" class="modal-overlay">
+    <div class="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden">
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-amber-600 to-amber-700 px-6 py-4 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white">
+            <span class="material-symbols-outlined text-[22px]">playlist_add_check</span>
+          </div>
+          <div>
+            <h3 class="font-bold text-base tracking-tight" id="organizerWaitlistTitle">Danh sách chờ suất diễn</h3>
+            <p class="text-xs text-amber-100" id="organizerWaitlistTotalCount">0 người đăng ký</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeOrganizerWaitlistModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-on-surface-variant">
+            ⚡ Khách hàng được sắp xếp theo thứ tự đăng ký trước (FIFO). Khi có vé về kho, hệ thống tự động gửi email thông báo.
+          </p>
+          <button type="button" id="btnTriggerNotify" onclick="triggerWaitlistNotify()" class="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition shrink-0 cursor-pointer shadow-xs">
+            <span class="material-symbols-outlined text-[16px]">forward_to_inbox</span>
+            <span>Gửi email cho người chờ</span>
+          </button>
+        </div>
+
+        <div id="organizerWaitlistTableWrapper" class="overflow-x-auto max-h-96 border border-surface-container-high/60 rounded-xl">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-surface-container-low text-[11px] font-bold text-outline uppercase sticky top-0 border-b border-surface-container-high">
+              <tr>
+                <th class="py-2.5 px-3">STT</th>
+                <th class="py-2.5 px-3">Họ và tên</th>
+                <th class="py-2.5 px-3">Email</th>
+                <th class="py-2.5 px-3">Điện thoại</th>
+                <th class="py-2.5 px-3">Trạng thái</th>
+                <th class="py-2.5 px-3">Thời điểm đăng ký</th>
+              </tr>
+            </thead>
+            <tbody id="organizerWaitlistTableBody">
+            </tbody>
+          </table>
+        </div>
+
+        <div id="organizerWaitlistEmpty" class="hidden py-8 text-center bg-surface-container-low/50 rounded-xl border border-dashed border-outline-variant/60">
+          <span class="material-symbols-outlined text-3xl text-outline mb-1">people_outline</span>
+          <p class="text-xs font-bold text-on-surface">Chưa có khán giả nào đăng ký danh sách chờ</p>
+          <p class="text-[11px] text-on-surface-variant">Khi suất diễn hết ghế, khách hàng sẽ có thể đăng ký chờ tại trang chi tiết.</p>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-3 bg-surface-container-low border-t border-surface-container-high/60 flex items-center justify-end">
+        <button type="button" onclick="closeOrganizerWaitlistModal()" class="px-4 py-2 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs transition cursor-pointer">
+          Đóng
+        </button>
+      </div>
+    </div>
+  </div>
 <script src="./seating-map-image.js"></script>
 <script src="./showtime-duplicate.js"></script>
 </body>

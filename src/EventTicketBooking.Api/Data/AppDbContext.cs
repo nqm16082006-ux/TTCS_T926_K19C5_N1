@@ -40,6 +40,7 @@ namespace EventTicketBooking.Api.Data
         public DbSet<DataDeletionRequest> DataDeletionRequests { get; set; } = null!;
         public DbSet<ReconciliationSession> ReconciliationSessions { get; set; } = null!;
         public DbSet<TicketTransfer> TicketTransfers { get; set; } = null!;
+        public DbSet<ShowtimeWaitlist> ShowtimeWaitlists { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -661,6 +662,30 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(x => x.ExecutedBy).HasMaxLength(200);
                 entity.HasIndex(x => x.SessionCode);
                 entity.HasIndex(x => x.ExecutedAt);
+            });
+
+            modelBuilder.Entity<ShowtimeWaitlist>(entity =>
+            {
+                entity.ToTable("ShowtimeWaitlists");
+                entity.HasKey(w => w.Id);
+                entity.Property(w => w.Email).IsRequired().HasMaxLength(255);
+                entity.Property(w => w.FullName).HasMaxLength(255);
+                entity.Property(w => w.PhoneNumber).HasMaxLength(50);
+                entity.Property(w => w.Status).IsRequired().HasMaxLength(50).HasDefaultValue("WAITING");
+                entity.Property(w => w.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(w => w.Showtime)
+                      .WithMany()
+                      .HasForeignKey(w => w.ShowtimeId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(w => w.User)
+                      .WithMany()
+                      .HasForeignKey(w => w.UserId)
+                      .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(w => new { w.ShowtimeId, w.Status, w.CreatedAt });
+                entity.HasIndex(w => new { w.ShowtimeId, w.Email });
             });
         }
 

@@ -677,6 +677,64 @@
     </div>
   </div>
 
+  <!-- 1.2. Waitlist Organizer Modal (Story S-59) -->
+  <div id="waitlistOrganizerModal" class="modal-overlay">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-outline-variant/30">
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-outline-variant/30">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-amber-600 text-[24px]">hourglass_top</span>
+          <div>
+            <h3 class="font-headline-sm text-headline-sm text-on-surface">Danh Sách Chờ Suất Diễn</h3>
+            <p id="waitlistOrganizerSubtitle" class="text-xs text-on-surface-variant">Đang tải...</p>
+          </div>
+        </div>
+        <button onclick="closeWaitlistOrganizerModal()" class="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+      </div>
+
+      <div class="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-900">
+        <div>
+          <span class="font-bold">⚡ Quy trình tự động (FIFO):</span> Khi có vé về kho do huỷ đơn hay hết hạn, hệ thống tự động gửi email cho người chờ theo thứ tự.
+        </div>
+        <button id="btnManualNotify" onclick="triggerManualWaitlistNotify()" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer">
+          <span class="material-symbols-outlined text-[15px]">send</span>
+          <span>Gửi email ngay</span>
+        </button>
+      </div>
+
+      <div id="waitlistTableWrapper" class="overflow-x-auto max-h-80 border border-outline-variant/30 rounded-xl">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead class="bg-surface-container-low font-bold text-outline uppercase sticky top-0 border-b border-outline-variant/30">
+            <tr>
+              <th class="py-2.5 px-3">Vị trí</th>
+              <th class="py-2.5 px-3">Họ và tên</th>
+              <th class="py-2.5 px-3">Email</th>
+              <th class="py-2.5 px-3">Điện thoại</th>
+              <th class="py-2.5 px-3">Trạng thái</th>
+              <th class="py-2.5 px-3">Ngày đăng ký</th>
+            </tr>
+          </thead>
+          <tbody id="waitlistTableBody">
+            <!-- Rendered by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <div id="waitlistEmptyState" class="hidden py-8 text-center bg-surface-container-low/40 rounded-xl border border-dashed border-outline-variant/50">
+        <span class="material-symbols-outlined text-3xl text-outline mb-1">people_outline</span>
+        <p class="text-xs font-bold text-on-surface">Chưa có ai đăng ký danh sách chờ</p>
+        <p class="text-[11px] text-on-surface-variant">Khi suất diễn hết vé, khách hàng sẽ có thể đăng ký chờ tại trang chi tiết.</p>
+      </div>
+
+      <div class="flex items-center justify-end pt-4 border-t border-outline-variant/30 mt-4">
+        <button type="button" onclick="closeWaitlistOrganizerModal()" class="px-4 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs transition">
+          Đóng lại
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- 2. Seat Import Modal (JSON Matrix) -->
   <div id="seatImportModal" class="modal-overlay">
     <div class="bg-surface-container-lowest rounded-2xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-outline-variant/30 max-h-[90vh] overflow-y-auto">
@@ -1639,6 +1697,10 @@
                           <span class="material-symbols-outlined text-[15px]">notifications_active</span>
                           <span>Nhắc vé</span>
                         </button>
+                        <button onclick="openWaitlistModal('${s.id}')" class="px-2.5 py-1.5 rounded-lg bg-surface-container hover:bg-amber-500/10 hover:text-amber-700 text-on-surface font-label-sm text-label-sm font-semibold transition flex items-center gap-1" title="Xem danh sách chờ vé và gửi email thông báo">
+                          <span class="material-symbols-outlined text-[15px] text-amber-600">hourglass_top</span>
+                          <span>Danh sách chờ</span>
+                        </button>
                         <button onclick="openSeatImportModal('${s.id}', ${hasSeats})" class="px-3 py-1.5 rounded-lg ${hasSeats ? 'bg-surface-container text-on-surface hover:bg-surface-container-high' : 'bg-primary text-on-primary shadow-sm hover:bg-on-primary-fixed-variant'} font-label-sm text-label-sm font-semibold transition" title="${hasSeats ? 'Suất diễn đã có sẵn ghế' : 'Nạp sơ đồ ghế từ tệp JSON'}">
                           ${hasSeats ? 'Nạp lại ghế' : 'Nạp ghế'}
                         </button>
@@ -1767,6 +1829,109 @@
         }
       } catch (err) {
         showAlert('Lỗi kết nối máy chủ.', 'error');
+      }
+    }
+
+    // Story S-59: Quản lý danh sách chờ cho Ban tổ chức trên events.html
+    let currentWaitlistShowtimeId = null;
+
+    async function openWaitlistModal(showtimeId) {
+      currentWaitlistShowtimeId = showtimeId;
+      const modal = document.getElementById('waitlistOrganizerModal');
+      const subtitle = document.getElementById('waitlistOrganizerSubtitle');
+      const bodyEl = document.getElementById('waitlistTableBody');
+      const tableWrapper = document.getElementById('waitlistTableWrapper');
+      const emptyState = document.getElementById('waitlistEmptyState');
+      const btnNotify = document.getElementById('btnManualNotify');
+
+      const st = (activeShowtimes || []).find(s => s.id === showtimeId);
+      const stName = st ? `${formatDate(st.startTime)} ${formatTime(st.startTime)}` : '';
+      subtitle.textContent = `Suất diễn: ${stName || showtimeId}`;
+
+      bodyEl.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-on-surface-variant">Đang tải danh sách chờ...</td></tr>';
+      tableWrapper.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+      if (btnNotify) btnNotify.disabled = false;
+      modal.classList.add('active');
+
+      try {
+        const authToken = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || token;
+        const res = await fetch(`${API_BASE}/api/waitlist/showtime/${showtimeId}`, {
+          headers: authToken ? { 'Authorization': 'Bearer ' + authToken } : {}
+        });
+        const json = await res.json();
+        if (res.ok && json.success) {
+          const list = json.data || [];
+          subtitle.textContent = `Suất diễn: ${stName || showtimeId} • ${list.length} người đăng ký`;
+
+          if (list.length === 0) {
+            tableWrapper.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+            return;
+          }
+
+          bodyEl.innerHTML = list.map((item, idx) => {
+            const isWaiting = item.status === 'WAITING';
+            const statusBadge = isWaiting
+              ? `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Đang chờ (#${item.queuePosition})</span>`
+              : `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Đã gửi email</span>`;
+
+            const createdStr = item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : '--';
+
+            return `
+              <tr class="border-b border-outline-variant/20 hover:bg-surface-container-low/60 transition text-xs">
+                <td class="py-2.5 px-3 font-code-mono font-bold text-on-surface">#${idx + 1}</td>
+                <td class="py-2.5 px-3 font-semibold text-on-surface">${escapeHtml(item.fullName || 'Khách vãng lai')}</td>
+                <td class="py-2.5 px-3 font-code-mono text-primary font-medium">${escapeHtml(item.email)}</td>
+                <td class="py-2.5 px-3 text-on-surface-variant">${escapeHtml(item.phoneNumber || '--')}</td>
+                <td class="py-2.5 px-3">${statusBadge}</td>
+                <td class="py-2.5 px-3 text-outline font-code-mono text-[11px]">${createdStr}</td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          bodyEl.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-error">${json.message || 'Không thể tải danh sách chờ.'}</td></tr>`;
+        }
+      } catch (err) {
+        bodyEl.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-error">Lỗi kết nối máy chủ.</td></tr>';
+      }
+    }
+
+    function closeWaitlistOrganizerModal() {
+      const modal = document.getElementById('waitlistOrganizerModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    async function triggerManualWaitlistNotify() {
+      if (!currentWaitlistShowtimeId) return;
+      if (!confirm('Bạn có chắc muốn kích hoạt gửi email thông báo vé có sẵn cho những người đang chờ theo thứ tự ưu tiên (FIFO)?')) return;
+
+      const btn = document.getElementById('btnManualNotify');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined text-[15px] animate-spin">refresh</span><span>Đang gửi...</span>';
+      }
+
+      try {
+        const authToken = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || token;
+        const res = await fetch(`${API_BASE}/api/waitlist/showtime/${currentWaitlistShowtimeId}/notify?seatsCount=5`, {
+          method: 'POST',
+          headers: authToken ? { 'Authorization': 'Bearer ' + authToken } : {}
+        });
+        const json = await res.json();
+        if (res.ok && json.success) {
+          showAlert(json.message || `Đã gửi email thông báo thành công cho ${json.data} người!`, 'success');
+          openWaitlistModal(currentWaitlistShowtimeId);
+        } else {
+          showAlert(json.message || 'Không thể gửi email thông báo.', 'error');
+        }
+      } catch (err) {
+        showAlert('Lỗi kết nối khi gửi thông báo.', 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span class="material-symbols-outlined text-[15px]">send</span><span>Gửi email ngay</span>';
+        }
       }
     }
 

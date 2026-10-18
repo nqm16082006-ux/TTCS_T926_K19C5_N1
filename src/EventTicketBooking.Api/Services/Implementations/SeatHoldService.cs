@@ -30,6 +30,7 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly IHubContext<SeatStatusHub>? _hubContext;
         private readonly IAppMetrics? _metrics;
         private readonly IDiscountCodeService _discountCodeService;
+        private readonly IWaitlistService? _waitlistService;
 
         public const int DefaultHoldTtlSeconds = 600; // 10 phút
 
@@ -39,7 +40,8 @@ namespace EventTicketBooking.Api.Services.Implementations
             IHubContext<SeatStatusHub>? hubContext = null,
             IConnectionMultiplexer? redis = null,
             IAppMetrics? metrics = null,
-            IDiscountCodeService? discountCodeService = null)
+            IDiscountCodeService? discountCodeService = null,
+            IWaitlistService? waitlistService = null)
         {
             _context = context;
             _logger = logger;
@@ -47,6 +49,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             _redis = redis;
             _metrics = metrics;
             _discountCodeService = discountCodeService ?? new DiscountCodeService(context);
+            _waitlistService = waitlistService;
         }
 
         public async Task<HoldSeatsResult> HoldSeatsAsync(
@@ -502,6 +505,19 @@ namespace EventTicketBooking.Api.Services.Implementations
                 if (groupClient != null)
                 {
                     await groupClient.SendAsync("SeatReleased", new { ShowtimeId = showtimeId, SeatIds = new List<Guid> { seatId } });
+                }
+            }
+
+            // Story S-59: Khi có ghế về kho do huỷ giữ chỗ, gửi email thông báo cho người chờ theo thứ tự đăng ký
+            if (_waitlistService != null)
+            {
+                try
+                {
+                    await _waitlistService.ProcessAvailableSeatsNotificationAsync(showtimeId, 1, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi thông báo danh sách chờ khi huỷ giữ chỗ ghế {SeatId} trong suất {ShowtimeId} (S-59)", seatId, showtimeId);
                 }
             }
 
