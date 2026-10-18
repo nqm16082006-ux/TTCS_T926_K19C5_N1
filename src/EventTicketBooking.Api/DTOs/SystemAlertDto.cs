@@ -17,5 +17,8 @@ namespace EventTicketBooking.Api.DTOs
         public DateTimeOffset? ResolvedAt { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset LastUpdatedAt { get; set; }
+
+        /// <summary>Nguồn phát cảnh báo (Alertmanager source / job / instance)</summary>
+        public string Source { get; set; } = "job=event-ticket-api, instance=host.docker.internal:5012";
     }
 }

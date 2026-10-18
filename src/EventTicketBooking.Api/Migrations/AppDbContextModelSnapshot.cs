@@ -285,6 +285,88 @@ namespace EventTicketBooking.Api.Migrations
                     b.ToTable("Events", (string)null);
                 });
 
+            modelBuilder.Entity("EventTicketBooking.Api.Models.MonitoringAlert", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("FirstTriggeredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("LastTriggeredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Metric")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<double>("ObservedValue")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTimeOffset?>("ResolvedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<double>("Threshold")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("WindowMinutes")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("IsActive", "Metric");
+
+                    b.ToTable("MonitoringAlerts", (string)null);
+                });
+
+            modelBuilder.Entity("EventTicketBooking.Api.Models.MonitoringEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Environment")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReferenceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAtUtc");
+
+                    b.HasIndex("OccurredAtUtc", "Type");
+
+                    b.ToTable("MonitoringEvents", (string)null);
+                });
+
             modelBuilder.Entity("EventTicketBooking.Api.Models.OfflineCheckInRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -848,6 +930,49 @@ namespace EventTicketBooking.Api.Migrations
                     b.HasIndex("Status");
 
                     b.ToTable("refund_requests", (string)null);
+                });
+
+            modelBuilder.Entity("EventTicketBooking.Api.Models.RequestTelemetry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<double>("DurationMs")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Environment")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("InstanceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Route")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int>("StatusCode")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAtUtc");
+
+                    b.HasIndex("OccurredAtUtc", "StatusCode");
+
+                    b.ToTable("RequestTelemetries", (string)null);
                 });
 
             modelBuilder.Entity("EventTicketBooking.Api.Models.Role", b =>
