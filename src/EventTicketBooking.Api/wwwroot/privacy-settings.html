@@ -302,43 +302,73 @@
 
         <!-- Policy Viewer Card -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
-          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2 mb-3">
-            <span class="material-symbols-outlined text-[20px] text-primary">description</span>
-            <span>Nội dung chính sách</span>
-          </h3>
-          <p class="text-xs text-slate-500 mb-4">Các điều khoản ràng buộc pháp lý và cam kết dữ liệu của EventPulse.</p>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span class="material-symbols-outlined text-[20px] text-primary">description</span>
+              <span>Quy chế &amp; Chính sách</span>
+            </h3>
+            <span class="px-2 py-0.5 rounded-full bg-indigo-50 text-primary text-[11px] font-bold">11 Điều / 8 Điều</span>
+          </div>
+          <p class="text-xs text-slate-500 mb-4">Các điều khoản ràng buộc pháp lý theo mô hình sàn vé (tương tự Ticketbox) và bảo vệ dữ liệu theo Nghị định 13/2023/NĐ-CP.</p>
 
-          <div class="space-y-3">
-            <details class="group bg-slate-50 rounded-xl border border-slate-100 p-3.5 text-xs text-slate-700 open:bg-white open:border-slate-200 transition">
+          <div class="space-y-2.5">
+            <details class="group bg-slate-50 rounded-xl border border-slate-100 p-3 text-xs text-slate-700 open:bg-white open:border-slate-200 transition">
               <summary class="font-bold text-slate-900 cursor-pointer list-none flex items-center justify-between">
-                <span>1. Điều khoản dịch vụ</span>
+                <span class="flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                  <span>1. Vai trò sàn trung gian &amp; BTC</span>
+                </span>
                 <span class="material-symbols-outlined text-[18px] text-slate-400 group-open:rotate-180 transition-transform">expand_more</span>
               </summary>
               <div class="mt-2 text-slate-600 leading-relaxed text-[11px] pt-2 border-t border-slate-100">
-                Áp dụng cho mọi tài khoản tham gia mua vé, giữ chỗ và tham dự sự kiện. Tuân thủ việc thanh toán hợp lệ và quy định kiểm soát vé tại cửa.
+                EventPulse cung ứng giải pháp công nghệ trung gian; Ban Tổ Chức chịu trách nhiệm toàn diện về nội dung biểu diễn, giấy phép và địa điểm.
               </div>
             </details>
 
-            <details class="group bg-slate-50 rounded-xl border border-slate-100 p-3.5 text-xs text-slate-700 open:bg-white open:border-slate-200 transition">
+            <details class="group bg-slate-50 rounded-xl border border-slate-100 p-3 text-xs text-slate-700 open:bg-white open:border-slate-200 transition">
               <summary class="font-bold text-slate-900 cursor-pointer list-none flex items-center justify-between">
-                <span>2. Chính sách bảo vệ dữ liệu</span>
+                <span class="flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                  <span>2. Vé điện tử &amp; Chữ ký số ECDSA</span>
+                </span>
                 <span class="material-symbols-outlined text-[18px] text-slate-400 group-open:rotate-180 transition-transform">expand_more</span>
               </summary>
               <div class="mt-2 text-slate-600 leading-relaxed text-[11px] pt-2 border-t border-slate-100">
-                Thông tin cá nhân chỉ được sử dụng cho việc xác thực tài khoản và phát hành vé điện tử có chữ ký số. Người dùng có toàn quyền xem và thu hồi sự đồng ý.
+                Vé chứa mã QR ký số mật mã học ECDSA chống giả mạo 100%. Áp dụng nguyên tắc quét 01 lượt duy nhất, ai quét trước vào trước.
               </div>
             </details>
 
-            <details class="group bg-slate-50 rounded-xl border border-slate-100 p-3.5 text-xs text-slate-700 open:bg-white open:border-slate-200 transition">
+            <details class="group bg-slate-50 rounded-xl border border-slate-100 p-3 text-xs text-slate-700 open:bg-white open:border-slate-200 transition">
               <summary class="font-bold text-slate-900 cursor-pointer list-none flex items-center justify-between">
-                <span>3. Quản lý email tiếp thị</span>
+                <span class="flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                  <span>3. Hủy vé &amp; Hoàn tiền (S-45, S-51)</span>
+                </span>
                 <span class="material-symbols-outlined text-[18px] text-slate-400 group-open:rotate-180 transition-transform">expand_more</span>
               </summary>
               <div class="mt-2 text-slate-600 leading-relaxed text-[11px] pt-2 border-t border-slate-100">
-                Chỉ gửi email quảng bá/ưu đãi khi có sự đồng ý của khách hàng. Khi thu hồi, việc gửi email tiếp thị chấm dứt ngay lập tức.
+                Khách hàng được tự phục vụ hủy vé trước 24h &amp; chưa check-in (hoàn 90%, giữ 10% phí); hoàn 100% khi BTC hoãn/hủy sự kiện.
+              </div>
+            </details>
+
+            <details class="group bg-slate-50 rounded-xl border border-slate-100 p-3 text-xs text-slate-700 open:bg-white open:border-slate-200 transition">
+              <summary class="font-bold text-slate-900 cursor-pointer list-none flex items-center justify-between">
+                <span class="flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                  <span>4. Quyền riêng tư (NĐ 13/2023/NĐ-CP)</span>
+                </span>
+                <span class="material-symbols-outlined text-[18px] text-slate-400 group-open:rotate-180 transition-transform">expand_more</span>
+              </summary>
+              <div class="mt-2 text-slate-600 leading-relaxed text-[11px] pt-2 border-t border-slate-100">
+                Bảo vệ mật khẩu bằng Argon2id; quyền yêu cầu xóa/ẩn danh hóa dữ liệu (S-53) và quyền thu hồi nhận email tiếp thị (S-54).
               </div>
             </details>
           </div>
+
+          <button onclick="openPolicyModal()" class="w-full mt-4 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center justify-center gap-1.5">
+            <span class="material-symbols-outlined text-[16px]">menu_book</span>
+            <span>Xem toàn văn văn bản chính sách</span>
+          </button>
         </div>
 
         <!-- Admin / Demo Version Changer Card (AC3 Verification) -->
@@ -724,6 +754,82 @@
       return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')} ngày ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} (UTC+7)`;
     }
 
+    function formatPolicyModalText(raw) {
+      if (!raw) return '';
+      const lines = raw.split('\n');
+      let html = '';
+      let currentSection = null;
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        if (trimmed.startsWith('ĐIỀU ')) {
+          if (currentSection) html += '</div></div>';
+          html += `<div class="mb-4 pb-3 border-b border-slate-200/80 last:border-0 last:pb-0 last:mb-0">
+            <h4 class="font-bold text-indigo-900 text-xs tracking-wide mb-1.5 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-primary inline-block"></span>
+              ${trimmed}
+            </h4>
+            <div class="text-slate-600 pl-3 leading-relaxed text-[11px] space-y-1">`;
+          currentSection = true;
+        } else if (currentSection) {
+          html += `<div>${trimmed}</div>`;
+        } else {
+          html += `<p class="mb-2 text-slate-700">${trimmed}</p>`;
+        }
+      });
+
+      if (currentSection) html += '</div></div>';
+      return html;
+    }
+
+    async function openPolicyModal(tab = 'terms') {
+      const modal = document.getElementById('policyViewerModal');
+      modal.classList.remove('hidden');
+      switchPolicyModalTab(tab);
+
+      try {
+        const res = await fetch('/api/v1/user/terms/policy');
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('fullModalPolicyVersion').textContent = data.version || 'v1.0';
+          document.getElementById('fullModalPolicyDate').textContent = data.effectiveDate || '2026-10-18';
+          if (data.termsContent) {
+            document.getElementById('fullModalTermsContent').innerHTML = formatPolicyModalText(data.termsContent);
+          }
+          if (data.privacyContent) {
+            document.getElementById('fullModalPrivacyContent').innerHTML = formatPolicyModalText(data.privacyContent);
+          }
+        }
+      } catch (err) {
+        console.error('Không thể tải chi tiết điều khoản:', err);
+      }
+    }
+
+    function closePolicyModal() {
+      document.getElementById('policyViewerModal').classList.add('hidden');
+    }
+
+    function switchPolicyModalTab(tab) {
+      const termsTab = document.getElementById('tabFullTermsBtn');
+      const privacyTab = document.getElementById('tabFullPrivacyBtn');
+      const termsBody = document.getElementById('fullModalTermsContent');
+      const privacyBody = document.getElementById('fullModalPrivacyContent');
+
+      if (tab === 'terms') {
+        termsTab.className = "px-4 py-2 border-b-2 border-primary font-bold text-primary text-xs transition";
+        privacyTab.className = "px-4 py-2 border-b-2 border-transparent font-medium text-slate-500 hover:text-slate-800 text-xs transition";
+        termsBody.classList.remove('hidden');
+        privacyBody.classList.add('hidden');
+      } else {
+        privacyTab.className = "px-4 py-2 border-b-2 border-primary font-bold text-primary text-xs transition";
+        termsTab.className = "px-4 py-2 border-b-2 border-transparent font-medium text-slate-500 hover:text-slate-800 text-xs transition";
+        privacyBody.classList.remove('hidden');
+        termsBody.classList.add('hidden');
+      }
+    }
+
     // ==========================================
     // STORY S-53: QUẢN LÝ XOÁ DỮ LIỆU CÁ NHÂN
     // ==========================================
@@ -1005,5 +1111,41 @@
       }
     }
   </script>
+
+  <!-- Modal Full Policy Viewer (S-54) -->
+  <div id="policyViewerModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="relative bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div>
+          <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <span>Toàn văn Quy chế &amp; Chính sách bảo vệ dữ liệu</span>
+            <span id="fullModalPolicyVersion" class="px-2 py-0.5 rounded-full bg-indigo-50 text-primary text-[11px] font-bold">v1.0</span>
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Ngày hiệu lực: <span id="fullModalPolicyDate">2026-10-18</span> • Chuẩn hóa pháp nhân theo Nghị định 13/2023/NĐ-CP</p>
+        </div>
+        <button onclick="closePolicyModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <div class="flex gap-2 border-b border-slate-200 mt-3">
+        <button id="tabFullTermsBtn" onclick="switchPolicyModalTab('terms')" class="px-4 py-2 border-b-2 border-primary font-bold text-primary text-xs transition">Phần I: Điều khoản dịch vụ (11 Điều)</button>
+        <button id="tabFullPrivacyBtn" onclick="switchPolicyModalTab('privacy')" class="px-4 py-2 border-b-2 border-transparent font-medium text-slate-500 hover:text-slate-800 text-xs transition">Phần II: Bảo vệ dữ liệu (8 Điều)</button>
+      </div>
+
+      <div class="max-h-96 overflow-y-auto p-4 my-3 bg-slate-50 rounded-xl text-xs text-slate-700 leading-relaxed border border-slate-200">
+        <div id="fullModalTermsContent">
+          Đang tải điều khoản dịch vụ...
+        </div>
+        <div id="fullModalPrivacyContent" class="hidden">
+          Đang tải chính sách bảo vệ dữ liệu cá nhân...
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end pt-3 border-t border-slate-100">
+        <button onclick="closePolicyModal()" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-sm">Đóng</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
