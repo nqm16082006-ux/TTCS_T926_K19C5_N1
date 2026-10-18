@@ -171,8 +171,20 @@ builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IOrderAudi
 // Đăng ký dịch vụ Xoá và Ẩn danh dữ liệu cá nhân (Story S-53)
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IDataDeletionService, EventTicketBooking.Api.Services.Implementations.DataDeletionService>();
 
-// Đăng ký dịch vụ Giám sát và Cảnh báo (Story S-43)
-builder.Services.AddSingleton<EventTicketBooking.Api.Metrics.IAppMetrics, EventTicketBooking.Api.Metrics.PrometheusAppMetrics>();
+// Đăng ký dịch vụ Giám sát và Cảnh báo (Story S-43 No-Grafana Shared PostgreSQL)
+builder.Services.Configure<EventTicketBooking.Api.Options.MonitoringOptions>(
+    builder.Configuration.GetSection(EventTicketBooking.Api.Options.MonitoringOptions.SectionName));
+builder.Services.AddSingleton<EventTicketBooking.Api.Monitoring.ITelemetryChannel, EventTicketBooking.Api.Monitoring.TelemetryChannel>();
+builder.Services.AddSingleton<EventTicketBooking.Api.Metrics.IAppMetrics>(sp =>
+{
+    var channel = sp.GetRequiredService<EventTicketBooking.Api.Monitoring.ITelemetryChannel>();
+    var env = sp.GetRequiredService<IHostEnvironment>();
+    var prometheus = new EventTicketBooking.Api.Metrics.PrometheusAppMetrics();
+    return new EventTicketBooking.Api.Monitoring.DatabaseAppMetrics(channel, env, prometheus);
+});
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IMonitoringService, EventTicketBooking.Api.Services.Implementations.MonitoringService>();
+builder.Services.AddHostedService<EventTicketBooking.Api.Monitoring.TelemetryBatchWriterHostedService>();
+builder.Services.AddHostedService<EventTicketBooking.Api.Monitoring.MonitoringAlertEvaluationHostedService>();
 builder.Services.AddHttpClient<EventTicketBooking.Api.Services.Interfaces.IPrometheusMetricsService, EventTicketBooking.Api.Services.Implementations.PrometheusMetricsService>();
 
 // T-44 (S-19): Đọc cấu hình cổng thanh toán từ biến môi trường hoặc appsettings
@@ -353,6 +365,7 @@ if (!string.IsNullOrWhiteSpace(uploadsPath))
 }
 
 app.UseRouting();
+app.UseMiddleware<EventTicketBooking.Api.Middlewares.RequestTelemetryMiddleware>();
 
 // S-43: Bảo vệ endpoint /metrics bằng Bearer token trước khi MapMetrics xử lý
 app.Use(async (context, next) =>

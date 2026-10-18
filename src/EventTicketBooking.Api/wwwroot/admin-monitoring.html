@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Giám Sát Hệ Thống & Cảnh Báo (S-43) - Event Ticket Booking</title>
+  <title>Giám Sát Hệ Thống & Cảnh Báo (S-43) - EventPulse Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
   <style>
     :root {
@@ -81,7 +81,7 @@
     .brand-icon {
       width: 38px;
       height: 38px;
-      background: linear-gradient(135deg, var(--primary) 0%, #3730a3 100%);
+      background: linear-gradient(135deg, #3525cd 0%, #4f46e5 100%);
       border-radius: 10px;
       display: flex;
       align-items: center;
@@ -501,6 +501,53 @@
       flex-wrap: wrap;
     }
 
+    .btn-group {
+      display: inline-flex;
+      background: #e2e8f0;
+      border-radius: 10px;
+      padding: 3px;
+    }
+
+    .btn-window {
+      background: transparent;
+      border: none;
+      color: var(--text-body);
+      padding: 7px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    .btn-window.active {
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(79, 70, 229, 0.3);
+    }
+
+    .btn-refresh {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      color: var(--text-heading);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 9px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+    }
+
+    .btn-refresh:hover {
+      background: var(--bg-app);
+      border-color: #cbd5e1;
+      transform: translateY(-1px);
+    }
+
     /* Status Bar Banner */
     .status-bar-banner {
       background: var(--bg-surface);
@@ -548,92 +595,70 @@
       border-radius: 50%;
       display: inline-block;
       box-shadow: 0 0 0 rgba(22, 163, 74, 0.4);
-      animation: livePulse 1.8s infinite;
+      animation: pulseLive 2s infinite;
     }
 
-    @keyframes livePulse {
-      0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
-      70% { box-shadow: 0 0 0 8px rgba(22, 163, 74, 0); }
+    @keyframes pulseLive {
+      0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.4); }
+      70% { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
       100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
     }
 
     .status-pill.healthy {
-      background: #ecfdf5;
-      color: #059669;
-      border: 1px solid #a7f3d0;
+      background: var(--success-bg);
+      color: var(--success-text);
+      border: 1px solid var(--success-border);
     }
 
     .status-pill.firing {
-      background: #fef2f2;
-      color: #dc2626;
-      border: 1px solid #fecaca;
-      animation: alertPulse 1.5s infinite;
+      background: var(--danger-bg);
+      color: var(--danger-text);
+      border: 1px solid var(--danger-border);
     }
 
-    .status-pill.neutral {
-      background: #f1f5f9;
-      color: #475569;
-      border: 1px solid #cbd5e1;
-    }
-
-    .status-pill.prom-up {
+    .status-pill.store-pill {
       background: #eff6ff;
       color: #1d4ed8;
       border: 1px solid #bfdbfe;
     }
 
-    .status-pill.prom-down {
-      background: #fff1f2;
-      color: #be123c;
-      border: 1px solid #fecdd3;
-    }
-
-    .status-pill.signalr-up {
-      background: #f0fdf4;
-      color: #15803d;
-      border: 1px solid #bbf7d0;
-    }
-
-    .status-pill.signalr-down {
-      background: #f8fafc;
-      color: #64748b;
-      border: 1px solid #e2e8f0;
-    }
-
     .status-meta-info {
-      font-size: 13px;
-      color: var(--text-muted);
       display: flex;
       align-items: center;
       gap: 16px;
+      font-size: 12.5px;
+      color: var(--text-muted);
       font-weight: 600;
     }
 
-    /* Section Title */
-    .section-header {
-      display: flex;
+    .countdown-tag {
+      background: #f1f5f9;
+      padding: 2px 8px;
+      border-radius: 6px;
+      color: var(--text-body);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Error Banner */
+    .alert-banner {
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      color: var(--danger-text);
+      padding: 14px 20px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      display: none;
+      align-items: center;
       justify-content: space-between;
-      align-items: center;
-      margin-bottom: 14px;
       gap: 12px;
-      flex-wrap: wrap;
     }
 
-    .section-title {
-      font-size: 17px;
-      font-weight: 800;
-      color: var(--text-heading);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    /* 5 Metrics Cards Grid */
+    /* 6 Metrics Grid */
     .metrics-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 16px;
-      margin-bottom: 28px;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 18px;
+      margin-bottom: 24px;
     }
 
     .metric-card {
@@ -641,118 +666,111 @@
       border: 1px solid var(--border-color);
       border-radius: 14px;
       padding: 20px;
+      box-shadow: var(--shadow-sm);
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      box-shadow: var(--shadow-sm);
+      justify-content: space-between;
       transition: all 0.2s ease;
       position: relative;
-      overflow: hidden;
     }
 
     .metric-card:hover {
-      border-color: var(--border-focus);
-      box-shadow: var(--shadow-md);
+      border-color: #cbd5e1;
       transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
     }
 
     .metric-card-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
+      margin-bottom: 14px;
     }
 
     .metric-icon-title {
       display: flex;
       align-items: center;
       gap: 10px;
-      font-weight: 700;
       font-size: 13.5px;
-      color: var(--text-heading);
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .metric-icon {
-      width: 34px;
-      height: 34px;
+      width: 32px;
+      height: 32px;
       border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 16px;
-      flex-shrink: 0;
     }
 
     .metric-icon.indigo { background: #e0e7ff; color: #4338ca; }
-    .metric-icon.red { background: #fee2e2; color: #dc2626; }
-    .metric-icon.amber { background: #fef3c7; color: #d97706; }
+    .metric-icon.red { background: #fee2e2; color: #b91c1c; }
+    .metric-icon.amber { background: #fef3c7; color: #b45309; }
     .metric-icon.purple { background: #f3e8ff; color: #7e22ce; }
-    .metric-icon.rose { background: #ffe4e6; color: #e11d48; }
+    .metric-icon.rose { background: #ffe4e6; color: #be123c; }
+    .metric-icon.blue { background: #dbeafe; color: #1d4ed8; }
 
     .metric-value-container {
-      margin: 4px 0;
       display: flex;
       align-items: baseline;
-      gap: 8px;
+      gap: 6px;
+      margin-bottom: 8px;
     }
 
     .metric-value {
-      font-size: 28px;
+      font-size: 30px;
       font-weight: 800;
       color: var(--text-heading);
-      letter-spacing: -0.5px;
+      letter-spacing: -1px;
       font-family: 'JetBrains Mono', monospace;
     }
 
     .metric-unit {
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 700;
       color: var(--text-muted);
-    }
-
-    .metric-na {
-      font-size: 14px;
-      font-weight: 600;
-      color: #94a3b8;
-      font-style: italic;
-      background: #f1f5f9;
-      padding: 4px 10px;
-      border-radius: 6px;
-      border: 1px dashed #cbd5e1;
     }
 
     .metric-card-desc {
-      font-size: 12px;
-      color: var(--text-body);
-      line-height: 1.45;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-bottom: 12px;
     }
 
-    .metric-threshold {
-      margin-top: auto;
-      padding-top: 10px;
-      border-top: 1px dashed var(--border-color);
-      font-size: 11.5px;
-      font-weight: 600;
-      color: var(--text-muted);
-      display: flex;
+    .metric-status-badge {
+      display: inline-flex;
       align-items: center;
       gap: 4px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
     }
 
-    /* Trends Section */
+    .metric-status-badge.ok { background: #dcfce7; color: #15803d; }
+    .metric-status-badge.warn { background: #fef3c7; color: #b45309; }
+    .metric-status-badge.crit { background: #fee2e2; color: #b91c1c; }
+
+    /* Trends Chart Card */
     .trends-card {
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: 14px;
-      padding: 20px 24px;
-      margin-bottom: 28px;
+      padding: 24px;
+      margin-bottom: 24px;
       box-shadow: var(--shadow-sm);
     }
 
     .trends-header {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
       margin-bottom: 16px;
       flex-wrap: wrap;
       gap: 12px;
@@ -761,9 +779,10 @@
     .trends-legend {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 20px;
       font-size: 12.5px;
       font-weight: 600;
+      color: var(--text-body);
     }
 
     .legend-item {
@@ -779,15 +798,15 @@
     }
 
     .legend-color.req { background: #4f46e5; }
-    .legend-color.err { background: #dc2626; }
+    .legend-color.p95 { background: #8b5cf6; }
 
     .sparkline-svg {
       width: 100%;
-      height: 90px;
+      height: 140px;
       overflow: visible;
     }
 
-    /* History Table Section */
+    /* History Table Card */
     .history-card {
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
@@ -805,86 +824,63 @@
       flex-wrap: wrap;
     }
 
+    .section-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--text-heading);
+      letter-spacing: -0.3px;
+    }
+
     .search-filter-box {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       flex-wrap: wrap;
-      flex: 1;
-      max-width: 600px;
     }
 
     .search-input {
-      background: var(--bg-app);
-      border: 1px solid var(--border-color);
       padding: 8px 14px;
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       font-size: 13px;
-      color: var(--text-heading);
+      font-family: inherit;
+      width: 240px;
       outline: none;
       transition: border-color 0.2s;
-      flex: 1;
-      min-width: 220px;
     }
 
     .search-input:focus {
       border-color: var(--border-focus);
-      background: #ffffff;
     }
 
     .filter-tabs {
       display: flex;
-      background: var(--bg-app);
-      padding: 4px;
-      border-radius: 10px;
-      border: 1px solid var(--border-color);
-      gap: 4px;
-      flex-wrap: wrap;
+      background: #f1f5f9;
+      border-radius: 8px;
+      padding: 2px;
+      gap: 2px;
     }
 
     .filter-tab {
       background: transparent;
       border: none;
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-size: 12.5px;
-      font-weight: 700;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
       color: var(--text-muted);
+      border-radius: 6px;
       cursor: pointer;
-      transition: all 0.2s ease;
-      white-space: nowrap;
+      transition: all 0.15s;
     }
 
     .filter-tab.active {
-      background: var(--bg-surface);
-      color: var(--primary);
+      background: #ffffff;
+      color: var(--text-heading);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    }
-
-    .btn-refresh {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-color);
-      color: var(--text-body);
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 12.5px;
-      font-weight: 700;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
-    }
-
-    .btn-refresh:hover {
-      background: var(--bg-app);
-      border-color: #cbd5e1;
     }
 
     .table-container {
       overflow-x: auto;
-      border-radius: 8px;
-      border: 1px solid var(--border-color);
     }
 
     table {
@@ -896,133 +892,87 @@
     th {
       padding: 12px 16px;
       background: #f8fafc;
-      font-size: 12px;
-      font-weight: 800;
+      font-size: 11.5px;
+      font-weight: 700;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
       border-bottom: 1px solid var(--border-color);
-      white-space: nowrap;
     }
 
     td {
       padding: 14px 16px;
-      border-bottom: 1px solid #f1f5f9;
       font-size: 13px;
-      color: var(--text-body);
+      border-bottom: 1px solid #f1f5f9;
       vertical-align: middle;
     }
 
-    tbody tr:hover {
-      background: #fafbfd;
-    }
-
-    .alert-status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 3px 10px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-      white-space: nowrap;
-    }
-
-    .alert-status-badge.firing {
-      background: #fee2e2;
-      color: #b91c1c;
-      border: 1px solid #fecaca;
-    }
-
-    .alert-status-badge.resolved {
-      background: #d1fae5;
-      color: #065f46;
-      border: 1px solid #a7f3d0;
+    tr:hover td {
+      background: #f8fafc;
     }
 
     .severity-tag {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      padding: 2px 8px;
-      border-radius: 4px;
+      padding: 3px 8px;
+      border-radius: 6px;
       font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
-      white-space: nowrap;
     }
 
     .severity-tag.critical {
-      background: #fef2f2;
-      color: #dc2626;
+      background: #fee2e2;
+      color: #b91c1c;
       border: 1px solid #fecaca;
     }
 
     .severity-tag.warning {
-      background: #fffbeb;
-      color: #d97706;
+      background: #fef3c7;
+      color: #b45309;
       border: 1px solid #fde68a;
+    }
+
+    .alert-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 11.5px;
+      font-weight: 700;
+    }
+
+    .alert-status-badge.firing {
+      background: #fee2e2;
+      color: #b91c1c;
+      animation: alertPulse 1.5s infinite;
+    }
+
+    .alert-status-badge.resolved {
+      background: #dcfce7;
+      color: #15803d;
     }
 
     .empty-state {
       text-align: center;
-      padding: 48px 16px;
+      padding: 36px 16px;
       color: var(--text-muted);
-      font-size: 14px;
-    }
-
-    /* Responsive Queries */
-    @media (max-width: 1024px) {
-      .navbar {
-        padding: 12px 20px;
-      }
-      .main-container {
-        padding: 20px 20px 48px;
-      }
-    }
-
-    @media (max-width: 768px) {
-      .navbar {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 12px;
-        padding: 12px 16px;
-      }
-      .nav-links {
-        overflow-x: auto;
-        padding-bottom: 4px;
-      }
-      .user-menu {
-        justify-content: space-between;
-      }
-      .page-header {
-        flex-direction: column;
-      }
-      .status-bar-banner {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-      .history-toolbar {
-        flex-direction: column;
-        align-items: stretch;
-      }
-      .search-filter-box {
-        max-width: 100%;
-      }
+      font-size: 13.5px;
+      font-style: italic;
     }
   </style>
 </head>
 <body>
 
-  <!-- S-43: Toast Container -->
+  <!-- Toast Container -->
   <div id="systemToastContainer" class="system-toast-container"></div>
 
   <!-- Navbar -->
   <nav class="navbar">
     <a href="./admin-users.html" class="brand">
-      <div class="brand-icon" style="background: linear-gradient(135deg, #3525cd 0%, #4f46e5 100%);">👑</div>
+      <div class="brand-icon">👑</div>
       <span>EventPulse</span>
       <span class="brand-badge">Admin Portal</span>
     </a>
@@ -1056,7 +1006,7 @@
       </div>
       <div class="user-chip">
         <div class="user-avatar" id="navAvatar">A</div>
-        <span class="user-name" id="navUsername">Admin</span>
+        <span class="user-name" id="navUsername">System Administrator</span>
       </div>
       <button class="btn-logout" onclick="logout()">Đăng xuất</button>
     </div>
@@ -1068,13 +1018,26 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">📊 Giám Sát Hệ Thống & Cảnh Báo</h1>
-        <p class="page-subtitle">Theo dõi trạng thái quá tải, tỉ lệ lỗi, độ trễ p95 và lịch sử cảnh báo thời gian thực (Story S-43).</p>
+        <p class="page-subtitle">Theo dõi trạng thái quá tải, tỉ lệ lỗi, độ trễ p95 và cảnh báo tự động từ PostgreSQL dùng chung (Story S-43 No-Grafana).</p>
       </div>
       <div class="header-actions">
-        <button type="button" class="btn-refresh" onclick="triggerManualRefresh()">
-          🔄 Làm mới ngay
+        <!-- Window selector -->
+        <div class="btn-group" role="group" aria-label="Khung thời gian">
+          <button class="btn-window" data-window="5m" onclick="setWindow('5m')">5 phút</button>
+          <button class="btn-window active" data-window="15m" onclick="setWindow('15m')">15 phút</button>
+          <button class="btn-window" data-window="1h" onclick="setWindow('1h')">1 giờ</button>
+        </div>
+
+        <button type="button" class="btn-refresh" onclick="refreshDashboard()" id="btnRefresh">
+          <span id="refreshIcon">🔄</span> Làm mới ngay
         </button>
       </div>
+    </div>
+
+    <!-- Error Banner -->
+    <div class="alert-banner" id="errorBanner">
+      <span id="errorMessage">Lỗi tải dữ liệu giám sát.</span>
+      <button class="btn-refresh" onclick="refreshDashboard()" style="padding: 4px 10px; font-size: 12px;">Thử lại</button>
     </div>
 
     <!-- Status Bar Banner -->
@@ -1088,44 +1051,34 @@
           <span id="statusPillDot">🟢</span>
           <span id="statusPillText">Hệ thống đang hoạt động bình thường</span>
         </div>
-        <div id="promStatusPill" class="status-pill neutral">
-          <span>📡</span>
-          <span id="promStatusText">Prometheus: Đang kiểm tra...</span>
-        </div>
-        <div id="signalRStatusPill" class="status-pill signalr-down">
-          <span>⚡</span>
-          <span id="signalRStatusText">Realtime: Đang khởi tạo...</span>
+        <div id="storeStatusPill" class="status-pill store-pill">
+          <span>🐘</span>
+          <span id="storeStatusText">Dữ liệu từ shared PostgreSQL monitoring store</span>
         </div>
       </div>
       <div class="status-meta-info">
         <span id="lastUpdatedLabel">Cập nhật lần cuối: Chưa tải</span>
+        <span>Tự động làm mới sau: <strong id="countdown" class="countdown-tag">5s</strong></span>
         <span id="firingCountLabel">0 cảnh báo đang hoạt động</span>
       </div>
     </div>
 
-    <!-- 5 Metrics Group Cards -->
-    <div class="section-header">
-      <h2 class="section-title">🛡️ 5 Nhóm Chỉ Số Giám Sát Cốt Lõi (S-43)</h2>
-      <span style="font-size: 12.5px; color: var(--text-muted);">Tự động làm mới mỗi 5 giây</span>
-    </div>
-
+    <!-- 6 Core Metrics Cards -->
     <div class="metrics-grid">
-      <!-- 1. Request Rate -->
+      <!-- 1. Total Requests -->
       <div class="metric-card">
         <div class="metric-card-header">
           <div class="metric-icon-title">
             <div class="metric-icon indigo">🌐</div>
-            <span>1. Request Rate</span>
+            <span>1. Tổng Request</span>
           </div>
+          <span class="metric-status-badge ok" id="badgeRequestCount">Thật</span>
         </div>
-        <div class="metric-value-container" id="valContainerRequestRate">
-          <span class="metric-value" id="valRequestRate">-</span>
-          <span class="metric-unit" id="unitRequestRate">req/s</span>
+        <div class="metric-value-container">
+          <span class="metric-value" id="valRequestCount">0</span>
+          <span class="metric-unit">reqs</span>
         </div>
-        <p class="metric-card-desc">Tổng thông lượng HTTP requests đến hệ thống (1m moving rate).</p>
-        <div class="metric-threshold">
-          <span>🎯</span> Mục tiêu: Đánh giá lưu lượng & sức chứa
-        </div>
+        <p class="metric-card-desc">Tổng số HTTP requests ghi nhận từ lưu lượng thực tế trong khung thời gian.</p>
       </div>
 
       <!-- 2. Error Rate -->
@@ -1133,17 +1086,15 @@
         <div class="metric-card-header">
           <div class="metric-icon-title">
             <div class="metric-icon red">💥</div>
-            <span>2. HTTP 5xx Error Rate</span>
+            <span>2. Tỷ Lệ Lỗi (5xx)</span>
           </div>
+          <span class="metric-status-badge ok" id="badgeErrorRate">Bình thường</span>
         </div>
-        <div class="metric-value-container" id="valContainerErrorRate">
-          <span class="metric-value" id="valErrorRate">-</span>
-          <span class="metric-unit" id="unitErrorRate">%</span>
+        <div class="metric-value-container">
+          <span class="metric-value" id="valErrorRate">0.00</span>
+          <span class="metric-unit">%</span>
         </div>
-        <p class="metric-card-desc">Tỉ lệ lỗi máy chủ (5xx) trên tổng lưu lượng xử lý.</p>
-        <div class="metric-threshold">
-          <span>⚠️</span> Ngưỡng: Warning &gt;2% | Critical &gt;5%
-        </div>
+        <p class="metric-card-desc" id="subErrorRate">0 lỗi máy chủ (HTTP 5xx) trên tổng lưu lượng.</p>
       </div>
 
       <!-- 3. Latency p95 -->
@@ -1151,17 +1102,15 @@
         <div class="metric-card-header">
           <div class="metric-icon-title">
             <div class="metric-icon amber">⏱️</div>
-            <span>3. Latency p95</span>
+            <span>3. Độ Trễ P95</span>
           </div>
+          <span class="metric-status-badge ok" id="badgeP95">Tốt</span>
         </div>
-        <div class="metric-value-container" id="valContainerP95">
-          <span class="metric-value" id="valP95">-</span>
-          <span class="metric-unit" id="unitP95">ms</span>
+        <div class="metric-value-container">
+          <span class="metric-value" id="valP95">0.0</span>
+          <span class="metric-unit">ms</span>
         </div>
-        <p class="metric-card-desc">Độ trễ phân vị 95 (Histogram) đo thời gian xử lý yêu cầu.</p>
-        <div class="metric-threshold">
-          <span>⚠️</span> Ngưỡng: Warning &gt;1.0s | Critical &gt;2.5s
-        </div>
+        <p class="metric-card-desc">Thời gian xử lý phân vị 95 (P95) tính toán từ DurationMs thực tế.</p>
       </div>
 
       <!-- 4. Seat Conflicts -->
@@ -1169,17 +1118,15 @@
         <div class="metric-card-header">
           <div class="metric-icon-title">
             <div class="metric-icon purple">💺</div>
-            <span>4. Seat Hold Conflicts</span>
+            <span>4. Tranh Chấp Ghế</span>
           </div>
+          <span class="metric-status-badge ok" id="badgeSeatConflict">Ổn định</span>
         </div>
-        <div class="metric-value-container" id="valContainerSeatConflicts">
-          <span class="metric-value" id="valSeatConflicts">-</span>
-          <span class="metric-unit" id="unitSeatConflicts">/phút</span>
+        <div class="metric-value-container">
+          <span class="metric-value" id="valSeatConflict">0</span>
+          <span class="metric-unit">sự kiện</span>
         </div>
-        <p class="metric-card-desc">Tốc độ tranh chấp giữ ghế đồng thời khi mở bán vé.</p>
-        <div class="metric-threshold">
-          <span>⚠️</span> Ngưỡng: Warning &gt;10/phút | Critical &gt;50/phút
-        </div>
+        <p class="metric-card-desc">Sự kiện tranh chấp giữ ghế đồng thời khi khách đặt vé.</p>
       </div>
 
       <!-- 5. Rejected Webhooks -->
@@ -1187,39 +1134,53 @@
         <div class="metric-card-header">
           <div class="metric-icon-title">
             <div class="metric-icon rose">🚫</div>
-            <span>5. Rejected Webhooks</span>
+            <span>5. Webhook Bị Từ Chối</span>
           </div>
+          <span class="metric-status-badge ok" id="badgeWebhookRejected">An toàn</span>
         </div>
-        <div class="metric-value-container" id="valContainerRejectedWebhooks">
-          <span class="metric-value" id="valRejectedWebhooks">-</span>
-          <span class="metric-unit" id="unitRejectedWebhooks">lần (5m)</span>
+        <div class="metric-value-container">
+          <span class="metric-value" id="valWebhookRejected">0</span>
+          <span class="metric-unit">lần</span>
         </div>
-        <p class="metric-card-desc">Webhook thanh toán PayOS bị từ chối do sai chữ ký hoặc lỗi.</p>
-        <div class="metric-threshold">
-          <span>⚠️</span> Ngưỡng: Warning &gt;3 lần | Critical &gt;10 lần
+        <p class="metric-card-desc">Webhook thanh toán PayOS bị từ chối do sai chữ ký hoặc dữ liệu sai lệch.</p>
+      </div>
+
+      <!-- 6. Active Alerts -->
+      <div class="metric-card">
+        <div class="metric-card-header">
+          <div class="metric-icon-title">
+            <div class="metric-icon blue">🔔</div>
+            <span>6. Cảnh Báo Hoạt Động</span>
+          </div>
+          <span class="metric-status-badge ok" id="badgeActiveAlerts">0 cảnh báo</span>
         </div>
+        <div class="metric-value-container">
+          <span class="metric-value" id="valActiveAlerts">0</span>
+          <span class="metric-unit">cảnh báo</span>
+        </div>
+        <p class="metric-card-desc">Số lượng cảnh báo tự động đang kích hoạt vượt ngưỡng trong PostgreSQL.</p>
       </div>
     </div>
 
-    <!-- Mini Trend Visualization (Real Prometheus Timeseries) -->
+    <!-- Trend Visualization Card (PostgreSQL Timeseries) -->
     <div class="trends-card">
       <div class="trends-header">
         <div class="metric-icon-title">
           <span>📈</span>
-          <span style="font-size: 14px; font-weight: 800; color: var(--text-heading);">Xu Hướng 15 Phút Qua (Prometheus Range Query)</span>
+          <span style="font-size: 14.5px; font-weight: 800; color: var(--text-heading);">Xu Hướng Lưu Lượng & Độ Trễ (Chuỗi thời gian PostgreSQL)</span>
         </div>
         <div class="trends-legend">
           <div class="legend-item">
             <span class="legend-color req"></span>
-            <span>Request Rate (req/s)</span>
+            <span>Request/giây (req/s)</span>
           </div>
           <div class="legend-item">
-            <span class="legend-color err"></span>
-            <span>5xx Error Rate (%)</span>
+            <span class="legend-color p95"></span>
+            <span>Độ trễ P95 (ms)</span>
           </div>
         </div>
       </div>
-      <svg id="trendSvg" class="sparkline-svg" viewBox="0 0 1000 90" preserveAspectRatio="none">
+      <svg id="trendSvg" class="sparkline-svg" viewBox="0 0 1000 140" preserveAspectRatio="none">
         <defs>
           <linearGradient id="reqGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#4f46e5" stop-opacity="0.25"/>
@@ -1229,21 +1190,24 @@
         <g id="svgGridLines" stroke="#f1f5f9" stroke-width="1"></g>
         <path id="svgReqArea" fill="url(#reqGrad)" d=""></path>
         <path id="svgReqPath" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linecap="round" d=""></path>
-        <path id="svgErrPath" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-dasharray="4,2" d=""></path>
-        <text id="svgEmptyText" x="500" y="50" text-anchor="middle" font-size="12" fill="#94a3b8">Đang tải chuỗi dữ liệu giám sát thời gian thực...</text>
+        <path id="svgP95Path" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-dasharray="4,2" d=""></path>
+        <text id="svgEmptyText" x="500" y="70" text-anchor="middle" font-size="13" fill="#94a3b8">Đang tải chuỗi dữ liệu giám sát từ PostgreSQL...</text>
       </svg>
     </div>
 
     <!-- History Table Section -->
     <div class="history-card">
       <div class="history-toolbar">
-        <h2 class="section-title" style="margin-bottom: 0;">📜 Lịch Sử Cảnh Báo Hệ Thống</h2>
+        <div>
+          <h2 class="section-title">📜 Lịch Sử & Danh Sách Cảnh Báo Hệ Thống (PostgreSQL)</h2>
+          <span style="font-size: 12.5px; color: var(--text-muted);" id="alertsCountLabel">Đang tải...</span>
+        </div>
         <div class="search-filter-box">
-          <input type="text" id="alertSearchInput" class="search-input" placeholder="🔍 Tìm kiếm cảnh báo theo tên, tóm tắt..." oninput="handleSearchInput(this.value)">
+          <input type="text" id="alertSearchInput" class="search-input" placeholder="🔍 Tìm kiếm theo chỉ số..." oninput="handleSearchInput(this.value)">
           <div class="filter-tabs">
             <button type="button" class="filter-tab active" onclick="setFilter('all', this)">Tất cả</button>
             <button type="button" class="filter-tab" onclick="setFilter('firing', this)">Đang diễn ra</button>
-            <button type="button" class="filter-tab" onclick="setFilter('resolved', this)">Đã phục hồi</button>
+            <button type="button" class="filter-tab" onclick="setFilter('resolved', this)">Đã giải quyết</button>
             <button type="button" class="filter-tab" onclick="setFilter('critical', this)">Critical</button>
             <button type="button" class="filter-tab" onclick="setFilter('warning', this)">Warning</button>
           </div>
@@ -1254,19 +1218,19 @@
         <table>
           <thead>
             <tr>
+              <th>Chỉ số</th>
               <th>Mức độ</th>
-              <th>Trạng thái</th>
-              <th>Tên cảnh báo</th>
-              <th>Nội dung chi tiết</th>
-              <th>Nguồn</th>
-              <th>Thời điểm bắt đầu</th>
-              <th>Thời điểm phục hồi</th>
+              <th>Ngưỡng</th>
+              <th>Giá trị đo</th>
+              <th>Cửa sổ</th>
+              <th>Kích hoạt lần đầu</th>
               <th>Cập nhật cuối</th>
+              <th>Trạng thái</th>
             </tr>
           </thead>
           <tbody id="alertsTableBody">
             <tr>
-              <td colspan="8" class="empty-state">⌛ Đang tải lịch sử cảnh báo...</td>
+              <td colspan="8" class="empty-state">⌛ Đang tải dữ liệu cảnh báo từ PostgreSQL...</td>
             </tr>
           </tbody>
         </table>
@@ -1276,24 +1240,29 @@
   </main>
 
   <script>
+    const REFRESH_INTERVAL_MS = 5000;
+    let currentWindow = '15m';
     let currentFilter = 'all';
     let searchQuery = '';
     let alertsData = [];
     let isAlertDropdownOpen = false;
     let signalRConnection = null;
 
-    // Overlap Guards
-    let isSummaryFetching = false;
-    let isAlertsFetching = false;
-    let isTimeSeriesFetching = false;
+    // Auto-refresh countdown & overlap guard
+    let countdownSec = 5;
+    let countdownTimer = null;
+    let refreshInProgress = false;
 
-    // Scheduler Timers
-    let summaryTimer = null;
-    let alertsTimer = null;
-    let timeSeriesTimer = null;
+    function getAuthToken() {
+      return localStorage.getItem('access_token') ||
+             localStorage.getItem('accessToken') ||
+             localStorage.getItem('token') ||
+             localStorage.getItem('auth_token') ||
+             '';
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
-      const token = localStorage.getItem('access_token');
+      const token = getAuthToken();
       if (!token) {
         window.location.href = './login.html?returnUrl=' + encodeURIComponent(window.location.pathname);
         return;
@@ -1303,333 +1272,377 @@
       if (userInfoRaw) {
         try {
           const user = JSON.parse(userInfoRaw);
-          const name = user.fullName || user.username || user.email;
+          const name = user.fullName || user.username || user.email || 'System Administrator';
           document.getElementById('navUsername').textContent = name;
           document.getElementById('navAvatar').textContent = name.charAt(0).toUpperCase();
 
-          const roles = (user.roles || []).map(r => (r || '').toLowerCase());
+          const roles = (user.roles || [user.role] || []).map(r => (r || '').toLowerCase());
           if (!roles.includes('admin')) {
-            alert('Bạn không có quyền truy cập trang Giám sát hệ thống (Chỉ dành riêng cho Admin).');
-            window.location.href = './events.html';
+            showError('Bạn không có quyền truy cập trang Giám sát hệ thống (Chỉ dành riêng cho Admin - HTTP 403).');
+            setTimeout(() => {
+              window.location.href = './events.html';
+            }, 3000);
             return;
           }
         } catch (e) {}
       }
 
-      // Initial data load
-      triggerManualRefresh();
+      // Initial load
+      refreshDashboard();
 
-      // Start SignalR connection
+      // Start 5-second Countdown Timer
+      startCountdownTimer();
+
+      // Initialize SignalR for Realtime Alerts
       initSystemAlertSignalR();
 
-      // Setup Polling Schedulers
-      startSchedulers();
-
-      // Pause/resume timers when tab is hidden/visible
+      // Tab visibility handling: pause when hidden, refresh immediately when returning
       document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-          stopSchedulers();
-        } else {
-          triggerManualRefresh();
-          startSchedulers();
+        if (!document.hidden) {
+          countdownSec = 5;
+          const countdownEl = document.getElementById('countdown');
+          if (countdownEl) countdownEl.textContent = '5s';
+          refreshDashboard();
         }
       });
     });
 
-    function startSchedulers() {
-      stopSchedulers();
-      // Monitoring summary: every 5 seconds
-      summaryTimer = setInterval(() => {
-        fetchMonitoringSummary();
-      }, 5000);
-
-      // Alert history reconciliation: every 10 seconds
-      alertsTimer = setInterval(() => {
-        fetchTableAlerts();
-      }, 10000);
-
-      // Real Time-Series Trend: every 15 seconds
-      timeSeriesTimer = setInterval(() => {
-        fetchMonitoringTimeSeries();
-      }, 15000);
+    function setWindow(w) {
+      currentWindow = w;
+      document.querySelectorAll('.btn-window').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.window === w);
+      });
+      countdownSec = 5;
+      const countdownEl = document.getElementById('countdown');
+      if (countdownEl) countdownEl.textContent = '5s';
+      refreshDashboard();
     }
 
-    function stopSchedulers() {
-      if (summaryTimer) clearInterval(summaryTimer);
-      if (alertsTimer) clearInterval(alertsTimer);
-      if (timeSeriesTimer) clearInterval(timeSeriesTimer);
-      summaryTimer = null;
-      alertsTimer = null;
-      timeSeriesTimer = null;
-    }
-
-    async function triggerManualRefresh() {
-      await Promise.all([
-        fetchMonitoringSummary(),
-        fetchTableAlerts(),
-        fetchMonitoringTimeSeries()
-      ]);
-    }
-
-    async function fetchMonitoringSummary() {
-      if (isSummaryFetching) return;
-      isSummaryFetching = true;
-
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        isSummaryFetching = false;
-        return;
+    async function apiFetch(endpoint) {
+      const token = getAuthToken();
+      const headers = {
+        'Accept': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = 'Bearer ' + token;
       }
+
+      const res = await fetch(endpoint, { headers });
+      if (res.status === 401) {
+        logout();
+        throw new Error('Unauthorized');
+      }
+      if (res.status === 403) {
+        showError('Quyền truy cập bị từ chối (HTTP 403 Forbidden). Chỉ Quản trị viên (Admin) mới có quyền truy cập.');
+        throw new Error('Forbidden');
+      }
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text}`);
+      }
+      const json = await res.json();
+      return json.data !== undefined ? json.data : json;
+    }
+
+    function showError(msg) {
+      const banner = document.getElementById('errorBanner');
+      const msgEl = document.getElementById('errorMessage');
+      if (banner && msgEl) {
+        msgEl.textContent = msg;
+        banner.style.display = 'flex';
+      }
+    }
+
+    function hideError() {
+      const banner = document.getElementById('errorBanner');
+      if (banner) {
+        banner.style.display = 'none';
+      }
+    }
+
+    async function refreshDashboard() {
+      if (refreshInProgress) return;
+      refreshInProgress = true;
+
+      const refreshIcon = document.getElementById('refreshIcon');
+      if (refreshIcon) refreshIcon.textContent = '⏳';
 
       try {
-        const queryParams = window.location.search || '';
-        const res = await fetch('/api/admin/monitoring/summary' + queryParams, {
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
+        const stepSec = currentWindow === '5m' ? 5 : (currentWindow === '15m' ? 15 : 60);
 
-        if (res.status === 401) {
-          logout();
-          return;
+        const [summary, timeSeries, alerts, status] = await Promise.all([
+          apiFetch(`/api/v1/monitoring/summary?window=${currentWindow}`),
+          apiFetch(`/api/v1/monitoring/timeseries?window=${currentWindow}&stepSeconds=${stepSec}`),
+          apiFetch('/api/v1/monitoring/alerts?limit=50'),
+          apiFetch('/api/v1/monitoring/status')
+        ]);
+
+        // Hide error banner on successful fetch
+        hideError();
+
+        // Update DOM with fresh telemetry
+        if (summary) {
+          renderSummaryMetrics(summary);
+        }
+        if (timeSeries) {
+          renderTrendChart(timeSeries.requestRateSeries || [], timeSeries.p95LatencySeries || []);
+        }
+        if (Array.isArray(alerts)) {
+          alertsData = alerts;
+          renderTable();
+          renderAlertDropdown();
+        }
+        if (status) {
+          renderStatus(status);
         }
 
-        if (res.ok) {
-          const json = await res.json();
-          if (json.success && json.data) {
-            renderSummaryMetrics(json.data);
-          }
-        } else {
-          renderPrometheusUnavailableState();
+        const now = new Date();
+        const lastUpdated = document.getElementById('lastUpdatedLabel');
+        if (lastUpdated) {
+          lastUpdated.textContent = 'Cập nhật lần cuối: ' + now.toLocaleTimeString('vi-VN');
         }
       } catch (err) {
-        renderPrometheusUnavailableState();
+        if (err.message !== 'Unauthorized' && err.message !== 'Forbidden') {
+          showError('Mất kết nối / Không thể cập nhật dữ liệu. Sẽ tự động thử lại sau 5 giây...');
+          const statusPill = document.getElementById('systemStatusPill');
+          const statusPillDot = document.getElementById('statusPillDot');
+          const statusPillText = document.getElementById('statusPillText');
+          if (statusPill && statusPillText) {
+            statusPill.className = 'status-pill firing';
+            if (statusPillDot) statusPillDot.textContent = '⚠️';
+            statusPillText.textContent = 'Mất kết nối / Không thể cập nhật';
+          }
+        }
       } finally {
-        isSummaryFetching = false;
+        if (refreshIcon) refreshIcon.textContent = '🔄';
+        countdownSec = 5;
+        const countdownEl = document.getElementById('countdown');
+        if (countdownEl) countdownEl.textContent = '5s';
+        refreshInProgress = false;
       }
+    }
+
+    function startCountdownTimer() {
+      if (countdownTimer) clearInterval(countdownTimer);
+      countdownTimer = setInterval(() => {
+        if (document.hidden) return; // Skip countdown when tab is hidden
+        countdownSec--;
+        if (countdownSec <= 0) {
+          countdownSec = 5;
+          refreshDashboard();
+        }
+        const countdownEl = document.getElementById('countdown');
+        if (countdownEl) {
+          countdownEl.textContent = countdownSec + 's';
+        }
+      }, 1000);
+    }
+
+    // 1. Fetch Summary
+    async function fetchMonitoringSummary() {
+      const summary = await apiFetch(`/api/v1/monitoring/summary?window=${currentWindow}`);
+      renderSummaryMetrics(summary);
     }
 
     function renderSummaryMetrics(data) {
-      const promPill = document.getElementById('promStatusPill');
-      const promText = document.getElementById('promStatusText');
-      const lastUpdatedLabel = document.getElementById('lastUpdatedLabel');
+      if (!data) return;
 
-      if (data.prometheusAvailable) {
-        promPill.className = 'status-pill prom-up';
-        promText.textContent = 'Prometheus: Đã kết nối (9090)';
-      } else {
-        promPill.className = 'status-pill prom-down';
-        promText.textContent = 'Prometheus: Không khả dụng (Offline)';
-      }
-
-      if (data.generatedAt) {
-        const d = new Date(data.generatedAt);
-        lastUpdatedLabel.textContent = 'Cập nhật lần cuối: ' + d.toLocaleTimeString('vi-VN');
-      }
-
-      // 1. Request Rate
-      renderMetricSlot('RequestRate', data.requestRate, 'req/s', 1);
+      // 1. Request Count
+      const reqCount = data.requestCount !== undefined ? data.requestCount : (data.requestRate || 0);
+      document.getElementById('valRequestCount').textContent = Number(reqCount).toLocaleString('vi-VN');
 
       // 2. Error Rate
-      renderMetricSlot('ErrorRate', data.errorRatePercent, '%', 2);
+      const errRate = data.errorRatePercent !== undefined && data.errorRatePercent !== null ? data.errorRatePercent : 0.0;
+      document.getElementById('valErrorRate').textContent = Number(errRate).toFixed(2);
+      document.getElementById('subErrorRate').textContent = `${Number(data.errorCount || 0).toLocaleString('vi-VN')} lỗi máy chủ (HTTP 5xx) trên tổng lưu lượng.`;
 
-      // 3. P95 Latency
-      renderMetricSlot('P95', data.p95ResponseTimeMs, 'ms', 0);
+      const badgeErr = document.getElementById('badgeErrorRate');
+      if (errRate > 10) {
+        badgeErr.className = 'metric-status-badge crit';
+        badgeErr.textContent = 'Rất cao';
+      } else if (errRate > 5) {
+        badgeErr.className = 'metric-status-badge warn';
+        badgeErr.textContent = 'Cảnh báo';
+      } else {
+        badgeErr.className = 'metric-status-badge ok';
+        badgeErr.textContent = 'Bình thường';
+      }
+
+      // 3. P95
+      const p95 = data.p95Milliseconds !== undefined && data.p95Milliseconds !== null ? data.p95Milliseconds : (data.p95ResponseTimeMs || 0.0);
+      document.getElementById('valP95').textContent = Number(p95).toFixed(1);
+      const badgeP95 = document.getElementById('badgeP95');
+      if (p95 > 2500) {
+        badgeP95.className = 'metric-status-badge crit';
+        badgeP95.textContent = 'Quá chậm';
+      } else if (p95 > 1000) {
+        badgeP95.className = 'metric-status-badge warn';
+        badgeP95.textContent = 'Chậm';
+      } else {
+        badgeP95.className = 'metric-status-badge ok';
+        badgeP95.textContent = 'Tốt';
+      }
 
       // 4. Seat Conflicts
-      renderMetricSlot('SeatConflicts', data.seatConflicts, '/phút', 0);
+      const seatConflict = data.seatConflictCount !== undefined ? data.seatConflictCount : (data.seatConflicts || 0);
+      document.getElementById('valSeatConflict').textContent = Number(seatConflict).toLocaleString('vi-VN');
+      const badgeSeat = document.getElementById('badgeSeatConflict');
+      if (seatConflict > 20) {
+        badgeSeat.className = 'metric-status-badge crit';
+        badgeSeat.textContent = 'Xung đột cao';
+      } else if (seatConflict > 5) {
+        badgeSeat.className = 'metric-status-badge warn';
+        badgeSeat.textContent = 'Có xung đột';
+      } else {
+        badgeSeat.className = 'metric-status-badge ok';
+        badgeSeat.textContent = 'Ổn định';
+      }
 
       // 5. Rejected Webhooks
-      renderMetricSlot('RejectedWebhooks', data.rejectedWebhooks, 'lần (5m)', 0);
-    }
-
-    function renderMetricSlot(slotId, value, unit, decimals) {
-      const container = document.getElementById('valContainer' + slotId);
-      if (!container) return;
-
-      if (value === null || value === undefined) {
-        container.innerHTML = `<span class="metric-na" id="val${slotId}">Chưa có dữ liệu</span>`;
+      const rejectedWebhooks = data.rejectedWebhookCount !== undefined ? data.rejectedWebhookCount : (data.rejectedWebhooks || 0);
+      document.getElementById('valWebhookRejected').textContent = Number(rejectedWebhooks).toLocaleString('vi-VN');
+      const badgeWebhook = document.getElementById('badgeWebhookRejected');
+      if (rejectedWebhooks > 5) {
+        badgeWebhook.className = 'metric-status-badge crit';
+        badgeWebhook.textContent = 'Cảnh báo an ninh';
+      } else if (rejectedWebhooks > 0) {
+        badgeWebhook.className = 'metric-status-badge warn';
+        badgeWebhook.textContent = 'Bị từ chối';
       } else {
-        const formatted = typeof value === 'number' ? value.toFixed(decimals) : value;
-        container.innerHTML = `
-          <span class="metric-value" id="val${slotId}">${formatted}</span>
-          <span class="metric-unit">${unit}</span>
-        `;
+        badgeWebhook.className = 'metric-status-badge ok';
+        badgeWebhook.textContent = 'An toàn';
+      }
+
+      // 6. Active Alerts
+      const activeAlerts = data.activeAlertCount || 0;
+      document.getElementById('valActiveAlerts').textContent = activeAlerts;
+      const badgeAlerts = document.getElementById('badgeActiveAlerts');
+      if (activeAlerts > 0) {
+        badgeAlerts.className = 'metric-status-badge crit';
+        badgeAlerts.textContent = `${activeAlerts} cảnh báo`;
+      } else {
+        badgeAlerts.className = 'metric-status-badge ok';
+        badgeAlerts.textContent = '0 cảnh báo';
+      }
+
+      // Top Status Bar Pill
+      const statusPill = document.getElementById('systemStatusPill');
+      const statusPillDot = document.getElementById('statusPillDot');
+      const statusPillText = document.getElementById('statusPillText');
+      const firingCountLabel = document.getElementById('firingCountLabel');
+
+      if (activeAlerts > 0) {
+        statusPill.className = 'status-pill firing';
+        statusPillDot.textContent = '🚨';
+        statusPillText.textContent = `Hệ thống có ${activeAlerts} cảnh báo đang diễn ra!`;
+      } else {
+        statusPill.className = 'status-pill healthy';
+        statusPillDot.textContent = '🟢';
+        statusPillText.textContent = 'Hệ thống đang hoạt động bình thường';
+      }
+      firingCountLabel.textContent = `${activeAlerts} cảnh báo đang hoạt động`;
+
+      const bellBadge = document.getElementById('systemAlertBadge');
+      if (bellBadge) {
+        bellBadge.textContent = activeAlerts;
+        if (activeAlerts > 0) bellBadge.classList.add('active');
+        else bellBadge.classList.remove('active');
       }
     }
 
-    function renderPrometheusUnavailableState() {
-      const promPill = document.getElementById('promStatusPill');
-      const promText = document.getElementById('promStatusText');
-      if (promPill) {
-        promPill.className = 'status-pill prom-down';
-        promText.textContent = 'Prometheus: Không khả dụng (Offline)';
-      }
-
-      ['RequestRate', 'ErrorRate', 'P95', 'SeatConflicts', 'RejectedWebhooks'].forEach(id => {
-        const container = document.getElementById('valContainer' + id);
-        if (container) {
-          container.innerHTML = `<span class="metric-na" id="val${id}">Chưa có dữ liệu</span>`;
-        }
-      });
-    }
-
+    // 2. Fetch TimeSeries & Render Real Chart
     async function fetchMonitoringTimeSeries() {
-      if (isTimeSeriesFetching) return;
-      isTimeSeriesFetching = true;
-
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        isTimeSeriesFetching = false;
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/admin/monitoring/timeseries?minutes=15&stepSeconds=15', {
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
-
-        if (res.ok) {
-          const json = await res.json();
-          if (json.success && json.data) {
-            renderRealTrendChart(json.data);
-          }
-        } else {
-          renderEmptyTrendChart();
-        }
-      } catch (err) {
-        renderEmptyTrendChart();
-      } finally {
-        isTimeSeriesFetching = false;
-      }
+      const stepSec = currentWindow === '5m' ? 10 : (currentWindow === '15m' ? 20 : 60);
+      const timeSeries = await apiFetch(`/api/v1/monitoring/timeseries?window=${currentWindow}&stepSeconds=${stepSec}`);
+      
+      const reqSeries = timeSeries?.requestRateSeries || [];
+      const p95Series = timeSeries?.p95LatencySeries || [];
+      renderTrendChart(reqSeries, p95Series);
     }
 
-    function renderEmptyTrendChart() {
-      const emptyText = document.getElementById('svgEmptyText');
-      const reqPath = document.getElementById('svgReqPath');
-      const reqArea = document.getElementById('svgReqArea');
-      const errPath = document.getElementById('svgErrPath');
-
-      if (emptyText) {
-        emptyText.textContent = 'Chưa có dữ liệu xu hướng.';
-        emptyText.style.display = 'block';
-      }
-      if (reqPath) reqPath.setAttribute('d', '');
-      if (reqArea) reqArea.setAttribute('d', '');
-      if (errPath) errPath.setAttribute('d', '');
-    }
-
-    function renderRealTrendChart(data) {
+    function renderTrendChart(reqSeries, p95Series) {
       const svg = document.getElementById('trendSvg');
       const reqPath = document.getElementById('svgReqPath');
       const reqArea = document.getElementById('svgReqArea');
-      const errPath = document.getElementById('svgErrPath');
+      const p95Path = document.getElementById('svgP95Path');
       const emptyText = document.getElementById('svgEmptyText');
 
       if (!svg) return;
 
-      const reqSeries = (data && data.requestRateSeries) || [];
-      const errSeries = (data && data.errorRateSeries) || [];
-
-      if (!data || !data.prometheusAvailable || reqSeries.length === 0) {
-        renderEmptyTrendChart();
+      if (!reqSeries || reqSeries.length < 2) {
+        if (emptyText) {
+          emptyText.textContent = 'Chưa có đủ điểm dữ liệu chuỗi thời gian PostgreSQL.';
+          emptyText.style.display = 'block';
+        }
+        if (reqPath) reqPath.setAttribute('d', '');
+        if (reqArea) reqArea.setAttribute('d', '');
+        if (p95Path) p95Path.setAttribute('d', '');
         return;
       }
 
       if (emptyText) emptyText.style.display = 'none';
 
       const width = 1000;
-      const height = 90;
-      const padding = 12;
+      const height = 140;
+      const padding = 16;
 
-      const reqVals = reqSeries.map(p => p.value).filter(v => v !== null);
-      const errVals = errSeries.map(p => p.value).filter(v => v !== null);
+      const reqVals = reqSeries.map(p => p.value || 0);
+      const p95Vals = p95Series.map(p => p.value || 0);
 
-      let maxReq = reqVals.length > 0 ? Math.max(...reqVals, 10) : 10;
-      let maxErr = errVals.length > 0 ? Math.max(...errVals, 5) : 5;
+      const maxReq = Math.max(1, ...reqVals);
+      const maxP95 = Math.max(10, ...p95Vals);
 
-      const xStep = reqSeries.length > 1 ? width / (reqSeries.length - 1) : width;
+      const n = reqSeries.length;
+      const xStep = width / (n - 1);
 
       let reqCoords = [];
-      let errCoords = [];
+      let p95Coords = [];
 
       reqSeries.forEach((p, idx) => {
         const x = idx * xStep;
-        if (p.value !== null && p.value !== undefined) {
-          const y = height - padding - ((p.value / maxReq) * (height - 2 * padding));
-          reqCoords.push({ x, y });
-        }
+        const val = p.value || 0;
+        const y = height - padding - ((val / maxReq) * (height - 2 * padding));
+        reqCoords.push({ x, y });
       });
 
-      errSeries.forEach((p, idx) => {
+      p95Series.forEach((p, idx) => {
         const x = idx * xStep;
-        if (p.value !== null && p.value !== undefined) {
-          const y = height - padding - ((p.value / maxErr) * (height - 2 * padding));
-          errCoords.push({ x, y });
-        }
+        const val = p.value || 0;
+        const y = height - padding - ((val / maxP95) * (height - 2 * padding));
+        p95Coords.push({ x, y });
       });
 
       if (reqCoords.length > 1) {
-        let dReq = `M ${reqCoords[0].x} ${reqCoords[0].y}`;
+        let dReq = `M ${reqCoords[0].x.toFixed(1)} ${reqCoords[0].y.toFixed(1)}`;
         for (let i = 1; i < reqCoords.length; i++) {
-          dReq += ` L ${reqCoords[i].x} ${reqCoords[i].y}`;
+          dReq += ` L ${reqCoords[i].x.toFixed(1)} ${reqCoords[i].y.toFixed(1)}`;
         }
         reqPath.setAttribute('d', dReq);
 
-        const dArea = `${dReq} L ${reqCoords[reqCoords.length - 1].x} ${height} L ${reqCoords[0].x} ${height} Z`;
+        const dArea = `${dReq} L ${reqCoords[reqCoords.length - 1].x.toFixed(1)} ${height} L ${reqCoords[0].x.toFixed(1)} ${height} Z`;
         reqArea.setAttribute('d', dArea);
       } else {
         reqPath.setAttribute('d', '');
         reqArea.setAttribute('d', '');
       }
 
-      if (errCoords.length > 1) {
-        let dErr = `M ${errCoords[0].x} ${errCoords[0].y}`;
-        for (let i = 1; i < errCoords.length; i++) {
-          dErr += ` L ${errCoords[i].x} ${errCoords[i].y}`;
+      if (p95Coords.length > 1) {
+        let dP95 = `M ${p95Coords[0].x.toFixed(1)} ${p95Coords[0].y.toFixed(1)}`;
+        for (let i = 1; i < p95Coords.length; i++) {
+          dP95 += ` L ${p95Coords[i].x.toFixed(1)} ${p95Coords[i].y.toFixed(1)}`;
         }
-        errPath.setAttribute('d', dErr);
+        p95Path.setAttribute('d', dP95);
       } else {
-        errPath.setAttribute('d', '');
+        p95Path.setAttribute('d', '');
       }
     }
 
+    // 3. Fetch Alerts
     async function fetchTableAlerts(force = false) {
-      if (isAlertsFetching && !force) return;
-      isAlertsFetching = true;
-
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        isAlertsFetching = false;
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/admin/monitoring/alerts?limit=50', {
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
-
-        if (res.status === 401) {
-          logout();
-          return;
-        }
-
-        if (res.ok) {
-          const json = await res.json();
-          if (json.success && Array.isArray(json.data)) {
-            alertsData = json.data;
-            updateOverviewStats();
-            renderTable();
-            renderAlertDropdown();
-          }
-        } else {
-          document.getElementById('alertsTableBody').innerHTML =
-            '<tr><td colspan="8" class="empty-state" style="color: var(--danger-text);">Không thể tải dữ liệu cảnh báo từ máy chủ.</td></tr>';
-        }
-      } catch (err) {
-        document.getElementById('alertsTableBody').innerHTML =
-          '<tr><td colspan="8" class="empty-state" style="color: var(--danger-text);">Lỗi kết nối máy chủ API.</td></tr>';
-      } finally {
-        isAlertsFetching = false;
-      }
+      const alerts = await apiFetch('/api/v1/monitoring/alerts?limit=50');
+      alertsData = Array.isArray(alerts) ? alerts : [];
+      renderTable();
+      renderAlertDropdown();
     }
 
     function setFilter(filter, btn) {
@@ -1644,139 +1657,85 @@
       renderTable();
     }
 
-    function updateOverviewStats() {
-      const firingCount = alertsData.filter(a => a.status === 'firing').length;
-
-      const statusPill = document.getElementById('systemStatusPill');
-      const statusPillDot = document.getElementById('statusPillDot');
-      const statusPillText = document.getElementById('statusPillText');
-      const firingCountLabel = document.getElementById('firingCountLabel');
-
-      if (firingCount > 0) {
-        statusPill.className = 'status-pill firing';
-        statusPillDot.textContent = '🚨';
-        statusPillText.textContent = `Hệ thống có ${firingCount} cảnh báo đang diễn ra!`;
-      } else {
-        statusPill.className = 'status-pill healthy';
-        statusPillDot.textContent = '🟢';
-        statusPillText.textContent = 'Hệ thống đang hoạt động bình thường';
-      }
-
-      firingCountLabel.textContent = `${firingCount} cảnh báo đang hoạt động`;
-
-      const badge = document.getElementById('systemAlertBadge');
-      if (badge) {
-        badge.textContent = firingCount;
-        if (firingCount > 0) badge.classList.add('active');
-        else badge.classList.remove('active');
-      }
-    }
-
     function renderTable() {
       const tbody = document.getElementById('alertsTableBody');
+      const countLabel = document.getElementById('alertsCountLabel');
       if (!tbody) return;
 
       let filtered = alertsData;
 
-      // Filter tab
       if (currentFilter === 'firing') {
-        filtered = filtered.filter(a => a.status === 'firing');
+        filtered = filtered.filter(a => a.isActive);
       } else if (currentFilter === 'resolved') {
-        filtered = filtered.filter(a => a.status === 'resolved');
+        filtered = filtered.filter(a => !a.isActive);
       } else if (currentFilter === 'critical') {
         filtered = filtered.filter(a => (a.severity || '').toLowerCase() === 'critical');
       } else if (currentFilter === 'warning') {
         filtered = filtered.filter(a => (a.severity || '').toLowerCase() === 'warning');
       }
 
-      // Search query
       if (searchQuery) {
         filtered = filtered.filter(a =>
-          (a.alertName || '').toLowerCase().includes(searchQuery) ||
-          (a.summary || '').toLowerCase().includes(searchQuery)
+          (a.metric || '').toLowerCase().includes(searchQuery) ||
+          (a.severity || '').toLowerCase().includes(searchQuery)
         );
       }
 
+      if (countLabel) {
+        countLabel.textContent = `${filtered.length} bản ghi cảnh báo (${currentFilter})`;
+      }
+
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Chưa có cảnh báo.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">✅ Không có cảnh báo nào phù hợp.</td></tr>';
         return;
       }
 
-      tbody.innerHTML = filtered.map(alert => {
-        const isResolved = alert.status === 'resolved';
-        const severity = (alert.severity || 'warning').toLowerCase();
+      tbody.innerHTML = filtered.map(a => {
+        const isResolved = !a.isActive;
+        const severity = (a.severity || 'warning').toLowerCase();
         const sevClass = severity === 'critical' ? 'critical' : 'warning';
         const sevIcon = severity === 'critical' ? '🚨' : '⚠️';
         const statusClass = isResolved ? 'resolved' : 'firing';
         const statusIcon = isResolved ? '✅' : '🔴';
-        const statusLabel = isResolved ? 'Đã phục hồi' : 'Đang diễn ra (Firing)';
+        const statusLabel = isResolved ? 'Đã giải quyết' : 'Đang diễn ra (Active)';
+
+        const firstAt = a.firstTriggeredAtUtc ? formatDateTime(a.firstTriggeredAtUtc) : '-';
+        const lastAt = a.lastTriggeredAtUtc ? formatDateTime(a.lastTriggeredAtUtc) : '-';
 
         return `
           <tr>
-            <td>
-              <span class="severity-tag ${sevClass}">${sevIcon} ${escapeHtml(severity)}</span>
-            </td>
-            <td>
-              <span class="alert-status-badge ${statusClass}">${statusIcon} ${statusLabel}</span>
-            </td>
-            <td>
-              <strong style="color: var(--text-heading); font-size: 13.5px;">${escapeHtml(alert.alertName || 'Alert')}</strong>
-            </td>
-            <td style="max-width: 320px; line-height: 1.4;">
-              ${escapeHtml(alert.summary || '-')}
-            </td>
-            <td style="white-space: nowrap; font-size: 12px; color: var(--text-muted);">
-              ${escapeHtml(alert.source || 'job=event-ticket-api')}
-            </td>
-            <td style="white-space: nowrap; font-size: 12.5px; color: var(--text-muted);">
-              ${formatDateTime(alert.startedAt)}
-            </td>
-            <td style="white-space: nowrap; font-size: 12.5px; color: var(--text-muted);">
-              ${isResolved && alert.resolvedAt ? formatDateTime(alert.resolvedAt) : '-'}
-            </td>
-            <td style="white-space: nowrap; font-size: 12.5px; color: var(--text-muted);">
-              ${formatDateTime(alert.lastUpdatedAt)}
-            </td>
+            <td><strong style="color: var(--text-heading); font-size: 13.5px;">${escapeHtml(a.metric)}</strong></td>
+            <td><span class="severity-tag ${sevClass}">${sevIcon} ${escapeHtml(severity)}</span></td>
+            <td style="font-family: 'JetBrains Mono', monospace;">${Number(a.threshold).toLocaleString('vi-VN')}</td>
+            <td style="font-family: 'JetBrains Mono', monospace;"><strong>${Number(a.observedValue).toLocaleString('vi-VN')}</strong></td>
+            <td>${a.windowMinutes}m</td>
+            <td style="white-space: nowrap; font-size: 12.5px; color: var(--text-muted);">${firstAt}</td>
+            <td style="white-space: nowrap; font-size: 12.5px; color: var(--text-muted);">${lastAt}</td>
+            <td><span class="alert-status-badge ${statusClass}">${statusIcon} ${statusLabel}</span></td>
           </tr>
         `;
       }).join('');
     }
 
-    function formatDateTime(isoStr) {
-      if (!isoStr) return '-';
-      try {
-        const d = new Date(isoStr);
-        return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ' +
-               d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-      } catch {
-        return isoStr;
+    function renderStatus(status) {
+      if (!status) return;
+      const storeText = document.getElementById('storeStatusText');
+      if (storeText) {
+        const count = status.totalPersistedRequests || 0;
+        storeText.textContent = `Dữ liệu từ shared PostgreSQL monitoring store (${Number(count).toLocaleString('vi-VN')} requests)`;
       }
     }
 
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-
-    function logout() {
-      localStorage.clear();
-      window.location.href = './login.html';
-    }
-
-    // --- Dropdown Chuông Logic ---
+    // Dropdown Chuông
     function renderAlertDropdown() {
       const listContainer = document.getElementById('systemAlertDropdownList');
       const firingBadge = document.getElementById('dropdownFiringBadge');
       if (!listContainer) return;
 
-      const firingCount = alertsData.filter(a => a.status === 'firing').length;
+      const firing = alertsData.filter(a => a.isActive);
       if (firingBadge) {
-        if (firingCount > 0) {
-          firingBadge.textContent = `${firingCount} đang diễn ra`;
+        if (firing.length > 0) {
+          firingBadge.textContent = `${firing.length} đang diễn ra`;
           firingBadge.style.display = 'inline-block';
         } else {
           firingBadge.style.display = 'none';
@@ -1784,29 +1743,29 @@
       }
 
       if (alertsData.length === 0) {
-        listContainer.innerHTML = '<div class="dropdown-empty-state">Chưa có cảnh báo hệ thống nào.</div>';
+        listContainer.innerHTML = '<div class="dropdown-empty-state">Chưa có cảnh báo hệ thống nào trong PostgreSQL.</div>';
         return;
       }
 
-      listContainer.innerHTML = alertsData.slice(0, 20).map(alert => {
-        const isResolved = alert.status === 'resolved';
-        const severity = (alert.severity || 'warning').toLowerCase();
+      listContainer.innerHTML = alertsData.slice(0, 15).map(a => {
+        const isResolved = !a.isActive;
+        const severity = (a.severity || 'warning').toLowerCase();
         const typeClass = isResolved ? 'resolved' : (severity === 'critical' ? 'critical' : 'warning');
         const icon = isResolved ? '✅' : (severity === 'critical' ? '🚨' : '⚠️');
-        const statusLabel = isResolved ? 'Đã phục hồi' : (severity === 'critical' ? 'CRITICAL' : 'WARNING');
+        const statusLabel = isResolved ? 'Đã giải quyết' : (severity === 'critical' ? 'CRITICAL' : 'WARNING');
 
-        let timeText = `Bắt đầu: ${formatDateTime(alert.startedAt)}`;
-        if (isResolved && alert.resolvedAt) {
-          timeText += ` • Xong: ${formatDateTime(alert.resolvedAt)}`;
+        let timeText = `Kích hoạt: ${formatDateTime(a.firstTriggeredAtUtc)}`;
+        if (isResolved && a.resolvedAtUtc) {
+          timeText += ` • Giải quyết: ${formatDateTime(a.resolvedAtUtc)}`;
         }
 
         return `
           <div class="dropdown-alert-item ${typeClass}">
             <div class="dropdown-alert-top">
-              <span class="dropdown-alert-title">${icon} ${escapeHtml(alert.alertName || 'Alert')}</span>
+              <span class="dropdown-alert-title">${icon} ${escapeHtml(a.metric)}</span>
               <span class="dropdown-alert-status-badge ${typeClass}">${statusLabel}</span>
             </div>
-            <div class="dropdown-alert-summary">${escapeHtml(alert.summary || '')}</div>
+            <div class="dropdown-alert-summary">Giá trị đo: ${Number(a.observedValue).toLocaleString('vi-VN')} (Ngưỡng: ${a.threshold})</div>
             <div class="dropdown-alert-time">${timeText}</div>
           </div>
         `;
@@ -1840,7 +1799,7 @@
       if (!container) return;
 
       const toast = document.createElement('div');
-      const isResolved = alert.status === 'resolved';
+      const isResolved = !alert.isActive;
       const severity = (alert.severity || 'warning').toLowerCase();
       const toastType = isResolved ? 'resolved' : (severity === 'critical' ? 'critical' : 'warning');
 
@@ -1859,9 +1818,9 @@
       toast.innerHTML = `
         <div class="system-toast-header">
           <span>${icon}</span>
-          <span>${title}: ${escapeHtml(alert.alertName || 'Alert')}</span>
+          <span>${title}: ${escapeHtml(alert.metric || 'Alert')}</span>
         </div>
-        <div class="system-toast-body">${escapeHtml(alert.summary || '')}</div>
+        <div class="system-toast-body">Giá trị: ${alert.observedValue} (Ngưỡng: ${alert.threshold})</div>
       `;
 
       container.appendChild(toast);
@@ -1874,67 +1833,56 @@
     }
 
     async function initSystemAlertSignalR() {
-      const authToken = localStorage.getItem('access_token');
+      const authToken = getAuthToken();
       if (!authToken) return;
-
-      const signalRPill = document.getElementById('signalRStatusPill');
-      const signalRText = document.getElementById('signalRStatusText');
 
       try {
         signalRConnection = new signalR.HubConnectionBuilder()
           .withUrl("/hubs/system-alerts", {
-            accessTokenFactory: () => localStorage.getItem('access_token')
+            accessTokenFactory: () => getAuthToken()
           })
           .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
           .build();
 
-        signalRConnection.onreconnecting(() => {
-          if (signalRPill) {
-            signalRPill.className = 'status-pill neutral';
-            signalRText.textContent = 'Realtime: Đang kết nối lại...';
-          }
-        });
-
         signalRConnection.onreconnected(() => {
-          if (signalRPill) {
-            signalRPill.className = 'status-pill signalr-up';
-            signalRText.textContent = 'Realtime: Đã kết nối';
-          }
-          // On reconnect, immediately refetch authoritative state
-          fetchMonitoringSummary();
-          fetchTableAlerts(true);
-          fetchMonitoringTimeSeries();
-        });
-
-        signalRConnection.onclose(() => {
-          if (signalRPill) {
-            signalRPill.className = 'status-pill signalr-down';
-            signalRText.textContent = 'Realtime: Ngoại tuyến (Polling 5s)';
-          }
+          triggerManualRefresh();
         });
 
         signalRConnection.on("ReceiveSystemAlert", (alert) => {
-          if (!alert || !alert.fingerprint) return;
-
-          // 1. Show notification toast
+          if (!alert) return;
           showSystemToast(alert);
-
-          // 2. Immediately refetch authoritative DB alerts and summary
-          fetchTableAlerts(true);
-          fetchMonitoringSummary();
+          triggerManualRefresh();
         });
 
         await signalRConnection.start();
-        if (signalRPill) {
-          signalRPill.className = 'status-pill signalr-up';
-          signalRText.textContent = 'Realtime: Đã kết nối';
-        }
       } catch (err) {
-        if (signalRPill) {
-          signalRPill.className = 'status-pill signalr-down';
-          signalRText.textContent = 'Realtime: Ngoại tuyến (Polling 5s)';
-        }
+        // Fallback gracefully to polling
       }
+    }
+
+    function formatDateTime(isoStr) {
+      if (!isoStr) return '-';
+      try {
+        const d = new Date(isoStr);
+        return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ' +
+               d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      } catch {
+        return isoStr;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function logout() {
+      localStorage.clear();
+      window.location.href = './login.html';
     }
   </script>
 </body>
