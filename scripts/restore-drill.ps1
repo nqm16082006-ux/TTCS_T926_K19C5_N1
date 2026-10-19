@@ -92,7 +92,13 @@ if ([string]::IsNullOrWhiteSpace($BackupDir)) {
 
 # S-55 Docker mode: chon Native hoac Docker cho pg_restore/psql
 # (tham so -PgToolMode, hoac env S55_PG_TOOL_MODE; mac dinh Native).
-$effectivePgToolMode = Resolve-S55PgToolMode -ToolMode $PgToolMode
+$effectivePgToolMode = $null
+try {
+    $effectivePgToolMode = Resolve-S55PgToolMode -ToolMode $PgToolMode
+} catch {
+    Write-Error "[LOI CAU HINH] $($_.Exception.Message)"
+    exit 1
+}
 Set-S55PgToolMode -Mode $effectivePgToolMode -DockerImage $PgDockerImage
 Write-Host "[TOOL MODE] PostgreSQL client mode: $effectivePgToolMode"
 
@@ -779,7 +785,9 @@ try {
 
     foreach ($tbl in $tablesList) {
         $cleanTbl = $tbl.Trim()
-        $cntQuery = 'SELECT count(*) FROM "' + $cleanTbl + '";'
+        # Bao toan ten bang chinh xac (ke ca CamelCase) va escape dau ngoac kep (" -> "")
+        $escapedTbl = '"' + $cleanTbl.Replace('"', '""') + '"'
+        $cntQuery = "SELECT count(*) FROM $escapedTbl;"
         try {
             $rowCnt = (Invoke-PgSqlQuery -PsqlExe $resolvedPsql -ConnParams $targetParams -DatabaseName $TargetDatabase -Query $cntQuery).Trim()
             $tableStats += [PSCustomObject]@{ TableName = $cleanTbl; RowCount = [int]$rowCnt }

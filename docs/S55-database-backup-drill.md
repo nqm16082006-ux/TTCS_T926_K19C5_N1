@@ -140,7 +140,7 @@ Khi máy chạy backup/restore **không cài PostgreSQL client**, các script c�
   .\scripts\restore-drill.ps1 -PgToolMode Docker -KeepDrillDb
   ```
 - **Lưu ý:** `run-drill-env.ps1` chạy restore-drill bên trong runner container (đã có sẵn pg tools) — runbook luôn ép `-PgToolMode Native` cho bước này để tránh docker-in-docker.
-- **Phạm vi kiểm chứng:** đã xác minh runtime cơ chế wrapper (`pg_dump --version`/`psql --version` qua Docker trả về PostgreSQL 18.6) và 23 test offline; **chưa** chạy backup/restore thật qua Docker mode — thuộc bước xác minh trước lần backup offsite đầu tiên.
+- **Phạm vi kiểm chứng (cập nhật 19/10/2026):** đã chạy **backup VÀ restore drill thật qua Docker mode** (`-PgToolMode Docker`, image `postgres:18-alpine`, máy không cài PostgreSQL client): restore drill PASS trên bản dump thật 18/10 (42 migrations, 31 bảng, 34 FK, RTO 27.5s, baseline khớp) và backup thật tạo dump 670.631 bytes với baseline 33 bảng (32 bảng nguồn + marker drill), row counts khớp 100% với manifest gốc Neon, SHA-256 khớp manifest. Kiểm thử fail-closed thật: sai mật khẩu, cổng sai, image thiếu, thiếu Docker CLI, mode không hợp lệ → đều exit 1, không publish artifact, không để file staging, backup cũ nguyên vẹn. Consistency guard mới (đếm row counts trước/sau dump, hủy backup khi lệch) đã được kiểm chứng thật với writer ghi song song. Bộ test offline nâng lên 45 test (thêm F7 quoting MSVCRT + guard).
 
 ---
 
@@ -235,6 +235,7 @@ Khi xảy ra thảm họa mất dữ liệu trên môi trường chính (Product
 | `root certificate file "/root/.postgresql/root.crt" does not exist` | Client chạy trong container Linux không có file chứng chỉ gốc mặc định. | Đã xử lý tự động: script đặt `PGSSLROOTCERT=system` trên Linux; cần gói `ca-certificates` trong container runner. |
 | `pg_dump: aborting because of server version mismatch` | Server nguồn (Neon 18.6) mới hơn client (16.x). | Dùng client PostgreSQL 18 (image `postgres:18-alpine` hoặc cài client 18). Client mới hơn luôn dump/restore được server cũ hơn. |
 | `Error: in 18+, these Docker images are configured...` khi dựng PostgreSQL drill | Image PostgreSQL 18+ từ chối mount volume tại `/var/lib/postgresql/data` (cần mount tại `/var/lib/postgresql` để hỗ trợ `pg_upgrade --link`). | Đã xử lý: `run-drill-env.ps1` mount volume drill tại `/var/lib/postgresql`. Nếu tự dựng container 18+ bằng tay, mount tại `/var/lib/postgresql` thay vì `/var/lib/postgresql/data`. |
+| `pg_restore: unrecognized configuration parameter "transaction_timeout"` (exit code 1) | Dump tạo từ server PostgreSQL 17+ (chứa `SET transaction_timeout = 0;`) được restore vào **server PostgreSQL 16 trở xuống** — GUC này chỉ tồn tại từ PG 17. | Dùng server đích PG 17+ (runbook `run-drill-env.ps1` dùng image `postgres:18-alpine`); hoặc dùng pg_restore 16 với server 16 cho dump tạo bởi pg_dump 16. Lưu ý: đây là hạn chế đúng chuẩn PostgreSQL — dump từ server mới hơn không thể restore nguyên vẹn vào server cũ hơn. |
 
 ---
 
@@ -290,17 +291,41 @@ Retention offsite đã xử lý **cả hai** dạng tên object mà `rclone lsjs
 
 Kết quả phải hiển thị `Name` có hoặc không có tiền tố `s55/` — cả hai đều được script hỗ trợ; nếu có dạng khác, dừng và báo lại trước khi bật retention.
 
-### 8.3. Quy trình Upload và Xác minh Ngoại vi R2 (Download & Hash Verification)
-1. Upload file mã hóa `.dump.age` và manifest `.json` lên Cloudflare R2 qua công cụ `rclone` (S3 API).
-2. **Không tin cậy mù quáng vào mã thoát (exit code 0):** Script tải ngược file mã hóa từ R2 về một thư mục tạm biệt lập.
-3. Tính toán lại mã băm SHA-256 của file vừa tải về và so sánh trực tiếp với `encryptedSha256` trong manifest.
-4. Chỉ khi mã băm khớp 100% từng bit: Hệ thống mới cập nhật `offsiteStatus = "VerifiedUploaded"` và đồng bộ lại manifest lên remote.
-5. Nếu lệch hash hoặc tải thất bại: Ném ngoại lệ, **tuyệt đối không đánh dấu VerifiedUploaded**, và dừng ngay trước khi thực thi retention.
+### 8.3. Quản lý Tiến trình rclone & Quy trình Upload / Xác minh Ngoại vi R2
 
-### 8.4. Chính sách Retention Offsite 14 Bản Độc lập (Fail-Safe & Namespace Isolation)
+#### A. Quản lý Tiến trình rclone An toàn (Timeout, Deadlock-Free & Masking)
+1. **Quoting chuẩn MSVCRT:** Sử dụng `ConvertTo-S55CliArgumentLine` từ `scripts/s55-common.ps1` để sinh chuỗi tham số cho `ProcessStartInfo`, bảo đảm an toàn khi đối số chứa khoảng trắng, ngoặc kép hoặc ký tự đặc biệt theo chuẩn Windows CLI.
+2. **Timeout có thể cấu hình:** Mặc định 300 giây (5 phút), tham số hóa qua `-TimeoutSeconds`.
+3. **Đọc stream bất đồng bộ (Non-blocking Async):** Sử dụng `ReadToEndAsync()` song song cho cả `stdout` và `stderr` trước khi gọi `WaitForExit`. Ngăn chặn hoàn toàn hiện tượng deadlock pipe buffer khi rclone xả log dung lượng lớn (đã xác thực qua test tải đồng thời 64KB stdout + 64KB stderr).
+4. **Hạ gục tiến trình an toàn (Process Kill):** Kiểm tra `WaitForExit($TimeoutSeconds * 1000)`. Nếu quá hạn, dừng ngay tiến trình bằng `$process.Kill($true)` (fallback `$process.Kill()`), chờ tối đa 10 giây để giải phóng tài nguyên, và ném lỗi rõ ràng chứa nhãn `[TIMEOUT]`, thời lượng và trạng thái giải phóng tiến trình.
+5. **Zero Credential Leakage:** Tự động che `AccessKeyId` và `SecretAccessKey` thành `***` trên toàn bộ output stdout, stderr, exception message và log. Tuyệt đối không để lộ credential ngay cả khi tiến trình gặp lỗi hoặc timeout.
+
+#### B. Quy trình Upload và Xác minh Manifest Hai Chiều (Two-Stage Verification)
+1. Upload file mã hóa `.dump.age` và manifest sơ bộ `.json` lên Cloudflare R2 qua `rclone copyto`.
+2. **Xác minh manifest remote ban đầu:** Tải manifest từ R2 về thư mục tạm độc lập, kiểm tra JSON hợp lệ, trường bắt buộc (`backupId`, `encryptedSha256`), đối chiếu `backupId` tiền tố `ep-backup-` và `encryptedSha256` 64 ký tự hex khớp 100% với local manifest.
+3. **Tải ngược và đối chiếu SHA-256 (Download & Hash Verification):**
+   - Script tải ngược file mã hóa `.dump.age` từ R2 về thư mục tạm biệt lập.
+   - Tính toán lại mã băm SHA-256 độc lập của file tải về và so sánh trực tiếp với `encryptedSha256` trong manifest.
+4. **Cập nhật và Read-back Manifest cuối cùng:**
+   - Khi hash khớp 100%, cập nhật local manifest thành `offsiteStatus = "VerifiedUploaded"` và `offsiteVerifiedAtUtc`.
+   - Upload manifest đã cập nhật lên Cloudflare R2.
+   - **Read-back verification:** Tải lại manifest lần 2 từ R2. Chỉ khi manifest đọc lại hợp lệ, `backupId` đúng, `encryptedSha256` đúng và `offsiteStatus` chính xác là `VerifiedUploaded` thì hàm upload mới trả về `Success = $true`.
+5. **Fail-Safe & Dọn dẹp:** Nếu bất kỳ bước upload, download, hash check hay manifest read-back nào thất bại, hệ thống ném ngoại lệ, **tuyệt đối không trả Success**, và dọn dẹp thư mục tạm trong khối `finally` mà không xóa file nguồn ngoài ý muốn.
+
+### 8.4. Chính sách Retention Offsite 14 Bản Độc lập (Fail-Safe, Namespace Isolation & Partial Failure)
 - **Giữ tối đa 14 bản backup hợp lệ gần nhất** trên Cloudflare R2.
 - **Quy tắc an toàn sống còn (Fail-Safe):** Nếu việc upload hoặc xác minh bản mới gặp lỗi (`IsUploadFailed = $true`), hệ thống lập tức hủy tác vụ retention, **tuyệt đối không xóa bản backup thứ 15 hoặc bất kỳ object cũ nào**.
-- **Retention lỗi sau khi upload đã VerifiedUploaded (F5):** lỗi retention transient (mạng/quyền) chỉ cảnh báo `[OFFSITE RETENTION FAILED]` và trả về trạng thái `RetentionFailedNonBlocking` — bản backup vẫn được tính là thành công (đã upload + xác minh); người vận hành cần chạy lại retention thủ công. Ngược lại, retention **không bao giờ** chạy khi upload/verification chưa thành công.
+- **Kiểm định Candidate Manifest trước khi đưa vào tập hợp lệ:**
+  - Quét danh sách object từ remote, chỉ ghép cặp khi có đủ `.dump.age` và `.json` cùng timestamp.
+  - Sử dụng `rclone cat` kiểm tra manifest candidate: parse JSON, kiểm tra `backupId`, `encryptedSha256` 64-char hex và bắt buộc `offsiteStatus == "VerifiedUploaded"`.
+  - Manifest lỗi, hỏng JSON hoặc chưa `VerifiedUploaded` bị loại khỏi tập backup hợp lệ, ghi log cảnh báo và **không xóa các file lạ, thư mục con hoặc ngoài prefix**.
+  - Nếu số bản backup hợp lệ không vượt quá giới hạn (`<= 14`), không thực hiện lệnh xóa nào.
+- **Thứ tự Xóa Giảm thiểu Rủi ro & Xử lý Partial Failure:**
+  - Vì Cloudflare R2 / S3 API không cung cấp giao dịch atomic cho hai object độc lập, hệ thống không tuyên bố xóa cặp là atomic.
+  - **Thứ tự xóa:** Luôn thực hiện xóa file `.dump.age` trước, sau đó mới xóa manifest `.json`. Thứ tự này bảo đảm nếu có sự cố mạng giữa chừng, manifest còn lại giúp ghi nhận tình trạng orphan thay vì xóa manifest trước làm mất dấu file dump mã hóa.
+  - **Nếu xóa dump thất bại:** Dừng ngay lập tức, không xóa manifest, ném ngoại lệ với trạng thái `Failed`.
+  - **Nếu xóa dump thành công nhưng xóa manifest thất bại:** Ghi nhận cảnh báo, đánh dấu `partialFailure = $true`, dừng vòng lặp xóa ngay lập tức và ném ngoại lệ chứa trạng thái `PartialFailure` kèm thông tin chi tiết file đã xóa và orphan manifest còn lại để người vận hành xử lý mà không chứa bí mật.
+- **Retention lỗi sau khi upload đã VerifiedUploaded (F5):** Lỗi retention transient (mạng/quyền) chỉ cảnh báo `[OFFSITE RETENTION FAILED]` và trả về trạng thái `RetentionFailedNonBlocking` — bản backup mới vẫn được bảo toàn (đã upload + xác minh).
 - **Cách ly Namespace (Namespace Guard):** Hệ thống chỉ nhận diện và xử lý các object khớp đúng quy ước `eventpulse_backup_\d{8}_\d{6}\.(dump\.age|json)`. Mọi object ngoài namespace (như file sao lưu của hệ thống khác, file log, thư mục khác trong bucket) được bảo vệ tuyệt đối 100%, không bao giờ bị xóa nhầm.
 
 ### 8.5. Ma trận Phân định Cấu hình & Hiện trạng Kiểm thử
@@ -310,14 +335,15 @@ Kết quả phải hiển thị `Name` có hoặc không có tiền tố `s55/` 
 
 | Hạng mục | Trạng thái hiện tại | Chi tiết |
 |---|---|---|
-| **Module `scripts/backup-upload-r2.ps1`** | **ĐÃ TRIỂN KHAI** | Hỗ trợ đầy đủ logic validation, mã hóa `age`, upload R2 qua `rclone`, download SHA-256 verify và retention 14 bản. |
+| **Module `scripts/backup-upload-r2.ps1`** | **ĐÃ TRIỂN KHAI & NÂNG CẤP** | Đã hoàn thiện: Quản lý tiến trình rclone với async stream + timeout kill (300s), che giấu secret; quy trình xác minh manifest 2 chiều (download hash verify + manifest read-back); retention an toàn kiểm tra candidate manifest, thứ tự xóa dump-first và xử lý `PartialFailure`. |
 | **Tích hợp `scripts/backup-db.ps1`** | **ĐÃ TRIỂN KHAI** | Bổ sung các tham số `-EnableOffsite`, `-AgeRecipientKey`, `-R2BucketName`, cập nhật manifest Version 2.0 dual-hash. |
 | **Tương thích `scripts/restore-drill.ps1`** | **ĐÃ TRIỂN KHAI** | Hỗ trợ xác thực file `.dump.age` qua `encryptedSha256` trong manifest và cơ chế giải mã an toàn qua `-AgeIdentityFile`. |
 | **Cặp khóa age (`age1...` / `AGE-SECRET-KEY-1...`)** | **CẦN NGƯỜI DÙNG THIẾT LẬP** | Người vận hành cần tự sinh cặp khóa thật qua lệnh `age-keygen -o key.txt`, chỉ đưa public key lên server. |
 | **Bucket Cloudflare R2 & API Token** | **CẦN NGƯỜI DÙNG THIẾT LẬP** | Cần tạo Bucket riêng trên Cloudflare Dashboard và cấp API Token có quyền Object Read/Write trên bucket đó. |
 | **Các giá trị trong tài liệu/test** | **CHỈ LÀ VÍ DỤ** | Mọi chuỗi `age1ql3z...`, `test_key_id`, `eventpulse-backup-prod` trong tài liệu/test chỉ là dữ liệu giả lập. |
-| **Bộ kiểm thử Phase 3 (`test-s55-phase3-offline.ps1`)** | **ĐÃ CHẠY & PASS (25/25)** | Đã kiểm thử 100% offline: validation config, age key format, error cleanup, dual hash, upload failure, checksum mismatch, retention 14 bản, namespace guard, masking secrets. |
-| **Kết nối Cloudflare R2 & Database thật** | **DATABASE THẬT: ĐÃ CHẠY (18/10/2026)** | Backup thật từ Neon cloud `neondb` (PostgreSQL 18.6) thành công: `artifacts/database-backups/eventpulse_backup_20261018_072456.dump` (671.084 bytes, SHA-256 + baseline 32 bảng). **R2: CHƯA CHẠY** — chưa có credentials (cần người dùng tạo bucket + API token). |
+| **Bộ kiểm thử Phase 3 (`test-s55-phase3-offline.ps1`)** | **ĐÃ CHẠY & PASS (39/39)** | Đã kiểm thử 100% offline: validation config, age key format, error cleanup, dual hash, upload failure, checksum mismatch, manifest sai backupId/encryptedSha256, manifest read-back thất bại, rclone timeout 1s kill, rclone concurrent 64KB stdout/stderr không deadlock, secret masking, candidate manifest hỏng bị loại, retention partial failure (xóa dump OK xóa manifest FAIL), retention failed (xóa dump FAIL dừng ngay), retention 14 bản, namespace guard, prefix R2. |
+| **Bộ kiểm thử Docker Mode (`test-s55-docker-mode-offline.ps1`)** | **ĐÃ CHẠY & PASS (45/45)** | Kiểm thử offline toàn diện: Resolve mode, path translation, container args, env injection prevention, non-blocking retention (F5), MSVCRT quoting (F7), 2-pass schema consistency guard. |
+| **Kết nối Cloudflare R2 & Database thật** | **DATABASE THẬT: ĐÃ CHẠY (18/10/2026)** | Backup thật từ Neon cloud `neondb` (PostgreSQL 18.6) thành công: `artifacts/database-backups/eventpulse_backup_20261018_072456.dump` (671.084 bytes, SHA-256 + baseline 32 bảng). **R2 THẬT: CHƯA CHẠY** — chưa có credentials/bucket thật (cần người dùng cấp bucket + API token để kiểm chứng live). |
 | **Smoke Test API trên DB đã restore (Phase 4)** | **ĐÃ CHẠY & PASS (18/10/2026)** | Runbook `scripts/run-drill-env.ps1` hoàn tất end-to-end trên bản backup thật `eventpulse_backup_20261018_072456.dump` (Neon 18.6): restore PASS (42 migrations, 31 bảng, 34 FK, 100 index, baseline 0 lệch, **RTO 2.07s ≤ 900s**), API khởi động môi trường `Drill` (Mock payment + SMTP tắt + AutoMigrate/AutoSeed tắt), smoke test 3 endpoint `/api/health`, `/api/public/events`, `/api/public/showtimes` đều HTTP 200, dọn dẹp có xác minh ownership marker + snapshot container trước/sau trùng khớp (isolation confirmed). Bằng chứng lưu tại `artifacts/drill-evidence/` (drill-result.json, smoke_test_report.txt, docker_snapshot_before/after.txt). Các lỗi phát hiện trong lần chạy đầu đã sửa: mount volume PG 18+ tại `/var/lib/postgresql`, đối chiếu baseline bảng tiền tố `__` (hàm `Compare-S55BaselineRowCounts` + 4 regression test), môi trường API drill `ASPNETCORE_ENVIRONMENT=Drill`. |
 
 ### 8.6. Hướng dẫn Chuẩn bị Cấu hình cho Vận hành Thật

@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     S-55 Phase 3: BỘ KIỂM THỬ OFFLINE CHO OFFSITE BACKUP & MÃ HÓA CLIENT-SIDE BẰNG AGE
 .DESCRIPTION
@@ -454,16 +454,24 @@ Run-Phase3Test 'R2 Upload: Upload va Checksum khop 100% -> Danh dau VerifiedUplo
         }
         $mfObj | ConvertTo-Json | Set-Content -LiteralPath $mfPath -Encoding utf8
 
+        $mockState = @{
+            remoteStoredManifest = ($mfObj | ConvertTo-Json)
+        }
         $res = Invoke-R2BackupUpload -EncryptedFilePath $encPath -ManifestFilePath $mfPath -R2Config $mockR2Cfg -MockCommandBlock {
             param($Command, $Arguments, $R2Config)
             $action = $Arguments[0]
+            $source = $Arguments[1]
             $target = $Arguments[$Arguments.Count - 1]
-            if ($action -eq "copyto" -and $target -match 's55_r2_verify_') {
-                if ($target.EndsWith(".dump.age")) {
-                    # Tra ve file co hash khop tuyet doi
-                    [System.IO.File]::WriteAllBytes($target, $dummyBytes)
-                } elseif ($target.EndsWith(".json")) {
-                    $mfObj | ConvertTo-Json | Set-Content -LiteralPath $target -Encoding utf8
+            if ($action -eq "copyto") {
+                if ($source -eq $mfPath -and $target -match '\.json$') {
+                    $mockState.remoteStoredManifest = Get-Content -LiteralPath $source -Raw
+                }
+                if ($target -match 's55_r2_verify_') {
+                    if ($target.EndsWith(".dump.age")) {
+                        [System.IO.File]::WriteAllBytes($target, $dummyBytes)
+                    } elseif ($target.EndsWith(".json")) {
+                        [System.IO.File]::WriteAllText($target, $mockState.remoteStoredManifest, [System.Text.Encoding]::UTF8)
+                    }
                 }
             }
             return @{ ExitCode = 0 }
@@ -477,6 +485,379 @@ Run-Phase3Test 'R2 Upload: Upload va Checksum khop 100% -> Danh dau VerifiedUplo
     } finally {
         Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
     }
+}
+
+Run-Phase3Test 'R2 Upload: Manifest remote sai backupId -> Nem ngoai le va khong danh dau VerifiedUploaded' {
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("s55_up_bad_id_" + [Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+    try {
+        $encPath = Join-Path $tempDir "eventpulse_backup_20261018_120000.dump.age"
+        $mfPath = Join-Path $tempDir "eventpulse_backup_20261018_120000.json"
+        $dummyBytes = [System.Text.Encoding]::UTF8.GetBytes("DUMMY_DATA")
+        [System.IO.File]::WriteAllBytes($encPath, $dummyBytes)
+        $encSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $encPath).Hash
+
+        $mfObj = [PSCustomObject]@{
+            backupId        = "ep-backup-correct-id"
+            manifestVersion = "2.0"
+            backupFile      = "eventpulse_backup_20261018_120000.dump"
+            encryptedFile   = "eventpulse_backup_20261018_120000.dump.age"
+            plaintextSha256 = "dummy_pt_sha"
+            encryptedSha256 = $encSha
+            status          = "VerifiedValid"
+            offsiteStatus   = "Pending"
+        }
+        $mfObj | ConvertTo-Json | Set-Content -LiteralPath $mfPath -Encoding utf8
+
+        $badRemoteMf = [PSCustomObject]@{
+            backupId        = "ep-backup-WRONG-ID"
+            encryptedSha256 = $encSha
+            offsiteStatus   = "Pending"
+        } | ConvertTo-Json
+
+        $caughtErr = $null
+        try {
+            Invoke-R2BackupUpload -EncryptedFilePath $encPath -ManifestFilePath $mfPath -R2Config $mockR2Cfg -MockCommandBlock {
+                param($Command, $Arguments, $R2Config)
+                $action = $Arguments[0]
+                $target = $Arguments[$Arguments.Count - 1]
+                if ($action -eq "copyto" -and $target -match 's55_r2_verify_') {
+                    if ($target.EndsWith(".dump.age")) {
+                        [System.IO.File]::WriteAllBytes($target, $dummyBytes)
+                    } elseif ($target.EndsWith(".json")) {
+                        [System.IO.File]::WriteAllText($target, $badRemoteMf, [System.Text.Encoding]::UTF8)
+                    }
+                }
+                return @{ ExitCode = 0 }
+            } | Out-Null
+        } catch {
+            $caughtErr = $_.Exception.Message
+        }
+
+        if ($null -eq $caughtErr -or $caughtErr -notmatch 'khong khop backupId') {
+            throw "Khong bat duoc loi sai backupId: $caughtErr"
+        }
+        $curr = Get-Content -LiteralPath $mfPath -Raw | ConvertFrom-Json
+        if ($curr.offsiteStatus -eq "VerifiedUploaded") { throw "Sai backupId nhung van danh dau VerifiedUploaded!" }
+    } finally {
+        Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Run-Phase3Test 'R2 Upload: Manifest remote sai encryptedSha256 -> Nem ngoai le va khong danh dau VerifiedUploaded' {
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("s55_up_bad_hash_" + [Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+    try {
+        $encPath = Join-Path $tempDir "eventpulse_backup_20261018_120000.dump.age"
+        $mfPath = Join-Path $tempDir "eventpulse_backup_20261018_120000.json"
+        $dummyBytes = [System.Text.Encoding]::UTF8.GetBytes("DUMMY_DATA")
+        [System.IO.File]::WriteAllBytes($encPath, $dummyBytes)
+        $encSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $encPath).Hash
+
+        $mfObj = [PSCustomObject]@{
+            backupId        = "ep-backup-good-id"
+            manifestVersion = "2.0"
+            backupFile      = "eventpulse_backup_20261018_120000.dump"
+            encryptedFile   = "eventpulse_backup_20261018_120000.dump.age"
+            plaintextSha256 = "dummy_pt_sha"
+            encryptedSha256 = $encSha
+            status          = "VerifiedValid"
+            offsiteStatus   = "Pending"
+        }
+        $mfObj | ConvertTo-Json | Set-Content -LiteralPath $mfPath -Encoding utf8
+
+        $badRemoteMf = [PSCustomObject]@{
+            backupId        = "ep-backup-good-id"
+            encryptedSha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+            offsiteStatus   = "Pending"
+        } | ConvertTo-Json
+
+        $caughtErr = $null
+        try {
+            Invoke-R2BackupUpload -EncryptedFilePath $encPath -ManifestFilePath $mfPath -R2Config $mockR2Cfg -MockCommandBlock {
+                param($Command, $Arguments, $R2Config)
+                $action = $Arguments[0]
+                $target = $Arguments[$Arguments.Count - 1]
+                if ($action -eq "copyto" -and $target -match 's55_r2_verify_') {
+                    if ($target.EndsWith(".dump.age")) {
+                        [System.IO.File]::WriteAllBytes($target, $dummyBytes)
+                    } elseif ($target.EndsWith(".json")) {
+                        [System.IO.File]::WriteAllText($target, $badRemoteMf, [System.Text.Encoding]::UTF8)
+                    }
+                }
+                return @{ ExitCode = 0 }
+            } | Out-Null
+        } catch {
+            $caughtErr = $_.Exception.Message
+        }
+
+        if ($null -eq $caughtErr -or $caughtErr -notmatch 'KHONG KHOP voi local') {
+            throw "Khong bat duoc loi sai encryptedSha256 tren manifest: $caughtErr"
+        }
+        $curr = Get-Content -LiteralPath $mfPath -Raw | ConvertFrom-Json
+        if ($curr.offsiteStatus -eq "VerifiedUploaded") { throw "Sai encryptedSha256 nhung van danh dau VerifiedUploaded!" }
+    } finally {
+        Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Run-Phase3Test 'R2 Upload: Manifest readback tren remote khong cap nhat VerifiedUploaded -> Nem ngoai le va khong thanh cong' {
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("s55_up_no_update_" + [Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+    try {
+        $encPath = Join-Path $tempDir "eventpulse_backup_20261018_120000.dump.age"
+        $mfPath = Join-Path $tempDir "eventpulse_backup_20261018_120000.json"
+        $dummyBytes = [System.Text.Encoding]::UTF8.GetBytes("DUMMY_DATA")
+        [System.IO.File]::WriteAllBytes($encPath, $dummyBytes)
+        $encSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $encPath).Hash
+
+        $mfObj = [PSCustomObject]@{
+            backupId        = "ep-backup-good-id"
+            manifestVersion = "2.0"
+            backupFile      = "eventpulse_backup_20261018_120000.dump"
+            encryptedFile   = "eventpulse_backup_20261018_120000.dump.age"
+            plaintextSha256 = "dummy_pt_sha"
+            encryptedSha256 = $encSha
+            status          = "VerifiedValid"
+            offsiteStatus   = "Pending"
+        }
+        $mfObj | ConvertTo-Json | Set-Content -LiteralPath $mfPath -Encoding utf8
+
+        # Remote bi treo/khong cap nhat: luon tra ve manifest cu voi offsiteStatus='Pending'
+        $remoteStuckManifest = $mfObj | ConvertTo-Json
+
+        $caughtErr = $null
+        try {
+            Invoke-R2BackupUpload -EncryptedFilePath $encPath -ManifestFilePath $mfPath -R2Config $mockR2Cfg -MockCommandBlock {
+                param($Command, $Arguments, $R2Config)
+                $action = $Arguments[0]
+                $target = $Arguments[$Arguments.Count - 1]
+                if ($action -eq "copyto" -and $target -match 's55_r2_verify_') {
+                    if ($target.EndsWith(".dump.age")) {
+                        [System.IO.File]::WriteAllBytes($target, $dummyBytes)
+                    } elseif ($target.EndsWith(".json")) {
+                        # Remote khong luu thay doi, van tra ve status Pending
+                        [System.IO.File]::WriteAllText($target, $remoteStuckManifest, [System.Text.Encoding]::UTF8)
+                    }
+                }
+                return @{ ExitCode = 0 }
+            } | Out-Null
+        } catch {
+            $caughtErr = $_.Exception.Message
+        }
+
+        if ($null -eq $caughtErr -or $caughtErr -notmatch 'chua cap nhat trang thai') {
+            throw "Khong bat duoc loi readback manifest chua cap nhat: $caughtErr"
+        }
+    } finally {
+        Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+
+# ==============================================================================
+# NHÓM 6B: FIX 403 — RCLONE ENV CONFIG (NO_CHECK_BUCKET) & MASK SECRET
+# ==============================================================================
+Write-Host "`n--- [NHOM 6B] RCLONE ENV CONFIG: NO_CHECK_BUCKET + MASK SECRET ---"
+
+Run-Phase3Test 'R2 rclone env: NO_CHECK_BUCKET=true va anh xa day du cau hinh remote (mock doc env)' {
+    $cfg = @{
+        AccountId       = "0123456789abcdef0123456789abcdef"
+        BucketName      = "s55-postgres-backup"
+        AccessKeyId     = "test_ak_id"
+        SecretAccessKey = "test_sk_secret"
+        Prefix          = "database-backups"
+        Endpoint        = "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com"
+    }
+    $script:r2EnvSeen = $null
+    Invoke-RcloneCommand -Arguments @("lsf", "R2:s55-postgres-backup/database-backups") -R2Config $cfg -MockCommandBlock {
+        param($Command, $Arguments, $ArgsList, $R2Config)
+        $script:r2EnvSeen = @{
+            Type          = $env:RCLONE_CONFIG_R2_TYPE
+            Provider      = $env:RCLONE_CONFIG_R2_PROVIDER
+            AccessKeyId   = $env:RCLONE_CONFIG_R2_ACCESS_KEY_ID
+            Secret        = $env:RCLONE_CONFIG_R2_SECRET_ACCESS_KEY
+            Endpoint      = $env:RCLONE_CONFIG_R2_ENDPOINT
+            NoCheckBucket = $env:RCLONE_CONFIG_R2_NO_CHECK_BUCKET
+        }
+        return @{ ExitCode = 0 }
+    } | Out-Null
+
+    $seen = $script:r2EnvSeen
+    if ($null -eq $seen) { throw "Mock khong duoc goi" }
+    if ($seen.Type -ne 's3') { throw "Sai TYPE: $($seen.Type)" }
+    if ($seen.Provider -ne 'Cloudflare') { throw "Sai PROVIDER: $($seen.Provider)" }
+    if ($seen.AccessKeyId -ne 'test_ak_id') { throw "Sai ACCESS_KEY_ID" }
+    if ($seen.Secret -ne 'test_sk_secret') { throw "Sai SECRET_ACCESS_KEY" }
+    if ($seen.Endpoint -ne 'https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com') { throw "Sai ENDPOINT" }
+    if ($seen.NoCheckBucket -ne 'true') { throw "THIEU NO_CHECK_BUCKET=true (nguyen nhan 403 CreateBucket): $($seen.NoCheckBucket)" }
+}
+
+Run-Phase3Test 'R2 rclone env: env duoc don sach sau khi chay (ke ca mock)' {
+    $targetVars = @(
+        'RCLONE_CONFIG_R2_TYPE',
+        'RCLONE_CONFIG_R2_PROVIDER',
+        'RCLONE_CONFIG_R2_ACCESS_KEY_ID',
+        'RCLONE_CONFIG_R2_SECRET_ACCESS_KEY',
+        'RCLONE_CONFIG_R2_ENDPOINT',
+        'RCLONE_CONFIG_R2_NO_CHECK_BUCKET'
+    )
+
+    # 1. Chụp trạng thái ban đầu của đúng 6 biến trước khi gọi Invoke-RcloneCommand
+    # Phân biệt rõ biến không tồn tại (Exists=$false, Value=$null) với biến tồn tại
+    # có giá trị rỗng (Exists=$true, Value="")
+    $initialStates = @{}
+    foreach ($v in $targetVars) {
+        $item = Get-Item "env:$v" -ErrorAction SilentlyContinue
+        $exists = ($null -ne $item) -or (Test-Path "env:$v")
+        $initialStates[$v] = @{
+            Exists = $exists
+            Value  = if ($exists -and $null -ne $item) {
+                $item.Value
+            } elseif ($exists) {
+                [System.Environment]::GetEnvironmentVariable($v, [System.EnvironmentVariableTarget]::Process)
+            } else {
+                $null
+            }
+        }
+    }
+
+    # 2. Gọi hàm với mock như test hiện tại
+    $cfg = @{
+        AccountId       = "0123456789abcdef0123456789abcdef"
+        BucketName      = "s55-postgres-backup"
+        AccessKeyId     = "test_ak_id"
+        SecretAccessKey = "test_sk_secret"
+        Prefix          = "database-backups"
+    }
+    Invoke-RcloneCommand -Arguments @("lsf", "R2:b/p") -R2Config $cfg -MockCommandBlock {
+        param($Command) return @{ ExitCode = 0 }
+    } | Out-Null
+
+    # 3. So sánh trạng thái từng biến với trạng thái ban đầu đã chụp
+    # - Nếu ban đầu không tồn tại -> sau khi gọi phải không tồn tại
+    # - Nếu ban đầu tồn tại -> sau khi gọi phải giữ nguyên giá trị ban đầu
+    # Tuyệt đối không in giá trị bí mật (như AccessKeyId, SecretAccessKey) ra log
+    $errors = @()
+    foreach ($v in $targetVars) {
+        $init = $initialStates[$v]
+        $item = Get-Item "env:$v" -ErrorAction SilentlyContinue
+        $currentExists = ($null -ne $item) -or (Test-Path "env:$v")
+        $currentValue = if ($currentExists -and $null -ne $item) {
+            $item.Value
+        } elseif ($currentExists) {
+            [System.Environment]::GetEnvironmentVariable($v, [System.EnvironmentVariableTarget]::Process)
+        } else {
+            $null
+        }
+
+        if (-not $init.Exists) {
+            if ($currentExists) {
+                $errors += "Bien '$v' ban dau khong ton tai nhung van con sot lai sau khi thuc thi."
+            }
+        } else {
+            if (-not $currentExists) {
+                $errors += "Bien '$v' ban dau ton tai nhung bi xoa mat sau khi thuc thi."
+            } elseif ($currentValue -ne $init.Value) {
+                $errors += "Bien '$v' khong duoc khoi phuc ve dung gia tri ban dau."
+            }
+        }
+    }
+
+    if ($errors.Count -gt 0) {
+        throw "Loi khoi phuc bien moi truong: $($errors -join '; ')"
+    }
+}
+
+Run-Phase3Test 'R2 rclone: mock van nhan R2Config goc (tuong thich nguoc voi test cu)' {
+    $cfg = @{
+        AccountId       = "0123456789abcdef0123456789abcdef"
+        BucketName      = "s55-postgres-backup"
+        AccessKeyId     = "test_ak_id"
+        SecretAccessKey = "test_sk_secret"
+        Prefix          = "database-backups"
+    }
+    $script:mockGotCfg = $null
+    Invoke-RcloneCommand -Arguments @("lsf", "R2:b/p") -R2Config $cfg -MockCommandBlock {
+        param($Command, $Arguments, $ArgsList, $R2Config)
+        $script:mockGotCfg = $R2Config
+        return @{ ExitCode = 0 }
+    } | Out-Null
+    if ($script:mockGotCfg.AccessKeyId -ne 'test_ak_id' -or $script:mockGotCfg.BucketName -ne 's55-postgres-backup') {
+        throw "Mock khong nhan R2Config dung"
+    }
+}
+
+Run-Phase3Test 'R2 rclone: exit code khac 0 -> nem loi va secret bi che trong exception (fake rclone = node.exe)' {
+    $nodeExe = (Get-Command node.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+    if ([string]::IsNullOrWhiteSpace($nodeExe)) {
+        Write-Host "   (SKIP) Khong tim thay node.exe de chay fake rclone thuc te"
+        return
+    }
+    $cfg = @{
+        AccountId       = "0123456789abcdef0123456789abcdef"
+        BucketName      = "s55-postgres-backup"
+        AccessKeyId     = "AKMARK_12345"
+        SecretAccessKey = "SKMARK_secret_999"
+        Prefix          = "database-backups"
+    }
+    # node.exe in stderr chuoi chua secret roi exit 2 — mo phong mot tien trinh
+    # rclone loi ma khong can ket noi cloud that.
+    $caught = $null
+    try {
+        Invoke-RcloneCommand -Arguments @("-e", "console.error(process.argv.slice(1).join(String.fromCharCode(32)));process.exit(2)", "copyto", "local-file-SKMARK_secret_999", "R2:s55-postgres-backup/database-backups/x") -R2Config $cfg -RcloneExePath $nodeExe | Out-Null
+    } catch { $caught = $_.Exception.Message }
+    if ($null -eq $caught) { throw "Phai nem loi khi exit code 2" }
+    if ($caught -notmatch 'ma thoat 2') { throw "Thieu ma thoat trong loi: $caught" }
+    if ($caught -match 'SKMARK_secret_999') { throw "SECRET BI LO trong exception!" }
+    if ($caught -notmatch '\*\*\*') { throw "Khong co dau hieu che secret" }
+    # Van phai giu duoc thong tin chan doan (ten file) sau khi che secret
+    if ($caught -notmatch 'local-file-') { throw "Thieu thong tin chan doan trong loi" }
+}
+
+Run-Phase3Test 'R2 rclone process: timeout sau 1 giay va tien trinh duoc dung an toan (fake rclone = node.exe)' {
+    $nodeExe = (Get-Command node.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+    if ([string]::IsNullOrWhiteSpace($nodeExe)) {
+        Write-Host "   (SKIP) Khong tim thay node.exe de chay fake rclone timeout"
+        return
+    }
+    $cfg = @{
+        AccountId       = "0123456789abcdef0123456789abcdef"
+        BucketName      = "s55-postgres-backup"
+        AccessKeyId     = "AKMARK_TIMEOUT_TEST"
+        SecretAccessKey = "SKMARK_TIMEOUT_SECRET"
+        Prefix          = "database-backups"
+    }
+    $caught = $null
+    try {
+        # node.exe ngu 10 giay, invoke voi TimeoutSeconds = 1
+        Invoke-RcloneCommand -Arguments @("-e", "setTimeout(() => {}, 10000)") -R2Config $cfg -RcloneExePath $nodeExe -TimeoutSeconds 1 | Out-Null
+    } catch {
+        $caught = $_.Exception.Message
+    }
+    if ($null -eq $caught) { throw "Phai nem loi timeout" }
+    if ($caught -notmatch '\[TIMEOUT\]') { throw "Thieu nhan [TIMEOUT] trong loi: $caught" }
+    if ($caught -notmatch '1 giay') { throw "Thieu thoi luong timeout trong loi: $caught" }
+    if ($caught -match 'SKMARK_TIMEOUT_SECRET' -or $caught -match 'AKMARK_TIMEOUT_TEST') { throw "Credential bi lo trong loi timeout!" }
+}
+
+Run-Phase3Test 'R2 rclone process: stdout va stderr lon dong thoi khong bi deadlock pipe (fake rclone = node.exe)' {
+    $nodeExe = (Get-Command node.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+    if ([string]::IsNullOrWhiteSpace($nodeExe)) {
+        Write-Host "   (SKIP) Khong tim thay node.exe de chay fake rclone deadlock"
+        return
+    }
+    $cfg = @{
+        AccountId       = "0123456789abcdef0123456789abcdef"
+        BucketName      = "s55-postgres-backup"
+        AccessKeyId     = "test_ak"
+        SecretAccessKey = "test_sk"
+        Prefix          = "database-backups"
+    }
+    # Ghi 64KB vao stdout va 64KB vao stderr dong thoi -> voi stream dong bo cu se deadlock pipe buffer
+    $res = Invoke-RcloneCommand -Arguments @("-e", "const s = 'X'.repeat(65536); process.stdout.write(s); process.stderr.write(s); process.exit(0);") -R2Config $cfg -RcloneExePath $nodeExe -TimeoutSeconds 10
+    if ($res.ExitCode -ne 0) { throw "Tien trinh that bai voi exit code: $($res.ExitCode)" }
+    if ($res.Output.Length -lt 65536) { throw "Output thu duoc qua ngan: $($res.Output.Length)" }
 }
 
 # ==============================================================================
@@ -623,6 +1004,121 @@ Run-Phase3Test 'R2 Retention: Namespace Guard - File khac namespace khong bao gi
         throw "File la ngoai namespace bi xoa nham: $($retResult.DeletedFiles -join ', ')"
     }
     if ($retResult.DeletedCount -ne 2) { throw "So file xoa khong dung: $($retResult.DeletedCount)" }
+}
+
+Run-Phase3Test 'R2 Retention: Manifest candidate bi hong hoac chua VerifiedUploaded -> Bi loai khoi tap backup hop le' {
+    $baseDate = (Get-Date).AddDays(-16)
+    $mockObjects = @()
+    # 15 ban backup hop le
+    for ($i = 1; $i -le 15; $i++) {
+        $ts = $baseDate.AddHours($i * 2).ToString("yyyyMMdd_HHmmss")
+        $mockObjects += @{ Name = "eventpulse_backup_$ts.dump.age"; Size = 2048; ModTime = $baseDate.AddHours($i * 2).ToString("o") }
+        $mockObjects += @{ Name = "eventpulse_backup_$ts.json"; Size = 512; ModTime = $baseDate.AddHours($i * 2).ToString("o") }
+    }
+    # 1 cap backup bi loi JSON manifest
+    $badTs = "20261001_000000"
+    $mockObjects += @{ Name = "eventpulse_backup_$badTs.dump.age"; Size = 2048; ModTime = "2026-10-01T00:00:00Z" }
+    $mockObjects += @{ Name = "eventpulse_backup_$badTs.json"; Size = 512; ModTime = "2026-10-01T00:00:00Z" }
+
+    $retResult = Invoke-R2RemoteRetention -R2Config $mockR2Cfg -RetentionLimit 14 -IsUploadFailed $false -MockCommandBlock {
+        param($Command, $Arguments, $R2Config)
+        $sub = $Arguments[0]
+        if ($sub -eq "lsjson") { return $mockObjects }
+        if ($sub -eq "cat") {
+            $manifestTarget = $Arguments[1]
+            if ($manifestTarget -match $badTs) {
+                # Manifest bi loi JSON
+                return @{ ExitCode = 0; Output = "{ INVALID_JSON_CORRUPTED " }
+            }
+            # Cac manifest con lai hop le
+            return @{
+                ExitCode = 0
+                Output   = (@{
+                    backupId        = "ep-backup-valid"
+                    encryptedSha256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+                    offsiteStatus   = "VerifiedUploaded"
+                } | ConvertTo-Json)
+            }
+        }
+        if ($sub -eq "deletefile") { return @{ ExitCode = 0 } }
+    }
+
+    # Cap bi loi JSON bi loai -> tap hop le chi con 15 ban (thay vi 16)
+    if ($retResult.TotalValidCount -ne 15) { throw "TotalValidCount phai la 15 (cap loi phai bi loai): $($retResult.TotalValidCount)" }
+    if ($retResult.RetainedCount -ne 14) { throw "RetainedCount sai: $($retResult.RetainedCount)" }
+    if ($retResult.DeletedCount -ne 2) { throw "DeletedCount phai la 2 (chi xoa 1 cap hop le cu nhat): $($retResult.DeletedCount)" }
+}
+
+Run-Phase3Test 'R2 Retention: Xoa dump thanh cong nhung xoa manifest that bai -> Bao trang thai PartialFailure va nem loi' {
+    $baseDate = (Get-Date).AddDays(-16)
+    $mockObjects = @()
+    for ($i = 1; $i -le 16; $i++) {
+        $ts = $baseDate.AddHours($i * 2).ToString("yyyyMMdd_HHmmss")
+        $mockObjects += @{ Name = "eventpulse_backup_$ts.dump.age"; Size = 2048; ModTime = $baseDate.AddHours($i * 2).ToString("o") }
+        $mockObjects += @{ Name = "eventpulse_backup_$ts.json"; Size = 512; ModTime = $baseDate.AddHours($i * 2).ToString("o") }
+    }
+
+    $deletedInMock = [System.Collections.Generic.List[string]]::new()
+    $caughtErr = $null
+    try {
+        Invoke-R2RemoteRetention -R2Config $mockR2Cfg -RetentionLimit 14 -IsUploadFailed $false -MockCommandBlock {
+            param($Command, $Arguments, $R2Config)
+            $sub = $Arguments[0]
+            if ($sub -eq "lsjson") { return $mockObjects }
+            if ($sub -eq "deletefile") {
+                $targetFile = $Arguments[1]
+                if ($targetFile.EndsWith(".dump.age")) {
+                    $deletedInMock.Add($targetFile)
+                    return @{ ExitCode = 0 }
+                } elseif ($targetFile.EndsWith(".json")) {
+                    # Mo phong loi khi xoa manifest
+                    throw "rclone that bai voi ma thoat 1: AccessDenied deleting manifest"
+                }
+            }
+        } | Out-Null
+    } catch {
+        $caughtErr = $_.Exception.Message
+    }
+
+    if ($null -eq $caughtErr) { throw "Phai nem ngoai le khi xoa manifest that bai" }
+    if ($caughtErr -notmatch 'PartialFailure') { throw "Loi phai chua trang thai PartialFailure: $caughtErr" }
+    if ($caughtErr -notmatch 'Da xoa 1 object') { throw "Loi phai ghi ro so file da xoa: $caughtErr" }
+    if ($deletedInMock.Count -ne 1) { throw "Chung cu mock phai ghi nhan dung 1 file dump da xoa: $($deletedInMock.Count)" }
+}
+
+Run-Phase3Test 'R2 Retention: Xoa dump that bai -> Dung ngay, khong xoa manifest, bao trang thai Failed' {
+    $baseDate = (Get-Date).AddDays(-16)
+    $mockObjects = @()
+    for ($i = 1; $i -le 16; $i++) {
+        $ts = $baseDate.AddHours($i * 2).ToString("yyyyMMdd_HHmmss")
+        $mockObjects += @{ Name = "eventpulse_backup_$ts.dump.age"; Size = 2048; ModTime = $baseDate.AddHours($i * 2).ToString("o") }
+        $mockObjects += @{ Name = "eventpulse_backup_$ts.json"; Size = 512; ModTime = $baseDate.AddHours($i * 2).ToString("o") }
+    }
+
+    $testState = @{ manifestDeleteAttempted = $false }
+    $caughtErr = $null
+    try {
+        Invoke-R2RemoteRetention -R2Config $mockR2Cfg -RetentionLimit 14 -IsUploadFailed $false -MockCommandBlock {
+            param($Command, $Arguments, $R2Config)
+            $sub = $Arguments[0]
+            if ($sub -eq "lsjson") { return $mockObjects }
+            if ($sub -eq "deletefile") {
+                $targetFile = $Arguments[1]
+                if ($targetFile.EndsWith(".dump.age")) {
+                    throw "rclone that bai voi ma thoat 1: S3 network error deleting dump"
+                } elseif ($targetFile.EndsWith(".json")) {
+                    $testState.manifestDeleteAttempted = $true
+                    return @{ ExitCode = 0 }
+                }
+            }
+        } | Out-Null
+    } catch {
+        $caughtErr = $_.Exception.Message
+    }
+
+    if ($null -eq $caughtErr) { throw "Phai nem ngoai le khi xoa dump that bai" }
+    if ($caughtErr -notmatch 'Failed') { throw "Loi phai chua trang thai Failed: $caughtErr" }
+    if ($testState.manifestDeleteAttempted) { throw "Khong duoc co xoa manifest khi xoa dump da that bai!" }
 }
 
 # ==============================================================================

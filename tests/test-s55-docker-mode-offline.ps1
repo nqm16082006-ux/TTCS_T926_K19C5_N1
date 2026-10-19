@@ -136,6 +136,9 @@ Run-AssertTest 'Docker.1: Build dung docker args (run --rm --name, mount, env-fi
     if ($call.Command -ne 'docker') { throw "Command sai" }
     if ($joined -notmatch '^run --rm --name s55_pgdump_') { throw "Thieu run --rm --name: $joined" }
     if ($joined -notmatch 'postgres:18-alpine') { throw "Thieu image" }
+    # FIX Lỗi 2: bat buoc co lenh pg_dump SAU image — neu thieu, entrypoint image
+    # postgres se chay POSTGRES SERVER voi cac tham so '-h ...' thay vi pg_dump.
+    if ($joined -notmatch 'postgres:18-alpine pg_dump ') { throw "THIEU LENH pg_dump trong docker args (entrypoint se chay postgres server thay vi pg_dump!): $joined" }
     if ($joined -notmatch '-v C:\\My Backup Dir:/s55work ') { throw "Mount sai: $joined" }
     if ($joined -notmatch '/s55work/sub/out\.dump') { throw "Khong remap duong dan -f: $joined" }
     if ($joined -notmatch '--env-file') { throw "Thieu --env-file" }
@@ -228,6 +231,8 @@ Run-AssertTest 'Sql.1: Host localhost -> host.docker.internal trong container, k
     $joined = $script:recordedCalls[0].Args -join ' '
     if ($out.Trim() -ne '42') { throw "Output sai: $out" }
     if ($joined -notmatch '-h host\.docker\.internal') { throw "Khong remap localhost: $joined" }
+    # FIX Lỗi 2: bat buoc co lenh psql SAU image (tranh chay postgres server).
+    if ($joined -notmatch 'postgres:18-alpine psql ') { throw "THIEU LENH psql trong docker args: $joined" }
     if ($joined -match [regex]::Escape($mockPassword)) { throw "PASSWORD BI LO!" }
 }
 
@@ -240,6 +245,97 @@ Run-AssertTest 'Proc.1: Native passthrough tra dung ExitCode/TimedOut' {
     $cmdExe = (Get-Command cmd.exe).Source
     $res = Invoke-PgProcessWithTimeout -ToolName 'pg_restore' -ToolArgs @('/c', 'exit 3') -NativeExePath $cmdExe -TimeoutSeconds 30 -Mode 'Native'
     if ($res.ExitCode -ne 3 -or $res.TimedOut) { throw "Passthrough sai: $($res | ConvertTo-Json -Compress)" }
+}
+
+# ==============================================================================
+# NHOM 5B: F7 — QUOTING MSVCRT CHO PROCESTARTINFO.ARGUMENTS (Lỗi 3)
+# ==============================================================================
+Write-Host "`n--- [NHOM 5B] F7: QUOTING MSVCRT (IDENTIFIER CAMELCASE) ---"
+
+Run-AssertTest 'Quote.1: SQL chua identifier CamelCase duoc bao toan dung MSVCRT (\" ben trong)' {
+    $line = ConvertTo-S55CliArgumentLine -Arguments @('SELECT count(*) FROM "AuditLogs";')
+    if ($line -ne '"SELECT count(*) FROM \"AuditLogs\";"') { throw "Sai escaping: $line" }
+}
+
+Run-AssertTest 'Quote.2: Arg khong khoang trang/ngoac kep giu nguyen (khong boc ngoac)' {
+    $line = ConvertTo-S55CliArgumentLine -Arguments @('pg_dump', '-Fc', '/s55work/x.dump')
+    if ($line -ne 'pg_dump -Fc /s55work/x.dump') { throw "Sai: $line" }
+}
+
+Run-AssertTest 'Quote.3: Arg rong -> "" (van la mot tham so)' {
+    $line = ConvertTo-S55CliArgumentLine -Arguments @('a', '', 'b')
+    if ($line -ne 'a "" b') { throw "Sai: $line" }
+}
+
+Run-AssertTest 'Quote.4: Duong dan co khoang trang duoc boc ngoac dung' {
+    $line = ConvertTo-S55CliArgumentLine -Arguments @('C:\My Backup Dir\file.dump')
+    if ($line -ne '"C:\My Backup Dir\file.dump"') { throw "Sai: $line" }
+}
+
+Run-AssertTest 'Quote.5: Backslash truoc ngoac kep duoc nhan doi (quy tac MSVCRT)' {
+    $line = ConvertTo-S55CliArgumentLine -Arguments @('a\"b c')
+    if ($line -ne '"a\\\"b c"') { throw "Sai: $line" }
+}
+
+Run-AssertTest 'Quote.6: Round-trip THUC TE qua node.exe (CommandLineToArgvW) — ngoac kep noi duoc bao toan' {
+    $nodeExe = (Get-Command node.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+    if ([string]::IsNullOrWhiteSpace($nodeExe)) {
+        Write-Host "   (SKIP) Khong tim thay node.exe de chay round-trip thuc te"
+        return
+    }
+    $args1 = @('SELECT count(*) FROM "AuditLogs";')
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $nodeExe
+    $psi.Arguments = '-e "console.log(JSON.stringify(process.argv))" ' + (ConvertTo-S55CliArgumentLine -Arguments $args1)
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    $stdOut = $proc.StandardOutput.ReadToEnd()
+    $stdErr = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit(30000) | Out-Null
+    if ($proc.ExitCode -ne 0) { throw "node.exe exit $($proc.ExitCode): $stdErr" }
+    $argv = $stdOut.Trim() | ConvertFrom-Json
+    if ($argv.Count -lt 2 -or $argv[1] -ne 'SELECT count(*) FROM "AuditLogs";') {
+        throw "Ngoac kep CamelCase bi mat qua command line that: [$stdOut]"
+    }
+}
+
+# ==============================================================================
+# NHOM 5C: CONSISTENCY GUARD — SO SANH 2 PASS BASELINE ROW COUNTS
+# ==============================================================================
+Write-Host "`n--- [NHOM 5C] CONSISTENCY GUARD: 2 PASS BASELINE ---"
+
+Run-AssertTest 'Guard.1: 2 pass giong het nhau -> Passed = true, 0 mismatch' {
+    $pre = [ordered]@{ AuditLogs = 39; Events = 9; orders = 98 }
+    $post = [ordered]@{ AuditLogs = 39; Events = 9; orders = 98 }
+    $res = Compare-S55BaselineRowCountPasses -PrePass $pre -PostPass $post
+    if (-not $res.Passed -or $res.MismatchCount -ne 0) { throw "Phai Passed: $($res | ConvertTo-Json -Compress)" }
+}
+
+Run-AssertTest 'Guard.2: Lech so dong 1 bang -> Passed = false va ghi ro bang lech' {
+    $pre = [ordered]@{ AuditLogs = 39; Events = 9 }
+    $post = [ordered]@{ AuditLogs = 39; Events = 10 }
+    $res = Compare-S55BaselineRowCountPasses -PrePass $pre -PostPass $post
+    if ($res.Passed) { throw "Phai fail" }
+    if (($res.Mismatches -join '; ') -notmatch 'Events') { throw "Thieu ten bang lech: $($res.Mismatches -join '; ')" }
+}
+
+Run-AssertTest 'Guard.3: Bang xuat hien them o pass sau -> mismatch (schema thay doi)' {
+    $pre = [ordered]@{ Events = 9 }
+    $post = [ordered]@{ Events = 9; NewTable = 1 }
+    $res = Compare-S55BaselineRowCountPasses -PrePass $pre -PostPass $post
+    if ($res.Passed -or $res.MismatchCount -ne 1) { throw "Phai fail 1 mismatch" }
+    if (($res.Mismatches -join '; ') -notmatch 'NewTable') { throw "Thieu ten bang moi: $($res.Mismatches -join '; ')" }
+}
+
+Run-AssertTest 'Guard.4: Bang bien mat o pass sau -> mismatch (schema thay doi)' {
+    $pre = [ordered]@{ Events = 9; Dropped = 5 }
+    $post = [ordered]@{ Events = 9 }
+    $res = Compare-S55BaselineRowCountPasses -PrePass $pre -PostPass $post
+    if ($res.Passed -or $res.MismatchCount -ne 1) { throw "Phai fail 1 mismatch" }
+    if (($res.Mismatches -join '; ') -notmatch 'Dropped') { throw "Thieu ten bang mat: $($res.Mismatches -join '; ')" }
 }
 
 # ==============================================================================
