@@ -161,6 +161,18 @@ function Invoke-PgSqlQuery {
 
     if ([string]::IsNullOrWhiteSpace($Mode)) { $Mode = $script:S55PgToolMode }
     if ([string]::IsNullOrWhiteSpace($Mode) -or $Mode -eq 'Native') {
+        if ($null -ne $MockCommandBlock) {
+            $mockRes = & $MockCommandBlock -ToolName "psql" -ConnParams $ConnParams -DatabaseName $DatabaseName -Query $Query -PsqlExe $PsqlExe -Mode $Mode
+            if ($mockRes -is [hashtable]) {
+                if ($mockRes.ContainsKey('ExitCode') -and $mockRes.ExitCode -ne 0) {
+                    $err = if ($mockRes.ContainsKey('Error')) { $mockRes.Error } else { "Mock SQL failure" }
+                    throw "Lenh SQL that bai (Ma thoat: $($mockRes.ExitCode)): $err"
+                }
+                if ($mockRes.ContainsKey('Output')) { return $mockRes.Output }
+            }
+            return $mockRes
+        }
+
         $output = & $PsqlExe $psqlArgs 2>&1
         if ($LASTEXITCODE -ne 0) {
             throw "Lenh SQL that bai (Ma thoat: $LASTEXITCODE): $output"
@@ -179,6 +191,79 @@ function Invoke-PgSqlQuery {
         -CaptureOutput `
         -MockCommandBlock $MockCommandBlock
     return $result.Output
+}
+
+# ==============================================================================
+# HÀM BỔ TRỢ: THU THẬP BASELINE ROW COUNTS CỦA CÁC BẢNG (FAIL-CLOSED)
+# ==============================================================================
+function Get-S55DatabaseBaselineRowCounts {
+    param(
+        [Parameter(Mandatory=$false)]
+        [string]$PsqlExe,
+
+        [Parameter(Mandatory)]
+        [hashtable]$ConnParams,
+
+        [Parameter(Mandatory)]
+        [string]$DatabaseName,
+
+        [Parameter()]
+        [string]$Mode = "Native",
+
+        [Parameter()]
+        [string]$DockerImage = "",
+
+        [Parameter()]
+        [scriptblock]$MockCommandBlock
+    )
+
+    if ($Mode -ne 'Docker' -and [string]::IsNullOrWhiteSpace($PsqlExe)) {
+        throw "[ABORT] Khong the thu thap baseline row counts: Khong tim thay cong cu 'psql'."
+    }
+
+    $getTablesQuery = "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name;"
+    $tablesRaw = Invoke-PgSqlQuery -PsqlExe $PsqlExe -ConnParams $ConnParams -DatabaseName $DatabaseName `
+        -Query $getTablesQuery -Mode $Mode -DockerImage $DockerImage -MockCommandBlock $MockCommandBlock
+
+    $tablesList = @($tablesRaw -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($tablesList.Count -eq 0) {
+        throw "[ABORT] Danh sach bang trong schema public rong bat thuong (0 bang). Khong the tao baseline."
+    }
+
+    $tableRowCounts = [ordered]@{}
+    foreach ($tbl in $tablesList) {
+        $cleanTbl = $tbl.Trim()
+        if ([string]::IsNullOrWhiteSpace($cleanTbl)) { continue }
+
+        # Xử lý an toàn định danh bảng PostgreSQL: bảo toàn chữ hoa và escape dấu ngoặc kép (" -> "")
+        $escapedTbl = '"' + $cleanTbl.Replace('"', '""') + '"'
+        $cntQuery = "SELECT count(*) FROM $escapedTbl;"
+
+        $cntRaw = Invoke-PgSqlQuery -PsqlExe $PsqlExe -ConnParams $ConnParams -DatabaseName $DatabaseName `
+            -Query $cntQuery -Mode $Mode -DockerImage $DockerImage -MockCommandBlock $MockCommandBlock
+
+        if ($null -eq $cntRaw -or [string]::IsNullOrWhiteSpace($cntRaw.ToString())) {
+            throw "[ABORT] So luong ban ghi cua bang '$cleanTbl' rong hoac khong hop le."
+        }
+
+        $trimmedCnt = $cntRaw.ToString().Trim()
+        $parsedCnt = 0L
+        if (-not [long]::TryParse($trimmedCnt, [ref]$parsedCnt)) {
+            throw "[ABORT] So luong ban ghi cua bang '$cleanTbl' khong phai la so nguyen hop le: '$trimmedCnt'."
+        }
+
+        if ($parsedCnt -lt 0) {
+            throw "[ABORT] So luong ban ghi cua bang '$cleanTbl' la so am khong hop le: $parsedCnt."
+        }
+
+        $tableRowCounts[$cleanTbl] = $parsedCnt
+    }
+
+    if ($tableRowCounts.Count -eq 0) {
+        throw "[ABORT] Khong co du lieu baseline row counts duoc thu thap."
+    }
+
+    return $tableRowCounts
 }
 
 # ==============================================================================

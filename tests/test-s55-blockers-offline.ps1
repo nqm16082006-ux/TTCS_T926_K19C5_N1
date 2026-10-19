@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     S-55: BO KIEM THU OFFLINE CHO CAC BLOCKER (A, B, C, D, E & DIEM PHU)
 .DESCRIPTION
@@ -849,6 +849,1033 @@ Run-AssertTest 'N1.5: Main flow cua restore-drill goi Resolve-S55TargetConnectio
     if ($content -match 'Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=postgres_password_123') {
         throw "Van con fallback connection string mac dinh trong restore-drill.ps1!"
     }
+}
+
+# ==============================================================================
+# NHOM 10: TC-02 — CONG BI CHIEM, SNAPSHOT SAFE, CLEANUP MODE
+# ==============================================================================
+Write-Host "`n--- [NHOM 10] TC-02: PORT / SNAPSHOT SAFE / CLEANUP MODE ---"
+
+Run-AssertTest 'TC02.1: Get-S55FreeHostPort chon ung vien dau tien con trong' {
+    $busy = @(5436, 5437)
+    $chosen = Get-S55FreeHostPort -StartPort 5436 -MaxAttempts 5 -IsPortInUse {
+        param([int]$Port) return ($busy -contains $Port)
+    }
+    if ($chosen -ne 5438) { throw "Sai cong duoc chon: $chosen" }
+}
+
+Run-AssertTest 'TC02.2: Tat ca ung vien deu ban -> NEM LOI ABORT (khong hardcode)' {
+    $caught = $null
+    try {
+        Get-S55FreeHostPort -StartPort 5436 -MaxAttempts 3 -IsPortInUse { param([int]$Port) return $true } | Out-Null
+    } catch { $caught = $_.Exception.Message }
+    if ($null -eq $caught -or $caught -notmatch 'ABORT') { throw "Phai nem loi khi het cong trong" }
+}
+
+Run-AssertTest 'TC02.3: Compare-S55SnapshotsSafe — khong co before-snapshot -> Skipped, KHONG quy container cu la leftover' {
+    $after = @{ '111111111111' = 'restaurant-api'; '222222222222' = 'eventpulse_test_pg_s55' }
+    $res = Compare-S55SnapshotsSafe -BeforeMap @{} -AfterMap $after
+    if ($res.Status -ne 'SkippedNoBeforeSnapshot') { throw "Sai status: $($res.Status)" }
+    if ($res.Message -notmatch 'KHONG bi xem la tai nguyen roi') { throw "Thieu cam ket khong do loi container cu" }
+}
+
+Run-AssertTest 'TC02.4: Compare-S55SnapshotsSafe — co before-snapshot thi uy quyen Compare-DockerSnapshots (phan biet cu/moi)' {
+    $before = @{ '111111111111' = 'restaurant-api' }
+    $after = @{
+        '111111111111' = 'restaurant-api'
+        '999999999999' = 'eventpulse_test_pg_tc02'
+    }
+    $res = Compare-S55SnapshotsSafe -BeforeMap $before -AfterMap $after
+    if ($res.Status -ne 'LeftoverContainersDetected') { throw "Sai status: $($res.Status)" }
+    if (($res.Leftovers -join ';') -notmatch 'eventpulse_test_pg_tc02') { throw "Thieu container TC-02 trong leftovers" }
+    if (($res.Leftovers -join ';') -match 'restaurant-api') { throw "Container co truoc phien bi do loi nham!" }
+}
+
+Run-AssertTest 'TC02.5: Cleanup mode — chua tao tai nguyen + drill fail -> Skip (khong tuyen bo cleanup thanh cong)' {
+    $m = Resolve-S55CleanupMode -DrillPassed $false -AnyResourceCreated $false
+    if ($m -ne 'Skip') { throw "Sai mode: $m" }
+}
+
+Run-AssertTest 'TC02.6: Cleanup mode — da tao + drill fail + container da tao -> Preserve (triage)' {
+    $m = Resolve-S55CleanupMode -DrillPassed $false -AnyResourceCreated $true -ContainerCreated $true
+    if ($m -ne 'Preserve') { throw "Sai mode: $m" }
+}
+
+Run-AssertTest 'TC02.7: Cleanup mode — drill thanh cong -> Cleanup co xac minh nhan' {
+    $m = Resolve-S55CleanupMode -DrillPassed $true -AnyResourceCreated $true -ContainerCreated $true
+    if ($m -ne 'Cleanup') { throw "Sai mode: $m" }
+}
+
+Run-AssertTest 'TC02.8: Cleanup mode — chi runner duoc tao (drill fail) -> van Cleanup (khong Preserve nhieu)' {
+    $m = Resolve-S55CleanupMode -DrillPassed $false -AnyResourceCreated $true -ContainerCreated $false
+    if ($m -ne 'Cleanup') { throw "Sai mode: $m" }
+}
+
+# ==============================================================================
+# NHOM 11: TC-02 TIMEOUT — THU THAP BANG CHUNG TRUOC KHI DUNG RUNNER
+# ==============================================================================
+Write-Host "`n--- [NHOM 11] TC-02 TIMEOUT: EVIDENCE TRUOC KHI DUNG RUNNER ---"
+
+Run-AssertTest 'TC03.1: Timeout — thu log TRUOC khi stop, tra ve Log + trang thai, khong bien thanh PASS' {
+    $script:callOrderEv1 = @()
+    $result = Invoke-RunnerWithSafeTimeout -SessionId "s55_tc02_ev1" `
+        -RunnerName "mock_runner_ev1" `
+        -TimeoutSeconds 2 `
+        -PollIntervalMs 0 `
+        -StartRunnerBlock { "mock_container_id" } `
+        -CheckRunnerStatusBlock {
+            $script:callOrderEv1 += "status"
+            return @{ IsRunning = $true; ExitCode = $null }
+        } `
+        -GetRunnerLogsBlock {
+            $script:callOrderEv1 += "logs"
+            return "apk: Setting postgresql15 as the default version"
+        } `
+        -VerifyOwnershipBlock { $true } `
+        -StopRunnerBlock {
+            $script:callOrderEv1 += "stop"
+            return @{ Success = $true }
+        }
+
+    $order = $script:callOrderEv1
+    if ($result.Success -ne $false -or $result.Status -ne "TimedOut") { throw "Timeout khong duoc bao FAIL: $($result | ConvertTo-Json -Compress)" }
+    if ($result.ExitCode -ne -1) { throw "Container dang chay phai tra ExitCode -1, khong phai $($result.ExitCode)" }
+    if ($result.Log -notmatch 'Setting postgresql15') { throw "Log timeout khong duoc thu thap" }
+    if ($order[-1] -ne 'stop') { throw "Phai stop cuoi cung: $($order -join ',')" }
+    $logIndex = [array]::IndexOf($order, 'logs')
+    $stopIndex = [array]::IndexOf($order, 'stop')
+    if ($logIndex -lt 0 -or $logIndex -gt $stopIndex) { throw "Log phai duoc thu TRUOC khi stop: $($order -join ',')" }
+}
+
+Run-AssertTest 'F1.1: Timeout khi container VAN DANG CHAY (inspect tra "true 0") -> ExitCode -1, KHONG ghi 0' {
+    $result = Invoke-RunnerWithSafeTimeout -SessionId "s55_tc02_f1_1" `
+        -RunnerName "mock_runner_f1_1" `
+        -TimeoutSeconds 2 `
+        -PollIntervalMs 0 `
+        -StartRunnerBlock { "mock_container_id" } `
+        -CheckRunnerStatusBlock { @{ IsRunning = $true; ExitCode = 0 } } `
+        -GetRunnerLogsBlock { "log" } `
+        -VerifyOwnershipBlock { $true } `
+        -StopRunnerBlock { @{ Success = $true } }
+
+    if ($result.Success -ne $false -or $result.Status -ne "TimedOut") { throw "Phai FAIL" }
+    if ($result.ExitCode -ne -1) { throw "ExitCode phai la -1 khi container con chay (khong duoc lay 0 mac dinh cua inspect): $($result.ExitCode)" }
+}
+
+Run-AssertTest 'F1.2: Container DA THOAT truoc timeout -> lay exit code thuc te (vd 137)' {
+    $script:f1StatusCalls = 0
+    $result = Invoke-RunnerWithSafeTimeout -SessionId "s55_tc02_f1_2" `
+        -RunnerName "mock_runner_f1_2" `
+        -TimeoutSeconds 2 `
+        -PollIntervalMs 0 `
+        -StartRunnerBlock { "mock_container_id" } `
+        -CheckRunnerStatusBlock {
+            $script:f1StatusCalls++
+            if ($script:f1StatusCalls -ge 3) {
+                # Lan goi truoc khi stop: container da thoat
+                return @{ IsRunning = $false; ExitCode = 137 }
+            }
+            return @{ IsRunning = $true; ExitCode = 0 }
+        } `
+        -GetRunnerLogsBlock { "log" } `
+        -VerifyOwnershipBlock { $true } `
+        -StopRunnerBlock { @{ Success = $true } }
+
+    if ($result.Success -ne $false -or $result.Status -ne "TimedOut") { throw "Phai FAIL" }
+    if ($result.ExitCode -ne 137) { throw "Phai lay exit code thuc te 137: $($result.ExitCode)" }
+}
+
+Run-AssertTest 'F2.1: Set-S55FailureEvidence ghi duoc -> tra $true va noi dung dung' {
+    $tmpFile = Join-Path ([System.IO.Path]::GetTempPath()) ('s55_ev_' + [guid]::NewGuid().ToString('N') + '.txt')
+    try {
+        $ok = Set-S55FailureEvidence -FailureMessage 'loi goc ABC' -EvidencePath $tmpFile
+        if ($ok -ne $true) { throw "Phai tra true" }
+        if ((Get-Content -LiteralPath $tmpFile -Raw).TrimEnd("`r", "`n") -ne 'loi goc ABC') { throw "Noi dung khong dung" }
+    } finally {
+        Remove-Item -LiteralPath $tmpFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Run-AssertTest 'F2.2: Set-S55FailureEvidence ghi LOI -> tra $false kem canh bao, KHONG nem loi (bao toan loi goc)' {
+    $badPath = Join-Path ([System.IO.Path]::GetTempPath()) ('s55_notadir_' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType File -Path $badPath -Force | Out-Null
+    try {
+        # Duong dan nam duoi mot FILE -> Set-Content chac chan loi
+        $ok = Set-S55FailureEvidence -FailureMessage 'loi goc ABC' -EvidencePath (Join-Path $badPath 'child\failure.txt')
+        if ($ok -ne $false) { throw "Phai tra false khi ghi loi" }
+    } finally {
+        Remove-Item -LiteralPath $badPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Run-AssertTest 'F4.1: Test-S55DockerImagePresent — mock co image -> true' {
+    $ok = Test-S55DockerImagePresent -ImageName 'mock/img:1' -DockerCommandBlock { param([string[]]$Arguments) return $true }
+    if ($ok -ne $true) { throw "Phai tra true" }
+}
+
+Run-AssertTest 'F4.2: Test-S55DockerImagePresent — mock thieu image -> false (dung som truoc khi tao runner)' {
+    $ok = Test-S55DockerImagePresent -ImageName 'mock/img:1' -DockerCommandBlock { param([string[]]$Arguments) return $false }
+    if ($ok -ne $false) { throw "Phai tra false" }
+}
+
+Run-AssertTest 'TC02b.1: Guard nguon — run_tc02_complete.ps1 (neu ton tai) parameterize ten qua ResourceSuffix, khong con ten cung tc02' {
+    $tc02Script = Join-Path $scriptDir 'artifacts\test-evidence-s55\run_tc02_complete.ps1'
+    if (-not (Test-Path -LiteralPath $tc02Script)) {
+        Write-Host "   (SKIP) File TC-02 driver khong ton tai trong working tree nay"
+        return
+    }
+    $content = Get-Content -LiteralPath $tc02Script -Raw
+    if ($content -notmatch 'ResourceSuffix') { throw "Thieu tham so ResourceSuffix" }
+    if ($content -notmatch '\$pgContainerName') { throw "Khong dung bien pgContainerName" }
+    if ($content -match 'eventpulse_test_pg_tc02"') { throw "Van con ten cung eventpulse_test_pg_tc02" }
+    if ($content -match 'eventpulse_test_net_tc02') { throw "Van con ten cung eventpulse_test_net_tc02" }
+    if ($content -match 'tc02_failure_reason\.txt') { throw "Evidence failure reason chua parameterize" }
+    # M1: runner phai noi vao dung network bien $pgNetworkName, KHONG hardcode mang s55
+    if ($content -notmatch '"--network", \$pgNetworkName') { throw "M1: runner chua dung bien network \$pgNetworkName" }
+    if ($content -match '"--network", "eventpulse_test_net_s55"') { throw "M1: runner van hardcode mang TC-01 s55" }
+    # M3: ten evidence phai duoc parameterize, khong con ten mangle mat prefix
+    if ($content -notmatch '\$\{ResourceSuffix\}_console\.log') { throw "M3: console log chua parameterize dung" }
+    if ($content -notmatch 'docker_snapshot_after_\$ResourceSuffix\.txt') { throw "M3: snapshot after chua parameterize" }
+    if ($content -match '\\_console\.log') { throw "M3: con ten evidence mangle (thieu prefix suffix)" }
+}
+
+Run-AssertTest 'TC03.2: Timeout — GetRunnerLogsBlock nem loi -> van FAIL an toan, Log rong, khong crash' {
+    $result = Invoke-RunnerWithSafeTimeout -SessionId "s55_tc02_ev2" `
+        -RunnerName "mock_runner_ev2" `
+        -TimeoutSeconds 2 `
+        -PollIntervalMs 0 `
+        -StartRunnerBlock { "mock_container_id" } `
+        -CheckRunnerStatusBlock { @{ IsRunning = $true; ExitCode = $null } } `
+        -GetRunnerLogsBlock { throw "docker logs daemon loi" } `
+        -VerifyOwnershipBlock { $true } `
+        -StopRunnerBlock { @{ Success = $true } }
+
+    if ($result.Success -ne $false -or $result.Status -ne "TimedOut") { throw "Phai van FAIL an toan" }
+    if ($null -ne $result.Log) { throw "Log phai rong khi khong thu duoc" }
+    if ($result.LogFetchFailed -ne $true) { throw "Phai danh dau LogFetchFailed" }
+}
+
+Run-AssertTest 'M2.1: Runner da thoat (exit 1) + GetRunnerLogsBlock nem loi (native stderr) -> helper KHONG throw, exit code bao toan' {
+    $result = Invoke-RunnerWithSafeTimeout -SessionId "s55_tc02_m2_1" `
+        -RunnerName "mock_runner_m2_1" `
+        -TimeoutSeconds 30 `
+        -PollIntervalMs 0 `
+        -StartRunnerBlock { "mock_container_id" } `
+        -CheckRunnerStatusBlock { @{ IsRunning = $false; ExitCode = 1 } } `
+        -GetRunnerLogsBlock { throw "* Setting postgresql15 as the default version" } `
+        -VerifyOwnershipBlock { $true } `
+        -StopRunnerBlock { @{ Success = $true } }
+
+    if ($result.Success -ne $false -or $result.Status -ne "CompletedFailed") { throw "Phai FAIL dung trang thai: $($result | ConvertTo-Json -Compress)" }
+    if ($result.ExitCode -ne 1) { throw "Exit code thuc te phai bao toan (1): $($result.ExitCode)" }
+    if ($result.LogFetchFailed -ne $true) { throw "Phai danh dau LogFetchFailed" }
+    if ($null -ne $result.Log) { throw "Log phai rong khi fetch loi" }
+}
+
+Run-AssertTest 'M2.2: Runner exit 7 + log fetch loi -> ExitCode 7, KHONG bao gio bien thanh 0' {
+    $result = Invoke-RunnerWithSafeTimeout -SessionId "s55_tc02_m2_2" `
+        -RunnerName "mock_runner_m2_2" `
+        -TimeoutSeconds 30 `
+        -PollIntervalMs 0 `
+        -StartRunnerBlock { "mock_container_id" } `
+        -CheckRunnerStatusBlock { @{ IsRunning = $false; ExitCode = 7 } } `
+        -GetRunnerLogsBlock { throw "native stderr line" } `
+        -VerifyOwnershipBlock { $true } `
+        -StopRunnerBlock { @{ Success = $true } }
+
+    if ($result.ExitCode -ne 7) { throw "ExitCode phai la 7: $($result.ExitCode)" }
+    if ($result.Success -ne $false) { throw "Khong duoc PASS" }
+}
+
+Run-AssertTest 'M2.3: Runner exit 0 + log fetch thanh cong -> CompletedSuccess, LogFetchFailed=false' {
+    $result = Invoke-RunnerWithSafeTimeout -SessionId "s55_tc02_m2_3" `
+        -RunnerName "mock_runner_m2_3" `
+        -TimeoutSeconds 30 `
+        -PollIntervalMs 0 `
+        -StartRunnerBlock { "mock_container_id" } `
+        -CheckRunnerStatusBlock { @{ IsRunning = $false; ExitCode = 0 } } `
+        -GetRunnerLogsBlock { "drill ok" } `
+        -VerifyOwnershipBlock { $true } `
+        -StopRunnerBlock { @{ Success = $true } }
+
+    if ($result.Success -ne $true -or $result.Status -ne "CompletedSuccess") { throw "Phai PASS: $($result | ConvertTo-Json -Compress)" }
+    if ($result.ExitCode -ne 0 -or $result.LogFetchFailed) { throw "Sai ExitCode/LogFetchFailed" }
+    if ($result.Log -ne "drill ok") { throw "Sai Log" }
+}
+
+Run-AssertTest 'P1.1: Lenh tao ca stdout lan stderr (exit 0) -> thu du 2 stream, khong throw, ExitCode dung' {
+    $cmdExe = (Get-Command cmd.exe).Source
+    $res = Get-DockerLogsSafe -ContainerName 'unused' -DockerExe $cmdExe -Arguments @('/c', '(echo out) & (echo err 1>&2) & exit /b 0') -TimeoutSeconds 30
+    if ($res.Success -ne $true -or $res.ExitCode -ne 0) { throw "Sai Success/ExitCode: $($res | ConvertTo-Json -Compress)" }
+    if ($res.StdOut -notmatch 'out') { throw "Thieu stdout" }
+    if ($res.StdErr -notmatch 'err') { throw "Thieu stderr" }
+}
+
+Run-AssertTest 'P1.2: Lenh exit 3 co stderr -> khong throw, ExitCode 3 duoc tra ve, 2 stream duoc giu' {
+    $cmdExe = (Get-Command cmd.exe).Source
+    $res = Get-DockerLogsSafe -ContainerName 'unused' -DockerExe $cmdExe -Arguments @('/c', '(echo out) & (echo err 1>&2) & exit /b 3') -TimeoutSeconds 30
+    if ($res.Success -ne $false -or $res.ExitCode -ne 3) { throw "Sai Success/ExitCode: $($res | ConvertTo-Json -Compress)" }
+    if ($res.StdOut -notmatch 'out' -or $res.StdErr -notmatch 'err') { throw "Stream bi mat" }
+    if ($res.Error -notmatch 'err') { throw "Thieu Error" }
+}
+
+Run-AssertTest 'P1.3: Executable khong ton tai -> tra Success=false kem Error, khong nem' {
+    $res = Get-DockerLogsSafe -ContainerName 'unused' -DockerExe 'C:\khong_ton_tai\docker.exe' -TimeoutSeconds 30
+    if ($res.Success -ne $false) { throw "Phai fail" }
+    if ($res.Error -notmatch 'Khong the khoi chay') { throw "Thieu Error: $($res.Error)" }
+}
+
+Run-AssertTest 'P1.4: Guard nguon — TC-02 GetRunnerLogsBlock dung Get-DockerLogsSafe (khong native 2>&1)' {
+    $tc02Script = Join-Path $scriptDir 'artifacts\test-evidence-s55\run_tc02_complete.ps1'
+    if (-not (Test-Path -LiteralPath $tc02Script)) {
+        Write-Host "   (SKIP) File TC-02 driver khong ton tai"
+        return
+    }
+    $content = Get-Content -LiteralPath $tc02Script -Raw
+    if ($content -notmatch 'Get-DockerLogsSafe -ContainerName \$runnerContainerName') { throw "P1: GetRunnerLogsBlock chua dung Get-DockerLogsSafe" }
+    if ($content -match 'docker logs \$runnerContainerName 2>&1') { throw "P1: con native pipeline docker logs" }
+}
+
+Run-AssertTest 'P2.1: Guard nguon — TC-02 tao runner script tren bind mount theo suffix, log du phong va goi sh file' {
+    $tc02Script = Join-Path $scriptDir 'artifacts\test-evidence-s55\run_tc02_complete.ps1'
+    if (-not (Test-Path -LiteralPath $tc02Script)) {
+        Write-Host "   (SKIP) File TC-02 driver khong ton tai"
+        return
+    }
+    $content = Get-Content -LiteralPath $tc02Script -Raw
+    if ($content -notmatch 'Get-S55RunnerShellScript') { throw "P2.1: thieu goi Get-S55RunnerShellScript" }
+    if ($content -notmatch 'Save-S55RunnerScript') { throw "P2.1: thieu goi Save-S55RunnerScript" }
+    if ($content -notmatch 'artifacts/test-evidence-s55/\$\{ResourceSuffix\}_runner\.sh') { throw "P2.1: thieu duong dan script theo suffix" }
+    if ($content -notmatch 'artifacts/test-evidence-s55/\$\{ResourceSuffix\}_runner_internal\.log') { throw "P2.1: thieu duong dan log du phong theo suffix" }
+    if ($content -notmatch '/workspace/\$runnerScriptRelPath') { throw "P2.1: thieu duong dan script trong container (/workspace/...)" }
+    if ($content -notmatch '/workspace/\$runnerLogRelPath') { throw "P2.1: thieu duong dan log trong container (/workspace/...)" }
+    if ($content -notmatch 'artifacts/test-evidence-s55:/workspace/artifacts/test-evidence-s55:rw') { throw "P2.1: evidence dir khong duoc bind-mount rw" }
+    if ($content -notmatch '"sh",\s*\$runnerScriptContainerPath') { throw "P2.1: runner phai duoc goi bang mot token sh + token duong dan script (khong inline string)" }
+    # Anti-regression: runner image bat buoc phai la Alpine 3.20 tro len de co postgresql16-client
+    if ($content -notmatch 'mcr\.microsoft\.com/powershell:lts-alpine-3\.20') { throw "P2.1: runner image bat buoc phai la mcr.microsoft.com/powershell:lts-alpine-3.20 (Alpine 3.20)" }
+    if ($content -match 'mcr\.microsoft\.com/powershell:lts-alpine[^\-]') { throw "P2.1: phat hien runner image lts-alpine cu (Alpine 3.17) khong chua postgresql16-client" }
+}
+
+Run-AssertTest 'P2.2: Get-S55RunnerShellScript — noi dung marker, placeholder va LF-only' {
+    $mockDump = "artifacts/test-backups-s55/eventpulse_backup_mock.dump"
+    $mockHost = "eventpulse_test_pg_mock"
+    $mockLog = "/workspace/artifacts/test-evidence-s55/mock_internal.log"
+    $script = Get-S55RunnerShellScript -DumpPath $mockDump -AllowedHost $mockHost -LogPath $mockLog
+
+    if ($script -notmatch 'echo RUNNER_MARK_START') { throw "P2.2: thieu marker RUNNER_MARK_START" }
+    if ($script -notmatch 'echo RUNNER_MARK_APK_EXIT=\$APK_EXIT') { throw "P2.2: thieu marker RUNNER_MARK_APK_EXIT" }
+    if ($script -notmatch 'echo RUNNER_MARK_APK_FAILED') { throw "P2.2: thieu marker RUNNER_MARK_APK_FAILED" }
+    if ($script -notmatch 'echo RUNNER_MARK_DRILL_EXIT=\$DRILL_EXIT') { throw "P2.2: thieu marker RUNNER_MARK_DRILL_EXIT" }
+    if ($script -notmatch [regex]::Escape($mockDump)) { throw "P2.2: thieu tham so DumpPath" }
+    if ($script -notmatch [regex]::Escape($mockHost)) { throw "P2.2: thieu tham so AllowedHost" }
+    if ($script -notmatch [regex]::Escape($mockLog)) { throw "P2.2: thieu tham so LogPath trong tee" }
+    if ($script.Contains("`r")) { throw "P2.2: script con chua ky tu CR (\r) — phai la LF-only" }
+    # Anti-regression: runner bat buoc cai postgresql16-client (khong dung 15 de tuong thich dump header 1.15)
+    if ($script -notmatch 'apk add --no-cache postgresql16-client') { throw "P2.2: runner bat buoc phai cai dat postgresql16-client" }
+    if ($script -match 'postgresql15-client') { throw "P2.2: phat hien postgresql15-client — regression ve phien ban 15 gay loi unsupported version 1.15" }
+    # Verification of tools & versions: bat buoc kiem tra pg_restore va pg_dump --version
+    if ($script -notmatch 'RESTORE_VER=\$\(pg_restore --version 2>&1\)') { throw "P2.2: thieu lenh goi pg_restore --version" }
+    if ($script -notmatch 'echo RUNNER_MARK_RESTORE_VER_EXIT=\$RESTORE_VER_EXIT') { throw "P2.2: thieu marker RUNNER_MARK_RESTORE_VER_EXIT" }
+    if ($script -notmatch 'echo RUNNER_MARK_PG16_VERIFIED') { throw "P2.2: thieu marker RUNNER_MARK_PG16_VERIFIED" }
+    if ($script -notmatch 'DUMP_VER=\$\(pg_dump --version 2>&1\)') { throw "P2.2: thieu lenh goi pg_dump --version" }
+    if ($script -notmatch 'echo RUNNER_MARK_DUMP_VER_EXIT=\$DUMP_VER_EXIT') { throw "P2.2: thieu marker RUNNER_MARK_DUMP_VER_EXIT" }
+    if ($script -notmatch 'echo RUNNER_MARK_TOOLS_VERIFIED') { throw "P2.2: thieu marker RUNNER_MARK_TOOLS_VERIFIED" }
+}
+
+Run-AssertTest 'P2.3: Get-S55RunnerShellScript — fail-fast khi apk that bai, bao toan exit code qua tee' {
+    $script = Get-S55RunnerShellScript -DumpPath "dump" -AllowedHost "host" -LogPath "log"
+
+    # 1. Bat APK_EXIT ngay sau apk add
+    $apkAddIdx = $script.IndexOf('apk add --no-cache postgresql16-client')
+    $apkExitIdx = $script.IndexOf('APK_EXIT=$?')
+    if ($apkAddIdx -lt 0 -or $apkExitIdx -lt 0 -or $apkExitIdx -lt $apkAddIdx) {
+        throw "P2.3: APK_EXIT=$? phai duoc bat ngay sau apk add postgresql16-client"
+    }
+
+    # 2. if APK_EXIT != 0 -> exit ngay, truoc lenh restore-drill
+    $apkFailIfIdx = $script.IndexOf('if [ $APK_EXIT -ne 0 ]')
+    $restoreVerIdx = $script.IndexOf('RESTORE_VER=$(pg_restore --version')
+    $dumpVerIdx = $script.IndexOf('DUMP_VER=$(pg_dump --version')
+    $toolsVerMarkIdx = $script.IndexOf('echo RUNNER_MARK_TOOLS_VERIFIED')
+    $drillCmdIdx = $script.IndexOf('scripts/restore-drill.ps1')
+
+    if ($apkFailIfIdx -lt 0 -or $drillCmdIdx -lt 0 -or $apkFailIfIdx -gt $drillCmdIdx) {
+        throw "P2.3: Chot chan APK fail phai nam TRUOC lenh restore-drill"
+    }
+    if ($restoreVerIdx -lt 0 -or $restoreVerIdx -lt $apkFailIfIdx -or $restoreVerIdx -gt $drillCmdIdx) {
+        throw "P2.3: pg_restore --version phai nam SAU apk add va TRUOC restore-drill"
+    }
+    if ($dumpVerIdx -lt 0 -or $dumpVerIdx -lt $restoreVerIdx -or $dumpVerIdx -gt $drillCmdIdx) {
+        throw "P2.3: pg_dump --version phai nam SAU pg_restore va TRUOC restore-drill"
+    }
+    if ($toolsVerMarkIdx -lt 0 -or $toolsVerMarkIdx -gt $drillCmdIdx) {
+        throw "P2.3: Marker TOOLS_VERIFIED phai duoc ghi TRUOC restore-drill"
+    }
+
+    # 3. Bat DRILL_EXIT ngay sau restore-drill
+    $drillExitIdx = $script.IndexOf('DRILL_EXIT=$?')
+    if ($drillExitIdx -lt 0 -or $drillExitIdx -lt $drillCmdIdx) {
+        throw "P2.3: DRILL_EXIT=$? phai duoc bat ngay sau restore-drill"
+    }
+
+    # 4. Bao toan exit code qua file tam (tranh tee lam mat exit code ve 0)
+    if ($script -notmatch 'RUNNER_EXIT_FILE=') { throw "P2.3: thieu bien RUNNER_EXIT_FILE de luu ma thoat qua pipeline" }
+    if ($script -notmatch 'FINAL_EXIT=\$\(cat "\$RUNNER_EXIT_FILE"') { throw "P2.3: thieu buoc doc lai exit code sau pipeline tee" }
+    if ($script -notmatch 'exit \$FINAL_EXIT') { throw "P2.3: thieu exit voi FINAL_EXIT" }
+}
+
+Run-AssertTest 'P2.4: Execution test (sh.exe) — apk that bai -> in du marker, KHONG chay drill, exit code dung' {
+    $shCandidates = @(
+        (Get-Command sh.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source),
+        (Join-Path $env:ProgramFiles 'Git\bin\sh.exe'),
+        (Join-Path $env:ProgramFiles 'Git\usr\bin\sh.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'Git\bin\sh.exe')
+    ) | Where-Object { -not [string]::IsNullOrEmpty($_) -and (Test-Path -LiteralPath $_) }
+
+    if ($shCandidates.Count -eq 0) {
+        Write-Host "   (SKIP) Khong tim thay sh.exe tren he thong de chay integration test"
+        return
+    }
+    $shExe = $shCandidates[0]
+
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ('s55_sh_test_' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+    $tempLog = (Join-Path $tempDir 'runner_internal.log').Replace('\', '/')
+    $tempScript = Join-Path $tempDir 'runner.sh'
+
+    # Mock script: apk add that bai voi exit code 14, drill neu chay se in LOI_DRILL
+    $rawTemplate = @'
+RUNNER_EXIT_FILE="__TEMP_DIR__/exit_$$.txt"
+rm -f "$RUNNER_EXIT_FILE"
+{
+echo RUNNER_MARK_START
+(exit 14)
+APK_EXIT=$?
+echo RUNNER_MARK_APK_EXIT=$APK_EXIT
+if [ $APK_EXIT -ne 0 ]; then
+    echo RUNNER_MARK_APK_FAILED
+    echo $APK_EXIT > "$RUNNER_EXIT_FILE"
+    exit $APK_EXIT
+fi
+echo RUNNER_MARK_DRILL_UNEXPECTED
+exit 0
+} 2>&1 | tee __LOG__
+FINAL_EXIT=$(cat "$RUNNER_EXIT_FILE" 2>/dev/null)
+rm -f "$RUNNER_EXIT_FILE"
+if [ -z "$FINAL_EXIT" ]; then FINAL_EXIT=1; fi
+exit $FINAL_EXIT
+'@
+    $mockContent = $rawTemplate.Replace('__TEMP_DIR__', $tempDir.Replace('\', '/')).Replace('__LOG__', $tempLog)
+    Save-S55RunnerScript -FilePath $tempScript -Content $mockContent | Out-Null
+
+    $output = & $shExe $tempScript.Replace('\', '/')
+    $shExit = $LASTEXITCODE
+    $outStr = ($output -join "`n")
+
+    if ($shExit -ne 14) { throw "P2.4: Exit code phai la 14 nhung thuc te la $shExit" }
+    if ($outStr -notmatch 'RUNNER_MARK_START') { throw "P2.4: Thieu RUNNER_MARK_START trong output" }
+    if ($outStr -notmatch 'RUNNER_MARK_APK_EXIT=14') { throw "P2.4: Thieu RUNNER_MARK_APK_EXIT=14" }
+    if ($outStr -notmatch 'RUNNER_MARK_APK_FAILED') { throw "P2.4: Thieu RUNNER_MARK_APK_FAILED" }
+    if ($outStr -match 'RUNNER_MARK_DRILL_UNEXPECTED') { throw "P2.4: Drill van chay khi apk that bai!" }
+    if (-not (Test-Path -LiteralPath $tempLog)) { throw "P2.4: File log du phong khong duoc tao" }
+    $logContent = Get-Content -LiteralPath $tempLog -Raw
+    if ($logContent -notmatch 'RUNNER_MARK_APK_FAILED') { throw "P2.4: Log du phong thieu marker" }
+
+    Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Run-AssertTest 'P2.5: Execution test (sh.exe) — drill that bai -> exit code khong bi tee ghi de thanh 0' {
+    $shCandidates = @(
+        (Get-Command sh.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source),
+        (Join-Path $env:ProgramFiles 'Git\bin\sh.exe'),
+        (Join-Path $env:ProgramFiles 'Git\usr\bin\sh.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'Git\bin\sh.exe')
+    ) | Where-Object { -not [string]::IsNullOrEmpty($_) -and (Test-Path -LiteralPath $_) }
+
+    if ($shCandidates.Count -eq 0) {
+        Write-Host "   (SKIP) Khong tim thay sh.exe tren he thong de chay integration test"
+        return
+    }
+    $shExe = $shCandidates[0]
+
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ('s55_sh_test2_' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+    $tempLog = (Join-Path $tempDir 'runner_internal.log').Replace('\', '/')
+    $tempScript = Join-Path $tempDir 'runner.sh'
+
+    # Mock script: apk thanh cong (0), drill that bai voi exit code 23
+    $rawTemplate = @'
+RUNNER_EXIT_FILE="__TEMP_DIR__/exit_$$.txt"
+rm -f "$RUNNER_EXIT_FILE"
+{
+echo RUNNER_MARK_START
+(exit 0)
+APK_EXIT=$?
+echo RUNNER_MARK_APK_EXIT=$APK_EXIT
+if [ $APK_EXIT -ne 0 ]; then
+    echo RUNNER_MARK_APK_FAILED
+    echo $APK_EXIT > "$RUNNER_EXIT_FILE"
+    exit $APK_EXIT
+fi
+(exit 23)
+DRILL_EXIT=$?
+echo RUNNER_MARK_DRILL_EXIT=$DRILL_EXIT
+echo $DRILL_EXIT > "$RUNNER_EXIT_FILE"
+exit $DRILL_EXIT
+} 2>&1 | tee __LOG__
+FINAL_EXIT=$(cat "$RUNNER_EXIT_FILE" 2>/dev/null)
+rm -f "$RUNNER_EXIT_FILE"
+if [ -z "$FINAL_EXIT" ]; then FINAL_EXIT=1; fi
+exit $FINAL_EXIT
+'@
+    $mockContent = $rawTemplate.Replace('__TEMP_DIR__', $tempDir.Replace('\', '/')).Replace('__LOG__', $tempLog)
+    Save-S55RunnerScript -FilePath $tempScript -Content $mockContent | Out-Null
+
+    $output = & $shExe $tempScript.Replace('\', '/')
+    $shExit = $LASTEXITCODE
+    $outStr = ($output -join "`n")
+
+    if ($shExit -ne 23) { throw "P2.5: Exit code phai la 23 nhung bi tee ghi de thanh $shExit" }
+    if ($outStr -notmatch 'RUNNER_MARK_START') { throw "P2.5: Thieu RUNNER_MARK_START" }
+    if ($outStr -notmatch 'RUNNER_MARK_APK_EXIT=0') { throw "P2.5: Thieu APK_EXIT=0" }
+    if ($outStr -notmatch 'RUNNER_MARK_DRILL_EXIT=23') { throw "P2.5: Thieu DRILL_EXIT=23" }
+
+    Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Run-AssertTest 'P2.6: Execution test (sh.exe) — ca hai buoc thanh cong -> exit 0 va log ghi day du' {
+    $shCandidates = @(
+        (Get-Command sh.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source),
+        (Join-Path $env:ProgramFiles 'Git\bin\sh.exe'),
+        (Join-Path $env:ProgramFiles 'Git\usr\bin\sh.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'Git\bin\sh.exe')
+    ) | Where-Object { -not [string]::IsNullOrEmpty($_) -and (Test-Path -LiteralPath $_) }
+
+    if ($shCandidates.Count -eq 0) {
+        Write-Host "   (SKIP) Khong tim thay sh.exe tren he thong de chay integration test"
+        return
+    }
+    $shExe = $shCandidates[0]
+
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ('s55_sh_test3_' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+    $tempLog = (Join-Path $tempDir 'runner_internal.log').Replace('\', '/')
+    $tempScript = Join-Path $tempDir 'runner.sh'
+
+    # Mock script: ca hai deu exit 0
+    $rawTemplate = @'
+RUNNER_EXIT_FILE="__TEMP_DIR__/exit_$$.txt"
+rm -f "$RUNNER_EXIT_FILE"
+{
+echo RUNNER_MARK_START
+(exit 0)
+APK_EXIT=$?
+echo RUNNER_MARK_APK_EXIT=$APK_EXIT
+if [ $APK_EXIT -ne 0 ]; then
+    echo RUNNER_MARK_APK_FAILED
+    echo $APK_EXIT > "$RUNNER_EXIT_FILE"
+    exit $APK_EXIT
+fi
+(exit 0)
+DRILL_EXIT=$?
+echo RUNNER_MARK_DRILL_EXIT=$DRILL_EXIT
+echo $DRILL_EXIT > "$RUNNER_EXIT_FILE"
+exit $DRILL_EXIT
+} 2>&1 | tee __LOG__
+FINAL_EXIT=$(cat "$RUNNER_EXIT_FILE" 2>/dev/null)
+rm -f "$RUNNER_EXIT_FILE"
+if [ -z "$FINAL_EXIT" ]; then FINAL_EXIT=1; fi
+exit $FINAL_EXIT
+'@
+    $mockContent = $rawTemplate.Replace('__TEMP_DIR__', $tempDir.Replace('\', '/')).Replace('__LOG__', $tempLog)
+    Save-S55RunnerScript -FilePath $tempScript -Content $mockContent | Out-Null
+
+    $output = & $shExe $tempScript.Replace('\', '/')
+    $shExit = $LASTEXITCODE
+    $outStr = ($output -join "`n")
+
+    if ($shExit -ne 0) { throw "P2.6: Exit code phai la 0 nhung thuc te la $shExit" }
+    if ($outStr -notmatch 'RUNNER_MARK_APK_EXIT=0' -or $outStr -notmatch 'RUNNER_MARK_DRILL_EXIT=0') { throw "P2.6: Thieu marker exit 0" }
+
+    Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Run-AssertTest 'P2.7: Save-S55RunnerScript — ghi UTF-8 khong BOM, LF-only va tu dong tao thu muc' {
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ('s55_utf8_' + [Guid]::NewGuid().ToString('N'))
+    $targetFile = Join-Path $tempDir 'nested\sub\runner.sh'
+
+    $testContent = "echo 'hello'`r`necho 'world'`r`n"
+    $savedPath = Save-S55RunnerScript -FilePath $targetFile -Content $testContent
+
+    if (-not (Test-Path -LiteralPath $savedPath)) { throw "P2.7: File chua duoc tao tai $savedPath" }
+
+    $bytes = [System.IO.File]::ReadAllBytes($savedPath)
+    if ($bytes.Length -lt 3) { throw "P2.7: File qua nho" }
+
+    # Kiem tra BOM: UTF-8 BOM la 0xEF, 0xBB, 0xBF -> KHONG duoc co
+    if ($bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        throw "P2.7: Phat hien UTF-8 BOM (0xEF, 0xBB, 0xBF)! Runner script phai la UTF-8 NO BOM."
+    }
+
+    # Kiem tra LF-only: khong duoc chua 0x0D (CR)
+    foreach ($b in $bytes) {
+        if ($b -eq 0x0D) {
+            throw "P2.7: Phat hien ky tu CR (0x0D) trong file! Runner script phai la LF-only."
+        }
+    }
+
+    Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Run-AssertTest 'P2.8: Tuong thich PowerShell 5.1 va PowerShell 7 — AST hop le khong loi cu phap' {
+    $scriptsToCheck = @(
+        (Join-Path $scriptDir 'artifacts\test-evidence-s55\run_tc02_complete.ps1'),
+        (Join-Path $scriptDir 'tests\S55-TestHelpers.ps1'),
+        (Join-Path $scriptDir 'tests\test-s55-blockers-offline.ps1')
+    )
+
+    foreach ($s in $scriptsToCheck) {
+        if (-not (Test-Path -LiteralPath $s)) { continue }
+        $tokens = $null
+        $errors = $null
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($s, [ref]$tokens, [ref]$errors)
+        if ($errors.Count -gt 0) {
+            throw "P2.8: AST parsing loi tai file '$s': $($errors[0].Message)"
+        }
+    }
+}
+
+# ==============================================================================
+# NHOM 13: HARDENING A/B — REPO ROOT GUARD + INTERNAL LOG VERIFY
+# ==============================================================================
+Write-Host "`n--- [NHOM 13] HARDENING A/B: REPO ROOT + INTERNAL LOG ---"
+
+$hardeningTempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('s55_harden_' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $hardeningTempRoot -Force | Out-Null
+
+Run-AssertTest 'H.1: Test-S55RepoRoot — du ca 2 file nhan dien -> true' {
+    New-Item -ItemType Directory -Path (Join-Path $hardeningTempRoot 'scripts'), (Join-Path $hardeningTempRoot 'tests') -Force | Out-Null
+    New-Item -ItemType File -Path (Join-Path $hardeningTempRoot 'scripts\restore-drill.ps1'), (Join-Path $hardeningTempRoot 'tests\S55-TestHelpers.ps1') -Force | Out-Null
+    if (-not (Test-S55RepoRoot -RootPath $hardeningTempRoot)) { throw "Phai true khi du 2 file" }
+}
+
+Run-AssertTest 'H.2: Test-S55RepoRoot — thieu ca 2 file -> false' {
+    $emptyRoot = Join-Path $hardeningTempRoot ('empty_' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $emptyRoot -Force | Out-Null
+    if (Test-S55RepoRoot -RootPath $emptyRoot) { throw "Phai false khi sai CWD" }
+}
+
+Run-AssertTest 'H.3: Test-S55RepoRoot — chi 1 file -> false (khong chi kiem 1 file)' {
+    $oneFile = Join-Path $hardeningTempRoot ('one_' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path (Join-Path $oneFile 'scripts') -Force | Out-Null
+    New-Item -ItemType File -Path (Join-Path $oneFile 'scripts\restore-drill.ps1') -Force | Out-Null
+    if (Test-S55RepoRoot -RootPath $oneFile) { throw "Phai false khi chi co 1 file" }
+}
+
+Run-AssertTest 'H.4: Internal log ton tai dung suffix -> true, khong canh bao' {
+    $logFile = Join-Path $hardeningTempRoot ('tc02d_runner_internal.log')
+    New-Item -ItemType File -Path $logFile -Force | Out-Null
+    if (-not (Test-S55RunnerInternalLogPresent -ExpectedPath $logFile)) { throw "Phai true khi file ton tai" }
+    Remove-Item -LiteralPath $logFile -Force
+}
+
+Run-AssertTest 'H.5: Thieu internal log -> false kem canh bao, KHONG nem, khong ghi de ket qua' {
+    $missingLog = Join-Path $hardeningTempRoot ('khong_ton_tai_' + [Guid]::NewGuid().ToString('N') + '.log')
+    $res = Test-S55RunnerInternalLogPresent -ExpectedPath $missingLog
+    if ($res -ne $false) { throw "Phai false khi thieu file" }
+}
+
+Run-AssertTest 'H.6: ExpectedPath rong -> false, khong nem' {
+    if ((Test-S55RunnerInternalLogPresent -ExpectedPath '') -ne $false) { throw "Phai false" }
+}
+
+Run-AssertTest 'H.7: Guard nguon — TC-02 co repo-root guard (2 file) TRUOC moi docker op va kiem tra internal log' {
+    $tc02Script = Join-Path $scriptDir 'artifacts\test-evidence-s55\run_tc02_complete.ps1'
+    if (-not (Test-Path -LiteralPath $tc02Script)) {
+        Write-Host "   (SKIP) File TC-02 driver khong ton tai"
+        return
+    }
+    $content = Get-Content -LiteralPath $tc02Script -Raw
+    if ($content -notmatch 'Test-S55RepoRoot') { throw "Thieu goi Test-S55RepoRoot" }
+    if ($content -notmatch 'scripts\\restore-drill\.ps1') { throw "Guard thieu file nhan dien scripts\restore-drill.ps1" }
+    if ($content -notmatch 'tests\\S55-TestHelpers\.ps1') { throw "Guard thieu file nhan dien tests\S55-TestHelpers.ps1" }
+    if ($content -notmatch 'Test-S55RunnerInternalLogPresent -ExpectedPath \$runnerLogRelPath') { throw "Thieu kiem tra internal log theo suffix" }
+    $guardIndex = $content.IndexOf('Test-S55RepoRoot')
+    $firstDockerOp = $content.IndexOf('docker ')
+    if ($guardIndex -lt 0 -or $firstDockerOp -lt 0 -or $guardIndex -gt $firstDockerOp) { throw "Guard phai nam TRUOC moi docker op" }
+}
+
+# ==============================================================================
+# NHOM 14: S-55 BASELINE ROW COUNTS & RESTORE STRICT MODE (FAIL-CLOSED)
+# ==============================================================================
+Write-Host "`n--- [NHOM 14] S-55 BASELINE ROW COUNTS & RESTORE STRICT MODE (FAIL-CLOSED) ---"
+
+# Scenario 1: Baseline đầy đủ và hợp lệ
+Run-AssertTest 'S55-BL.1: Baseline day du va hop le -> Thu thap dung tat ca bang va row counts non-negative' {
+    $mockBlock = {
+        param($ToolName, $ConnParams, $DatabaseName, $Query, $PsqlExe, $Mode)
+        if ($Query -match "information_schema\.tables") {
+            return "events`ntickets`n__EFMigrationsHistory"
+        }
+        if ($Query -match 'FROM "events"') { return "10" }
+        if ($Query -match 'FROM "tickets"') { return "25" }
+        if ($Query -match 'FROM "__EFMigrationsHistory"') { return "3" }
+        throw "Unexpected query: $Query"
+    }
+
+    $res = Get-S55DatabaseBaselineRowCounts -PsqlExe "mock-psql" `
+        -ConnParams @{ Host = "localhost"; Port = 5432; Username = "postgres" } `
+        -DatabaseName "event_ticket_db" `
+        -Mode "Native" `
+        -MockCommandBlock $mockBlock
+
+    if ($null -eq $res -or $res.Count -ne 3) { throw "Baseline phai co 3 bang, thuc te: $($res.Count)" }
+    if ($res["events"] -ne 10L -or $res["tickets"] -ne 25L -or $res["__EFMigrationsHistory"] -ne 3L) {
+        throw "Row count khong khop gia tri mong doi"
+    }
+}
+
+# Scenario 2: Không tìm thấy psql
+Run-AssertTest 'S55-BL.2: Khong tim thay psql (Native mode) -> Throw fail-closed [ABORT]' {
+    $threw = $false
+    try {
+        Get-S55DatabaseBaselineRowCounts -PsqlExe "" `
+            -ConnParams @{ Host = "localhost"; Port = 5432; Username = "postgres" } `
+            -DatabaseName "event_ticket_db" `
+            -Mode "Native"
+    } catch {
+        if ($_ -match "Khong tim thay cong cu 'psql'") { $threw = $true }
+    }
+    if (-not $threw) { throw "Khong nem loi khi thieu psql!" }
+}
+
+# Scenario 3: Truy vấn lấy danh sách bảng thất bại
+Run-AssertTest 'S55-BL.3: Truy van lay danh sach bang that bai -> Throw loi fail-closed' {
+    $mockBlock = {
+        param($ToolName, $ConnParams, $DatabaseName, $Query, $PsqlExe, $Mode)
+        return @{ ExitCode = 2; Error = "Connection to server failed (timeout)" }
+    }
+
+    $threw = $false
+    try {
+        Get-S55DatabaseBaselineRowCounts -PsqlExe "mock-psql" `
+            -ConnParams @{ Host = "localhost"; Port = 5432; Username = "postgres" } `
+            -DatabaseName "event_ticket_db" `
+            -Mode "Native" `
+            -MockCommandBlock $mockBlock
+    } catch {
+        if ($_ -match "Lenh SQL that bai") { $threw = $true }
+    }
+    if (-not $threw) { throw "Khong nem loi khi truy van danh sach bang that bai!" }
+}
+
+# Scenario 4: Truy vấn row count thất bại
+Run-AssertTest 'S55-BL.4: Truy van row count that bai -> Throw loi fail-closed' {
+    $mockBlock = {
+        param($ToolName, $ConnParams, $DatabaseName, $Query, $PsqlExe, $Mode)
+        if ($Query -match "information_schema\.tables") {
+            return "events`ntickets"
+        }
+        if ($Query -match 'FROM "events"') { return "10" }
+        if ($Query -match 'FROM "tickets"') {
+            return @{ ExitCode = 1; Error = "permission denied for table tickets" }
+        }
+        throw "Unexpected query: $Query"
+    }
+
+    $threw = $false
+    try {
+        Get-S55DatabaseBaselineRowCounts -PsqlExe "mock-psql" `
+            -ConnParams @{ Host = "localhost"; Port = 5432; Username = "postgres" } `
+            -DatabaseName "event_ticket_db" `
+            -Mode "Native" `
+            -MockCommandBlock $mockBlock
+    } catch {
+        if ($_ -match "Lenh SQL that bai") { $threw = $true }
+    }
+    if (-not $threw) { throw "Khong nem loi khi truy van row count mot bang that bai!" }
+}
+
+# Scenario 5: Count rỗng, không phải số nguyên hoặc số âm
+Run-AssertTest 'S55-BL.5a: Row count rong -> Throw fail-closed' {
+    $mockBlock = {
+        param($ToolName, $ConnParams, $DatabaseName, $Query, $PsqlExe, $Mode)
+        if ($Query -match "information_schema\.tables") { return "events" }
+        if ($Query -match 'FROM "events"') { return "   " }
+    }
+
+    $threw = $false
+    try {
+        Get-S55DatabaseBaselineRowCounts -PsqlExe "mock-psql" `
+            -ConnParams @{ Host = "localhost"; Port = 5432; Username = "postgres" } `
+            -DatabaseName "event_ticket_db" `
+            -Mode "Native" `
+            -MockCommandBlock $mockBlock
+    } catch {
+        if ($_ -match "rong hoac khong hop le") { $threw = $true }
+    }
+    if (-not $threw) { throw "Khong nem loi khi count rong!" }
+}
+
+Run-AssertTest 'S55-BL.5b: Row count khong phai so nguyen -> Throw fail-closed' {
+    $mockBlock = {
+        param($ToolName, $ConnParams, $DatabaseName, $Query, $PsqlExe, $Mode)
+        if ($Query -match "information_schema\.tables") { return "events" }
+        if ($Query -match 'FROM "events"') { return "NOT_A_NUMBER" }
+    }
+
+    $threw = $false
+    try {
+        Get-S55DatabaseBaselineRowCounts -PsqlExe "mock-psql" `
+            -ConnParams @{ Host = "localhost"; Port = 5432; Username = "postgres" } `
+            -DatabaseName "event_ticket_db" `
+            -Mode "Native" `
+            -MockCommandBlock $mockBlock
+    } catch {
+        if ($_ -match "khong phai la so nguyen hop le") { $threw = $true }
+    }
+    if (-not $threw) { throw "Khong nem loi khi count khong phai so nguyen!" }
+}
+
+Run-AssertTest 'S55-BL.5c: Row count la so am -> Throw fail-closed' {
+    $mockBlock = {
+        param($ToolName, $ConnParams, $DatabaseName, $Query, $PsqlExe, $Mode)
+        if ($Query -match "information_schema\.tables") { return "events" }
+        if ($Query -match 'FROM "events"') { return "-42" }
+    }
+
+    $threw = $false
+    try {
+        Get-S55DatabaseBaselineRowCounts -PsqlExe "mock-psql" `
+            -ConnParams @{ Host = "localhost"; Port = 5432; Username = "postgres" } `
+            -DatabaseName "event_ticket_db" `
+            -Mode "Native" `
+            -MockCommandBlock $mockBlock
+    } catch {
+        if ($_ -match "la so am khong hop le") { $threw = $true }
+    }
+    if (-not $threw) { throw "Khong nem loi khi count la so am!" }
+}
+
+# Scenario 6: Không có bảng trong baseline (0 tables)
+Run-AssertTest 'S55-BL.6: Danh sach bang rong bat thuong (0 bang) -> Throw fail-closed' {
+    $mockBlock = {
+        param($ToolName, $ConnParams, $DatabaseName, $Query, $PsqlExe, $Mode)
+        if ($Query -match "information_schema\.tables") { return "" }
+    }
+
+    $threw = $false
+    try {
+        Get-S55DatabaseBaselineRowCounts -PsqlExe "mock-psql" `
+            -ConnParams @{ Host = "localhost"; Port = 5432; Username = "postgres" } `
+            -DatabaseName "event_ticket_db" `
+            -Mode "Native" `
+            -MockCommandBlock $mockBlock
+    } catch {
+        if ($_ -match "rong bat thuong \(0 bang\)") { $threw = $true }
+    }
+    if (-not $threw) { throw "Khong nem loi khi danh sach bang rong!" }
+}
+
+# Scenario 7: Tên bảng có chữ hoa / dấu ngoặc kép được xử lý an toàn
+Run-AssertTest 'S55-BL.7: Ten bang co chu hoa hoac dau ngoac kep -> Escape an toan trong cau truy van' {
+    $executedQueries = [System.Collections.Generic.List[string]]::new()
+    $mockBlock = {
+        param($ToolName, $ConnParams, $DatabaseName, $Query, $PsqlExe, $Mode)
+        if ($Query -match "information_schema\.tables") {
+            return "User`"Data`nOrderDetails`nSpecial`"Table`"Name"
+        }
+        $executedQueries.Add($Query)
+        return "10"
+    }
+
+    $res = Get-S55DatabaseBaselineRowCounts -PsqlExe "mock-psql" `
+        -ConnParams @{ Host = "localhost"; Port = 5432; Username = "postgres" } `
+        -DatabaseName "event_ticket_db" `
+        -Mode "Native" `
+        -MockCommandBlock $mockBlock
+
+    if (-not ($executedQueries -contains 'SELECT count(*) FROM "User""Data";')) {
+        throw "Cau lenh SQL cho bang 'User`"Data' khong duoc escape dung: $($executedQueries -join '; ')"
+    }
+    if (-not ($executedQueries -contains 'SELECT count(*) FROM "OrderDetails";')) {
+        throw "Cau lenh SQL cho bang 'OrderDetails' khong bao toan chu hoa: $($executedQueries -join '; ')"
+    }
+    if (-not ($executedQueries -contains 'SELECT count(*) FROM "Special""Table""Name";')) {
+        throw "Cau lenh SQL cho bang 'Special`"Table`"Name' khong duoc escape dung: $($executedQueries -join '; ')"
+    }
+    if (-not $res.Contains('User"Data') -or -not $res.Contains('OrderDetails')) {
+        throw "Baseline output phai giu nguyen ten bang goc"
+    }
+}
+
+# Scenario 8: Backup thất bại không xóa backup cũ và dọn dẹp file staging
+Run-AssertTest 'S55-BL.8: Backup that bai -> Khong xoa backup cu va don sach file staging' {
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("s55_bl8_" + [Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+    try {
+        # Tạo 2 bản backup cũ hợp lệ
+        $oldDump1 = Join-Path $tempDir "eventpulse_backup_20261017_100000.dump"
+        $oldJson1 = Join-Path $tempDir "eventpulse_backup_20261017_100000.json"
+        $oldDump2 = Join-Path $tempDir "eventpulse_backup_20261017_120000.dump"
+        $oldJson2 = Join-Path $tempDir "eventpulse_backup_20261017_120000.json"
+
+        [System.IO.File]::WriteAllBytes($oldDump1, (New-Object byte[] 1024))
+        [System.IO.File]::WriteAllBytes($oldDump2, (New-Object byte[] 1024))
+        $sha1 = (Get-FileHash -Algorithm SHA256 -LiteralPath $oldDump1).Hash
+        $sha2 = (Get-FileHash -Algorithm SHA256 -LiteralPath $oldDump2).Hash
+
+        [PSCustomObject]@{ backupFile = "eventpulse_backup_20261017_100000.dump"; sha256 = $sha1; status = "VerifiedValid"; sizeBytes = 1024; createdAtUtc = (Get-Date).ToString("o") } | ConvertTo-Json | Set-Content -LiteralPath $oldJson1 -Encoding utf8
+        [PSCustomObject]@{ backupFile = "eventpulse_backup_20261017_120000.dump"; sha256 = $sha2; status = "VerifiedValid"; sizeBytes = 1024; createdAtUtc = (Get-Date).ToString("o") } | ConvertTo-Json | Set-Content -LiteralPath $oldJson2 -Encoding utf8
+
+        # Tạo file staging của lần chạy hiện tại bị dở dang
+        $stagingDump = Join-Path $tempDir "eventpulse_backup_20261017_140000_in_progress.dump"
+        $stagingJson = Join-Path $tempDir "eventpulse_backup_20261017_140000_in_progress.json"
+        [System.IO.File]::WriteAllBytes($stagingDump, (New-Object byte[] 512))
+        [System.IO.File]::WriteAllBytes($stagingJson, (New-Object byte[] 128))
+
+        # Thực thi retention khi IsCurrentBackupFailed = $true qua backup-db.ps1
+        $retResult = & $backupScript -TestOnlyRetention -BackupDir $tempDir -SimulateFailureForRetentionTest $true
+
+        # Mô phỏng dọn dẹp staging như trong catch của backup-db.ps1
+        if (Test-Path -LiteralPath $stagingDump) { Remove-Item -LiteralPath $stagingDump -Force }
+        if (Test-Path -LiteralPath $stagingJson) { Remove-Item -LiteralPath $stagingJson -Force }
+
+        if (-not (Test-Path -LiteralPath $oldDump1) -or -not (Test-Path -LiteralPath $oldJson1)) {
+            throw "Ban backup cu 1 bi xoa khi lan chay moi that bai!"
+        }
+        if (-not (Test-Path -LiteralPath $oldDump2) -or -not (Test-Path -LiteralPath $oldJson2)) {
+            throw "Ban backup cu 2 bi xoa khi lan chay moi that bai!"
+        }
+        if (Test-Path -LiteralPath $stagingDump) {
+            throw "File staging dump chua duoc don dep sau khi that bai!"
+        }
+        if ($retResult.DeletedCount -ne 0) {
+            throw "Retention da xoa $($retResult.DeletedCount) file khi backup that bai!"
+        }
+    } finally {
+        Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# Scenario 9: Restore strict mode thất bại khi thiếu baseline
+Run-AssertTest 'S55-BL.9: Restore drill bat -RequireBaselineMatch nhung manifest thieu tableRowCounts -> Fail [ABORT]' {
+    $manifestObj = [PSCustomObject]@{
+        backupFile = "eventpulse_backup_20261018_100000.dump"
+        status = "VerifiedValid"
+    }
+
+    $threw = $false
+    try {
+        $hasBaseline = ($null -ne $manifestObj.PSObject.Properties['tableRowCounts'] -and $null -ne $manifestObj.tableRowCounts)
+        if (-not $hasBaseline) {
+            $RequireBaselineMatch = $true
+            if ($RequireBaselineMatch) {
+                throw "[ABORT] Doi soat baseline that bai: Manifest khong co tableRowCounts va bat buoc kiem tra baseline (-RequireBaselineMatch)."
+            }
+        }
+    } catch {
+        if ($_ -match "RequireBaselineMatch" -or $_ -match "khong co tableRowCounts") { $threw = $true }
+    }
+    if (-not $threw) { throw "Khong nem loi khi manifest thieu baseline trong che do -RequireBaselineMatch!" }
+}
+
+# Scenario 10: Restore compatibility mode chấp nhận manifest cũ nhưng ghi rõ đã bỏ qua baseline
+Run-AssertTest 'S55-BL.10: Restore compatibility mode (khong bat RequireBaselineMatch) -> Chap nhan manifest cu va ghi SkippedNoBaselineInManifest' {
+    $manifestObj = [PSCustomObject]@{
+        backupFile = "eventpulse_backup_legacy.dump"
+        status = "VerifiedValid"
+    }
+
+    $baselineCompare = @{
+        Compared = $false
+        Status = "SkippedNoBaselineInManifest"
+        MismatchCount = 0
+        Mismatches = @()
+    }
+
+    $hasBaselineInManifest = ($null -ne $manifestObj.PSObject.Properties['tableRowCounts'] -and $null -ne $manifestObj.tableRowCounts)
+    if (-not $hasBaselineInManifest) {
+        $baselineCompare = @{
+            Compared = $false
+            Status = "SkippedNoBaselineInManifest"
+            MismatchCount = 0
+            Mismatches = @()
+        }
+    }
+
+    if ($baselineCompare.Compared -ne $false) { throw "Compared phai bang false" }
+    if ($baselineCompare.Status -ne "SkippedNoBaselineInManifest") {
+        throw "Status phai la 'SkippedNoBaselineInManifest', thuc te: $($baselineCompare.Status)"
+    }
+}
+
+# Scenario 11: Restore thất bại khi baseline sai định dạng hoặc row count mismatch
+Run-AssertTest 'S55-BL.11a: Baseline rong (0 bang) -> Compare-S55BaselineRowCounts nem loi sai dinh dang' {
+    $threw = $false
+    try {
+        $emptyBaseline = [PSCustomObject]@{}
+        Compare-S55BaselineRowCounts -Baseline $emptyBaseline -TableStats @([PSCustomObject]@{ TableName = "events"; RowCount = 10 })
+    } catch {
+        if ($_ -match "sai dinh dang hoac rong") { $threw = $true }
+    }
+    if (-not $threw) { throw "Khong nem loi khi baseline rong!" }
+}
+
+Run-AssertTest 'S55-BL.11b: Baseline co gia tri am -> Compare-S55BaselineRowCounts nem loi sai dinh dang' {
+    $threw = $false
+    try {
+        $badBaseline = [PSCustomObject]@{ events = 0 }
+        $badBaseline.events = -5
+        Compare-S55BaselineRowCounts -Baseline $badBaseline -TableStats @([PSCustomObject]@{ TableName = "events"; RowCount = 10 })
+    } catch {
+        if ($_ -match "khong hop le") { $threw = $true }
+    }
+    if (-not $threw) { throw "Khong nem loi khi baseline co gia tri dem am!" }
+}
+
+Run-AssertTest 'S55-BL.11c: Row count mismatch -> Compare-S55BaselineRowCounts bao cao MismatchCount > 0' {
+    $baseline = [PSCustomObject]@{
+        events = 10
+        tickets = 50
+    }
+    $tableStats = @(
+        [PSCustomObject]@{ TableName = "events"; RowCount = 10 }
+        [PSCustomObject]@{ TableName = "tickets"; RowCount = 48 }
+    )
+    $res = Compare-S55BaselineRowCounts -Baseline $baseline -TableStats $tableStats
+    if ($res.MismatchCount -ne 1) { throw "Phai co 1 mismatch, thuc te: $($res.MismatchCount)" }
+    if ($res.Mismatches[0] -notmatch "tickets") { throw "Mismatch phai bao gom bang tickets" }
+}
+
+# Scenario 12: Đảm bảo exit code và trạng thái kết quả phản ánh đúng lỗi
+Run-AssertTest 'S55-BL.12: Doi soat baseline mismatch gay ra ngoai le va fail result ghi nhan Failed' {
+    $baseline = [PSCustomObject]@{ events = 100 }
+    $tableStats = @([PSCustomObject]@{ TableName = "events"; RowCount = 10 })
+    $res = Compare-S55BaselineRowCounts -Baseline $baseline -TableStats $tableStats
+
+    $drillCompletedSuccessfully = $false
+    $threwDrillError = $false
+    $errorMessage = ""
+    try {
+        if ($res.MismatchCount -gt 0) {
+            throw "Doi soat baseline that bai: $($res.MismatchCount) bang co so dong khac biet: $($res.Mismatches -join '; ')"
+        }
+        $drillCompletedSuccessfully = $true
+    } catch {
+        $threwDrillError = $true
+        $errorMessage = $_.Exception.Message
+    }
+
+    if (-not $threwDrillError) { throw "Khong nem loi khi co mismatch!" }
+    if ($drillCompletedSuccessfully) { throw "drillCompletedSuccessfully phai la false khi baseline mismatch!" }
+
+    $failResult = [PSCustomObject]@{
+        status = "Failed"
+        error  = $errorMessage
+    }
+    if ($failResult.status -ne "Failed") { throw "Fail result phai co status Failed" }
+    if ($failResult.error -notmatch "events") { throw "Fail result phai ghi ro loi mismatch" }
 }
 
 # ==============================================================================

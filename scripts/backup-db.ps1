@@ -95,7 +95,13 @@ param(
     [switch]$TestOnlyOffsite,
 
     [Parameter()]
-    [hashtable]$OffsiteTestInputs
+    [hashtable]$OffsiteTestInputs,
+
+    [Parameter()]
+    [switch]$TestOnlyBaseline,
+
+    [Parameter()]
+    [hashtable]$BaselineTestInputs
 )
 
 $ErrorActionPreference = 'Stop'
@@ -389,6 +395,14 @@ if ($TestOnlyOffsite) {
     return @{ Status = "OffsiteTestReady" }
 }
 
+if ($TestOnlyBaseline) {
+    Write-Host "[TEST MODE] Dang chay kiem thu co lap baseline..."
+    if ($null -ne $BaselineTestInputs) {
+        return (Get-S55DatabaseBaselineRowCounts @BaselineTestInputs)
+    }
+    return @{ Status = "BaselineTestReady" }
+}
+
 # ==============================================================================
 # LUỒNG CHÍNH: SAO LƯU DATABASE THỰC TẾ
 # ==============================================================================
@@ -532,31 +546,30 @@ try {
     $sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $stagingDumpFilePath).Hash
     $backupId = "ep-backup-${timestamp}-$([Guid]::NewGuid().ToString('N').Substring(0, 8))"
 
-    # 5.1 (Tùy chọn) Ghi baseline row counts vào manifest nếu có psql — phục vụ đối chiếu sau restore
-    $tableRowCounts = $null
+    # 5.1 Thu thập baseline row counts vào manifest (bắt buộc - fail-closed)
+    # Ghi chú về snapshot consistency:
+    # pg_dump và psql chạy qua các tiến trình CLI riêng biệt. Baseline row counts được thu thập
+    # ngay sau khi tạo dump hoàn tất. Trong điều kiện bảo trì hoặc tải tĩnh, baseline phản ánh
+    # chính xác trạng thái dữ liệu của bản backup. Tuy nhiên, nếu có các giao dịch ghi đồng thời
+    # diễn ra giữa thời điểm pg_dump hoàn tất và psql truy vấn count(*), có thể xuất hiện sai lệch
+    # nhỏ giữa dump và baseline. Kiến trúc hiện tại không cam kết transaction snapshot consistency
+    # tuyệt đối giữa 2 lệnh CLI riêng biệt; không tuyên bố đã bảo đảm snapshot consistency.
+    Write-Host "[BASELINE] Dang thu thap baseline row counts tu CSDL nguon (fail-closed)..."
     $resolvedPsql = Get-PgToolExecutable -ToolName "psql" -ExplicitPath $PsqlPath
-    # Docker mode: psql co san trong image; Native: chi ghi baseline khi co psql
-    if (($effectivePgToolMode -eq 'Docker') -or ($null -ne $resolvedPsql)) {
-        try {
-            Write-Host "[BASELINE] Dang ghi nhan so dong tung bang vao manifest (psql)..."
-            $getTablesQuery = "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name;"
-            $tablesList = (Invoke-PgSqlQuery -PsqlExe $resolvedPsql -ConnParams $pgParams -DatabaseName $pgParams.Database -Query $getTablesQuery) -split "`r?`n" |
-                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-
-            $tableRowCounts = @{}
-            foreach ($tbl in $tablesList) {
-                $cleanTbl = $tbl.Trim()
-                $cntQuery = 'SELECT count(*) FROM "' + $cleanTbl + '";'
-                $rowCnt = (Invoke-PgSqlQuery -PsqlExe $resolvedPsql -ConnParams $pgParams -DatabaseName $pgParams.Database -Query $cntQuery).Trim()
-                $tableRowCounts[$cleanTbl] = [long]$rowCnt
-            }
-            Write-Host "[BASELINE] Da ghi nhan row counts cho $($tableRowCounts.Count) bang."
-        } catch {
-            Write-Warning "[BASELINE] Khong the ghi row counts (se tiep tuc khong co baseline): $_"
-        }
-    } else {
-        Write-Warning "[BASELINE] Khong tim thay 'psql' — manifest se khong co tableRowCounts (khong bat buoc)."
+    if ($effectivePgToolMode -ne 'Docker' -and [string]::IsNullOrWhiteSpace($resolvedPsql)) {
+        throw "[ABORT] Khong the tao ban backup: Khong tim thay cong cu 'psql' de thu thap baseline row counts."
     }
+
+    $tableRowCounts = Get-S55DatabaseBaselineRowCounts -PsqlExe $resolvedPsql `
+        -ConnParams $pgParams `
+        -DatabaseName $pgParams.Database `
+        -Mode $effectivePgToolMode `
+        -DockerImage $script:S55PgDockerImage
+
+    if ($null -eq $tableRowCounts -or $tableRowCounts.Count -eq 0) {
+        throw "[ABORT] Du lieu baseline row counts rong hoac khong hop le truoc khi ghi manifest."
+    }
+    Write-Host "[BASELINE] Da thu thap row counts thanh cong cho $($tableRowCounts.Count) bang (fail-closed)."
 
     # 6. Ghi Manifest JSON tạm (Version 2.0)
     $manifestData = [PSCustomObject]@{
@@ -578,10 +591,7 @@ try {
         status               = "VerifiedValid"
         offsiteStatus        = if ($EnableOffsite) { "Pending" } else { "LocalOnly" }
         offsiteVerifiedAtUtc = $null
-    }
-
-    if ($null -ne $tableRowCounts -and $tableRowCounts.Count -gt 0) {
-        $manifestData | Add-Member -NotePropertyName 'tableRowCounts' -NotePropertyValue $tableRowCounts
+        tableRowCounts       = $tableRowCounts
     }
 
     $manifestData | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $stagingManifestPath -Encoding utf8

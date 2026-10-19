@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Kiểm thử tự động cô lập (không cần Database) cho Story S-55:
     1. Kiểm tra cú pháp tĩnh (PowerShell AST Syntax Check).

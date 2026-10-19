@@ -34,6 +34,9 @@ param(
     [switch]$KeepDrillDb,
 
     [Parameter()]
+    [switch]$RequireBaselineMatch,
+
+    [Parameter()]
     [string]$PgRestorePath,
 
     [Parameter()]
@@ -217,28 +220,65 @@ function Compare-S55BaselineRowCounts {
         $Baseline,
 
         [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
         [array]$TableStats,
 
         [Parameter()]
         [long]$MigrationCount = 0
     )
 
+    if ($null -eq $Baseline) {
+        throw "Baseline row counts khong hop le (null)."
+    }
+
+    # Trích xuất danh sách thuộc tính/khóa bảng (hỗ trợ cả PSCustomObject lẫn Hashtable/IDictionary)
+    $baselineProps = @()
+    if ($Baseline -is [System.Collections.IDictionary]) {
+        foreach ($k in $Baseline.Keys) {
+            $baselineProps += [PSCustomObject]@{ Name = [string]$k; Value = $Baseline[$k] }
+        }
+    } elseif ($null -ne $Baseline.PSObject) {
+        foreach ($p in $Baseline.PSObject.Properties) {
+            if ($p.MemberType -match 'Property') {
+                $baselineProps += $p
+            }
+        }
+    }
+
+    if ($baselineProps.Count -eq 0) {
+        throw "Baseline row counts sai dinh dang hoac rong (0 bang)."
+    }
+
     $mismatches = @()
     $statsByName = @{}
     foreach ($s in $TableStats) {
-        if ($null -ne $s) { $statsByName[[string]$s.TableName] = [long]$s.RowCount }
+        if ($null -ne $s) {
+            $tName = [string]$s.TableName
+            $parsedStatsCount = 0L
+            if ([long]::TryParse([string]$s.RowCount, [ref]$parsedStatsCount)) {
+                $statsByName[$tName] = $parsedStatsCount
+            } else {
+                $statsByName[$tName] = -1L
+            }
+        }
     }
 
     # S55-BASELINE-FIX: baseline ghi lúc backup bao gồm cả bảng hệ thống '__EFMigrationsHistory'.
     # Bảng này bị loại khỏi $TableStats (chỉ đếm bảng nghiệp vụ), nên bổ sung giá trị đã đếm ở Cấp 1
     # để tránh kết luận sai "THIEU BANG" khi bảng thực tế đã được khôi phục đầy đủ.
-    if ($Baseline.PSObject.Properties.Name -contains '__EFMigrationsHistory' -and -not $statsByName.ContainsKey('__EFMigrationsHistory')) {
+    $hasMigrationInBaseline = ($baselineProps | Where-Object { $_.Name -eq '__EFMigrationsHistory' })
+    if ($hasMigrationInBaseline -and -not $statsByName.ContainsKey('__EFMigrationsHistory')) {
         $statsByName['__EFMigrationsHistory'] = $MigrationCount
     }
 
-    foreach ($prop in $Baseline.PSObject.Properties) {
+    foreach ($prop in $baselineProps) {
         $tbl = $prop.Name
-        $expected = [long]$prop.Value
+        $expectedVal = $prop.Value
+        $expected = 0L
+        if ($null -eq $expectedVal -or -not [long]::TryParse([string]$expectedVal, [ref]$expected) -or $expected -lt 0) {
+            throw "Baseline row counts sai dinh dang: Bang '$tbl' co gia tri dem khong hop le ('$expectedVal')."
+        }
+
         if ($statsByName.ContainsKey($tbl)) {
             if ($statsByName[$tbl] -ne $expected) {
                 $mismatches += "$tbl (baseline: $expected, restored: $($statsByName[$tbl]))"
@@ -249,13 +289,19 @@ function Compare-S55BaselineRowCounts {
     }
 
     # Bảng có trong DB khôi phục nhưng không có trong baseline: cảnh báo (không fail) — có thể là bảng mới thêm sau lần backup
+    $baselineNames = @($baselineProps | ForEach-Object { $_.Name })
     foreach ($t in $statsByName.Keys) {
-        if (-not ($Baseline.PSObject.Properties.Name -contains $t)) {
+        if ($baselineNames -notcontains $t) {
             Write-Warning "[BASELINE] Bang '$t' co trong DB khoi phuc nhung khong co trong baseline manifest (co the la bang moi them sau khi backup)."
         }
     }
 
-    return @{ Compared = $true; MismatchCount = $mismatches.Count; Mismatches = $mismatches }
+    return @{
+        Compared = $true
+        Status = "Matched"
+        MismatchCount = $mismatches.Count
+        Mismatches = $mismatches
+    }
 }
 
 # ==============================================================================
@@ -443,6 +489,12 @@ if ($TestOnlyValidation) {
             $paramValue = ""
             if ($inp.ContainsKey("ParamValue")) { $paramValue = $inp.ParamValue }
             return Resolve-S55TargetConnection -TargetConnectionString $paramValue
+        }
+        if ($TestValidationInputs.ContainsKey("BaselineCompareTest")) {
+            $inp = $TestValidationInputs.BaselineCompareTest
+            $migCount = 0L
+            if ($inp.ContainsKey("MigrationCount")) { $migCount = [long]$inp.MigrationCount }
+            return Compare-S55BaselineRowCounts -Baseline $inp.Baseline -TableStats $inp.TableStats -MigrationCount $migCount
         }
     }
     return @{ Status = "TestModeReady" }
@@ -747,9 +799,19 @@ try {
         throw "Doi soat that bai: Co $failedTableCount bang nghiep vu khong the truy van so luong ban ghi ($summaryErrors). Dung dien tap de bao ve du lieu phuc vu dieu tra."
     }
 
-    # S55-BASELINE: Đối chiếu row counts với baseline ghi trong manifest lúc backup (nếu có)
-    $baselineCompare = @{ Compared = $false; MismatchCount = 0; Mismatches = @() }
-    if ($null -ne $selectedManifest -and $selectedManifest.PSObject.Properties['tableRowCounts'] -and $null -ne $selectedManifest.tableRowCounts) {
+    # S55-BASELINE: Đối chiếu row counts với baseline ghi trong manifest lúc backup
+    $baselineCompare = @{
+        Compared = $false
+        Status = "SkippedNoBaselineInManifest"
+        MismatchCount = 0
+        Mismatches = @()
+    }
+
+    $hasBaselineInManifest = ($null -ne $selectedManifest -and
+                              $null -ne $selectedManifest.PSObject.Properties['tableRowCounts'] -and
+                              $null -ne $selectedManifest.tableRowCounts)
+
+    if ($hasBaselineInManifest) {
         $baseline = $selectedManifest.tableRowCounts
         $baselineCompare = Compare-S55BaselineRowCounts -Baseline $baseline -TableStats $tableStats -MigrationCount $migrationCount
         if ($baselineCompare.MismatchCount -gt 0) {
@@ -757,7 +819,10 @@ try {
         }
         Write-Host "[BASELINE] Doi soat row counts voi manifest: DAT — toan bo bang khop baseline."
     } else {
-        Write-Warning "[BASELINE] Manifest khong co tableRowCounts — bo qua buoc doi soat baseline (chi doi soat cau truc)."
+        if ($RequireBaselineMatch) {
+            throw "[ABORT] Doi soat baseline that bai: Manifest khong co tableRowCounts va bat buoc kiem tra baseline (-RequireBaselineMatch)."
+        }
+        Write-Warning "[BASELINE] Manifest khong co tableRowCounts — bo qua buoc doi soat baseline do che do tuong thich cu (SkippedNoBaselineInManifest). CHUA xac minh toan ven du lieu o muc do bang ghi!"
     }
 
     # Đo lường và kiểm tra ngưỡng RTO bắt buộc (<= 900 giây)
@@ -774,7 +839,15 @@ try {
     Write-Host " - Tong so bang          : $tableCount"
     Write-Host " - Rang buoc FK          : $fkCount"
     Write-Host " - RTO do luong          : $rtoSeconds s"
+    if ($baselineCompare.Compared) {
+        Write-Host " - Baseline row counts   : XAC MINH HOP LE (Khop $($tableStats.Count) bang)"
+    } else {
+        Write-Host " - Baseline row counts   : BO QUA ($($baselineCompare.Status) - Che do tuong thich)"
+    }
     Write-Host " [XAC NHAN GIOI HAN] Doi soat xac minh tinh toan ven ve cau truc schema, migrations, rang buoc khoa ngoai, chi muc va so luong ban ghi."
+    if (-not $baselineCompare.Compared) {
+        Write-Host "                     CANH BAO: Ban backup nay chua duoc doi soat voi baseline so luong ban ghi goc."
+    }
     Write-Host "                     Khong tu coi so luong bang nhau la bang chung tuyet doi du lieu nghiep vu dong nhat."
     Write-Host "                     Can chay test suite API tren database drill de kiem chung logic ung dung."
     Write-Host "=================================================================="

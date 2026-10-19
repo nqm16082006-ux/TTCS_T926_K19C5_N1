@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     S-55: BO KIEM THU OFFLINE CHO CAC GUARD H1 / H2 / H3
 
