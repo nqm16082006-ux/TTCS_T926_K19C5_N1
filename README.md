@@ -203,3 +203,45 @@ Hệ thống tích hợp dashboard giám sát trực tiếp trên giao diện we
 - **Thời gian thực & Bền vững (Persistence)**: Hai developer chạy app khác process hoặc khác máy kết nối cùng shared database đều nhìn thấy chung telemetry; dữ liệu không bị mất khi restart server.
 - **Không ghi dữ liệu nhạy cảm**: Tuyệt đối không lưu query string, JWT/token, Authorization header, cookie hoặc thông tin thanh toán vào telemetry.
 
+---
+
+## 🛡️ Sao Lưu Cơ Sở Dữ Liệu & Khôi Phục Thảm Họa (Story S-55: Disaster Recovery)
+
+Hệ thống sao lưu tự động và diễn tập phục hồi sự cố cho PostgreSQL được quản lý qua bộ script PowerShell tại thư mục `scripts/`:
+
+- **Chi tiết kiến trúc & Runbook:** Xem tài liệu đầy đủ tại [docs/S55-database-backup-drill.md](docs/S55-database-backup-drill.md).
+- **Sao lưu hằng ngày (Daily Backup):**
+  - Chạy thủ công: `.\scripts\backup-db.ps1`
+  - Định dạng: PostgreSQL Custom Format (`-Fc`, nén zlib) kèm Manifest JSON (mã băm SHA-256, kích thước, timestamp UTC).
+  - Chính sách lưu trữ: Tự động duy trì **14 bản backup hợp lệ gần nhất**; fail-safe không xóa bản cũ nếu backup mới gặp lỗi.
+  - Lịch chạy tự động đề xuất: 02:00 AM hằng đêm qua Windows Task Scheduler hoặc Linux cron.
+  - **Không cài PostgreSQL client trên máy?** Chạy chế độ Docker: `.\scripts\backup-db.ps1 -PgToolMode Docker` (client 18.6 trong image `postgres:18-alpine`, mật khẩu qua `--env-file` tạm, mount tối thiểu `/s55work`, dọn container tự động). Chi tiết xem mục "Chạy PostgreSQL client qua Docker" trong [docs/S55-database-backup-drill.md](docs/S55-database-backup-drill.md).
+- **Sao lưu Ngoại vi & Mã hóa (Offsite Backup - Phase 3):**
+  - Mã hóa Client-Side bằng **`age`** (khóa bất đối xứng X25519, chỉ cần public key `age1...` trên server; private key bảo quản an toàn ngoại tuyến).
+  - Đồng bộ lên **Cloudflare R2** qua `rclone` (S3 API).
+  - Xác minh remote độc lập bằng cách tải về thư mục tạm và đối soát mã băm SHA-256 từng bit.
+  - Retention ngoại vi: Giữ 14 bản hợp lệ trên bucket; cô lập namespace không xóa nhầm dữ liệu lạ.
+- **Diễn tập Khôi phục (Disaster Recovery Drill):**
+  - Chạy diễn tập tự động: `.\scripts\restore-drill.ps1`
+  - Cơ chế phòng vệ an toàn: Chỉ cho phép restore vào database tạm local cô lập `eventpulse_drill_*`; từ chối tuyệt đối máy chủ Cloud/Production (Deny-by-default host guard); đối soát quyền sở hữu (Session ID marker).
+  - Tiêu chí đối soát toàn vẹn: Kiểm tra migrations (`__EFMigrationsHistory`), bảng nghiệp vụ, Foreign Keys, Indexes, đếm số bản ghi từng bảng và kiểm tra ngưỡng RTO $\le 15$ phút (900 giây).
+  - Đối chiếu row counts với baseline ghi trong manifest lúc backup (nếu manifest có `tableRowCounts`).
+- **Diễn tập End-to-End kèm Smoke Test (Docker cô lập):**
+  - `.\scripts\run-drill-env.ps1` — dựng PostgreSQL + Redis + API tạm trong Docker (mạng/volume riêng, mật khẩu ngẫu nhiên), restore bản backup hợp lệ mới nhất, khởi động API với **Mock payment + SMTP tắt + AutoMigrate/AutoSeed tắt**, chạy smoke test (`/api/health`, `/api/public/events`, `/api/public/showtimes`), đo RTO và tự dọn dẹp có xác minh ownership.
+  - Tham số hữu ích: `-DumpFile <file>`, `-SkipApiSmoke`, `-KeepResources` (giữ lại để điều tra khi lỗi), `-PgPort 5544 -ApiPort 5013`.
+- **Lập lịch tự động (02:00 Asia/Ho_Chi_Minh):**
+  - Windows: `.\scripts\register-backup-task.ps1` (mặc định dry-run an toàn; `-Register` để đăng ký, `-Remove` để gỡ, `-Force` để cập nhật). Chỉ đăng ký **một** cơ chế cho một database nguồn.
+  - Linux: dùng cron (xem hướng dẫn in ra khi chạy script dry-run).
+  - Job ghi log qua `-LogFile` (không ghi secrets); kiểm tra lần chạy gần nhất bằng `Get-ScheduledTaskInfo`.
+- **Upload Offsite khi chạy backup:**
+  - `.\scripts\backup-db.ps1 -EnableOffsite -AgeRecipientKey <age1...>` (đọc cấu hình R2 từ env `R2_ACCOUNT_ID`, `R2_BUCKET_NAME`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PREFIX`; cần `age` và `rclone` trong PATH hoặc truyền `-AgeExePath`/`-RcloneExePath`).
+  - Prefix R2 ưu tiên: tham số `-R2Prefix` → env `R2_PREFIX` → mặc định `database-backups`; dấu `/` thừa được chuẩn hóa.
+  - Bản mã hóa có đuôi `.dump.age`; manifest v2 ghi `plaintextSha256` + `encryptedSha256`; upload chỉ được đánh dấu `VerifiedUploaded` sau khi tải về xác minh SHA-256 khớp 100%.
+- **Kiểm thử offline (không DB, không Docker, không credentials cloud):**
+  - `pwsh -File tests/test-backup-retention-s55.ps1`
+  - `pwsh -File tests/test-s55-blockers-offline.ps1`
+  - `pwsh -File tests/test-s55-guards-offline.ps1`
+  - `pwsh -File tests/test-s55-phase3-offline.ps1`
+  - `pwsh -File tests/test-s55-docker-mode-offline.ps1` (Docker mode: chọn mode, args, env-file, mount, timeout, không lộ credential; prefix R2)
+  - Các bộ test này chạy trong CI (job `s55-offline-tests` của `.github/workflows/ci.yml`).
+

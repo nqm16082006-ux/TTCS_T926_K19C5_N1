@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -22,9 +23,21 @@ namespace EventTicketBooking.Api.Data
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
             var logger = scope.ServiceProvider.GetService<ILogger<AppDbContext>>();
-            configuration ??= scope.ServiceProvider.GetService<Microsoft.Extensions.Configuration.IConfiguration>();
+            configuration ??= scope.ServiceProvider.GetService<IConfiguration>();
 
-            var autoMigrate = configuration?.GetValue<bool>("Database:AutoMigrate") ?? false;
+            // Story S-55 & S-43: Kiểm tra cấu hình AutoMigrate và AutoSeed/SeedDemoData
+            // AutoMigrate và AutoSeed mặc định là false khi không có cấu hình (fail-safe)
+            bool autoMigrate = configuration?.GetValue<bool?>("Database:AutoMigrate") ?? false;
+            bool autoSeed = (configuration?.GetValue<bool?>("Database:AutoSeed") ?? false)
+                            || (configuration?.GetValue<bool>("Database:SeedDemoData") ?? false);
+
+            if (!autoMigrate && !autoSeed)
+            {
+                logger?.LogInformation("[S-55] Cả Database:AutoMigrate và Database:AutoSeed đều bị tắt. Bỏ qua toàn bộ migration và seeding.");
+                return;
+            }
+
+            // Chỉ chạy migration khi AutoMigrate được bật rõ ràng
             if (autoMigrate && context.Database.IsRelational())
             {
                 await context.Database.MigrateAsync();
@@ -32,8 +45,8 @@ namespace EventTicketBooking.Api.Data
 
             try
             {
-
-                if (context.Database.IsNpgsql())
+                // Chỉ chạy các lệnh DDL, Cast, Alter Type khi AutoMigrate được bật
+                if (autoMigrate && context.Database.IsNpgsql())
                 {
                     var conn = (Npgsql.NpgsqlConnection)context.Database.GetDbConnection();
                     if (conn.State != System.Data.ConnectionState.Open)
@@ -208,8 +221,11 @@ namespace EventTicketBooking.Api.Data
                     }
                 }
 
-                // 1. Kiểm tra nếu bảng Roles chưa có dữ liệu thì seed 5 roles
-                if (!await context.Roles.AnyAsync())
+                // Chỉ thực hiện seeding dữ liệu nếu AutoSeed được bật
+                if (autoSeed)
+                {
+                    // 1. Kiểm tra nếu bảng Roles chưa có dữ liệu thì seed 5 roles
+                    if (!await context.Roles.AnyAsync())
                 {
                     var roles = new List<Role>
                     {
@@ -500,7 +516,8 @@ namespace EventTicketBooking.Api.Data
                     }
                 }
             }
-            catch (Exception ex)
+        }
+        catch (Exception ex)
             {
                 logger?.LogWarning(ex, "Lỗi xảy ra trong quá trình seed dữ liệu ban đầu.");
             }

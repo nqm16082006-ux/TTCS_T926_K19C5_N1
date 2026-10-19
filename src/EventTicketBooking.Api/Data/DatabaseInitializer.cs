@@ -10,6 +10,10 @@ public static class DatabaseInitializer
     {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        if (!configuration.GetValue<bool>("Database:AutoMigrate"))
+        {
+            return;
+        }
         // Fail startup if migrations fail instead of serving an unusable application.
         await db.Database.MigrateAsync();
         var names = new[] { "Admin", "Organizer", "Staff", "Customer", "Auditor" };
