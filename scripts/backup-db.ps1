@@ -117,7 +117,14 @@ if ([string]::IsNullOrWhiteSpace($BackupDir)) {
 
 # S-55 Docker mode: chon Native hoac Docker cho pg_dump/pg_restore/psql
 # (tham so -PgToolMode, hoac env S55_PG_TOOL_MODE; mac dinh Native).
-$effectivePgToolMode = Resolve-S55PgToolMode -ToolMode $PgToolMode
+# Gia tri mode khong duoc ho tro -> loi ro rang + exit 1 (khong fallback im lang).
+$effectivePgToolMode = $null
+try {
+    $effectivePgToolMode = Resolve-S55PgToolMode -ToolMode $PgToolMode
+} catch {
+    Write-Error "[LOI CAU HINH] $($_.Exception.Message)"
+    exit 1
+}
 Set-S55PgToolMode -Mode $effectivePgToolMode -DockerImage $PgDockerImage
 Write-Host "[TOOL MODE] PostgreSQL client mode: $effectivePgToolMode"
 
@@ -141,7 +148,9 @@ if (-not [string]::IsNullOrWhiteSpace($LogFile)) {
 # ==============================================================================
 function Invoke-PgDumpWithTimeout {
     param(
-        [Parameter(Mandatory)]
+        # KHONG dung [Mandatory] cho PgDumpExe vi Docker mode khong can executable tren host.
+        # Validation noi bo chi ap dung khi thuc su o Native mode (xem ben duoi).
+        [Parameter()]
         [string]$PgDumpExe,
 
         [Parameter(Mandatory)]
@@ -162,6 +171,7 @@ function Invoke-PgDumpWithTimeout {
 
     # Docker mode: uy quyen cho Invoke-PgToolCommand (mount HostDir -> /s55work,
     # mat khau qua --env-file tam, remap duong dan -f ve container).
+    # KHONG yeu cau $PgDumpExe — pg_dump chay ben trong container/image.
     if ($script:S55PgToolMode -eq 'Docker') {
         Write-Host "[EXEC] Dang thuc thi pg_dump trong Docker container (Timeout: $TimeoutSeconds giay)..."
         $res = Invoke-PgToolCommand -ToolName "pg_dump" `
@@ -175,12 +185,17 @@ function Invoke-PgDumpWithTimeout {
         return $res.ExitCode
     }
 
+    # Native mode: bat buoc phai co duong dan executable hop le.
+    if ([string]::IsNullOrWhiteSpace($PgDumpExe)) {
+        throw "[LOI NOI BO] PgDumpExe khong duoc truyen vao Invoke-PgDumpWithTimeout o Native mode."
+    }
+
     Write-Host "[EXEC] Dang thuc thi pg_dump (Timeout: $TimeoutSeconds giay)..."
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $PgDumpExe
-    $escapedArgs = ($DumpArgs | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }) -join ' '
-    $psi.Arguments = $escapedArgs
+    # F7 (Lỗi 3): quoting chuan MSVCRT — bao toan dau ngoac kep ben trong tham so.
+    $psi.Arguments = ConvertTo-S55CliArgumentLine -Arguments $DumpArgs
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
 
@@ -412,7 +427,10 @@ Write-Host "=================================================================="
 
 # 1. Kiểm tra công cụ pg_dump và pg_restore
 if ($effectivePgToolMode -eq 'Docker') {
-    # Docker mode: client chay trong container, khong can cai PostgreSQL tren may
+    # Docker mode: pg_dump/pg_restore/psql chay ben trong container/image.
+    # KHONG yeu cau cai dat PostgreSQL client tren Windows host.
+    $resolvedPgDump   = $null   # Khong dung tren host — chi dung trong container.
+    $resolvedPgRestore = $null  # Khong dung tren host — chi dung trong container.
     if (-not (Get-Command $script:S55PgDockerExe -ErrorAction SilentlyContinue)) {
         Write-Error "[LOI MOI TRUONG] PgToolMode=Docker nhung khong tim thay '$($script:S55PgDockerExe)' trong PATH. Vui long kiem tra Docker."
         exit 1
@@ -520,6 +538,27 @@ try {
         }
     }
 
+    # 4.0 Xác định psql TRƯỚC dump (can cho baseline pass 1) — Native mode bat buoc co psql.
+    $resolvedPsql = Get-PgToolExecutable -ToolName "psql" -ExplicitPath $PsqlPath
+    if ($effectivePgToolMode -ne 'Docker' -and [string]::IsNullOrWhiteSpace($resolvedPsql)) {
+        throw "[ABORT] Khong the tao ban backup: Khong tim thay cong cu 'psql' de thu thap baseline row counts."
+    }
+
+    # 4.1 CONSISTENCY GUARD — Pass 1: thu thap baseline row counts TRUOC khi dump.
+    # Sau dump se thu thap pass 2 va doi chieu; moi lech -> ABORT (fail-closed).
+    # Xem ghi chu ve gioi han snapshot o khoi doc manifest ben duoi.
+    Write-Host "[BASELINE] Thu thap baseline row counts TRUOC dump (pass 1) de doi chieu nhat quan..."
+    $preDumpRowCounts = Get-S55DatabaseBaselineRowCounts -PsqlExe $resolvedPsql `
+        -ConnParams $pgParams `
+        -DatabaseName $pgParams.Database `
+        -Mode $effectivePgToolMode `
+        -DockerImage $script:S55PgDockerImage
+
+    if ($null -eq $preDumpRowCounts -or $preDumpRowCounts.Count -eq 0) {
+        throw "[ABORT] Du lieu baseline row counts pass 1 rong hoac khong hop le truoc khi dump."
+    }
+    Write-Host "[BASELINE] Pass 1 hoan tat: $($preDumpRowCounts.Count) bang."
+
     Invoke-PgDumpWithTimeout -PgDumpExe $resolvedPgDump -DumpArgs $dumpArgs -TimeoutSeconds $DumpTimeoutSeconds -ConnParams $pgParams -HostDir $BackupDir | Out-Null
 
     if (-not (Test-Path -LiteralPath $stagingDumpFilePath)) {
@@ -546,30 +585,35 @@ try {
     $sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $stagingDumpFilePath).Hash
     $backupId = "ep-backup-${timestamp}-$([Guid]::NewGuid().ToString('N').Substring(0, 8))"
 
-    # 5.1 Thu thập baseline row counts vào manifest (bắt buộc - fail-closed)
-    # Ghi chú về snapshot consistency:
-    # pg_dump và psql chạy qua các tiến trình CLI riêng biệt. Baseline row counts được thu thập
-    # ngay sau khi tạo dump hoàn tất. Trong điều kiện bảo trì hoặc tải tĩnh, baseline phản ánh
-    # chính xác trạng thái dữ liệu của bản backup. Tuy nhiên, nếu có các giao dịch ghi đồng thời
-    # diễn ra giữa thời điểm pg_dump hoàn tất và psql truy vấn count(*), có thể xuất hiện sai lệch
-    # nhỏ giữa dump và baseline. Kiến trúc hiện tại không cam kết transaction snapshot consistency
-    # tuyệt đối giữa 2 lệnh CLI riêng biệt; không tuyên bố đã bảo đảm snapshot consistency.
-    Write-Host "[BASELINE] Dang thu thap baseline row counts tu CSDL nguon (fail-closed)..."
-    $resolvedPsql = Get-PgToolExecutable -ToolName "psql" -ExplicitPath $PsqlPath
-    if ($effectivePgToolMode -ne 'Docker' -and [string]::IsNullOrWhiteSpace($resolvedPsql)) {
-        throw "[ABORT] Khong the tao ban backup: Khong tim thay cong cu 'psql' de thu thap baseline row counts."
-    }
-
-    $tableRowCounts = Get-S55DatabaseBaselineRowCounts -PsqlExe $resolvedPsql `
+    # 5.1 CONSISTENCY GUARD — Pass 2: thu thap baseline row counts SAU khi dump hoan tat,
+    # doi chieu voi pass 1 (truoc dump). Moi lech -> ABORT, khong publish metadata.
+    # Ghi chu ve tinh nhat quan (consistency):
+    # - pg_dump luon tu chup mot snapshot MVCC nhat quan noi tai cua rieng no (REPEATABLE
+    #   READ) — du lieu trong file dump luon tu nhat quan.
+    # - 2 luot dem row counts chay qua cac tien trinh CLI doc lap nen tu ban than chung
+    #   khong phai la mot snapshot giao dich duy nhat. Guard chi phat hien va CHAN cac
+    #   cua so co ghi dong thoi giua 2 luot dem (dump nam giua): neu co bat ky bang nao
+    #   lech so dong hoac danh sach bang thay doi, backup bi huy (fail-closed). Neu 2
+    #   luot khop nhau, baseline tuong ung voi cua so dump voi do tin cay cao nhung van
+    #   KHONG phai la cam ket snapshot giao dich tuyet doi; gioi han nay duoc neu ro.
+    Write-Host "[BASELINE] Thu thap baseline row counts SAU dump (pass 2) de doi chieu nhat quan..."
+    $postDumpRowCounts = Get-S55DatabaseBaselineRowCounts -PsqlExe $resolvedPsql `
         -ConnParams $pgParams `
         -DatabaseName $pgParams.Database `
         -Mode $effectivePgToolMode `
         -DockerImage $script:S55PgDockerImage
 
-    if ($null -eq $tableRowCounts -or $tableRowCounts.Count -eq 0) {
-        throw "[ABORT] Du lieu baseline row counts rong hoac khong hop le truoc khi ghi manifest."
+    if ($null -eq $postDumpRowCounts -or $postDumpRowCounts.Count -eq 0) {
+        throw "[ABORT] Du lieu baseline row counts pass 2 rong hoac khong hop le sau khi dump."
     }
-    Write-Host "[BASELINE] Da thu thap row counts thanh cong cho $($tableRowCounts.Count) bang (fail-closed)."
+
+    $consistencyCheck = Compare-S55BaselineRowCountPasses -PrePass $preDumpRowCounts -PostPass $postDumpRowCounts
+    if (-not $consistencyCheck.Passed) {
+        throw "[ABORT] [CONSISTENCY GUARD] Du lieu thay doi giua 2 luot dem (dump nam giua): $($consistencyCheck.Mismatches -join '; '). Backup bi huy de dam bao baseline nhat quan voi dump."
+    }
+
+    $tableRowCounts = $postDumpRowCounts
+    Write-Host "[BASELINE] Row counts nhat quan giua 2 pass cho $($tableRowCounts.Count) bang (fail-closed)."
 
     # 6. Ghi Manifest JSON tạm (Version 2.0)
     $manifestData = [PSCustomObject]@{

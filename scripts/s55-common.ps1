@@ -36,6 +36,7 @@ function Get-PgToolExecutable {
     }
 
     $standardPaths = @(
+        "C:\Program Files\PostgreSQL\18\bin\$ToolName.exe",
         "C:\Program Files\PostgreSQL\17\bin\$ToolName.exe",
         "C:\Program Files\PostgreSQL\16\bin\$ToolName.exe",
         "C:\Program Files\PostgreSQL\15\bin\$ToolName.exe"
@@ -150,7 +151,10 @@ function Invoke-PgSqlQuery {
         [scriptblock]$MockCommandBlock
     )
 
+    # F8 (Lỗi 3 — fail-closed): ON_ERROR_STOP=1 buoc psql tra exit code khac 0
+    # khi SQL loi (mac dinh psql -c van tra 0 va moi loi SQL bi nuot im lang).
     $psqlArgs = @(
+        "-v", "ON_ERROR_STOP=1",
         "-h", $ConnParams.Host,
         "-p", $ConnParams.Port.ToString(),
         "-U", $ConnParams.Username,
@@ -410,14 +414,10 @@ function Invoke-ProcessWithTimeout {
         [string]$WorkingDirectory
     )
 
-    # Xây dựng chuỗi tham số với quoting an toàn cho đường dẫn chứa khoảng trắng
-    $quotedArgs = @($Arguments | ForEach-Object {
-        if ($_ -match '\s' -and -not $_.StartsWith('"')) { "`"$_`"" } else { $_ }
-    })
-
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $FilePath
-    $psi.Arguments = $quotedArgs -join ' '
+    # F7 (Lỗi 3): quoting chuan MSVCRT — bao toan dau ngoac kep ben trong tham so.
+    $psi.Arguments = ConvertTo-S55CliArgumentLine -Arguments $Arguments
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
     if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
@@ -575,6 +575,109 @@ function ConvertTo-S55ContainerPath {
     return "/s55work/" + ($rest -replace '\\', '/')
 }
 
+# ==============================================================================
+# HÀM BỔ TRỢ: XÂY DỰNG DÒNG THAM SỐ CHO PROCESTARTINFO.ARGUMENTS (F7 — Lỗi 3)
+# Quoting dung chuan MSVCRT/CommandLineToArgvW cua Windows:
+#   - Arg chua khoang trang hoac dau ngoac kep -> boc trong "...", moi " ben
+#     trong duoc escape thanh \", moi \ dung truoc " duoc nhan doi.
+#   - Arg rong -> "".
+# KHONG dung cach nay, cac tham so chua ngoac kep noi (vi du SQL chua
+# "AuditLogs") se bi mat dau ngoac kep khi child parse command line ->
+# PostgreSQL nhan duoc ten bang bi lowercase -> "relation auditlogs does
+# not exist".
+# ==============================================================================
+function ConvertTo-S55CliArgumentLine {
+    param(
+        # KHONG dung [Mandatory]: PowerShell tu choi binding array co phan tu
+        # rong (arg rong "" la hop le va can duoc ma hoa thanh `""`).
+        [string[]]$Arguments
+    )
+
+    if ($null -eq $Arguments -or $Arguments.Count -eq 0) {
+        throw "[LOI NOI BO] ConvertTo-S55CliArgumentLine yeu cau danh sach tham so khong rong."
+    }
+
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($arg in $Arguments) {
+        if ($sb.Length -gt 0) { [void]$sb.Append(' ') }
+
+        if ([string]::IsNullOrEmpty($arg)) {
+            [void]$sb.Append('""')
+            continue
+        }
+
+        if (-not ($arg -match '[\s"]')) {
+            [void]$sb.Append($arg)
+            continue
+        }
+
+        [void]$sb.Append('"')
+        $backslashes = 0
+        foreach ($ch in $arg.ToCharArray()) {
+            if ($ch -eq '\') { $backslashes++; continue }
+            if ($ch -eq '"') {
+                $slashCount = $backslashes * 2 + 1
+                [void]$sb.Append('\', $slashCount)
+                [void]$sb.Append('"')
+                $backslashes = 0
+                continue
+            }
+            if ($backslashes -gt 0) {
+                [void]$sb.Append('\', $backslashes)
+                $backslashes = 0
+            }
+            [void]$sb.Append($ch)
+        }
+        if ($backslashes -gt 0) {
+            [void]$sb.Append('\', $backslashes * 2)
+        }
+        [void]$sb.Append('"')
+    }
+    return $sb.ToString()
+}
+
+# ==============================================================================
+# HÀM BỔ TRỢ: ĐỐI CHIẾU 2 LƯỢT BASELINE ROW COUNTS (CONSISTENCY GUARD)
+# backup-db.ps1 thu thap row counts TRUOC va SAU pg_dump. Neu co bat ky lech
+# nao giua 2 luot (so dong hoac danh sach bang) thi co ghi xen trong cua so
+# dump -> backup bat buoc ABORT (fail-closed), khong publish baseline nghi ngo.
+# Gioi han (duoc neu ro trong backup-db.ps1): pg_dump tu chup snapshot noi tai
+# nhat quan; 2 luot dem la 2 tap lenh CLI doc lap nen khong cam ket snapshot
+# giao dich tuyet doi giua chung — guard chi phat hien va CHAN cac cua so co
+# ghi dong thoi, khong loai tru toan bo kha nang sai lech ly thuyet.
+# ==============================================================================
+function Compare-S55BaselineRowCountPasses {
+    param(
+        [Parameter(Mandatory)]
+        [hashtable]$PrePass,
+
+        [Parameter(Mandatory)]
+        [hashtable]$PostPass
+    )
+
+    $mismatches = @()
+    $allKeys = @($PrePass.Keys) + @($PostPass.Keys) | Select-Object -Unique
+    foreach ($k in $allKeys) {
+        if (-not $PrePass.ContainsKey($k)) {
+            $mismatches += "Bang '$k' chi xuat hien o pass SAU dump (schema thay doi giua 2 luot dem)"
+            continue
+        }
+        if (-not $PostPass.ContainsKey($k)) {
+            $mismatches += "Bang '$k' chi xuat hien o pass TRUOC dump (schema thay doi giua 2 luot dem)"
+            continue
+        }
+        if ([long]$PrePass[$k] -ne [long]$PostPass[$k]) {
+            $mismatches += "Bang '$k' lech so dong: truoc dump = $($PrePass[$k]), sau dump = $($PostPass[$k])"
+        }
+    }
+
+    return @{
+        Passed        = ($mismatches.Count -eq 0)
+        MismatchCount = $mismatches.Count
+        Mismatches    = $mismatches
+    }
+}
+
 # Trinh dieu khien chay lenh PostgreSQL client (pg_dump/pg_restore/psql) o
 # Native mode hoac Docker mode. Dung chung cho ca Invoke-PgSqlQuery va
 # Invoke-PgProcessWithTimeout.
@@ -627,8 +730,9 @@ function Invoke-PgToolCommand {
         }
         $psi = New-Object System.Diagnostics.ProcessStartInfo
         $psi.FileName = $NativeExePath
-        $quotedArgs = @($ToolArgs | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } })
-        $psi.Arguments = $quotedArgs -join ' '
+        # F7 (Lỗi 3): quoting chuan MSVCRT — bao toan dau ngoac kep ben trong
+        # tham so (vd: SQL chua identifier CamelCase "AuditLogs").
+        $psi.Arguments = ConvertTo-S55CliArgumentLine -Arguments $ToolArgs
         $psi.UseShellExecute = $false
         $psi.CreateNoWindow = $true
         # F3: Luon redirect ca 2 stream va doc BAT DONG BO de tranh deadlock
@@ -743,6 +847,13 @@ function Invoke-PgToolCommand {
     }
     if (-not [string]::IsNullOrWhiteSpace($envFilePath)) { $dockerArgs += @('--env-file', $envFilePath) }
     $dockerArgs += $DockerImage
+    # FIX (Lỗi 2): PHAI truyen ro lenh can chay trong container ($ToolName, vd:
+    # pg_dump/psql/pg_restore). Neu thieu, entrypoint cua image postgres se
+    # thay doi so dau tien bat dau bang '-' (vd: '-h', '-f', '-c', '--version')
+    # thanh tham so cua POSTGRES SERVER thay vi chay cong cu client mong muon.
+    # Image postgres chinh thuc: khi doi so dau khong phai 'postgres'/flag thi
+    # entrypoint exec thang lenh duoc truyen (pg_dump chay truc tiep).
+    $dockerArgs += $ToolName
     $dockerArgs += $containerToolArgs
 
     try {
@@ -775,8 +886,9 @@ function Invoke-PgToolCommand {
         # ---------- Docker that ----------
         $psi = New-Object System.Diagnostics.ProcessStartInfo
         $psi.FileName = $dockerExe
-        $quotedDockerArgs = @($dockerArgs | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } })
-        $psi.Arguments = $quotedDockerArgs -join ' '
+        # F7 (Lỗi 3): quoting chuan MSVCRT cho Docker CLI — bao toan dau ngoac
+        # kep ben trong tham so SQL khi chay tu script/Task Scheduler.
+        $psi.Arguments = ConvertTo-S55CliArgumentLine -Arguments $dockerArgs
         $psi.UseShellExecute = $false
         $psi.CreateNoWindow = $true
         # F3: Luon redirect ca 2 stream va doc BAT DONG BO de tranh deadlock,

@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     S-55 Phase 3: Module ma hoa client-side bang age va dong bo offsite Cloudflare R2 (S3-compatible).
 
@@ -60,6 +60,17 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Nap ham quoting tham so CLI dung chuan MSVCRT tu s55-common.ps1 (neu chua co)
+if (-not (Get-Command ConvertTo-S55CliArgumentLine -ErrorAction SilentlyContinue)) {
+    $scriptDir = if (-not [string]::IsNullOrWhiteSpace($PSScriptRoot)) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
+    if (-not [string]::IsNullOrWhiteSpace($scriptDir)) {
+        $commonScriptPath = Join-Path $scriptDir "s55-common.ps1"
+        if (Test-Path -LiteralPath $commonScriptPath) {
+            . $commonScriptPath
+        }
+    }
+}
 
 # ==============================================================================
 # 1. HÀM XÁC THỰC CẤU HÌNH CLOUDFLARE R2
@@ -545,25 +556,20 @@ function Invoke-RcloneCommand {
         [string]$RcloneExePath,
 
         [Parameter()]
+        [int]$TimeoutSeconds = 300,
+
+        [Parameter()]
         [scriptblock]$MockCommandBlock
     )
 
-    if ($null -ne $MockCommandBlock) {
-        # Che do Mock: Chuyen cau hinh va tham so toi block kiem thu
-        return (& $MockCommandBlock -Command "rclone" -Arguments $Arguments -ArgsList $Arguments -R2Config $R2Config)
-    }
-
-    $resolvedRclone = Get-ToolExecutable -ToolName "rclone" -ExplicitPath $RcloneExePath
-    if (-not $resolvedRclone) {
-        throw "[LOI MOI TRUONG] Khong tim thay 'rclone' tren he thong. Vui long cai dat rclone (https://rclone.org) hoac truyen qua -RcloneExePath."
-    }
-
-    # Thiet lap cau hinh R2 qua BIEN MOI TRUONG CUA PHIEN (Tuyet doi khong truyen secret tren CLI args)
+    # Thiet lap cau hinh R2 qua BIEN MOI TRUONG CUA PHIEN (Tuyet doi khong truyen secret tren CLI args).
+    # Luu truoc gia tri cu de khoi phuc trong khoi finally (ke ca khi mock).
     $oldType = $env:RCLONE_CONFIG_R2_TYPE
     $oldProvider = $env:RCLONE_CONFIG_R2_PROVIDER
     $oldKeyId = $env:RCLONE_CONFIG_R2_ACCESS_KEY_ID
     $oldSecret = $env:RCLONE_CONFIG_R2_SECRET_ACCESS_KEY
     $oldEndpoint = $env:RCLONE_CONFIG_R2_ENDPOINT
+    $oldNoCheckBucket = $env:RCLONE_CONFIG_R2_NO_CHECK_BUCKET
 
     try {
         $env:RCLONE_CONFIG_R2_TYPE = "s3"
@@ -571,24 +577,75 @@ function Invoke-RcloneCommand {
         $env:RCLONE_CONFIG_R2_ACCESS_KEY_ID = $R2Config.AccessKeyId
         $env:RCLONE_CONFIG_R2_SECRET_ACCESS_KEY = $R2Config.SecretAccessKey
         $env:RCLONE_CONFIG_R2_ENDPOINT = $R2Config.Endpoint
+        # FIX (403 AccessDenied / CreateBucket): Cloudflare R2 KHONG ho tro tao
+        # bucket qua S3 API (chi tao tren Dashboard). Khi thieu no_check_bucket,
+        # rclone HEAD bucket truoc moi lan upload; neu HEAD tra 403/404 (API
+        # token chi co quyen object-level) rclone co goi CreateBucket va nhan
+        # "failed to prepare upload: operation error S3: CreateBucket, https
+        # response error StatusCode: 403, api error AccessDenied". Bucket da ton
+        # tai san nen bo qua buoc kiem tra/tao bucket la cach chinh thuc cua
+        # rclone cho R2 (https://rclone.org/s3/#standard-options, no_check_bucket).
+        # Khong anh huong read path (lsf/lsjson) va khong lam giam muc xac minh
+        # toan ven: sau upload van readback + so sanh SHA-256.
+        $env:RCLONE_CONFIG_R2_NO_CHECK_BUCKET = "true"
+
+        if ($null -ne $MockCommandBlock) {
+            # Che do Mock: Chuyen cau hinh va tham so toi block kiem thu
+            # (env da duoc thiet lap de test co the xac minh anh xa cau hinh).
+            return (& $MockCommandBlock -Command "rclone" -Arguments $Arguments -ArgsList $Arguments -R2Config $R2Config)
+        }
+
+        $resolvedRclone = Get-ToolExecutable -ToolName "rclone" -ExplicitPath $RcloneExePath
+        if (-not $resolvedRclone) {
+            throw "[LOI MOI TRUONG] Khong tim thay 'rclone' tren he thong. Vui long cai dat rclone (https://rclone.org) hoac truyen qua -RcloneExePath."
+        }
 
         $psi = New-Object System.Diagnostics.ProcessStartInfo
         $psi.FileName = $resolvedRclone
-        $escapedArgs = ($Arguments | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }) -join ' '
-        $psi.Arguments = $escapedArgs
+        # Quoting chuan MSVCRT / CommandLineToArgvW tu s55-common.ps1
+        if (Get-Command ConvertTo-S55CliArgumentLine -ErrorAction SilentlyContinue) {
+            $psi.Arguments = ConvertTo-S55CliArgumentLine -Arguments $Arguments
+        } else {
+            $psi.Arguments = ($Arguments | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }) -join ' '
+        }
         $psi.UseShellExecute = $false
         $psi.RedirectStandardOutput = $true
         $psi.RedirectStandardError = $true
         $psi.CreateNoWindow = $true
 
-        $process = [System.Diagnostics.Process]::Start($psi)
-        $stdOut = $process.StandardOutput.ReadToEnd()
-        $stdErr = $process.StandardError.ReadToEnd()
-        $process.WaitForExit(300000)
+        $process = $null
+        try {
+            $process = [System.Diagnostics.Process]::Start($psi)
+        } catch {
+            $startErr = $_.Exception.Message -replace [regex]::Escape($R2Config.SecretAccessKey), '***' -replace [regex]::Escape($R2Config.AccessKeyId), '***'
+            throw "Khong the khoi chay rclone ('$resolvedRclone'): $startErr"
+        }
+
+        # Doc bat dong bo ca stdout lan stderr de tranh deadlock khi pipe buffer bi day
+        $stdOutTask = $process.StandardOutput.ReadToEndAsync()
+        $stdErrTask = $process.StandardError.ReadToEndAsync()
+
+        $finished = $process.WaitForExit($TimeoutSeconds * 1000)
+        if (-not $finished) {
+            try {
+                $process.Kill($true)
+            } catch {
+                try { $process.Kill() } catch { }
+            }
+            $process.WaitForExit(10000) | Out-Null
+
+            $partialOut = if ($stdOutTask.IsCompleted) { $stdOutTask.Result } else { "" }
+            $partialErr = if ($stdErrTask.IsCompleted) { $stdErrTask.Result } else { "" }
+            $safeErr = ($partialOut + "`n" + $partialErr) -replace [regex]::Escape($R2Config.SecretAccessKey), '***' -replace [regex]::Escape($R2Config.AccessKeyId), '***'
+            throw "[TIMEOUT] Lenh rclone vuot qua $TimeoutSeconds giay va da bi dung an toan (tien trinh da bi kill). Chi tiet loi/output: $safeErr"
+        }
+
+        $stdOut = $stdOutTask.Result
+        $stdErr = $stdErrTask.Result
 
         # Che mat bat ky chuoi secret nao co the xuat hien trong output / error
-        $safeErr = $stdErr -replace [regex]::Escape($R2Config.SecretAccessKey), '***'
-        $safeOut = $stdOut -replace [regex]::Escape($R2Config.SecretAccessKey), '***'
+        $safeErr = $stdErr -replace [regex]::Escape($R2Config.SecretAccessKey), '***' -replace [regex]::Escape($R2Config.AccessKeyId), '***'
+        $safeOut = $stdOut -replace [regex]::Escape($R2Config.SecretAccessKey), '***' -replace [regex]::Escape($R2Config.AccessKeyId), '***'
 
         if ($process.ExitCode -ne 0) {
             throw "rclone that bai voi ma thoat $($process.ExitCode): $safeErr"
@@ -606,6 +663,7 @@ function Invoke-RcloneCommand {
         if ($null -ne $oldKeyId) { $env:RCLONE_CONFIG_R2_ACCESS_KEY_ID = $oldKeyId } else { Remove-Item env:RCLONE_CONFIG_R2_ACCESS_KEY_ID -ErrorAction SilentlyContinue }
         if ($null -ne $oldSecret) { $env:RCLONE_CONFIG_R2_SECRET_ACCESS_KEY = $oldSecret } else { Remove-Item env:RCLONE_CONFIG_R2_SECRET_ACCESS_KEY -ErrorAction SilentlyContinue }
         if ($null -ne $oldEndpoint) { $env:RCLONE_CONFIG_R2_ENDPOINT = $oldEndpoint } else { Remove-Item env:RCLONE_CONFIG_R2_ENDPOINT -ErrorAction SilentlyContinue }
+        if ($null -ne $oldNoCheckBucket) { $env:RCLONE_CONFIG_R2_NO_CHECK_BUCKET = $oldNoCheckBucket } else { Remove-Item env:RCLONE_CONFIG_R2_NO_CHECK_BUCKET -ErrorAction SilentlyContinue }
     }
 }
 
@@ -625,6 +683,9 @@ function Invoke-R2BackupUpload {
 
         [Parameter()]
         [string]$RcloneExePath,
+
+        [Parameter()]
+        [int]$TimeoutSeconds = 300,
 
         [Parameter()]
         [scriptblock]$MockCommandBlock
@@ -656,11 +717,11 @@ function Invoke-R2BackupUpload {
 
     # Step 1: Upload file ma hoa
     $uploadDumpArgs = @("copyto", $EncryptedFilePath, $remoteEncPath)
-    $uploadDumpResult = Invoke-RcloneCommand -Arguments $uploadDumpArgs -R2Config $validatedConfig -RcloneExePath $RcloneExePath -MockCommandBlock $MockCommandBlock
+    $uploadDumpResult = Invoke-RcloneCommand -Arguments $uploadDumpArgs -R2Config $validatedConfig -RcloneExePath $RcloneExePath -TimeoutSeconds $TimeoutSeconds -MockCommandBlock $MockCommandBlock
 
     # Step 2: Upload file manifest
     $uploadManifestArgs = @("copyto", $ManifestFilePath, $remoteManifestPath)
-    $uploadManifestResult = Invoke-RcloneCommand -Arguments $uploadManifestArgs -R2Config $validatedConfig -RcloneExePath $RcloneExePath -MockCommandBlock $MockCommandBlock
+    $uploadManifestResult = Invoke-RcloneCommand -Arguments $uploadManifestArgs -R2Config $validatedConfig -RcloneExePath $RcloneExePath -TimeoutSeconds $TimeoutSeconds -MockCommandBlock $MockCommandBlock
 
     # Step 3: XAC MINH TINH TOAN VEN TREN REMOTE (DOWNLOAD VA SO SANH SHA-256)
     Write-Host "[R2 VERIFY] Dang xac minh tinh toan ven file tren remote qua co che checksum doc lap..."
@@ -673,7 +734,7 @@ function Invoke-R2BackupUpload {
 
         # Tai nguoc file ma hoa ve thu muc tam de kiem tra
         $dlDumpArgs = @("copyto", $remoteEncPath, $tempDownloadEnc)
-        Invoke-RcloneCommand -Arguments $dlDumpArgs -R2Config $validatedConfig -RcloneExePath $RcloneExePath -MockCommandBlock $MockCommandBlock | Out-Null
+        Invoke-RcloneCommand -Arguments $dlDumpArgs -R2Config $validatedConfig -RcloneExePath $RcloneExePath -TimeoutSeconds $TimeoutSeconds -MockCommandBlock $MockCommandBlock | Out-Null
 
         if (-not (Test-Path -LiteralPath $tempDownloadEnc)) {
             throw "[LOI XAC MINH R2] Khong the tai file kiem thu tu remote ve: $tempDownloadEnc"
@@ -688,11 +749,34 @@ function Invoke-R2BackupUpload {
 
         # Tai nguoc file manifest ve kiem tra
         $dlManifestArgs = @("copyto", $remoteManifestPath, $tempDownloadManifest)
-        Invoke-RcloneCommand -Arguments $dlManifestArgs -R2Config $validatedConfig -RcloneExePath $RcloneExePath -MockCommandBlock $MockCommandBlock | Out-Null
+        Invoke-RcloneCommand -Arguments $dlManifestArgs -R2Config $validatedConfig -RcloneExePath $RcloneExePath -TimeoutSeconds $TimeoutSeconds -MockCommandBlock $MockCommandBlock | Out-Null
 
-        $dlManifestContent = Get-Content -LiteralPath $tempDownloadManifest -Raw | ConvertFrom-Json
+        if (-not (Test-Path -LiteralPath $tempDownloadManifest)) {
+            throw "[LOI XAC MINH R2] Khong the tai file manifest kiem thu tu remote ve: $tempDownloadManifest"
+        }
+
+        $dlManifestRaw = Get-Content -LiteralPath $tempDownloadManifest -Raw
+        $dlManifestContent = $null
+        try {
+            $dlManifestContent = $dlManifestRaw | ConvertFrom-Json
+        } catch {
+            throw "[LOI XAC MINH R2] File manifest tren remote khong phai JSON hop le: $($_.Exception.Message)"
+        }
+
+        if ($null -eq $dlManifestContent) {
+            throw "[LOI XAC MINH R2] Manifest tren remote rong hoac khong hop le."
+        }
+
         if ($dlManifestContent.backupId -ne $manifestData.backupId) {
-            throw "[LOI XAC MINH R2] Manifest tren remote khong khop backupId."
+            throw "[LOI XAC MINH R2] Manifest tren remote khong khop backupId (remote: '$($dlManifestContent.backupId)', local: '$($manifestData.backupId)')."
+        }
+
+        # Kiem tra encryptedSha256 tren remote manifest
+        if ([string]::IsNullOrWhiteSpace($dlManifestContent.encryptedSha256) -or $dlManifestContent.encryptedSha256 -notmatch '^[A-Fa-f0-9]{64}$') {
+            throw "[LOI XAC MINH R2] Manifest tren remote co encryptedSha256 khong dung dinh dang 64 ky tu hex."
+        }
+        if ($dlManifestContent.encryptedSha256 -ne $manifestData.encryptedSha256) {
+            throw "[LOI XAC MINH R2] Manifest tren remote co encryptedSha256 ($($dlManifestContent.encryptedSha256)) KHONG KHOP voi local ($($manifestData.encryptedSha256))."
         }
 
         Write-Host "[R2 VERIFY] Xac minh toan ven remote hoan tat: SHA-256 KHOP 100% ($downloadedSha256)."
@@ -710,7 +794,37 @@ function Invoke-R2BackupUpload {
         $manifestData | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $ManifestFilePath -Encoding utf8
 
         # Dong bo lai manifest da danh dau thanh cong len remote
-        Invoke-RcloneCommand -Arguments @("copyto", $ManifestFilePath, $remoteManifestPath) -R2Config $validatedConfig -RcloneExePath $RcloneExePath -MockCommandBlock $MockCommandBlock | Out-Null
+        Invoke-RcloneCommand -Arguments @("copyto", $ManifestFilePath, $remoteManifestPath) -R2Config $validatedConfig -RcloneExePath $RcloneExePath -TimeoutSeconds $TimeoutSeconds -MockCommandBlock $MockCommandBlock | Out-Null
+
+        # Step 5: DOC LAI MANIFEST TREN REMOTE DE XAC MINH DA THUC SU CAP NHAT 'VerifiedUploaded'
+        $tempReadbackManifest = Join-Path $verifyTempDir ("readback_" + $manifestFileName)
+        Invoke-RcloneCommand -Arguments @("copyto", $remoteManifestPath, $tempReadbackManifest) -R2Config $validatedConfig -RcloneExePath $RcloneExePath -TimeoutSeconds $TimeoutSeconds -MockCommandBlock $MockCommandBlock | Out-Null
+
+        if (-not (Test-Path -LiteralPath $tempReadbackManifest)) {
+            throw "[LOI XAC MINH R2] Khong the tai lai manifest tu remote sau khi cap nhat VerifiedUploaded."
+        }
+
+        $readbackRaw = Get-Content -LiteralPath $tempReadbackManifest -Raw
+        $readbackContent = $null
+        try {
+            $readbackContent = $readbackRaw | ConvertFrom-Json
+        } catch {
+            throw "[LOI XAC MINH R2] Manifest doc lai tren remote khong phai JSON hop le: $($_.Exception.Message)"
+        }
+
+        if ($null -eq $readbackContent) {
+            throw "[LOI XAC MINH R2] Manifest doc lai tren remote rong."
+        }
+
+        if ($readbackContent.offsiteStatus -ne "VerifiedUploaded") {
+            throw "[LOI XAC MINH R2] Manifest tren remote chua cap nhat trang thai 'VerifiedUploaded' sau upload (trang thai hien tai: '$($readbackContent.offsiteStatus)')."
+        }
+        if ($readbackContent.backupId -ne $manifestData.backupId) {
+            throw "[LOI XAC MINH R2] Manifest doc lai tren remote khong khop backupId."
+        }
+        if ($readbackContent.encryptedSha256 -ne $manifestData.encryptedSha256) {
+            throw "[LOI XAC MINH R2] Manifest doc lai tren remote khong khop encryptedSha256."
+        }
 
         return @{
             Success         = $true
@@ -746,6 +860,9 @@ function Invoke-R2RemoteRetention {
         [string]$RcloneExePath,
 
         [Parameter()]
+        [int]$TimeoutSeconds = 300,
+
+        [Parameter()]
         [scriptblock]$MockCommandBlock
     )
 
@@ -769,7 +886,7 @@ function Invoke-R2RemoteRetention {
 
     # Lay danh sach objects tu remote
     $lsArgs = @("lsjson", $remotePathPrefix)
-    $lsResult = Invoke-RcloneCommand -Arguments $lsArgs -R2Config $validatedConfig -RcloneExePath $RcloneExePath -MockCommandBlock $MockCommandBlock
+    $lsResult = Invoke-RcloneCommand -Arguments $lsArgs -R2Config $validatedConfig -RcloneExePath $RcloneExePath -TimeoutSeconds $TimeoutSeconds -MockCommandBlock $MockCommandBlock
 
     $remoteObjects = @()
     if ($null -ne $lsResult) {
@@ -811,7 +928,7 @@ function Invoke-R2RemoteRetention {
         }
     }
 
-    # 2. Xac dinh cac cap backup hop le (phai co ca dump.age va manifest json)
+    # 2. Xac dinh cac cap backup hop le (phai co ca dump.age va manifest json, dung namespace va manifest hop le)
     $validBackups = @()
     foreach ($ts in $backupDumpMap.Keys) {
         if ($backupManifestMap.ContainsKey($ts)) {
@@ -819,12 +936,57 @@ function Invoke-R2RemoteRetention {
             $manifestObj = $backupManifestMap[$ts]
             # Kiem tra dung luong > 0
             if ($dumpObj.Size -gt 64 -and $manifestObj.Size -gt 0) {
-                $validBackups += [PSCustomObject]@{
-                    Timestamp    = $ts
-                    DumpName     = $dumpObj.Name
-                    ManifestName = $manifestObj.Name
-                    DumpSize     = $dumpObj.Size
-                    ManifestSize = $manifestObj.Size
+                # Kiem tra tinh toan ven noi dung manifest tren remote qua rclone cat (neu co the truy cap)
+                $targetManifestPath = if (-not [string]::IsNullOrWhiteSpace($prefixNormalized) -and $manifestObj.Name.StartsWith($prefixNormalized + '/', [System.StringComparison]::OrdinalIgnoreCase)) {
+                    "R2:$bucket/$($manifestObj.Name)"
+                } else {
+                    "$remotePathPrefix/$($manifestObj.Name)"
+                }
+
+                $isValidPair = $true
+                $manifestContentRaw = $null
+                try {
+                    $catRes = Invoke-RcloneCommand -Arguments @("cat", $targetManifestPath) -R2Config $validatedConfig -RcloneExePath $RcloneExePath -TimeoutSeconds $TimeoutSeconds -MockCommandBlock $MockCommandBlock
+                    if ($null -ne $catRes) {
+                        if ($catRes -is [hashtable] -and $catRes.ContainsKey("Output")) {
+                            $manifestContentRaw = $catRes.Output
+                        } elseif ($catRes -is [string]) {
+                            $manifestContentRaw = $catRes
+                        }
+                    }
+                } catch {
+                    Write-Warning "[R2 RETENTION] Khong the doc manifest cho ban ${ts}: $($_.Exception.Message). Cap backup bi bo qua khoi tap hop le de bao toan an toan."
+                    $isValidPair = $false
+                }
+
+                if ($isValidPair -and -not [string]::IsNullOrWhiteSpace($manifestContentRaw)) {
+                    try {
+                        $parsedMf = $manifestContentRaw | ConvertFrom-Json
+                        if ($null -eq $parsedMf -or
+                            [string]::IsNullOrWhiteSpace($parsedMf.backupId) -or
+                            $parsedMf.backupId -notmatch '^ep-backup-' -or
+                            [string]::IsNullOrWhiteSpace($parsedMf.encryptedSha256) -or
+                            $parsedMf.encryptedSha256 -notmatch '^[A-Fa-f0-9]{64}$' -or
+                            $parsedMf.offsiteStatus -ne "VerifiedUploaded") {
+                            Write-Warning "[R2 RETENTION] Manifest cua ban $ts khong hop le hoac chua duoc VerifiedUploaded (backupId: '$($parsedMf.backupId)', offsiteStatus: '$($parsedMf.offsiteStatus)'). Cap backup bi loai khoi tap hop le."
+                            $isValidPair = $false
+                        }
+                    } catch {
+                        Write-Warning "[R2 RETENTION] Manifest cua ban $ts bi loi JSON. Cap backup bi loai khoi tap hop le."
+                        $isValidPair = $false
+                    }
+                }
+
+                if ($isValidPair) {
+                    $validBackups += [PSCustomObject]@{
+                        Timestamp    = $ts
+                        DumpName     = $dumpObj.Name
+                        ManifestName = $manifestObj.Name
+                        DumpSize     = $dumpObj.Size
+                        ManifestSize = $manifestObj.Size
+                    }
+                } else {
+                    $foreignFiles += $manifestObj.Name
                 }
             }
         }
@@ -835,6 +997,8 @@ function Invoke-R2RemoteRetention {
 
     $retained = @()
     $deleted = @()
+    $deleteErrors = @()
+    $partialFailure = $false
 
     if ($sortedValid.Count -le $RetentionLimit) {
         $retained = $sortedValid
@@ -855,12 +1019,37 @@ function Invoke-R2RemoteRetention {
                 $targetManifest = "$remotePathPrefix/$($item.ManifestName)"
             }
 
-            Invoke-RcloneCommand -Arguments @("deletefile", $targetDump) -R2Config $validatedConfig -RcloneExePath $RcloneExePath -MockCommandBlock $MockCommandBlock | Out-Null
-            Invoke-RcloneCommand -Arguments @("deletefile", $targetManifest) -R2Config $validatedConfig -RcloneExePath $RcloneExePath -MockCommandBlock $MockCommandBlock | Out-Null
+            # Thu tu xoa: Xoa dump truoc de giai phong dung luong storage, sau do xoa manifest
+            $dumpDeleteSuccess = $false
+            try {
+                Invoke-RcloneCommand -Arguments @("deletefile", $targetDump) -R2Config $validatedConfig -RcloneExePath $RcloneExePath -TimeoutSeconds $TimeoutSeconds -MockCommandBlock $MockCommandBlock | Out-Null
+                $deleted += $item.DumpName
+                $dumpDeleteSuccess = $true
+            } catch {
+                $err = $_.Exception.Message
+                $deleteErrors += "Loi xoa file dump '$($item.DumpName)': $err"
+                Write-Warning "[R2 RETENTION ERROR] Khong the xoa file dump '$($item.DumpName)': $err. Huy buoc xoa manifest de tranh tao orphan record."
+                # Dung ngay lap tuc de tranh gay loi day chuyen
+                break
+            }
 
-            $deleted += $item.DumpName
-            $deleted += $item.ManifestName
+            try {
+                Invoke-RcloneCommand -Arguments @("deletefile", $targetManifest) -R2Config $validatedConfig -RcloneExePath $RcloneExePath -TimeoutSeconds $TimeoutSeconds -MockCommandBlock $MockCommandBlock | Out-Null
+                $deleted += $item.ManifestName
+            } catch {
+                $err = $_.Exception.Message
+                $partialFailure = $true
+                $deleteErrors += "Loi xoa manifest '$($item.ManifestName)': $err"
+                Write-Warning "[R2 RETENTION ERROR] Da xoa dump '$($item.DumpName)' thanh cong nhung xoa manifest '$($item.ManifestName)' that bai ($err). Trang thai: PartialFailure (orphan manifest con tren R2)."
+                # Dung ngay lap tuc
+                break
+            }
         }
+    }
+
+    if ($deleteErrors.Count -gt 0) {
+        $status = if ($partialFailure) { "PartialFailure" } else { "Failed" }
+        throw "[R2 RETENTION ERROR] Retention that bai voi trang thai $status. Da xoa $($deleted.Count) object ($($deleted -join ', ')). Chi tiet loi: $($deleteErrors -join '; ')"
     }
 
     return @{
