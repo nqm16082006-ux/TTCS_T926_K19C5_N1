@@ -47,7 +47,7 @@ namespace EventTicketBooking.Api.Controllers
                 Version = TermsPolicy.CurrentVersion,
                 EffectiveDate = "2026-10-18",
                 Title = "Điều khoản dịch vụ và Chính sách bảo vệ dữ liệu cá nhân EventPulse",
-                Summary = "Quy định toàn diện về dịch vụ phân phối vé trực tuyến theo mô hình sàn giao dịch vé sự kiện tương tự Ticketbox, bảo vệ quyền riêng tư, quyền yêu cầu xóa dữ liệu cá nhân và quyền thu hồi email tiếp thị theo Nghị định 13/2023/NĐ-CP.",
+                Summary = "Quy định toàn diện về dịch vụ phân phối vé trực tuyến, vai trò trung gian giữa Ban Tổ Chức và Khách hàng, bảo vệ quyền riêng tư, quyền yêu cầu xóa dữ liệu cá nhân và quyền thu hồi email tiếp thị theo Nghị định 13/2023/NĐ-CP.",
                 TermsContent = """
 ĐIỀU 1: GIẢI THÍCH TỪ NGỮ VÀ ĐỊNH NGHĨA PHÁP LÝ
 1. "EventPulse" / "Nền tảng": Hệ thống sàn thương mại điện tử giao dịch vé sự kiện trực tuyến.
