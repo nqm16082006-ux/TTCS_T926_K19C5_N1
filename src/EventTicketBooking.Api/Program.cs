@@ -297,6 +297,10 @@ builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.Show
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IShowtimeReminderService, EventTicketBooking.Api.Services.Implementations.ShowtimeReminderService>();
 builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.ShowtimeReminderWorker>();
 
+// Story S-59: Dịch vụ & Job nền danh sách chờ khi suất diễn hết vé
+builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IWaitlistService, EventTicketBooking.Api.Services.Implementations.WaitlistService>();
+builder.Services.AddHostedService<EventTicketBooking.Api.BackgroundServices.WaitlistNotificationWorker>();
+
 var app = builder.Build();
 app.UseForwardedHeaders();
 

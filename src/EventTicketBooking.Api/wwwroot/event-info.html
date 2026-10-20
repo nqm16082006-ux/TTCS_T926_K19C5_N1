@@ -937,29 +937,41 @@
           `;
         } else {
           // Closed / Sold Out state
-          card.className = "relative rounded-xl bg-surface-container-low/60 p-space-md opacity-85 border border-surface-container-high/40";
+          const isSoldOutShowtime = isOnSale && isSoldOut;
+          card.className = isSoldOutShowtime
+            ? "relative rounded-xl bg-surface-container-low/80 p-space-md border border-amber-300/60 hover:border-amber-400 transition-all shadow-xs"
+            : "relative rounded-xl bg-surface-container-low/60 p-space-md opacity-85 border border-surface-container-high/40";
           card.innerHTML = `
             <div class="flex items-start justify-between gap-space-sm">
               <div class="space-y-1">
                 <div class="flex items-center gap-2">
-                  <span class="font-headline-md text-headline-md text-outline font-bold">${dt.time}</span>
+                  <span class="font-headline-md text-headline-md ${isSoldOutShowtime ? 'text-amber-950 font-black' : 'text-outline font-bold'}">${dt.time}</span>
                   <span class="text-outline-variant font-code-mono">•</span>
-                  <span class="font-headline-sm text-headline-sm text-outline font-semibold">${dt.dayName}, ${dt.date}</span>
+                  <span class="font-headline-sm text-headline-sm ${isSoldOutShowtime ? 'text-on-surface font-bold' : 'text-outline font-semibold'}">${dt.dayName}, ${dt.date}</span>
                 </div>
-                <p class="font-body-sm text-body-sm text-outline">${isOnSale ? 'Hiện không còn ghế trống để chọn' : 'Suất diễn hiện không mở bán'}</p>
+                <p class="font-body-sm text-body-sm ${isSoldOutShowtime ? 'text-amber-800/90 font-medium' : 'text-outline'}">
+                  ${isSoldOutShowtime ? 'Tạm hết ghế trống • Đăng ký danh sách chờ để nhận thông báo khi có vé mới' : (isOnSale ? 'Hiện không còn ghế trống để chọn' : 'Suất diễn hiện không mở bán')}
+                </p>
               </div>
-              <span class="px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-semibold shrink-0">
-                ${isOnSale ? 'Hết ghế trống' : 'Đã đóng bán'}
+              <span class="px-2.5 py-1 rounded-full ${isSoldOutShowtime ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold' : 'bg-surface-container-high text-on-surface-variant font-semibold'} font-label-sm text-label-sm shrink-0 flex items-center gap-1">
+                ${isSoldOutShowtime ? '<span class="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>Hết ghế trống' : (isOnSale ? 'Hết vé' : 'Đã đóng bán')}
               </span>
             </div>
             <div class="flex items-center justify-between pt-space-md mt-space-sm border-t border-surface-container-high/40">
               <div class="space-y-0.5">
                 <div class="font-label-sm text-label-sm text-outline">Tình trạng vé</div>
-                <div class="font-label-md text-label-md text-outline font-semibold"> ${available.toLocaleString('vi-VN')} chỗ trống</div>
+                <div class="font-label-md text-label-md ${isSoldOutShowtime ? 'text-amber-800 font-bold' : 'text-outline font-semibold'}"> ${available.toLocaleString('vi-VN')} chỗ trống</div>
               </div>
-              <button disabled type="button" class="h-11 px-5 rounded-lg bg-surface-container-high text-outline cursor-not-allowed font-label-lg text-label-lg font-bold">
-                ${isOnSale ? 'Hết vé' : 'Không mở bán'}
-              </button>
+              ${isSoldOutShowtime ? `
+                <button type="button" onclick="openWaitlistModal('${st.id}', '${escapeHtml(st.name || 'Suất diễn ' + dt.time)}', '${escapeHtml(dt.dayName)}, ${escapeHtml(dt.date)} • ${escapeHtml(dt.time)}')" class="h-11 px-5 rounded-lg bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-label-lg text-label-lg flex items-center justify-center gap-1.5 shadow-sm hover:shadow active:scale-95 transition-all font-bold shrink-0 cursor-pointer">
+                  <span class="material-symbols-outlined text-[18px]">playlist_add</span>
+                  <span>Đăng ký chờ</span>
+                </button>
+              ` : `
+                <button disabled type="button" class="h-11 px-5 rounded-lg bg-surface-container-high text-outline cursor-not-allowed font-label-lg text-label-lg font-bold">
+                  Không mở bán
+                </button>
+              `}
             </div>
           `;
         }
@@ -968,9 +980,220 @@
       });
     }
 
+    // --- Waitlist Modal Logic (Story S-59) ---
+    async function openWaitlistModal(showtimeId, showtimeName, timeStr) {
+      const modal = document.getElementById('waitlistModal');
+      const stIdInput = document.getElementById('waitlistShowtimeId');
+      const nameEl = document.getElementById('waitlistShowtimeName');
+      const timeEl = document.getElementById('waitlistShowtimeTime');
+      const countEl = document.getElementById('waitlistQueueCount');
+      const alertEl = document.getElementById('waitlistAlert');
+      const formEl = document.getElementById('waitlistForm');
+      const successEl = document.getElementById('waitlistSuccessView');
+
+      stIdInput.value = showtimeId;
+      nameEl.textContent = showtimeName || 'Suất diễn';
+      timeEl.textContent = timeStr || '';
+      alertEl.classList.add('hidden');
+      alertEl.textContent = '';
+      formEl.classList.remove('hidden');
+      successEl.classList.add('hidden');
+
+      // Tự động điền email và tên nếu đã đăng nhập
+      const userStr = localStorage.getItem('user_info');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user.email) document.getElementById('waitlistEmail').value = user.email;
+          if (user.fullName || user.username) document.getElementById('waitlistFullName').value = user.fullName || user.username;
+        } catch (_) {}
+      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      // Tải số lượng người đang chờ
+      countEl.textContent = 'Đang kiểm tra...';
+      try {
+        const emailVal = document.getElementById('waitlistEmail').value;
+        const res = await fetch(`/api/waitlist/status?showtimeId=${encodeURIComponent(showtimeId)}${emailVal ? `&email=${encodeURIComponent(emailVal)}` : ''}`);
+        const data = await res.json();
+        if (data.success && data.data) {
+          countEl.textContent = `${data.data.totalWaiting} người`;
+          if (data.data.isUserWaiting && data.data.userQueuePosition) {
+            alertEl.className = 'p-3 rounded-lg text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200';
+            alertEl.innerHTML = `ℹ️ Bạn đã nằm trong danh sách chờ của suất này (<strong>Vị trí #${data.data.userQueuePosition}</strong>). Hệ thống sẽ gửi email ngay khi có ghế trống.`;
+            alertEl.classList.remove('hidden');
+          }
+        } else {
+          countEl.textContent = '0 người';
+        }
+      } catch (e) {
+        countEl.textContent = 'Chưa xác định';
+      }
+    }
+
+    function closeWaitlistModal() {
+      const modal = document.getElementById('waitlistModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    async function submitWaitlist(e) {
+      e.preventDefault();
+      const showtimeId = document.getElementById('waitlistShowtimeId').value;
+      const email = document.getElementById('waitlistEmail').value.trim();
+      const fullName = document.getElementById('waitlistFullName').value.trim();
+      const phoneNumber = document.getElementById('waitlistPhone').value.trim();
+      const btn = document.getElementById('btnSubmitWaitlist');
+      const alertEl = document.getElementById('waitlistAlert');
+      const formEl = document.getElementById('waitlistForm');
+      const successEl = document.getElementById('waitlistSuccessView');
+
+      if (!email) {
+        alertEl.className = 'p-3 rounded-lg text-xs font-medium bg-red-50 text-red-700 border border-red-200';
+        alertEl.textContent = 'Vui lòng nhập địa chỉ email nhận thông báo.';
+        alertEl.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>Đang xử lý...</span>';
+      alertEl.classList.add('hidden');
+
+      try {
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/waitlist', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            showtimeId,
+            email,
+            fullName,
+            phoneNumber
+          })
+        });
+
+        const json = await res.json();
+
+        if (res.ok && json.success) {
+          formEl.classList.add('hidden');
+          successEl.classList.remove('hidden');
+          document.getElementById('waitlistSuccessTitle').textContent = json.data?.isExisting ? 'Bạn đã có trong danh sách!' : 'Đăng ký chờ thành công!';
+          document.getElementById('waitlistSuccessMsg').innerHTML = `Vị trí hàng đợi ưu tiên: <strong class="text-amber-700 text-sm">#${json.data?.queuePosition || 1}</strong> (${json.data?.totalWaiting || 1} người chờ).<br><span class="text-on-surface-variant text-[11px] mt-1 block">Email thông báo sẽ tự động gửi tới <strong>${escapeHtml(email)}</strong> ngay khi có vé nhả về kho.</span>`;
+        } else {
+          alertEl.className = 'p-3 rounded-lg text-xs font-medium bg-red-50 text-red-700 border border-red-200';
+          alertEl.textContent = json.message || 'Không thể đăng ký danh sách chờ. Vui lòng thử lại sau.';
+          alertEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        alertEl.className = 'p-3 rounded-lg text-xs font-medium bg-red-50 text-red-700 border border-red-200';
+        alertEl.textContent = 'Lỗi kết nối tới máy chủ. Vui lòng kiểm tra lại mạng.';
+        alertEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">send</span><span>Xác nhận đăng ký</span>';
+      }
+    }
+
     // Initialize when DOM is ready
     document.addEventListener('DOMContentLoaded', initPage);
   </script>
+
+  <!-- Modal Đăng Ký Danh Sách Chờ (Story S-59) -->
+  <div id="waitlistModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="relative w-full max-w-md bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high/60 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
+      <!-- Modal Header -->
+      <div class="bg-gradient-to-r from-amber-600 to-amber-700 px-6 py-5 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white">
+            <span class="material-symbols-outlined text-[24px]">playlist_add</span>
+          </div>
+          <div>
+            <h3 class="font-headline-sm text-lg font-extrabold tracking-tight">Đăng Ký Danh Sách Chờ</h3>
+            <p class="text-xs text-amber-100 font-medium">Nhận email ngay khi có vé về kho</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeWaitlistModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 space-y-4">
+        <!-- Showtime Info Banner -->
+        <div class="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200/60 text-xs text-amber-900 space-y-1">
+          <div class="font-bold flex items-center gap-1.5 text-amber-800 text-sm">
+            <span class="material-symbols-outlined text-[18px]">event</span>
+            <span id="waitlistShowtimeName">Suất diễn</span>
+          </div>
+          <div class="text-amber-700 font-medium" id="waitlistShowtimeTime">Thời gian</div>
+          <p class="text-[11px] text-amber-800/80 pt-1 border-t border-amber-200/40">
+            ⚡ <strong>Cơ chế hàng đợi FIFO:</strong> Khi có vé được huỷ hoặc hết hạn giữ chỗ, người đăng ký trước sẽ được nhận email thông báo trước.
+          </p>
+        </div>
+
+        <!-- Waiting Queue Stat -->
+        <div class="flex items-center justify-between px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-surface-container-high/40 text-xs">
+          <span class="text-on-surface-variant font-medium">Số người đang chờ hiện tại:</span>
+          <span class="font-bold text-primary font-code-mono text-sm" id="waitlistQueueCount">Đang tải...</span>
+        </div>
+
+        <!-- Registration Form -->
+        <form id="waitlistForm" onsubmit="submitWaitlist(event)" class="space-y-3.5">
+          <input type="hidden" id="waitlistShowtimeId" value="">
+
+          <div>
+            <label class="block text-xs font-bold text-on-surface mb-1">Họ và tên</label>
+            <input type="text" id="waitlistFullName" placeholder="Nguyễn Văn A" class="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/60 focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm outline-none transition">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-on-surface mb-1">Email nhận thông báo <span class="text-error">*</span></label>
+            <input type="email" id="waitlistEmail" required placeholder="example@email.com" class="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/60 focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm outline-none transition">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-on-surface mb-1">Số điện thoại (tuỳ chọn)</label>
+            <input type="tel" id="waitlistPhone" placeholder="0912 345 678" class="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/60 focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm outline-none transition">
+          </div>
+
+          <!-- Alert / Status message -->
+          <div id="waitlistAlert" class="hidden p-3 rounded-lg text-xs font-medium"></div>
+
+          <!-- Actions -->
+          <div class="flex items-center justify-end gap-2 pt-2">
+            <button type="button" onclick="closeWaitlistModal()" class="h-10 px-4 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs transition cursor-pointer">
+              Đóng
+            </button>
+            <button type="submit" id="btnSubmitWaitlist" class="h-10 px-5 rounded-lg bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer">
+              <span class="material-symbols-outlined text-[16px]">send</span>
+              <span>Xác nhận đăng ký</span>
+            </button>
+          </div>
+        </form>
+
+        <!-- Success View (hidden initially) -->
+        <div id="waitlistSuccessView" class="hidden py-4 text-center space-y-3">
+          <div class="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-3xl">
+            <span class="material-symbols-outlined text-[36px]">check_circle</span>
+          </div>
+          <h4 class="font-bold text-base text-on-surface" id="waitlistSuccessTitle">Đăng ký thành công!</h4>
+          <p class="text-xs text-on-surface-variant max-w-xs mx-auto" id="waitlistSuccessMsg"></p>
+          <div class="pt-2">
+            <button type="button" onclick="closeWaitlistModal()" class="h-10 px-6 rounded-lg bg-primary hover:bg-primary-container text-white font-bold text-xs transition shadow-sm cursor-pointer">
+              Hoàn tất
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 <script src="./seating-map-image.js"></script>
 </body>
 </html>

@@ -250,6 +250,42 @@ public class EmailService : IEmailService
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<bool> SendWaitlistSeatAvailableEmailAsync(
+        string toEmail,
+        string toName,
+        string eventTitle,
+        string location,
+        string showtime,
+        int availableSeatsCount,
+        string bookingUrl)
+    {
+        try
+        {
+            var message = CreateMessage(toEmail, toName);
+            message.Subject = $"🎟️ [Có vé trống] Cơ hội đặt vé cho suất diễn bạn đang chờ: {eventTitle}";
+
+            message.Body = new TextPart("html")
+            {
+                Text = BuildWaitlistSeatAvailableEmailBody(
+                    System.Net.WebUtility.HtmlEncode(toName),
+                    System.Net.WebUtility.HtmlEncode(eventTitle),
+                    System.Net.WebUtility.HtmlEncode(location),
+                    System.Net.WebUtility.HtmlEncode(showtime),
+                    availableSeatsCount,
+                    bookingUrl)
+            };
+
+            await SendEmailInternalAsync(message, toEmail);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send waitlist seat available email to {Email}", toEmail);
+            return false;
+        }
+    }
+
     private MimeMessage CreateMessage(string toEmail, string toName)
     {
         var senderEmail = GetSetting("SenderEmail", "FromEmail", "Username", "User", "SmtpUser");
@@ -918,5 +954,112 @@ public class EmailService : IEmailService
         </html>
         """;
     }
+
+    // ─── Template email Thông báo danh sách chờ khi có vé về kho (Story S-59) ──────────
+    private static string BuildWaitlistSeatAvailableEmailBody(
+        string name,
+        string eventTitle,
+        string location,
+        string showtime,
+        int availableSeatsCount,
+        string bookingUrl)
+    {
+        var seatsBadge = availableSeatsCount > 0 ? $"{availableSeatsCount} ghế trống vừa mở lại" : "Có ghế vừa nhả về kho";
+
+        return $"""
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="UTF-8"/>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+          <title>Thông báo: Có vé mở lại cho suất diễn bạn đang chờ</title>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center">
+                <table width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+                  <!-- Header -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #3525cd 0%, #712ae2 100%); padding: 32px 24px; text-align: center;">
+                      <div style="font-size: 38px; line-height: 1;">🎟️</div>
+                      <h1 style="color: #ffffff; margin: 10px 0 0 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
+                        Có Vé Về Kho – Đến Lượt Bạn!
+                      </h1>
+                      <p style="color: #dad7ff; margin: 6px 0 0 0; font-size: 13px;">EventPulse Waitlist • Ưu tiên thông báo cho người đăng ký chờ</p>
+                    </td>
+                  </tr>
+
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding: 32px 28px;">
+                      <p style="font-size: 16px; color: #1e293b; margin: 0 0 12px 0;">Xin chào <strong>{name}</strong>,</p>
+                      <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 20px 0;">
+                        Bạn nhận được thông báo này vì đã đăng ký vào <strong>Danh sách chờ (Waitlist)</strong> cho sự kiện dưới đây khi suất diễn tạm thời hết vé. Do có khán giả huỷ vé hoặc lượt giữ chỗ hết hạn, ghế đã được giải phóng và quay trở lại kho bán:
+                      </p>
+
+                      <!-- Showtime Information Box -->
+                      <div style="background-color: #f8fafc; border-radius: 12px; padding: 18px 20px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+                        <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px; color: #334155;">
+                          <tr>
+                            <td style="font-weight: 700; width: 130px; padding: 8px 0; border-bottom: 1px solid #e2e8f0;">🎭 Sự kiện:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">{eventTitle}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700; padding: 8px 0; border-bottom: 1px solid #e2e8f0;">⏰ Thời gian diễn:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: #3525cd;">{showtime}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700; padding: 8px 0; border-bottom: 1px solid #e2e8f0;">📍 Địa điểm:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">{location}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700; padding: 8px 0;">⚡ Tình trạng kho:</td>
+                            <td style="padding: 8px 0; color: #16a34a; font-weight: 700;">{seatsBadge}</td>
+                          </tr>
+                        </table>
+                      </div>
+
+                      <!-- Priority Notice Box -->
+                      <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 0 10px 10px 0; padding: 16px 18px; margin: 0 0 24px 0;">
+                        <div style="font-size: 14px; font-weight: 700; color: #b45309; margin-bottom: 6px;">
+                          ⚡ Nhanh Tay Đặt Vé Ngay:
+                        </div>
+                        <p style="font-size: 13px; color: #92400e; line-height: 1.6; margin: 0;">
+                          Vé được mở bán công khai theo thứ tự ưu tiên ai chọn trước sẽ giữ chỗ trước. Vì số lượng ghế quay về kho có hạn, hãy click vào nút bên dưới để chọn ghế và hoàn tất đơn hàng ngay lập tức!
+                        </p>
+                      </div>
+
+                      <!-- CTA Button -->
+                      <div style="text-align: center; margin: 28px 0 20px 0;">
+                        <a href="{bookingUrl}"
+                           style="background: linear-gradient(135deg, #3525cd 0%, #4f46e5 100%); color: #ffffff; padding: 14px 34px; text-decoration: none; border-radius: 12px; font-size: 15px; font-weight: 800; display: inline-block; box-shadow: 0 4px 14px rgba(53,37,205,0.35); letter-spacing: 0.3px;">
+                          👉 Chọn Ghế &amp; Đặt Vé Ngay
+                        </a>
+                      </div>
+
+                      <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; text-align: center; margin: 0;">
+                        Nếu bạn không còn nhu cầu mua vé suất này, bạn có thể bỏ qua email này.
+                      </p>
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f8fafc; padding: 20px 24px; text-align: center; border-top: 1px solid #f1f5f9;">
+                      <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+                        © 2026 EventPulse System. Hỗ trợ khách hàng: 1900 8899 | support@eventticket.com
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        """;
+    }
 }
+
 

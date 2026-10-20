@@ -38,6 +38,7 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly ILogger<RefundService> _logger;
         private readonly IHubContext<SeatStatusHub>? _hubContext;
         private readonly IConnectionMultiplexer? _redis;
+        private readonly IWaitlistService? _waitlistService;
 
         private static readonly HashSet<string> NonRetryableErrorCodes = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -69,7 +70,8 @@ namespace EventTicketBooking.Api.Services.Implementations
             IOptions<RefundOptions> options,
             ILogger<RefundService> logger,
             IHubContext<SeatStatusHub>? hubContext = null,
-            IConnectionMultiplexer? redis = null)
+            IConnectionMultiplexer? redis = null,
+            IWaitlistService? waitlistService = null)
         {
             _context = context;
             _paymentGateway = paymentGateway;
@@ -79,6 +81,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             _logger = logger;
             _hubContext = hubContext;
             _redis = redis;
+            _waitlistService = waitlistService;
         }
 
         public RefundService(
@@ -87,7 +90,8 @@ namespace EventTicketBooking.Api.Services.Implementations
             IPaymentGateway? paymentGateway = null,
             ILogger<RefundService>? logger = null,
             IHubContext<SeatStatusHub>? hubContext = null,
-            IConnectionMultiplexer? redis = null)
+            IConnectionMultiplexer? redis = null,
+            IWaitlistService? waitlistService = null)
         {
             _context = context;
             _orderAuditService = orderAuditService;
@@ -96,6 +100,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             _hubContext = hubContext;
             _redis = redis;
             _options = new RefundOptions();
+            _waitlistService = waitlistService;
         }
 
         public async Task<RefundRequest> CreateRefundRequestAsync(
@@ -822,6 +827,19 @@ namespace EventTicketBooking.Api.Services.Implementations
                 }
             }
 
+            // Story S-59: Khi có ghế về kho do huỷ vé, gửi email thông báo cho người chờ theo thứ tự đăng ký
+            if (_waitlistService != null && seatsToRelease.Count > 0)
+            {
+                try
+                {
+                    await _waitlistService.ProcessAvailableSeatsNotificationAsync(order.ShowtimeId, seatsToRelease.Count, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi gửi thông báo danh sách chờ cho suất {ShowtimeId} khi huỷ vé (S-59)", order.ShowtimeId);
+                }
+            }
+
             // 4. Pha 2: Gọi cổng hoàn tiền NGOÀI transaction DB (không giữ lock DB khi chờ mạng)
             RefundCreationResult gatewayResult;
             bool gatewaySupportsRefund = _paymentGateway != null && _paymentGateway.SupportsRefund;
@@ -1095,6 +1113,19 @@ namespace EventTicketBooking.Api.Services.Implementations
                         catch (Exception ex)
                         {
                             _logger.LogWarning(ex, "Lỗi gửi SignalR SeatReleased {ShowtimeId}", order.ShowtimeId);
+                        }
+                    }
+
+                    // Story S-59: Khi có ghế về kho do huỷ vé, gửi email thông báo cho người chờ theo thứ tự đăng ký
+                    if (_waitlistService != null && seatsToRelease.Count > 0)
+                    {
+                        try
+                        {
+                            await _waitlistService.ProcessAvailableSeatsNotificationAsync(order.ShowtimeId, seatsToRelease.Count, cancellationToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Lỗi gửi thông báo danh sách chờ cho suất {ShowtimeId} khi huỷ hoàn vé (S-59)", order.ShowtimeId);
                         }
                     }
                 }

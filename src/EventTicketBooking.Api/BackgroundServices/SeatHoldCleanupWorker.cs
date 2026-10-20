@@ -119,6 +119,24 @@ public class SeatHoldCleanupWorker : BackgroundService
                     }
                 }
 
+                // Story S-59: Khi có ghế về kho do hết hạn giữ chỗ, gửi email cho người chờ theo thứ tự đăng ký
+                var waitlistService = scope.ServiceProvider.GetService<EventTicketBooking.Api.Services.Interfaces.IWaitlistService>();
+                if (waitlistService != null)
+                {
+                    var grouped = expiredSeatsInfo.GroupBy(x => x.ShowtimeId);
+                    foreach (var group in grouped)
+                    {
+                        try
+                        {
+                            await waitlistService.ProcessAvailableSeatsNotificationAsync(group.Key, group.Count(), stoppingToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Lỗi thông báo danh sách chờ cho suất {ShowtimeId} sau khi nhả ghế quá hạn.", group.Key);
+                        }
+                    }
+                }
+
                 _logger.LogInformation("Đã nhả thành công {Count} ghế quá hạn giữ chỗ.", expiredSeatIds.Count);
             }
             else
