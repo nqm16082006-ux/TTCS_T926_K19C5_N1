@@ -114,14 +114,14 @@ Tại một cửa sổ PowerShell khác, chạy script E2E:
 
 ---
 
-## 6. Đối chiếu Chính sách Ticketbox và Áp dụng vào Dự án EventPulse
+## 6. Đối chiếu Thực tiễn Vận hành Nền tảng Vé Sự kiện và Áp dụng vào Dự án EventPulse
 
-Nhằm giải quyết ghi chú Backlog: *"chưa refine — nội dung điều khoản do người có thẩm quyền cung cấp, không phải dev soạn"*, hệ thống đã tiến hành đối chiếu toàn diện các quy chế hoạt động của sàn thương mại điện tử phân phối vé hàng đầu Việt Nam (**Ticketbox**) và tích hợp tương thích với các năng lực công nghệ sẵn có của EventPulse:
+Nhằm giải quyết ghi chú Backlog: *"chưa refine — nội dung điều khoản do người có thẩm quyền cung cấp, không phải dev soạn"*, nhóm phát triển đã tiến hành khảo sát và đối chiếu toàn diện các quy chế hoạt động tiêu chuẩn của các sàn thương mại điện tử phân phối vé sự kiện trực tuyến, từ đó xây dựng bộ điều khoản tương thích với các năng lực công nghệ sẵn có của EventPulse:
 
-| STT | Trụ cột chính sách | Quy định thực tế tại Ticketbox | Tích hợp & Áp dụng trong Dự án EventPulse | Story kỹ thuật liên quan |
+| STT | Trụ cột chính sách | Quy định thực tế trong ngành vé sự kiện | Tích hợp & Áp dụng trong Dự án EventPulse | Story kỹ thuật liên quan |
 |---|---|---|---|---|
-| **1** | **Mô hình & Vai trò sàn giao dịch** | Ticketbox là đơn vị trung gian công nghệ kết nối BTC và Khách hàng; BTC chịu trách nhiệm toàn bộ về sự kiện, giấy phép biểu diễn và chất lượng chương trình. | EventPulse đóng vai trò nền tảng trung gian; hệ thống phân quyền 4 nhóm đối tượng (`Admin`, `Organizer`, `Staff`, `Customer`). Điều khoản quy định rõ nghĩa vụ từng bên và miễn trừ trách nhiệm nội dung cho bên thứ ba. | S-03 (Phân quyền Role) |
-| **2** | **Tài khoản & Xác thực an toàn** | Khách hàng chịu trách nhiệm bảo mật thông tin đăng nhập, Ticketbox miễn trừ trách nhiệm nếu khách để lộ mật khẩu/OTP. | Bắt buộc xác thực đa yếu tố với mật mã băm Argon2id và mã OTP gửi qua email (2FA); quy định trách nhiệm bảo mật thuộc về chủ tài khoản. | S-02 (2FA Login & Register) |
+| **1** | **Mô hình & Vai trò sàn giao dịch** | Nền tảng là đơn vị trung gian công nghệ kết nối BTC và Khách hàng; BTC chịu trách nhiệm toàn bộ về sự kiện, giấy phép biểu diễn và chất lượng chương trình. | EventPulse đóng vai trò nền tảng trung gian; hệ thống phân quyền 4 nhóm đối tượng (`Admin`, `Organizer`, `Staff`, `Customer`). Điều khoản quy định rõ nghĩa vụ từng bên và miễn trừ trách nhiệm nội dung cho bên thứ ba. | S-03 (Phân quyền Role) |
+| **2** | **Tài khoản & Xác thực an toàn** | Khách hàng chịu trách nhiệm bảo mật thông tin đăng nhập, nền tảng miễn trừ trách nhiệm nếu khách để lộ mật khẩu/OTP. | Bắt buộc xác thực đa yếu tố với mật mã băm Argon2id và mã OTP gửi qua email (2FA); quy định trách nhiệm bảo mật thuộc về chủ tài khoản. | S-02 (2FA Login & Register) |
 | **3** | **Giữ chỗ tạm thời & Đặt vé** | Cơ chế giữ ghế trong 5-15 phút khi thanh toán để tránh tranh chấp chỗ; quá hạn hệ thống tự động nhả vé. | Áp dụng cơ chế Hold Ticket với countdown timer thời gian thực; quá hạn tự hủy đơn hàng tạm thời và giải phóng ghế cho người mua khác. | S-26, S-27 (Hold & Booking) |
 | **4** | **Vé điện tử & Chống vé giả mạo** | Phát hành vé E-ticket chứa mã QR; mỗi vé chỉ có giá trị cho 01 lần soát vé vào cổng; người quét trước được quyền vào. | Sử dụng công nghệ chữ ký số bất đối xứng **ECDSA** ký trực tiếp lên mã QR vé điện tử; ứng dụng web `staff-scanner.html` soát vé xác minh chữ ký số chống sao chép/chỉnh sửa giả mạo 100%. | S-28, S-48 (ECDSA Ticket & Scanner) |
 | **5** | **Hủy vé & Hoàn tiền** | Vé không đổi trả theo nhu cầu cá nhân; chỉ xử lý hoàn tiền theo chính sách riêng từng sự kiện hoặc khi BTC hủy sự kiện. | **Tích hợp tính năng tự phục vụ S-45 & S-46:** Cho phép khách hàng chủ động hủy vé trước giờ diễn tối thiểu 24 giờ và chưa check-in, nhận hoàn 90% (giữ 10% phí); tự động giải phóng ghế về kho bán; hoàn 100% khi BTC hoãn/hủy sự kiện (S-51). | S-45, S-46, S-51 |
