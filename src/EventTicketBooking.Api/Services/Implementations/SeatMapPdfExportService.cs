@@ -151,6 +151,22 @@ namespace EventTicketBooking.Api.Services.Implementations
 
         #region QuestPDF Composition Components
 
+        private static string FormatVnDateTime(DateTime dt, string format)
+        {
+            try
+            {
+                var utc = dt.Kind == DateTimeKind.Utc ? dt : DateTime.SpecifyKind(dt, DateTimeKind.Utc);
+                TimeZoneInfo vnZone;
+                try { vnZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"); }
+                catch { vnZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"); }
+                return TimeZoneInfo.ConvertTimeFromUtc(utc, vnZone).ToString(format, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return dt.ToString(format, CultureInfo.InvariantCulture);
+            }
+        }
+
         private void ComposeHeader(IContainer container, SeatMapExportDataDto data)
         {
             container.PaddingBottom(8).Row(row =>
@@ -177,7 +193,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                     {
                         text.Span("Suất diễn: ").Bold();
                         text.Span(data.ShowtimeName);
-                        text.Span($" ({data.StartTime:dd/MM/yyyy HH:mm} - {data.EndTime:HH:mm})");
+                        text.Span($" ({FormatVnDateTime(data.StartTime, "dd/MM/yyyy HH:mm")} - {FormatVnDateTime(data.EndTime, "HH:mm")})");
                     });
                 });
 
@@ -187,8 +203,8 @@ namespace EventTicketBooking.Api.Services.Implementations
                         .PaddingHorizontal(8).PaddingVertical(4).Column(subCol =>
                         {
                             subCol.Item().Text("THỜI ĐIỂM XUẤT REAL-TIME").FontSize(7).Bold().FontColor(Colors.Grey.Darken2);
-                            subCol.Item().Text($"{data.ExportedAt:dd/MM/yyyy HH:mm:ss} UTC").FontSize(9).Bold().FontColor(Colors.Blue.Darken3);
-                            subCol.Item().Text("Chính xác từng giây").FontSize(7).Italic().FontColor(Colors.Grey.Darken1);
+                            subCol.Item().Text($"{FormatVnDateTime(data.ExportedAt, "dd/MM/yyyy HH:mm:ss")} (UTC+7)").FontSize(8.5f).Bold().FontColor(Colors.Blue.Darken3);
+                            subCol.Item().Text("Dữ liệu tức thời chính xác").FontSize(7).Italic().FontColor(Colors.Grey.Darken1);
                         });
                 });
             });
@@ -265,6 +281,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             string bgColor;
             string borderColor;
             string textColor;
+            string symbolText = "";
 
             switch (seat.Status)
             {
@@ -272,11 +289,13 @@ namespace EventTicketBooking.Api.Services.Implementations
                     bgColor = "#EF4444";     // Đỏ đậm nổi bật
                     borderColor = "#DC2626";
                     textColor = "#FFFFFF";
+                    symbolText = " ✕";
                     break;
                 case "HELD":
                     bgColor = "#F59E0B";     // Vàng hổ phách
                     borderColor = "#D97706";
                     textColor = "#FFFFFF";
+                    symbolText = " ~";
                     break;
                 case "AVAILABLE":
                 default:
@@ -294,10 +313,14 @@ namespace EventTicketBooking.Api.Services.Implementations
                 .BorderColor(borderColor)
                 .AlignCenter()
                 .AlignMiddle()
-                .Text(seat.SeatCode)
-                .FontSize(7.5f)
-                .Bold()
-                .FontColor(textColor);
+                .Text(text =>
+                {
+                    text.Span(seat.SeatCode).FontSize(7.5f).Bold().FontColor(textColor);
+                    if (!string.IsNullOrEmpty(symbolText))
+                    {
+                        text.Span(symbolText).FontSize(6.5f).Bold().FontColor(textColor);
+                    }
+                });
         }
 
         private void ComposeFooter(IContainer container, SeatMapExportDataDto data)
@@ -316,7 +339,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                         {
                             r.AutoItem().Width(14).Height(12).Background("#EF4444").Border(0.5f).BorderColor("#DC2626");
                             r.AutoItem().PaddingLeft(4).AlignMiddle()
-                                .Text($"Đã bán ({data.SoldCount} - {data.SoldPercentage}%)").FontSize(8).Bold().FontColor(Colors.Grey.Darken3);
+                                .Text($"[✕] Đã bán ({data.SoldCount} - {data.SoldPercentage}%)").FontSize(8).Bold().FontColor(Colors.Grey.Darken3);
                         });
 
                         // Held
@@ -324,7 +347,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                         {
                             r.AutoItem().Width(14).Height(12).Background("#F59E0B").Border(0.5f).BorderColor("#D97706");
                             r.AutoItem().PaddingLeft(4).AlignMiddle()
-                                .Text($"Đang giữ chỗ ({data.HeldCount} - {data.HeldPercentage}%)").FontSize(8).Bold().FontColor(Colors.Grey.Darken3);
+                                .Text($"[~] Đang giữ chỗ ({data.HeldCount} - {data.HeldPercentage}%)").FontSize(8).Bold().FontColor(Colors.Grey.Darken3);
                         });
 
                         // Available
@@ -332,7 +355,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                         {
                             r.AutoItem().Width(14).Height(12).Background("#10B981").Border(0.5f).BorderColor("#059669");
                             r.AutoItem().PaddingLeft(4).AlignMiddle()
-                                .Text($"Còn trống ({data.AvailableCount} - {data.AvailablePercentage}%)").FontSize(8).Bold().FontColor(Colors.Grey.Darken3);
+                                .Text($"[○] Còn trống ({data.AvailableCount} - {data.AvailablePercentage}%)").FontSize(8).Bold().FontColor(Colors.Grey.Darken3);
                         });
                     });
 
