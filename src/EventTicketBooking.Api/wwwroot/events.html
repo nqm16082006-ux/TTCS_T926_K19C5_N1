@@ -584,6 +584,10 @@
       <span class="material-symbols-outlined text-[18px] text-tertiary">open_in_new</span>
       <span>Trang mua vé công khai</span>
     </a>
+    <button onclick="handleMenuAction('export-pdf')" class="w-full flex items-center gap-2 px-3.5 py-2.5 text-amber-700 hover:bg-amber-50 transition-colors text-left font-semibold">
+      <span class="material-symbols-outlined text-[18px] text-amber-600">picture_as_pdf</span>
+      <span>Xuất sơ đồ ghế đã bán (PDF)</span>
+    </button>
     <button onclick="handleMenuAction('export-csv')" class="w-full flex items-center gap-2 px-3.5 py-2.5 text-emerald-700 hover:bg-emerald-50 transition-colors text-left font-semibold">
       <span class="material-symbols-outlined text-[18px] text-emerald-600">file_download</span>
       <span>Xuất danh sách Check-in (CSV)</span>
@@ -1329,6 +1333,9 @@
                 <a href="./create-event.html?id=${e.id}" class="p-2 rounded-lg text-outline hover:text-primary hover:bg-surface-container transition-colors inline-flex items-center justify-center" title="Chỉnh sửa sự kiện">
                   <span class="material-symbols-outlined text-[20px]">edit</span>
                 </a>
+                <a href="./export-test.html?showId=${showtimes.length > 0 ? encodeURIComponent(showtimes[0].id) : ''}" class="p-2 rounded-lg text-outline hover:text-amber-700 hover:bg-amber-50 transition-colors inline-flex items-center justify-center" title="Xuất sơ đồ ghế đã bán PDF (S-60)">
+                  <span class="material-symbols-outlined text-[20px]">picture_as_pdf</span>
+                </a>
                 <a href="./checkin-export.html?showId=${showtimes.length > 0 ? encodeURIComponent(showtimes[0].id) : ''}" class="p-2 rounded-lg text-outline hover:text-emerald-700 hover:bg-emerald-50 transition-colors inline-flex items-center justify-center" title="Xuất danh sách check-in CSV (S-62)">
                   <span class="material-symbols-outlined text-[20px]">file_download</span>
                 </a>
@@ -1401,6 +1408,9 @@
                 <span class="material-symbols-outlined text-[16px]">visibility</span>
                 <span>Xem chi tiết (${showtimeCount} suất)</span>
               </a>
+              <a href="./export-test.html?showId=${showtimes.length > 0 ? encodeURIComponent(showtimes[0].id) : ''}" class="h-9 px-3 rounded-lg bg-surface-container hover:bg-amber-50 hover:text-amber-700 text-on-surface font-label-md text-label-md flex items-center justify-center transition" title="Xuất sơ đồ ghế đã bán PDF (S-60)">
+                <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+              </a>
               <a href="./checkin-export.html?showId=${showtimes.length > 0 ? encodeURIComponent(showtimes[0].id) : ''}" class="h-9 px-3 rounded-lg bg-surface-container hover:bg-emerald-50 hover:text-emerald-700 text-on-surface font-label-md text-label-md flex items-center justify-center transition" title="Xuất danh sách check-in CSV (S-62)">
                 <span class="material-symbols-outlined text-[18px]">file_download</span>
               </a>
@@ -1466,6 +1476,10 @@
 
       if (action === 'detail') {
         window.location.href = `./event-detail.html?id=${activeMenuEventId}`;
+      } else if (action === 'export-pdf') {
+        const ev = currentEvents.find(e => e.id === activeMenuEventId);
+        const showId = ev && ev.showtimes && ev.showtimes.length > 0 ? ev.showtimes[0].id : '';
+        window.location.href = `./export-test.html?showId=${encodeURIComponent(showId)}`;
       } else if (action === 'export-csv') {
         const ev = currentEvents.find(e => e.id === activeMenuEventId);
         const showId = ev && ev.showtimes && ev.showtimes.length > 0 ? ev.showtimes[0].id : '';

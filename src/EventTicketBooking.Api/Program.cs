@@ -44,34 +44,35 @@ if (!string.IsNullOrWhiteSpace(publicUrl))
 
 // Xác định provider database cho local dev. Nếu Postgres không sẵn sàng, hãy fallback về InMemory để app vẫn chạy
 var selectedDbProvider = builder.Configuration["Database:Provider"] ?? "Postgres";
-string? pgConnection = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-                       ?? builder.Configuration.GetConnectionString("DefaultConnection");
+string? pgConnection = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
+var envHost = Environment.GetEnvironmentVariable("POSTGRES_HOST");
 
+if (string.IsNullOrWhiteSpace(pgConnection) && !string.IsNullOrWhiteSpace(envHost))
+{
+    string port = Environment.GetEnvironmentVariable("POSTGRES_PORT") ?? "5432";
+    string db = Environment.GetEnvironmentVariable("POSTGRES_DB") ?? "event_ticket_db";
+    string user = Environment.GetEnvironmentVariable("POSTGRES_USER") ?? "postgres";
+    string pass = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD") ?? "postgres_password_123";
+
+    pgConnection = new Npgsql.NpgsqlConnectionStringBuilder
+    {
+        Host = envHost,
+        Port = int.Parse(port),
+        Database = db,
+        Username = user,
+        Password = pass
+    }.ConnectionString;
+}
+else if (string.IsNullOrWhiteSpace(pgConnection))
+{
+    pgConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+}
 if (string.Equals(selectedDbProvider, "InMemory", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase("EventTicketBooking"));
 }
 else
 {
-    // Nếu chưa có chuỗi kết nối DefaultConnection thì mới tự ráp từ các biến POSTGRES_HOST, PORT, DB...
-    if (string.IsNullOrWhiteSpace(pgConnection) && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("POSTGRES_HOST")))
-    {
-        string host = Environment.GetEnvironmentVariable("POSTGRES_HOST") ?? "localhost";
-        string port = Environment.GetEnvironmentVariable("POSTGRES_PORT") ?? "5432";
-        string db = Environment.GetEnvironmentVariable("POSTGRES_DB") ?? "event_ticket_db";
-        string user = Environment.GetEnvironmentVariable("POSTGRES_USER") ?? "postgres";
-        string pass = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD") ?? "postgres_password_123";
-
-        pgConnection = new Npgsql.NpgsqlConnectionStringBuilder
-        {
-            Host = host,
-            Port = int.Parse(port),
-            Database = db,
-            Username = user,
-            Password = pass
-        }.ConnectionString;
-    }
-
     try
     {
         using var testConnection = new Npgsql.NpgsqlConnection(pgConnection);

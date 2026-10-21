@@ -75,7 +75,7 @@ namespace EventTicketBooking.Api.Controllers
             if (!User.IsInRole("Admin") && !User.IsInRole("Staff"))
             {
                 var currentUserId = GetCurrentUserId();
-                if (currentUserId.HasValue && showtime.Event.OwnerId != currentUserId.Value)
+                if (!currentUserId.HasValue || showtime.Event?.OwnerId != currentUserId.Value)
                 {
                     return StatusCode(StatusCodes.Status403Forbidden, new { message = "Bạn không có quyền truy cập sơ đồ ghế của suất diễn này." });
                 }
@@ -85,7 +85,7 @@ namespace EventTicketBooking.Api.Controllers
             {
                 var pdfBytes = await _seatMapPdfExportService.ExportSeatMapPdfAsync(showtimeId, nowOverride, cancellationToken);
 
-                var sanitizedEventTitle = string.Join("_", (showtime.Event.Title ?? "Event").Split(System.IO.Path.GetInvalidFileNameChars())).Replace(" ", "_");
+                var sanitizedEventTitle = string.Join("_", (showtime.Event?.Title ?? "Event").Split(System.IO.Path.GetInvalidFileNameChars())).Replace(" ", "_");
                 var fileName = $"so-do-ghe-{sanitizedEventTitle}-{showtimeId.ToString().Substring(0, 8)}.pdf";
 
                 return File(pdfBytes, "application/pdf", fileName);
@@ -98,6 +98,58 @@ namespace EventTicketBooking.Api.Controllers
             {
                 _logger.LogError(ex, "Lỗi xảy ra khi xuất PDF sơ đồ ghế cho suất diễn {ShowtimeId}.", showtimeId);
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Đã xảy ra lỗi khi tạo tệp PDF sơ đồ ghế.", detail = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Lấy dữ liệu thống kê trạng thái sơ đồ ghế (Real-time JSON metadata).
+        /// Route: GET /api/v1/showtimes/{showtimeId}/seats/export-data
+        /// Route: GET /api/shows/{showtimeId}/seats/export-data
+        /// </summary>
+        [HttpGet("api/v1/showtimes/{showtimeId:guid}/seats/export-data")]
+        [HttpGet("api/shows/{showtimeId:guid}/seats/export-data")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetSeatMapData(
+            [FromRoute] Guid showtimeId,
+            [FromQuery] DateTime? nowOverride = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (showtimeId == Guid.Empty)
+            {
+                return BadRequest(new { message = "Mã suất diễn không hợp lệ." });
+            }
+
+            var showtime = await _context.Showtimes
+                .AsNoTracking()
+                .Include(s => s.Event)
+                .FirstOrDefaultAsync(s => s.Id == showtimeId, cancellationToken);
+
+            if (showtime == null)
+            {
+                return NotFound(new { message = $"Không tìm thấy suất diễn với mã {showtimeId}." });
+            }
+
+            if (!User.IsInRole("Admin") && !User.IsInRole("Staff"))
+            {
+                var currentUserId = GetCurrentUserId();
+                if (!currentUserId.HasValue || showtime.Event?.OwnerId != currentUserId.Value)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new { message = "Bạn không có quyền truy cập sơ đồ ghế của suất diễn này." });
+                }
+            }
+
+            try
+            {
+                var data = await _seatMapPdfExportService.GetSeatMapDataAsync(showtimeId, nowOverride, cancellationToken);
+                return Ok(data);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
             }
         }
 

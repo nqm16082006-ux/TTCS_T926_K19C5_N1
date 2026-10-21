@@ -66,6 +66,11 @@
   }
   $('download').addEventListener('click', () => downloadFile(false));
   $('downloadExcel').addEventListener('click', () => downloadFile(true));
+  $('exportPdf')?.addEventListener('click', () => {
+    const showId = $('showtime').value;
+    if (!showId) { status('Vui lòng chọn suất diễn để xuất sơ đồ ghế PDF.', true); return; }
+    window.location.href = `./export-test.html?showId=${encodeURIComponent(showId)}`;
+  });
   async function init() {
     if (!token) { $('showtime').replaceChildren(new Option('Vui lòng đăng nhập','')); $('loginPrompt').hidden = false; status('Cần đăng nhập để xuất dữ liệu.', true); setBusy(true); return; }
     try {

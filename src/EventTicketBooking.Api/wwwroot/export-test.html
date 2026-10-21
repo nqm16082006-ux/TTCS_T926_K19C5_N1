@@ -333,9 +333,10 @@
             </p>
           </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <span class="stat-pill" style="background:#fee2e2; color:#b91c1c;">● Đã bán (SOLD)</span>
-            <span class="stat-pill" style="background:#fef3c7; color:#b45309;">● Giữ chỗ (HELD)</span>
-            <span class="stat-pill" style="background:#dcfce7; color:#15803d;">● Còn trống (AVAILABLE)</span>
+            <span id="pillSold" class="stat-pill" style="background:#fee2e2; color:#b91c1c;">[✕] Đã bán (SOLD)</span>
+            <span id="pillHeld" class="stat-pill" style="background:#fef3c7; color:#b45309;">[~] Giữ chỗ (HELD)</span>
+            <span id="pillAvail" class="stat-pill" style="background:#dcfce7; color:#15803d;">[○] Còn trống (AVAILABLE)</span>
+            <span id="pillTotal" class="stat-pill" style="background:#e0f2fe; color:#0369a1; display:none;">Tổng ghế</span>
           </div>
         </div>
 
@@ -604,6 +605,7 @@
           note.textContent = 'Không có suất diễn';
         } else {
           note.textContent = `Đã tìm thấy ${showtimeCount} suất diễn`;
+          await onShowtimeChanged();
         }
       } catch (err) {
         // Fallback: nếu lỗi thì thử nạp từ API public
@@ -637,14 +639,42 @@
           select.appendChild(opt);
         }
         note.textContent = `Đã nạp ${items.length} suất diễn (Public)`;
+        await onShowtimeChanged();
       } catch (fallbackErr) {
         select.innerHTML = `<option value="">-- Lỗi tải suất diễn: ${fallbackErr.message} --</option>`;
         note.textContent = 'Lỗi nạp dữ liệu';
       }
     }
 
-    function onShowtimeChanged() {
+    async function onShowtimeChanged() {
       closePdfPreview();
+      const showId = document.getElementById('showtimeSelect').value;
+      if (!showId) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/shows/${encodeURIComponent(showId)}/seats/export-data`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const pillSold = document.getElementById('pillSold');
+          const pillHeld = document.getElementById('pillHeld');
+          const pillAvail = document.getElementById('pillAvail');
+          const pillTotal = document.getElementById('pillTotal');
+          if (pillSold) pillSold.textContent = `[✕] Đã bán: ${data.soldCount} (${data.soldPercentage}%)`;
+          if (pillHeld) pillHeld.textContent = `[~] Giữ chỗ: ${data.heldCount} (${data.heldPercentage}%)`;
+          if (pillAvail) pillAvail.textContent = `[○] Còn trống: ${data.availableCount} (${data.availablePercentage}%)`;
+          if (pillTotal) {
+            pillTotal.textContent = `Tổng: ${data.totalSeats} ghế`;
+            pillTotal.style.display = 'inline-flex';
+          }
+          const statusNote = document.getElementById('statusNotePdf');
+          if (statusNote) {
+            statusNote.textContent = `Đã đồng bộ số liệu: ${data.totalSeats} ghế (${data.soldCount} đã bán, ${data.heldCount} đang giữ). Sẵn sàng xuất PDF.`;
+          }
+        }
+      } catch (err) {
+        console.warn('Không thể nạp dữ liệu thống kê sơ đồ:', err);
+      }
     }
 
     function closePdfPreview() {

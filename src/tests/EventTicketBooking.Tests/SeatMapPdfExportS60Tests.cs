@@ -341,5 +341,46 @@ namespace EventTicketBooking.Tests
             int pageCount = System.Text.RegularExpressions.Regex.Matches(pdfContentString, @"/Type\s*/Page\b").Count;
             Assert.Equal(1, pageCount);
         }
+
+        [Fact]
+        public async Task GetSeatMapData_ViaController_ReturnsOkResult_WithMetadata()
+        {
+            // Arrange
+            var (ev, showtime, seats) = await SeedShowtimeDataAsync(_organizerOwnerId);
+            var controller = CreateController(_organizerOwnerId, "Organizer");
+
+            // Act
+            var actionResult = await controller.GetSeatMapData(showtime.Id);
+
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(actionResult);
+            var data = Assert.IsType<SeatMapExportDataDto>(okResult.Value);
+            Assert.Equal(showtime.Id, data.ShowtimeId);
+            Assert.Equal(4, data.TotalSeats);
+            Assert.Equal(ev.Title, data.EventTitle);
+        }
+
+        [Fact]
+        public async Task ExportSeatMapPdf_ViaController_ReturnsForbidden_WhenOrganizerClaimIsMissing()
+        {
+            // Arrange: Controller with Organizer role but missing user ID claim
+            var (ev, showtime, seats) = await SeedShowtimeDataAsync(_organizerOwnerId);
+            var claims = new List<Claim> { new Claim(ClaimTypes.Role, "Organizer") }; // No NameIdentifier claim
+            var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"));
+            var controller = new SeatMapExportController(_service, _context, NullLogger<SeatMapExportController>.Instance)
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext { User = principal }
+                }
+            };
+
+            // Act
+            var actionResult = await controller.ExportSeatMapPdf(showtime.Id);
+
+            // Assert
+            var objResult = Assert.IsType<ObjectResult>(actionResult);
+            Assert.Equal(StatusCodes.Status403Forbidden, objResult.StatusCode);
+        }
     }
 }

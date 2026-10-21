@@ -231,6 +231,10 @@
                     <span class="material-symbols-outlined text-[16px]">aspect_ratio</span>
                     <span class="hidden sm:inline">Vừa khung</span>
                   </button>
+                  <button id="btnExportSeatMapPdf" onclick="exportSeatMapPdf()" class="hidden px-2.5 h-8 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 transition-colors font-label-sm text-label-sm flex items-center gap-1 font-bold shadow-2xs" title="Xuất sơ đồ ghế đã bán dạng PDF (S-60)">
+                    <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                    <span class="hidden sm:inline">Xuất PDF (S-60)</span>
+                  </button>
                 </div>
               </div>
 
@@ -906,6 +910,11 @@
             `;
           }
 
+          const btnExport = document.getElementById('btnExportSeatMapPdf');
+          if (btnExport && (isAdmin || isOrganizer || isStaff)) {
+            btnExport.classList.remove('hidden');
+          }
+
           container.innerHTML = `
             ${portalLink}
             <div class="flex items-center gap-2 pl-2 border-l border-surface-container-high">
@@ -940,6 +949,15 @@
       localStorage.removeItem('access_token');
       localStorage.removeItem('user_info');
       renderAuthNav();
+    }
+
+    function exportSeatMapPdf() {
+      const showId = currentShowtimeId || showtimeId;
+      if (!showId) {
+        alert('Chưa có thông tin mã suất diễn.');
+        return;
+      }
+      window.open('./export-test.html?showId=' + encodeURIComponent(showId), '_blank');
     }
 
     // Modal Helpers

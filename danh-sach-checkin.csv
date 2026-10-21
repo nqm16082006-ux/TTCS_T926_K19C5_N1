@@ -1,6 +1,0 @@
-﻿Mã vé,Số ghế,Thời gian vào,Cửa vào,Cờ xung đột,Ghi chú xung đột
-TICK-ATSH-A1,A1,2026-10-15 01:30:00,Cổng A,Không,
-TICK-ATSH-D1,D1,2026-10-15 01:45:00,Cổng B,Có,Vé quét lại nhiều lần (1 lượt vào bổ sung)
-TICK-ATSH-E2-CANCEL,E2,2026-10-15 02:00:00,Cổng VIP,Có,Đơn hàng trạng thái Cancelled nhưng có dữ liệu vào cửa
-TICK-ATSH-D1,D1,2026-10-15 02:25:00,Cổng B,Có,Vào bổ sung lần 1: Khách ra ngoài nghe điện thoại và quay lại (NV: Soát vé viên Tuấn)
-TICK-ATSH-D2,D2,,Chưa vào,Không,
