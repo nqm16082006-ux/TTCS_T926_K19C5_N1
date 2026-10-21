@@ -20,7 +20,7 @@ namespace EventTicketBooking.Api.DTOs
         /// </summary>
         public string QrPayload
         {
-            get => !string.IsNullOrEmpty(_qrPayload) ? _qrPayload : TicketCode;
+            get => _qrPayload ?? TicketCode;
             set => _qrPayload = value;
         }
 
@@ -34,5 +34,15 @@ namespace EventTicketBooking.Api.DTOs
         public string SeatName => !string.IsNullOrEmpty(SeatRow) ? $"{SeatRow}{SeatNumber}" : $"Ghế #{SeatNumber}";
         public int Price { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
+
+        public Guid? OrderId { get; set; }
+        public Guid? ShowtimeId { get; set; }
+        public string? EventImageUrl { get; set; }
+        public bool IsCheckedIn { get; set; }
+        public bool IsTransferred { get; set; }
+        public string? TransferredToEmail { get; set; }
+        public string? TransferredFromEmail { get; set; }
+        public int TransferCount { get; set; }
+        public bool CanTransfer { get; set; }
     }
 }

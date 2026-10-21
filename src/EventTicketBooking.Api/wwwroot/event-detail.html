@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html class="h-full" lang="vi">
 <head>
+  <link rel="stylesheet" href="./event-description.css">
+  <script src="./event-description.js"></script>
+  <link rel="stylesheet" href="./showtime-duplicate.css">
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
   <meta content="web_dashboard" name="shell-type">
@@ -40,6 +43,10 @@
     }
     .modal-overlay.active {
       display: flex;
+    }
+    #addShowtimeModal > div, #editShowtimeModal > div {
+      max-height: calc(100dvh - 2rem);
+      overflow-y: auto;
     }
 
     .seat-grid-preview {
@@ -217,9 +224,11 @@
       <!-- Logo Header -->
       <div class="h-16 px-space-md flex items-center justify-between bg-surface-container-low">
         <a href="./overview.html" class="flex items-center gap-space-sm">
-          <img alt="EventPulse Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WTV6ECUtEUhk0z2OhrYrHSztCKcv9GeCNfmcT273KDmrGfvnfNjO-uFn7ATWOsV48K8VSD8RgaP6nA7UlHLZRqTI0Wp1hsKNBB2hCGvimywycHDhMKaCFgxRaIhinj6vXjrz4KX-RWUcFVmjpPY8KdEXLAiptD9n7k51M75Sc6w1aBY7AIYj55cuIhMogpGjtAb-tv4r8Mg5sBZlRk4SsC6WzXyCEM8aHQAZ3bI3WnX8ogB38-mTpVIKT9">
+          <div class="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center shadow-sm shrink-0">
+            <span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+          </div>
           <div class="flex flex-col">
-            <span class="font-headline-sm text-headline-sm text-primary leading-tight font-bold">EventPulse</span>
+            <span class="font-headline-sm text-headline-sm text-primary leading-tight font-extrabold">EventPulse</span>
             <span class="font-label-sm text-label-sm text-secondary tracking-wider uppercase font-semibold">Ban Tổ Chức</span>
           </div>
         </a>
@@ -259,7 +268,7 @@
         <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="javascript:void(0)" onclick="scrollToSeatSection()">
           <span class="material-symbols-outlined text-[20px]">chair</span>Cấu hình ghế &amp; bảng giá
         </a>
-        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./export-test.html">
+        <a class="flex items-center gap-space-sm px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all font-label-lg text-label-lg" href="./checkin-export.html">
           <span class="material-symbols-outlined text-[20px]">file_download</span>Xuất danh sách Check-in
         </a>
       </nav>
@@ -372,6 +381,10 @@
                 <span class="material-symbols-outlined text-[18px]">save</span>
                 Lưu thay đổi
               </button>
+              <button onclick="sendAllShowtimesRemindersPrompt()" class="inline-flex items-center gap-space-xs px-3.5 py-2.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-all font-label-lg text-label-lg font-semibold shadow-2xs" type="button" title="Gửi email nhắc nhở trước 24h cho các suất diễn của sự kiện này">
+                <span class="material-symbols-outlined text-[18px] text-indigo-600">notifications_active</span>
+                Gửi nhắc nhở
+              </button>
               <button onclick="openAddShowtimeModal()" class="inline-flex items-center gap-space-xs px-4 py-2.5 rounded-lg bg-primary text-on-primary shadow hover:bg-on-primary-fixed-variant transition-all font-label-lg text-label-lg font-semibold" type="button">
                 <span class="material-symbols-outlined text-[18px]">add_circle</span>
                 + Thêm suất diễn mới
@@ -398,6 +411,12 @@
             <button id="tabBtnSettings" onclick="switchTab('settings')" class="flex items-center gap-space-xs px-4 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-all" type="button">
               <span class="material-symbols-outlined text-[18px]">tune</span>
               <span>Cấu hình chung &amp; Đơn vị tổ chức</span>
+            </button>
+            <!-- Tab 4: Discount Codes (Story S-56) -->
+            <button id="tabBtnDiscounts" onclick="switchTab('discounts')" class="flex items-center gap-space-xs px-4 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-all" type="button">
+              <span class="material-symbols-outlined text-[18px]">loyalty</span>
+              <span>Mã giảm giá</span>
+              <span id="tabCountDiscounts" class="ml-1 px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-code-mono text-label-sm">0</span>
             </button>
           </nav>
           <div class="hidden xl:flex items-center gap-space-xs pr-2 text-on-surface-variant font-label-sm text-label-sm">
@@ -489,7 +508,7 @@
 
                 <!-- Table Responsive Container -->
                 <div class="overflow-x-auto">
-                  <table class="w-full text-left">
+                  <table class="w-full text-left st-showtimes-table">
                     <thead>
                       <tr class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider border-b border-outline-variant/20">
                         <th class="py-3 px-space-md" scope="col">Thông tin suất diễn</th>
@@ -614,7 +633,7 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                   <div class="rounded-xl overflow-hidden shadow-sm border border-outline-variant/30 aspect-[3/4] bg-surface-container-low relative">
-                    <img id="tabPosterImg" class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80" alt="Poster sự kiện">
+                    <img id="tabPosterImg" class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80" alt="Poster sự kiện" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&q=80';">
                   </div>
                   <div class="md:col-span-2 space-y-4">
                     <div class="p-3 rounded-lg bg-surface-container-low border border-outline-variant/30 flex items-center justify-between">
@@ -651,6 +670,85 @@
               </div>
             </div>
 
+            <!-- TAB 4 CONTENT: DISCOUNT CODES (Story S-56) -->
+            <div id="tabContentDiscounts" class="hidden flex-col gap-space-lg">
+              <!-- Create Discount Code Form Card -->
+              <div class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-outline-variant/20 space-y-4">
+                <div class="flex items-center justify-between">
+                  <h3 class="font-headline-md text-headline-md text-on-surface font-bold flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">add_circle</span>
+                    <span>Tạo mã giảm giá mới</span>
+                  </h3>
+                </div>
+                <form id="formCreateDiscount" onsubmit="handleCreateDiscountSubmit(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label for="orgDiscountCodeInput" class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Mã giảm giá (Code) *</label>
+                    <input id="orgDiscountCodeInput" type="text" maxlength="50" required placeholder="Ví dụ: SALE10, EARLYBIRD" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface uppercase font-mono font-bold focus:outline-none focus:ring-2 focus:ring-primary">
+                  </div>
+                  <div>
+                    <label for="orgDiscountTypeSelect" class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Loại giảm giá *</label>
+                    <select id="orgDiscountTypeSelect" onchange="handleOrgDiscountTypeChange()" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-semibold focus:outline-none focus:ring-2 focus:ring-primary">
+                      <option value="Percent">Phần trăm (%)</option>
+                      <option value="FixedAmount">Số tiền cố định (VNĐ)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label id="orgDiscountValueLabel" for="orgDiscountValueInput" class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Giá trị giảm (%) *</label>
+                    <input id="orgDiscountValueInput" type="number" min="1" max="100" required placeholder="1 - 100" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-semibold focus:outline-none focus:ring-2 focus:ring-primary">
+                  </div>
+                  <div>
+                    <label for="orgDiscountUsageLimitInput" class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Số lượt sử dụng *</label>
+                    <input id="orgDiscountUsageLimitInput" type="number" min="1" required placeholder="Ví dụ: 100" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-semibold focus:outline-none focus:ring-2 focus:ring-primary">
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label for="orgDiscountExpiresAtInput" class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Hạn dùng (Hết hạn lúc) *</label>
+                    <input id="orgDiscountExpiresAtInput" type="datetime-local" required class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-semibold focus:outline-none focus:ring-2 focus:ring-primary">
+                  </div>
+                  <div id="orgCreateDiscountAlert" class="sm:col-span-2 hidden p-3 rounded-lg text-sm font-semibold"></div>
+                  <div class="sm:col-span-2 flex justify-end">
+                    <button id="btnSubmitCreateDiscount" type="submit" class="px-5 py-2.5 rounded-lg bg-primary hover:bg-on-primary-fixed-variant text-on-primary font-label-md text-label-md font-semibold transition shadow-sm flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[18px]">save</span>
+                      <span>Lưu mã giảm giá</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Discount Codes List Table Card -->
+              <div class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-outline-variant/20 space-y-4">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h3 class="font-headline-md text-headline-md text-on-surface font-bold">Danh sách mã giảm giá</h3>
+                    <p class="text-body-sm text-on-surface-variant">Các mã giảm giá áp dụng cho sự kiện này</p>
+                  </div>
+                  <button onclick="loadDiscountCodes(currentEventId)" class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">refresh</span>
+                    <span>Làm mới</span>
+                  </button>
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-outline-variant/20">
+                  <table class="w-full text-left">
+                    <thead class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase">
+                      <tr>
+                        <th class="px-4 py-3">Mã (Code)</th>
+                        <th class="px-4 py-3">Loại</th>
+                        <th class="px-4 py-3">Giá trị</th>
+                        <th class="px-4 py-3">Đã dùng / Giới hạn</th>
+                        <th class="px-4 py-3">Hạn dùng</th>
+                        <th class="px-4 py-3">Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody id="discountCodesTableBody" class="divide-y divide-outline-variant/20 text-on-surface text-sm">
+                      <tr>
+                        <td colspan="6" class="px-4 py-6 text-center text-on-surface-variant">Đang tải dữ liệu...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
           </div>
 
           <!-- RIGHT COLUMN: Event Summary & Metadata Sticky Card (4 cols) -->
@@ -659,7 +757,7 @@
             <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden border border-outline-variant/20">
               <!-- Poster Visual with scrim -->
               <div class="relative w-full h-64 bg-surface-container-high overflow-hidden">
-                <img id="sideEventPosterImg" class="w-full h-full object-cover object-top transition-transform duration-500 hover:scale-105" alt="Poster sự kiện" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3qOAl1-ftfAgs0A4GJNBcvKYksU1b0EgSPzgNdc-Ld8IfeOmf_fh8wIYf6HPQfCe4g43nE67RT65JwkNqVfuH8l-QZGoWETiknHP_D91A-pmBcBj9Kcthj3lfHf2FnbGgHD8Ok_dmzhEhUz7HKVr5PFoyfsEUwHi5N3BMMNKYO0DnzBen5BK0T8bWx3vutsg_YAHdqmd7Z1jH5OGaExuEElSgE4wd-XMGVbjC1SqEZtKpIa0dKrjqmA">
+                <img id="sideEventPosterImg" class="w-full h-full object-cover object-top transition-transform duration-500 hover:scale-105" alt="Poster sự kiện" src="https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&q=80';">
                 <div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/95 via-inverse-surface/40 to-transparent flex flex-col justify-end p-space-md text-on-primary">
                   <span id="sideEventCategoryTag" class="px-2 py-0.5 rounded bg-secondary text-on-secondary font-label-sm text-label-sm self-start mb-1 font-semibold">
                     Live Concert • Âm Nhạc
@@ -785,6 +883,16 @@
 
       <form id="formAddShowtime" onsubmit="handleAddShowtimeSubmit(event)" class="space-y-4">
         <div>
+          <label for="showtimeName" class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Tên suất diễn</label>
+          <input id="showtimeName" type="text" maxlength="200" placeholder="Ví dụ: Đêm Chung khảo, Đêm Chung kết" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-body-md focus:outline-none focus:ring-2 focus:ring-primary">
+          <p class="text-[11px] text-outline mt-1">Đặt tên riêng để phân biệt các suất trong cùng sự kiện. Có thể để trống.</p>
+        </div>
+        <div>
+          <label for="showtimeSalesEndTime" class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Hạn bán vé</label>
+          <input id="showtimeSalesEndTime" type="datetime-local" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface">
+          <p class="text-[11px] text-outline mt-1">Để trống: ngừng bán khi bắt đầu diễn. Hạn bán không vượt giờ kết thúc. Có thể đóng bán sớm.</p>
+        </div>
+        <div>
           <label class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Thời gian bắt đầu <span class="text-error">*</span></label>
           <input id="showtimeStartTime" type="datetime-local" required class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-body-md focus:outline-none focus:ring-2 focus:ring-primary">
         </div>
@@ -828,6 +936,16 @@
 
       <form id="formEditShowtime" onsubmit="handleEditShowtimeSubmit(event)" class="space-y-4">
         <input type="hidden" id="editShowtimeId">
+        <div>
+          <label for="editShowtimeName" class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Tên suất diễn</label>
+          <input id="editShowtimeName" type="text" maxlength="200" placeholder="Ví dụ: Đêm Chung khảo, Đêm Chung kết" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-body-md focus:outline-none focus:ring-2 focus:ring-primary">
+          <p class="text-[11px] text-outline mt-1">Đặt tên riêng để phân biệt các suất trong cùng sự kiện. Có thể để trống.</p>
+        </div>
+        <div>
+          <label for="editSalesEndTime" class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Hạn bán vé</label>
+          <input id="editSalesEndTime" type="datetime-local" class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface">
+          <p class="text-[11px] text-outline mt-1">Để trống: ngừng bán khi bắt đầu diễn. Hạn bán không vượt giờ kết thúc. Có thể đóng bán sớm.</p>
+        </div>
         <div>
           <label class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Thời gian bắt đầu <span class="text-error">*</span></label>
           <input id="editStartTime" type="datetime-local" required class="w-full h-11 px-3.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-body-md focus:outline-none focus:ring-2 focus:ring-primary">
@@ -955,9 +1073,9 @@
 
     // Image fallback catalog
     const EVENT_IMAGES = [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuD3qOAl1-ftfAgs0A4GJNBcvKYksU1b0EgSPzgNdc-Ld8IfeOmf_fh8wIYf6HPQfCe4g43nE67RT65JwkNqVfuH8l-QZGoWETiknHP_D91A-pmBcBj9Kcthj3lfHf2FnbGgHD8Ok_dmzhEhUz7HKVr5PFoyfsEUwHi5N3BMMNKYO0DnzBen5BK0T8bWx3vutsg_YAHdqmd7Z1jH5OGaExuEElSgE4wd-XMGVbjC1SqEZtKpIa0dKrjqmA',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCwgfSQKNAE5_AwoH7VdGLGQyDLytRQ1WgIpeNwcfEJrpZNNWrU_ZqE8nnwRTIKIpSGWMu2D6TjqsLZwtWEGFq9z55HU37WXIzEOOUWmyGAHLNQjGf2O0PBdCZNYDpoiYyTKXB__S5RBsA80ZvxGhkkeJXZRUyBCtuisrXe03l0g6o77NacpQ7Oa77kM5dxW1RwU-psLPACrDSo-YUByJwkNz5-lzuisC1gcoOm7eWHr8Di3eJLmd7HOw',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuAZ7__2YI8x3FM5Dvf7jpAW66PsIHCc_tHdSNnMgxXw1vihOd__UyD1m1Tp9v1RiBXt3cw-kipHzj0MtBrLukCh4hh8D3H8Gs_2MYpjUpTeEG5_pq2cU8laWIiYOOhKFQgaqzK0w7oQvD3rC6FscijtE7nLPUtyiIzB_QgsewqN6qS9XzZXbwBC6I3riGJkL1iXXHagO--jglP9sAKyLkKt1m5EoIylVnNTEVLR4F7FMNoVK_pASHpbtQ'
+      'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80',
+      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&q=80',
+      'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&q=80'
     ];
 
     // Auth & Init
@@ -1098,7 +1216,7 @@
       }
 
       // Description
-      document.getElementById('infoTabDescription').innerHTML = ev.description ? escapeHtml(ev.description).replace(/\n/g, '<br>') : 'Chưa có thông tin mô tả chi tiết.';
+      document.getElementById('infoTabDescription').innerHTML = formatEventDescription(ev.description);
 
       // Public view button link
       document.getElementById('btnPublicView').href = `./public-events.html`;
@@ -1187,154 +1305,73 @@
           }
         }
 
-        const nightLabel = `Đêm ${String(index + 1).padStart(2, '0')}: Suất biểu diễn chính thức`;
-
-        return `
-          <tr class="hover:bg-surface-container-low/50 transition-colors group">
-            <!-- 1. Thông tin suất diễn -->
-            <td class="py-space-md px-space-md align-top">
-              <div class="flex flex-col">
-                <span class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors font-bold">
-                  ${nightLabel}
-                </span>
-                <div class="flex items-center gap-1.5 text-on-surface-variant font-body-sm text-body-sm mt-0.5">
-                  <span class="material-symbols-outlined text-[15px] text-primary">calendar_today</span>
-                  <span class="font-semibold text-on-surface">${formatDate(s.startTime)}</span>
-                  <span>•</span>
-                  <span class="font-code-mono text-code-mono">${formatTime(s.startTime)} - ${formatTime(s.endTime)}</span>
-                </div>
-                <div class="flex items-center gap-1 text-on-surface-variant font-body-sm text-body-sm mt-1">
-                  <span class="material-symbols-outlined text-[15px] text-outline">location_on</span>
-                  <span>${escapeHtml(currentEvent ? currentEvent.location : 'Hội trường biểu diễn')}</span>
-                </div>
+        pct = Math.max(0, Math.min(100, pct));
+        const cancelled = s.status === 4 || s.status === 'Cancelled';
+        const expired = Date.now() >= new Date(s.salesEndTime || s.startTime).getTime() || Date.now() >= new Date(s.endTime).getTime();
+        const statusText = !cancelled && expired ? 'Đã hết thời gian bán vé' : isOnSale ? 'Đang mở bán' : isDraft ? 'Bản nháp' : cancelled ? 'Đã hủy' : 'Đã đóng bán';
+        const statusClass = expired ? 'st-status-closed' : isOnSale ? 'st-status-sale' : isDraft ? 'st-status-draft' : 'st-status-closed';
+        const label = escapeHtml(s.name || `Suất diễn ${String(showtimes.indexOf(s) + 1).padStart(2, '0')}`);
+        const maxTickets = s.maxTicketsPerUser || currentEvent?.maxTicketsPerUser || 10;
+        const endLabel = formatDate(s.startTime) === formatDate(s.endTime)
+          ? formatTime(s.endTime) : `${formatTime(s.endTime)} · ${formatDate(s.endTime)}`;
+        return `<tr><td colspan="6" class="st-card-cell">
+          <article class="st-card" aria-label="${label}">
+            <header class="st-card-header">
+              <div class="st-heading"><span class="st-calendar material-symbols-outlined" aria-hidden="true">event</span>
+                <div><h3>${label}</h3><p>${formatDate(s.startTime)} <span>·</span> ${formatTime(s.startTime)} – ${endLabel}</p></div>
               </div>
-            </td>
-
-            <!-- 2. Sơ đồ ghế (Map) -->
-            <td class="py-space-md px-space-md align-top">
-              <div class="flex flex-col items-start gap-1">
-                ${hasSeats ? `
-                  <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-label-sm text-label-sm font-semibold">
-                    <span class="material-symbols-outlined text-[13px]">check_circle</span>
-                    ${totalSeats.toLocaleString('vi-VN')} ghế (Hội trường)
-                  </span>
-                  <span class="text-[11px] font-semibold text-primary bg-primary-fixed/30 px-2 py-0.5 rounded-full w-fit">
-                    Tối đa ${s.maxTicketsPerUser || (currentEvent && currentEvent.maxTicketsPerUser) || 10} vé/người
-                  </span>
-                  <a class="font-label-sm text-label-sm text-primary hover:underline inline-flex items-center gap-0.5 font-semibold" href="./seat-map.html?showtimeId=${s.id}" target="_blank">
-                    <span class="material-symbols-outlined text-[14px]">map</span>
-                    Xem trước sơ đồ
-                  </a>
-                  <button onclick="openSeatImportModal('${s.id}', true)" class="text-[11px] text-outline hover:text-primary hover:underline">
-                    + Nạp lại tệp JSON
-                  </button>
-                ` : `
-                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-label-sm text-label-sm font-semibold">
-                    <span class="material-symbols-outlined text-[13px] text-amber-700">warning</span>
-                    Chưa có sơ đồ ghế
-                  </span>
-                  <span class="text-[11px] font-semibold text-primary bg-primary-fixed/30 px-2 py-0.5 rounded-full w-fit">
-                    Tối đa ${s.maxTicketsPerUser || (currentEvent && currentEvent.maxTicketsPerUser) || 10} vé/người
-                  </span>
-                  <button onclick="openSeatImportModal('${s.id}', false)" class="font-label-sm text-label-sm text-primary hover:underline flex items-center gap-0.5 font-semibold" type="button">
-                    <span class="material-symbols-outlined text-[14px]">upload_file</span>
-                    Tải file sơ đồ (.JSON)
-                  </button>
-                `}
-                <button type="button" onclick="openSeatingMapImageEditor(this)" data-showtime="${escapeHtml(s.id)}" data-image="${escapeHtml(s.seatingMapImageUrl || '')}" class="font-label-sm text-primary hover:underline mt-2">${s.seatingMapImageUrl ? 'Thay / xóa ảnh sơ đồ' : 'Tải ảnh / link sơ đồ khán phòng'}</button>
-              </div>
-            </td>
-
-            <!-- 3. Bảng giá vé -->
-            <td class="py-space-md px-space-md align-top">
-              <div class="flex flex-col items-start gap-1">
-                ${hasPrices ? `
-                  <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container-highest text-primary font-label-sm text-label-sm font-semibold">
-                    <span class="material-symbols-outlined text-[13px]">sell</span>
-                    ${categories.length} hạng vé
-                  </span>
-                  <span class="text-on-surface-variant font-body-sm text-body-sm">
-                    ${priceRangeText}
-                  </span>
-                  <button onclick="openPricingModal('${s.id}')" class="font-label-sm text-label-sm text-primary hover:underline inline-flex items-center gap-0.5 font-semibold">
-                    <span class="material-symbols-outlined text-[14px]">tune</span> Chỉnh sửa giá
-                  </button>
-                ` : `
-                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-label-sm text-label-sm font-semibold">
-                    <span class="material-symbols-outlined text-[13px] text-amber-700">error</span>
-                    Chưa thiết lập giá vé
-                  </span>
-                  <span class="text-on-surface-variant font-body-sm text-body-sm">Cần tối thiểu 1 hạng vé</span>
-                  <button onclick="openPricingModal('${s.id}')" class="font-label-sm text-label-sm text-primary hover:underline inline-flex items-center gap-0.5 font-semibold">
-                    + Cài đặt bảng giá
-                  </button>
-                `}
-              </div>
-            </td>
-
-            <!-- 4. Tình trạng bán vé -->
-            <td class="py-space-md px-space-md align-top">
-              <div class="flex flex-col gap-1 w-36">
-                <div class="flex justify-between items-center font-label-sm text-label-sm">
-                  <span class="font-semibold text-on-surface">${sold.toLocaleString('vi-VN')} / ${totalSeats.toLocaleString('vi-VN')}</span>
-                  <span class="font-bold ${pct >= 80 ? 'text-secondary' : 'text-emerald-700'}">${pct}%</span>
+              <span class="st-status ${statusClass}">${statusText}</span>
+            </header>
+            <p class="st-subtext">Hạn bán vé: ${formatTime(s.salesEndTime || s.startTime)} · ${formatDate(s.salesEndTime || s.startTime)}</p>
+            <p class="st-location" title="${escapeHtml(currentEvent?.location || '')}"><span class="material-symbols-outlined" aria-hidden="true">location_on</span>${escapeHtml(currentEvent?.location || 'Chưa cập nhật địa điểm')}</p>
+            <div class="st-card-grid">
+              <section class="st-info"><h4>Sơ đồ &amp; sức chứa</h4>
+                <p class="st-value">${hasSeats ? Number(totalSeats).toLocaleString('vi-VN') + ' ghế' : 'Chưa có ghế'}</p>
+                <p class="st-subtext">Tối đa ${maxTickets} vé / người</p>
+                <div class="st-inline-actions">${hasSeats ? `<a href="./seat-map.html?showtimeId=${s.id}" target="_blank" rel="noopener">Xem sơ đồ <span aria-hidden="true">↗</span></a>` : ''}
+                  <button type="button" onclick="openSeatingMapImageEditor(this)" data-showtime="${escapeHtml(s.id)}" data-image="${escapeHtml(s.seatingMapImageUrl || '')}">${s.seatingMapImageUrl ? 'Sửa ảnh sơ đồ' : 'Thêm ảnh sơ đồ'}</button>
                 </div>
-                <div class="w-full bg-surface-container-high rounded-full h-1.5 overflow-hidden">
-                  <div class="${pct >= 80 ? 'bg-secondary' : 'bg-emerald-600'} h-1.5 rounded-full transition-all" style="width: ${pct}%"></div>
-                </div>
-                <span class="text-on-surface-variant font-body-sm text-body-sm">Còn lại: ${Math.max(0, totalSeats - sold).toLocaleString('vi-VN')} chỗ</span>
-              </div>
-            </td>
-
-            <!-- 5. Trạng thái -->
-            <td class="py-space-md px-space-md align-top">
-              ${isOnSale ? `
-                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 font-label-sm text-label-sm font-bold shadow-xs">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Đang mở bán
-                </span>
-              ` : (isDraft ? `
-                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 font-label-sm text-label-sm font-bold">
-                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                  Bản nháp
-                </span>
-              ` : `
-                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-bold">
-                  <span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
-                  Đã đóng bán
-                </span>
-              `)}
-            </td>
-
-            <!-- 6. Thao tác -->
-            <td class="py-space-md px-space-md align-top text-right">
-              <div class="flex items-center justify-end gap-1">
-                ${isDraft ? `
-                  <button onclick="toggleShowtimeSale('${s.id}', true)" ${s.canOpenSale === false ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-label-sm text-label-sm font-semibold transition shadow-xs" title="${escapeHtml(s.statusActionMessage || 'Kích hoạt mở bán')}">
-                    Mở bán
-                  </button>
-                ` : isOnSale ? `
-                  <button onclick="toggleShowtimeSale('${s.id}', false)" class="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-label-sm text-label-sm font-semibold transition shadow-xs" title="Đóng bán vé">
-                    Đóng bán
-                  </button>
-                ` : ''}
-                ${isDraft && s.canOpenSale === false ? `<span class="text-xs text-amber-800 max-w-36">${escapeHtml(s.statusActionMessage)}</span>` : ''}
-                <button onclick="openPricingModal('${s.id}')" class="p-2 rounded-lg text-primary hover:bg-surface-container transition-colors" title="Cấu hình bảng giá" type="button">
-                  <span class="material-symbols-outlined text-[19px]">settings</span>
+              </section>
+              <section class="st-info"><h4>Bảng giá vé</h4>
+                <p class="st-value">${categories.length} hạng vé</p>
+                <p class="st-subtext ${hasPrices ? '' : 'st-warning'}">${hasPrices ? priceRangeText.replace('Từ ', '') : 'Chưa thiết lập đủ giá'}</p>
+                <div class="st-inline-actions"><button type="button" onclick="openPricingModal('${s.id}')">${hasPrices ? 'Chỉnh bảng giá' : 'Thiết lập giá'}</button></div>
+              </section>
+              <section class="st-info"><h4>Tiến độ bán vé</h4>
+                <p class="st-value">${Number(sold).toLocaleString('vi-VN')} <small>/ ${Number(totalSeats).toLocaleString('vi-VN')} vé</small><span class="st-percent">${pct}%</span></p>
+                <div class="st-progress" role="progressbar" aria-label="Tỷ lệ vé đã bán" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><span style="width:${pct}%"></span></div>
+                <p class="st-subtext">Còn ${Math.max(0, totalSeats - sold).toLocaleString('vi-VN')} chỗ chưa bán</p>
+              </section>
+            </div>
+            ${isDraft && s.canOpenSale === false ? `<p class="st-warning-note">${escapeHtml(s.statusActionMessage || 'Cần hoàn tất sơ đồ và bảng giá trước khi mở bán.')}</p>` : ''}
+            <footer class="st-card-actions">
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="openDuplicateShowtime('${s.id}')" class="showtime-copy-button"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Nhân bản suất diễn</button>
+                <button type="button" onclick="sendShowtimeReminderPrompt('${s.id}')" class="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50/90 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs active:scale-95" title="Gửi email nhắc nhở trước 24h kèm vé và chỉ dẫn địa điểm">
+                  <span class="material-symbols-outlined text-[16px] text-indigo-600" aria-hidden="true">notifications_active</span>
+                  <span>Gửi nhắc nhở</span>
                 </button>
-                <a href="./export-test.html?showId=${encodeURIComponent(s.id)}" class="p-2 rounded-lg text-emerald-700 hover:bg-emerald-50 transition-colors inline-flex items-center justify-center" title="Xuất danh sách soát vé CSV (S-62)">
-                  <span class="material-symbols-outlined text-[19px]">file_download</span>
-                </a>
-                <button onclick="openEditShowtimeModal('${s.id}')" class="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" title="Chỉnh sửa thông tin suất" type="button">
-                  <span class="material-symbols-outlined text-[19px]">edit</span>
-                </button>
-                <button onclick="confirmDeleteShowtime('${s.id}')" class="p-2 rounded-lg text-error hover:bg-error-container transition-colors" title="Hủy / Xóa suất diễn" type="button">
-                  <span class="material-symbols-outlined text-[19px]">delete</span>
+                <button type="button" onclick="openOrganizerWaitlistModal('${s.id}', '${label}')" class="px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs active:scale-95" title="Xem danh sách khách hàng đăng ký chờ suất diễn">
+                  <span class="material-symbols-outlined text-[16px] text-amber-600" aria-hidden="true">hourglass_top</span>
+                  <span>Xem danh sách chờ</span>
                 </button>
               </div>
-            </td>
-          </tr>
-        `;
+              <div class="st-secondary-actions">
+                <details class="st-more"><summary><span class="material-symbols-outlined" aria-hidden="true">more_horiz</span>Thao tác khác</summary>
+                  <div class="st-more-menu">
+                    <button type="button" onclick="sendShowtimeReminderPrompt('${s.id}')"><span class="material-symbols-outlined text-indigo-600" aria-hidden="true">notifications_active</span>Gửi email nhắc nhở trước 24h</button>
+                    <button type="button" onclick="openOrganizerWaitlistModal('${s.id}', '${label}')"><span class="material-symbols-outlined text-amber-600" aria-hidden="true">playlist_add_check</span>Xem danh sách chờ</button>
+                    <button type="button" onclick="openEditShowtimeModal('${s.id}')"><span class="material-symbols-outlined" aria-hidden="true">edit_calendar</span>Chỉnh sửa suất diễn</button>
+                    <a href="./export-test.html?showId=${encodeURIComponent(s.id)}"><span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>Xuất sơ đồ ghế (PDF)</a>
+                    <a href="./checkin-export.html?showId=${encodeURIComponent(s.id)}"><span class="material-symbols-outlined" aria-hidden="true">file_download</span>Xuất danh sách soát vé (CSV)</a>
+                    <button type="button" class="st-danger" onclick="confirmDeleteShowtime('${s.id}')"><span class="material-symbols-outlined" aria-hidden="true">delete</span>Hủy / xóa suất diễn</button>
+                  </div>
+                </details>
+                ${isDraft ? `<button type="button" class="st-sale-button" onclick="toggleShowtimeSale('${s.id}', true)" ${s.canOpenSale === false ? 'disabled' : ''}>Mở bán</button>` : isOnSale ? `<button type="button" class="st-close-button" onclick="toggleShowtimeSale('${s.id}', false)">Đóng bán</button>` : ''}
+              </div>
+            </footer>
+          </article>
+        </td></tr>`;
       }).join('');
     }
 
@@ -1412,16 +1449,18 @@
       const btnShowtimes = document.getElementById('tabBtnShowtimes');
       const btnInfo = document.getElementById('tabBtnInfo');
       const btnSettings = document.getElementById('tabBtnSettings');
+      const btnDiscounts = document.getElementById('tabBtnDiscounts');
 
       const contentShowtimes = document.getElementById('tabContentShowtimes');
       const contentInfo = document.getElementById('tabContentInfo');
       const contentSettings = document.getElementById('tabContentSettings');
+      const contentDiscounts = document.getElementById('tabContentDiscounts');
 
       // Reset tabs
-      [btnShowtimes, btnInfo, btnSettings].forEach(b => {
+      [btnShowtimes, btnInfo, btnSettings, btnDiscounts].filter(Boolean).forEach(b => {
         b.className = 'flex items-center gap-space-xs px-4 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-label-lg text-label-lg transition-all';
       });
-      [contentShowtimes, contentInfo, contentSettings].forEach(c => {
+      [contentShowtimes, contentInfo, contentSettings, contentDiscounts].filter(Boolean).forEach(c => {
         c.classList.add('hidden');
         c.classList.remove('flex');
       });
@@ -1438,12 +1477,223 @@
         btnSettings.className = 'flex items-center gap-space-xs px-4 py-2 rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg shadow-sm transition-all';
         contentSettings.classList.remove('hidden');
         contentSettings.classList.add('flex');
+      } else if (tab === 'discounts') {
+        if (btnDiscounts) btnDiscounts.className = 'flex items-center gap-space-xs px-4 py-2 rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg shadow-sm transition-all';
+        if (contentDiscounts) {
+          contentDiscounts.classList.remove('hidden');
+          contentDiscounts.classList.add('flex');
+        }
+        if (currentEventId) {
+          loadDiscountCodes(currentEventId);
+        }
+      }
+    }
+
+    function handleOrgDiscountTypeChange() {
+      const typeSelect = document.getElementById('orgDiscountTypeSelect');
+      const valInput = document.getElementById('orgDiscountValueInput');
+      const valLabel = document.getElementById('orgDiscountValueLabel');
+      if (!typeSelect || !valInput || !valLabel) return;
+
+      if (typeSelect.value === 'Percent') {
+        valLabel.textContent = 'Giá trị giảm (%) *';
+        valInput.min = '1';
+        valInput.max = '100';
+        valInput.placeholder = '1 - 100';
+      } else {
+        valLabel.textContent = 'Số tiền giảm (VNĐ) *';
+        valInput.min = '1000';
+        valInput.removeAttribute('max');
+        valInput.placeholder = 'Ví dụ: 50000';
+      }
+    }
+
+    async function loadDiscountCodes(eventId) {
+      const tbody = document.getElementById('discountCodesTableBody');
+      const countBadge = document.getElementById('tabCountDiscounts');
+      if (!tbody) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/events/${eventId}/discount-codes`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const result = await res.json().catch(() => ({}));
+
+        if (!res.ok || !result.success) {
+          tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center text-rose-600 font-semibold">${result.message || 'Lỗi tải mã giảm giá'}</td></tr>`;
+          return;
+        }
+
+        const codes = result.data || [];
+        if (countBadge) countBadge.textContent = codes.length;
+
+        if (codes.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center text-on-surface-variant font-medium">Chưa có mã giảm giá nào cho sự kiện này.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = codes.map(c => {
+          const isExpired = new Date(c.expiresAt).getTime() <= new Date().getTime();
+          const isExhausted = c.usedCount >= c.usageLimit;
+          const statusBadge = !c.isActive 
+            ? `<span class="px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-600">Ngừng hoạt động</span>`
+            : isExpired
+            ? `<span class="px-2 py-0.5 rounded text-xs font-bold bg-rose-100 text-rose-700">Đã hết hạn</span>`
+            : isExhausted
+            ? `<span class="px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-700">Hết lượt</span>`
+            : `<span class="px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-700">Đang hoạt động</span>`;
+
+          const valText = c.discountType === 'Percent'
+            ? `${c.discountValue}%`
+            : `${Number(c.discountValue).toLocaleString('vi-VN')} đ`;
+
+          const typeText = c.discountType === 'Percent' ? 'Phần trăm' : 'Cố định';
+          const expiresDate = new Date(c.expiresAt).toLocaleString('vi-VN');
+
+          return `
+            <tr class="hover:bg-surface-container-low/50 transition">
+              <td class="px-4 py-3 font-mono font-bold text-primary">${c.code}</td>
+              <td class="px-4 py-3 font-medium text-on-surface-variant">${typeText}</td>
+              <td class="px-4 py-3 font-bold text-on-surface">${valText}</td>
+              <td class="px-4 py-3 font-semibold">${c.usedCount} / ${c.usageLimit}</td>
+              <td class="px-4 py-3 text-on-surface-variant text-xs">${expiresDate}</td>
+              <td class="px-4 py-3">${statusBadge}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center text-rose-600 font-semibold">Lỗi kết nối máy chủ.</td></tr>`;
+      }
+    }
+
+    async function handleCreateDiscountSubmit(e) {
+      e.preventDefault();
+      const alertDiv = document.getElementById('orgCreateDiscountAlert');
+      const btn = document.getElementById('btnSubmitCreateDiscount');
+
+      const code = document.getElementById('orgDiscountCodeInput').value.trim();
+      const selectedType = document.getElementById('orgDiscountTypeSelect').value;
+      const discountValue = parseInt(document.getElementById('orgDiscountValueInput').value, 10);
+      const usageLimit = parseInt(document.getElementById('orgDiscountUsageLimitInput').value, 10);
+      const expiresAtInput = document.getElementById('orgDiscountExpiresAtInput').value;
+
+      if (!code || !expiresAtInput) {
+        alertDiv.className = 'sm:col-span-2 p-3 rounded-lg text-sm font-semibold bg-rose-100 text-rose-800';
+        alertDiv.textContent = 'Vui lòng điền đầy đủ các trường bắt buộc.';
+        alertDiv.classList.remove('hidden');
+        return;
+      }
+
+      const discountTypeValue =
+        selectedType === 'Percent' ? 0 :
+        selectedType === 'FixedAmount' ? 1 :
+        null;
+
+      if (discountTypeValue === null) {
+        alertDiv.className = 'sm:col-span-2 p-3 rounded-lg text-sm font-semibold bg-rose-100 text-rose-800';
+        alertDiv.textContent = 'Vui lòng chọn loại giảm giá hợp lệ.';
+        alertDiv.classList.remove('hidden');
+        return;
+      }
+
+      const expiresAt = new Date(expiresAtInput).toISOString();
+
+      alertDiv.classList.add('hidden');
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/events/${currentEventId}/discount-codes`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({
+            code,
+            discountType: discountTypeValue,
+            discountValue,
+            usageLimit,
+            expiresAt
+          })
+        });
+
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok || !result.success) {
+          let errorMsg = result.message;
+          if (!errorMsg && result.errors && typeof result.errors === 'object') {
+            const firstErrKey = Object.keys(result.errors)[0];
+            const firstErrVal = result.errors[firstErrKey];
+            if (Array.isArray(firstErrVal) && firstErrVal.length > 0) {
+              errorMsg = firstErrVal[0];
+            } else if (typeof firstErrVal === 'string') {
+              errorMsg = firstErrVal;
+            }
+          }
+          alertDiv.className = 'sm:col-span-2 p-3 rounded-lg text-sm font-semibold bg-rose-100 text-rose-800';
+          alertDiv.textContent = (typeof errorMsg === 'string' && errorMsg.trim()) ? errorMsg.trim() : 'Tạo mã giảm giá thất bại.';
+          alertDiv.classList.remove('hidden');
+        } else {
+          alertDiv.className = 'sm:col-span-2 p-3 rounded-lg text-sm font-semibold bg-emerald-100 text-emerald-800';
+          alertDiv.textContent = 'Tạo mã giảm giá thành công!';
+          alertDiv.classList.remove('hidden');
+          document.getElementById('formCreateDiscount').reset();
+          handleOrgDiscountTypeChange();
+          loadDiscountCodes(currentEventId);
+          setTimeout(() => alertDiv.classList.add('hidden'), 3000);
+        }
+      } catch (err) {
+        alertDiv.className = 'sm:col-span-2 p-3 rounded-lg text-sm font-semibold bg-rose-100 text-rose-800';
+        alertDiv.textContent = 'Lỗi kết nối máy chủ.';
+        alertDiv.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
       }
     }
 
     function scrollToSeatSection() {
       switchTab('showtimes');
-      document.getElementById('blueprintSection').scrollIntoView({ behavior: 'smooth' });
+      if (!currentShowtimes.length) {
+        showAlert('Hãy thêm suất diễn trước khi cấu hình ghế và bảng giá.', 'warning');
+        document.getElementById('showtimesTableBody').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      const dialog = document.createElement('dialog');
+      dialog.className = 'showtime-copy-dialog';
+      dialog.setAttribute('aria-label', 'Cấu hình ghế và bảng giá');
+      dialog.innerHTML = `<div class="showtime-copy-header">
+        <div class="showtime-copy-icon"><span class="material-symbols-outlined" aria-hidden="true">chair</span></div>
+        <div><h2>Cấu hình ghế &amp; bảng giá</h2><p>Chọn suất diễn và nội dung cần chỉnh sửa.</p></div>
+      </div>
+      <div class="showtime-copy-body">
+        <label for="seatConfigShowtime" class="showtime-copy-label">Suất diễn</label>
+        <select id="seatConfigShowtime" class="st-config-select">${currentShowtimes.map((s, index) => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name || `Suất ${index + 1}`)} · ${formatDate(s.startTime)} · ${formatTime(s.startTime)}</option>`).join('')}</select>
+        <p data-summary class="st-subtext"></p>
+        <div class="st-config-actions">
+          <button type="button" data-price><span class="material-symbols-outlined" aria-hidden="true">payments</span><strong>Bảng giá vé</strong><small>Giá bán theo từng hạng ghế</small></button>
+          <button type="button" data-json><span class="material-symbols-outlined" aria-hidden="true">upload_file</span><strong>Sơ đồ ghế JSON</strong><small>Nhập danh sách và hạng ghế</small></button>
+          <button type="button" data-image><span class="material-symbols-outlined" aria-hidden="true">image</span><strong>Ảnh sơ đồ</strong><small>Tải ảnh hoặc nhập đường link</small></button>
+        </div>
+        <p class="showtime-copy-hint">Chỉ được nạp sơ đồ JSON khi suất diễn ở trạng thái Nháp.</p>
+      </div>
+      <div class="showtime-copy-footer"><button type="button" data-close class="showtime-copy-cancel">Đóng</button></div>`;
+      document.body.appendChild(dialog);
+      const select = dialog.querySelector('select');
+      const selected = () => currentShowtimes.find(s => s.id === select.value);
+      const update = () => {
+        const s = selected();
+        if (!s) return;
+        const count = Number(s.actualSeatCount ?? s.availableSeats ?? 0);
+        dialog.querySelector('[data-summary]').textContent = `${count.toLocaleString('vi-VN')} ghế · ${(s.seatCategories || []).length} hạng vé`;
+        dialog.querySelector('[data-json]').disabled = !(s.status === 1 || s.status === 'Draft');
+      };
+      select.onchange = update;
+      update();
+      dialog.querySelector('[data-price]').onclick = () => { const s = selected(); if (s) { dialog.close(); openPricingModal(s.id); } };
+      dialog.querySelector('[data-json]').onclick = () => { const s = selected(); if (s) { dialog.close(); openSeatImportModal(s.id, Number(s.actualSeatCount ?? s.availableSeats) > 0); } };
+      dialog.querySelector('[data-image]').onclick = () => { const s = selected(); if (s) { dialog.close(); openSeatingMapImageEditor({ dataset: { showtime: s.id, image: s.seatingMapImageUrl || '' } }); } };
+      dialog.querySelector('[data-close]').onclick = () => dialog.close();
+      dialog.addEventListener('close', () => dialog.remove());
+      dialog.showModal();
     }
 
     // Modal helpers
@@ -1465,6 +1715,8 @@
       start.setHours(20, 0, 0, 0);
       const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
 
+      document.getElementById('showtimeName').value = '';
+      document.getElementById('showtimeSalesEndTime').value = '';
       document.getElementById('showtimeStartTime').value = formatDateTimeLocal(start);
       document.getElementById('showtimeEndTime').value = formatDateTimeLocal(end);
       if (currentEvent && currentEvent.totalSeats) {
@@ -1504,6 +1756,8 @@
         const maxTickets = (!isNaN(maxTicketsVal) && maxTicketsVal > 0) ? maxTicketsVal : (currentEvent && currentEvent.maxTicketsPerUser ? currentEvent.maxTicketsPerUser : 10);
 
         const payload = {
+          name: document.getElementById('showtimeName').value.trim(),
+          salesEndTime: document.getElementById('showtimeSalesEndTime').value ? new Date(document.getElementById('showtimeSalesEndTime').value).toISOString() : sDate.toISOString(),
           startTime: sDate.toISOString(),
           endTime: eDate.toISOString(),
           availableSeats: !isNaN(seatsVal) && seatsVal > 0 ? seatsVal : (currentEvent ? currentEvent.totalSeats : 1000),
@@ -1543,6 +1797,8 @@
       if (!showtime) return;
 
       document.getElementById('editShowtimeId').value = showtime.id;
+      document.getElementById('editShowtimeName').value = showtime.name || '';
+      document.getElementById('editSalesEndTime').value = formatDateTimeLocal(showtime.salesEndTime || showtime.startTime);
       document.getElementById('editStartTime').value = formatDateTimeLocal(showtime.startTime);
       document.getElementById('editEndTime').value = formatDateTimeLocal(showtime.endTime);
       document.getElementById('editAvailableSeats').value = showtime.availableSeats;
@@ -1577,6 +1833,8 @@
         const maxTickets = (!isNaN(maxTicketsVal) && maxTicketsVal > 0) ? maxTicketsVal : null;
 
         const payload = {
+          name: document.getElementById('editShowtimeName').value.trim(),
+          salesEndTime: document.getElementById('editSalesEndTime').value ? new Date(document.getElementById('editSalesEndTime').value).toISOString() : sDate.toISOString(),
           startTime: sDate.toISOString(),
           endTime: eDate.toISOString(),
           availableSeats: !isNaN(seatsVal) && seatsVal > 0 ? seatsVal : null,
@@ -1629,6 +1887,68 @@
         }
       } catch (err) {
         showAlert('Lỗi kết nối máy chủ.', 'error');
+      }
+    }
+
+    // ==================== S-61 REMINDER LOGIC ====================
+    async function sendShowtimeReminderPrompt(showtimeId) {
+      if (!currentEventId || !showtimeId) return;
+      if (!confirm('Bạn có muốn gửi email nhắc nhở trước 24h kèm vé điện tử và chỉ dẫn địa điểm cho tất cả người mua vé của suất diễn này ngay bây giờ?')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/events/${currentEventId}/showtimes/${showtimeId}/send-reminders?force=true`, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token
+          }
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (response.ok) {
+          showAlert(result.message || `Đã gửi thành công ${result.data?.sentCount || 0} email nhắc nhở.`, 'success');
+        } else {
+          showAlert(result.message || result.detail || 'Không thể gửi email nhắc nhở.', 'error');
+        }
+      } catch (err) {
+        showAlert('Lỗi kết nối máy chủ khi gửi email nhắc nhở.', 'error');
+      }
+    }
+
+    async function sendAllShowtimesRemindersPrompt() {
+      if (!currentEventId) return;
+      if (!currentShowtimes || currentShowtimes.length === 0) {
+        showAlert('Chưa có suất diễn nào để gửi nhắc nhở.', 'warning');
+        return;
+      }
+
+      if (!confirm(`Bạn có muốn quét và gửi email nhắc nhở trước 24h cho người mua vé của tất cả ${currentShowtimes.length} suất diễn thuộc sự kiện này?`)) {
+        return;
+      }
+
+      let totalSent = 0;
+      let errorOccurred = false;
+
+      for (const s of currentShowtimes) {
+        try {
+          const response = await fetch(`${API_BASE}/api/events/${currentEventId}/showtimes/${s.id}/send-reminders?force=true`, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          const result = await response.json().catch(() => ({}));
+          if (response.ok) {
+            totalSent += (result.data?.sentCount || 0);
+          }
+        } catch (e) {
+          errorOccurred = true;
+        }
+      }
+
+      if (errorOccurred && totalSent === 0) {
+        showAlert('Có lỗi xảy ra khi kết nối máy chủ gửi nhắc nhở.', 'error');
+      } else {
+        showAlert(`Đã hoàn tất gửi email nhắc nhở! Tổng cộng ${totalSent} email đã được gửi thành công.`, 'success');
       }
     }
 
@@ -1965,7 +2285,169 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
     }
+
+    // --- Organizer Waitlist Viewer Logic (Story S-59) ---
+    let currentWaitlistShowtimeId = null;
+
+    async function openOrganizerWaitlistModal(showtimeId, showtimeLabel) {
+      currentWaitlistShowtimeId = showtimeId;
+      const modal = document.getElementById('organizerWaitlistModal');
+      const titleEl = document.getElementById('organizerWaitlistTitle');
+      const bodyEl = document.getElementById('organizerWaitlistTableBody');
+      const countEl = document.getElementById('organizerWaitlistTotalCount');
+      const emptyEl = document.getElementById('organizerWaitlistEmpty');
+      const tableWrapper = document.getElementById('organizerWaitlistTableWrapper');
+
+      titleEl.textContent = `Danh sách chờ: ${showtimeLabel || 'Suất diễn'}`;
+      bodyEl.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-outline">Đang tải danh sách chờ...</td></tr>';
+      emptyEl.classList.add('hidden');
+      tableWrapper.classList.remove('hidden');
+      modal.classList.add('active');
+
+      try {
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+        const res = await fetch(`/api/waitlist/showtime/${showtimeId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        const json = await res.json();
+        if (res.ok && json.success) {
+          const list = json.data || [];
+          countEl.textContent = `${list.length} người đăng ký`;
+
+          if (list.length === 0) {
+            tableWrapper.classList.add('hidden');
+            emptyEl.classList.remove('hidden');
+            return;
+          }
+
+          bodyEl.innerHTML = list.map((item, idx) => {
+            const isWaiting = item.status === 'WAITING';
+            const statusBadge = isWaiting
+              ? `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Đang chờ (#${item.queuePosition})</span>`
+              : `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Đã gửi email</span>`;
+
+            const createdStr = item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : '--';
+            const notifiedStr = item.notifiedAt ? new Date(item.notifiedAt).toLocaleString('vi-VN') : 'Chưa';
+
+            return `
+              <tr class="border-b border-surface-container-high/40 hover:bg-surface-container-low/60 transition text-xs">
+                <td class="py-2.5 px-3 font-code-mono font-bold text-on-surface">#${idx + 1}</td>
+                <td class="py-2.5 px-3 font-semibold text-on-surface">${escapeHtml(item.fullName || 'Khách vãng lai')}</td>
+                <td class="py-2.5 px-3 font-code-mono text-primary font-medium">${escapeHtml(item.email)}</td>
+                <td class="py-2.5 px-3 text-on-surface-variant">${escapeHtml(item.phoneNumber || '--')}</td>
+                <td class="py-2.5 px-3">${statusBadge}</td>
+                <td class="py-2.5 px-3 text-outline font-code-mono text-[11px]">${createdStr}</td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          bodyEl.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-error">${json.message || 'Không thể tải danh sách chờ.'}</td></tr>`;
+        }
+      } catch (err) {
+        bodyEl.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-error">Lỗi kết nối máy chủ.</td></tr>';
+      }
+    }
+
+    function closeOrganizerWaitlistModal() {
+      const modal = document.getElementById('organizerWaitlistModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    async function triggerWaitlistNotify() {
+      if (!currentWaitlistShowtimeId) return;
+      if (!confirm('Bạn có chắc muốn gửi email thông báo vé mở lại cho những người đang chờ trong danh sách này?')) return;
+
+      const btn = document.getElementById('btnTriggerNotify');
+      btn.disabled = true;
+      btn.textContent = 'Đang gửi...';
+
+      try {
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+        const res = await fetch(`/api/waitlist/showtime/${currentWaitlistShowtimeId}/notify?seatsCount=5`, {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        const json = await res.json();
+        if (res.ok && json.success) {
+          showAlert(json.message || 'Đã gửi thông báo thành công!', 'success');
+          // Tải lại danh sách
+          openOrganizerWaitlistModal(currentWaitlistShowtimeId, '');
+        } else {
+          showAlert(json.message || 'Không thể gửi email thông báo.', 'error');
+        }
+      } catch (e) {
+        showAlert('Lỗi kết nối khi gửi thông báo.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Gửi email cho người chờ';
+      }
+    }
   </script>
+
+  <!-- Modal Quản lý danh sách chờ cho Ban tổ chức (Story S-59) -->
+  <div id="organizerWaitlistModal" class="modal-overlay">
+    <div class="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-surface-container-high overflow-hidden">
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-amber-600 to-amber-700 px-6 py-4 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white">
+            <span class="material-symbols-outlined text-[22px]">playlist_add_check</span>
+          </div>
+          <div>
+            <h3 class="font-bold text-base tracking-tight" id="organizerWaitlistTitle">Danh sách chờ suất diễn</h3>
+            <p class="text-xs text-amber-100" id="organizerWaitlistTotalCount">0 người đăng ký</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeOrganizerWaitlistModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-on-surface-variant">
+            ⚡ Khách hàng được sắp xếp theo thứ tự đăng ký trước (FIFO). Khi có vé về kho, hệ thống tự động gửi email thông báo.
+          </p>
+          <button type="button" id="btnTriggerNotify" onclick="triggerWaitlistNotify()" class="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition shrink-0 cursor-pointer shadow-xs">
+            <span class="material-symbols-outlined text-[16px]">forward_to_inbox</span>
+            <span>Gửi email cho người chờ</span>
+          </button>
+        </div>
+
+        <div id="organizerWaitlistTableWrapper" class="overflow-x-auto max-h-96 border border-surface-container-high/60 rounded-xl">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-surface-container-low text-[11px] font-bold text-outline uppercase sticky top-0 border-b border-surface-container-high">
+              <tr>
+                <th class="py-2.5 px-3">STT</th>
+                <th class="py-2.5 px-3">Họ và tên</th>
+                <th class="py-2.5 px-3">Email</th>
+                <th class="py-2.5 px-3">Điện thoại</th>
+                <th class="py-2.5 px-3">Trạng thái</th>
+                <th class="py-2.5 px-3">Thời điểm đăng ký</th>
+              </tr>
+            </thead>
+            <tbody id="organizerWaitlistTableBody">
+            </tbody>
+          </table>
+        </div>
+
+        <div id="organizerWaitlistEmpty" class="hidden py-8 text-center bg-surface-container-low/50 rounded-xl border border-dashed border-outline-variant/60">
+          <span class="material-symbols-outlined text-3xl text-outline mb-1">people_outline</span>
+          <p class="text-xs font-bold text-on-surface">Chưa có khán giả nào đăng ký danh sách chờ</p>
+          <p class="text-[11px] text-on-surface-variant">Khi suất diễn hết ghế, khách hàng sẽ có thể đăng ký chờ tại trang chi tiết.</p>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-3 bg-surface-container-low border-t border-surface-container-high/60 flex items-center justify-end">
+        <button type="button" onclick="closeOrganizerWaitlistModal()" class="px-4 py-2 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs transition cursor-pointer">
+          Đóng
+        </button>
+      </div>
+    </div>
+  </div>
 <script src="./seating-map-image.js"></script>
+<script src="./showtime-duplicate.js"></script>
 </body>
 </html>

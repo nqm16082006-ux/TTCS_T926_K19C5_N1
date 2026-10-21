@@ -74,6 +74,35 @@ namespace EventTicketBooking.Api.DTOs.Payment
     }
 
     /// <summary>
+    /// Thông tin lịch sử một lần thử hoàn tiền để Kế toán theo dõi chi tiết (Story S-48).
+    /// </summary>
+    public class RefundAttemptHistoryDto
+    {
+        public int AttemptNumber { get; set; }
+        public string Action { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string? ErrorCode { get; set; }
+        public string? Notes { get; set; }
+        public DateTimeOffset Timestamp { get; set; }
+    }
+
+    /// <summary>
+    /// DTO an toàn cho khách hàng xem thông tin hoàn tiền đơn hàng của mình (Story S-48).
+    /// Tuyệt đối KHÔNG chứa ErrorCode nội bộ, ErrorMessage gateway, retry internals, accounting notes, lock/worker internals.
+    /// </summary>
+    public class CustomerRefundDto
+    {
+        public Guid Id { get; set; }
+        public Guid OrderId { get; set; }
+        public int Amount { get; set; }
+        public string Currency { get; set; } = "VND";
+        public string Status { get; set; } = string.Empty;
+        public string? CustomerStatusText { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset? UpdatedAt { get; set; }
+    }
+
+    /// <summary>
     /// DTO trả về thông tin chi tiết lệnh hoàn tiền cho Kế toán / Quản trị viên.
     /// </summary>
     public class RefundDetailDto
@@ -102,6 +131,22 @@ namespace EventTicketBooking.Api.DTOs.Payment
         public string? AccountingNotificationError { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
+
+        /// <summary>
+        /// Lịch sử chi tiết các lần thử hoàn tiền phục vụ đối soát của Kế toán.
+        /// </summary>
+        public List<RefundAttemptHistoryDto> AttemptHistory { get; set; } = new();
+    }
+
+    /// <summary>
+    /// DTO khi kế toán hoàn tất xử lý hoàn tiền thủ công cho khách hàng.
+    /// </summary>
+    public class ResolveAccountingRefundDto
+    {
+        /// <summary>Mã tham chiếu chuyển tiền qua ngân hàng hoặc giao dịch thủ công.</summary>
+        public string? ManualTransactionCode { get; set; }
+        /// <summary>Ghi chú của kế toán khi xử lý.</summary>
+        public string? Notes { get; set; }
     }
 
     /// <summary>

@@ -36,6 +36,14 @@ namespace EventTicketBooking.Api.Data
         public DbSet<RefundRequest> RefundRequests { get; set; } = null!;
         public DbSet<Refund> Refunds { get; set; } = null!;
         public DbSet<SystemAlert> SystemAlerts { get; set; } = null!;
+        public DbSet<DiscountCode> DiscountCodes { get; set; } = null!;
+        public DbSet<DataDeletionRequest> DataDeletionRequests { get; set; } = null!;
+        public DbSet<ReconciliationSession> ReconciliationSessions { get; set; } = null!;
+        public DbSet<TicketTransfer> TicketTransfers { get; set; } = null!;
+        public DbSet<ShowtimeWaitlist> ShowtimeWaitlists { get; set; } = null!;
+        public DbSet<RequestTelemetry> RequestTelemetries { get; set; } = null!;
+        public DbSet<MonitoringEvent> MonitoringEvents { get; set; } = null!;
+        public DbSet<MonitoringAlert> MonitoringAlerts { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -63,6 +71,8 @@ namespace EventTicketBooking.Api.Data
                 entity.Property(e => e.ImageUrl).HasColumnType("text").HasMaxLength(2000);
                 entity.Property(e => e.TotalSeats).IsRequired();
                 entity.Property(e => e.MaxTicketsPerUser).IsRequired().HasDefaultValue(10);
+                entity.Property(e => e.AllowTicketTransfer).IsRequired().HasDefaultValue(true);
+                entity.Property(e => e.TransferCutoffHours).IsRequired().HasDefaultValue(2);
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
@@ -251,6 +261,19 @@ namespace EventTicketBooking.Api.Data
                 // Story S-45: lý do huỷ đơn (PAYMENT_CANCELLED / CUSTOMER_REFUND)
                 entity.Property(o => o.CancelReason).HasMaxLength(30);
 
+                // Story S-56: Mã giảm giá
+                entity.Property(o => o.OriginalAmount).IsRequired().HasDefaultValue(0);
+                entity.Property(o => o.DiscountAmount).IsRequired().HasDefaultValue(0);
+                entity.Property(o => o.DiscountCodeSnapshot).HasMaxLength(500);
+
+                entity.HasOne(o => o.DiscountCode)
+                      .WithMany()
+                      .HasForeignKey(o => o.DiscountCodeId)
+                      .OnDelete(DeleteBehavior.SetNull);
+
+                // Story S-61: thời điểm gửi email nhắc nhở 24h trước giờ diễn
+                entity.Property(o => o.ReminderSentAt);
+
                 entity.HasOne(o => o.User)
                       .WithMany()
                       .HasForeignKey(o => o.UserId)
@@ -266,6 +289,34 @@ namespace EventTicketBooking.Api.Data
                       .IsUnique()
                       .HasFilter(Database.IsNpgsql() ? "\"Status\" = 'Pending'" : "\"Status\" = 'Pending'")
                       .HasDatabaseName("IX_orders_UserId_ShowtimeId_Pending");
+            });
+
+            // Cấu hình bảng DiscountCodes (Story S-56)
+            modelBuilder.Entity<DiscountCode>(entity =>
+            {
+                entity.ToTable("DiscountCodes");
+                entity.HasKey(d => d.Id);
+                entity.Property(d => d.Code).IsRequired().HasMaxLength(50);
+                entity.Property(d => d.DiscountType).HasConversion<string>().HasMaxLength(20);
+                entity.Property(d => d.DiscountValue).IsRequired();
+                entity.Property(d => d.UsageLimit).IsRequired();
+                entity.Property(d => d.UsedCount).IsRequired().HasDefaultValue(0);
+                entity.Property(d => d.ExpiresAt).IsRequired();
+                entity.Property(d => d.IsActive).IsRequired().HasDefaultValue(true);
+                entity.Property(d => d.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(d => d.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(d => d.Event)
+                      .WithMany()
+                      .HasForeignKey(d => d.EventId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(d => d.CreatedByUser)
+                      .WithMany()
+                      .HasForeignKey(d => d.CreatedByUserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(d => new { d.EventId, d.Code }).IsUnique();
             });
 
             // Cấu hình bảng OrderItems
@@ -423,6 +474,53 @@ namespace EventTicketBooking.Api.Data
                 entity.HasIndex(t => t.TicketCode)
                       .IsUnique()
                       .HasDatabaseName("IX_tickets_TicketCode_Unique");
+
+                // Story S-57: Người sở hữu hiện tại và số lần chuyển nhượng
+                entity.Property(t => t.TransferCount).HasDefaultValue(0);
+
+                entity.HasOne(t => t.CurrentUser)
+                      .WithMany()
+                      .HasForeignKey(t => t.CurrentUserId)
+                      .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(t => t.CurrentUserId);
+            });
+
+            // Cấu hình bảng chuyển nhượng vé (Story S-57)
+            modelBuilder.Entity<TicketTransfer>(entity =>
+            {
+                entity.ToTable("ticket_transfers");
+                entity.HasKey(tt => tt.Id);
+
+                entity.Property(tt => tt.FromUserEmail).IsRequired().HasMaxLength(150);
+                entity.Property(tt => tt.ToUserEmail).IsRequired().HasMaxLength(150);
+                entity.Property(tt => tt.OldTicketCode).IsRequired().HasMaxLength(64);
+                entity.Property(tt => tt.NewTicketCode).IsRequired().HasMaxLength(64);
+                entity.Property(tt => tt.Status)
+                      .HasConversion(v => v.ToString(), v => Enum.Parse<TransferStatus>(v))
+                      .HasMaxLength(20);
+                entity.Property(tt => tt.Note).HasMaxLength(500);
+                entity.Property(tt => tt.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(tt => tt.Ticket)
+                      .WithMany()
+                      .HasForeignKey(tt => tt.TicketId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(tt => tt.FromUser)
+                      .WithMany()
+                      .HasForeignKey(tt => tt.FromUserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(tt => tt.ToUser)
+                      .WithMany()
+                      .HasForeignKey(tt => tt.ToUserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(tt => tt.TicketId);
+                entity.HasIndex(tt => tt.FromUserId);
+                entity.HasIndex(tt => tt.ToUserId);
+                entity.HasIndex(tt => tt.OldTicketCode);
             });
 
             // Cấu hình bảng nhật ký thao tác đơn hàng và vé (Story S-49)
@@ -530,6 +628,104 @@ namespace EventTicketBooking.Api.Data
 
                 entity.HasIndex(a => a.LastUpdatedAt)
                     .HasDatabaseName("IX_SystemAlerts_LastUpdatedAt");
+            });
+
+            // Cấu hình bảng yêu cầu xoá dữ liệu cá nhân theo NĐ 13/2023/NĐ-CP (Story S-53)
+            modelBuilder.Entity<DataDeletionRequest>(entity =>
+            {
+                entity.ToTable("data_deletion_requests");
+                entity.HasKey(r => r.Id);
+                entity.Property(r => r.RequesterEmail).IsRequired().HasMaxLength(255);
+                entity.Property(r => r.RequesterName).HasMaxLength(255);
+                entity.Property(r => r.Reason).HasMaxLength(1000);
+                entity.Property(r => r.AdminNote).HasMaxLength(1000);
+                entity.Property(r => r.Status)
+                    .HasConversion<string>()
+                    .HasMaxLength(50);
+                entity.Property(r => r.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(r => r.User)
+                    .WithMany(u => u.DataDeletionRequests)
+                    .HasForeignKey(r => r.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(r => r.ReviewedByUser)
+                    .WithMany()
+                    .HasForeignKey(r => r.ReviewedByUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ReconciliationSession>(entity =>
+            {
+                entity.ToTable("reconciliation_sessions");
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.SessionCode).IsRequired().HasMaxLength(100);
+                entity.Property(x => x.SourceType).IsRequired().HasMaxLength(50);
+                entity.Property(x => x.Status).IsRequired().HasMaxLength(50);
+                entity.Property(x => x.ExecutedBy).HasMaxLength(200);
+                entity.HasIndex(x => x.SessionCode);
+                entity.HasIndex(x => x.ExecutedAt);
+            });
+
+            modelBuilder.Entity<ShowtimeWaitlist>(entity =>
+            {
+                entity.ToTable("ShowtimeWaitlists");
+                entity.HasKey(w => w.Id);
+                entity.Property(w => w.Email).IsRequired().HasMaxLength(255);
+                entity.Property(w => w.FullName).HasMaxLength(255);
+                entity.Property(w => w.PhoneNumber).HasMaxLength(50);
+                entity.Property(w => w.Status).IsRequired().HasMaxLength(50).HasDefaultValue("WAITING");
+                entity.Property(w => w.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(w => w.Showtime)
+                      .WithMany()
+                      .HasForeignKey(w => w.ShowtimeId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(w => w.User)
+                      .WithMany()
+                      .HasForeignKey(w => w.UserId)
+                      .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(w => new { w.ShowtimeId, w.Status, w.CreatedAt });
+                entity.HasIndex(w => new { w.ShowtimeId, w.Email });
+            });
+
+            // S-43: Bảng lưu vết lưu lượng HTTP Request thực tế vào Shared PostgreSQL
+            modelBuilder.Entity<RequestTelemetry>(entity =>
+            {
+                entity.ToTable("RequestTelemetries");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Method).IsRequired().HasMaxLength(10);
+                entity.Property(e => e.Route).IsRequired().HasMaxLength(300);
+                entity.Property(e => e.Environment).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.InstanceId).HasMaxLength(100);
+                entity.HasIndex(e => e.OccurredAtUtc);
+                entity.HasIndex(e => new { e.OccurredAtUtc, e.StatusCode });
+            });
+
+            // S-43: Bảng lưu vết sự kiện nghiệp vụ (SeatConflict, WebhookRejected) vào Shared PostgreSQL
+            modelBuilder.Entity<MonitoringEvent>(entity =>
+            {
+                entity.ToTable("MonitoringEvents");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Type).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Category).HasMaxLength(50);
+                entity.Property(e => e.ReferenceId).HasMaxLength(100);
+                entity.Property(e => e.Environment).IsRequired().HasMaxLength(50);
+                entity.HasIndex(e => e.OccurredAtUtc);
+                entity.HasIndex(e => new { e.OccurredAtUtc, e.Type });
+            });
+
+            // S-43: Bảng lưu cảnh báo hệ thống được đánh giá tự động dựa trên metrics
+            modelBuilder.Entity<MonitoringAlert>(entity =>
+            {
+                entity.ToTable("MonitoringAlerts");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Metric).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Severity).IsRequired().HasMaxLength(20);
+                entity.HasIndex(e => e.IsActive);
+                entity.HasIndex(e => new { e.IsActive, e.Metric });
             });
         }
 

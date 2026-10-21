@@ -1,0 +1,25 @@
+.readmission-panel { margin: 20px 0 0; padding: 20px; background: #fff; border: 1px solid #ddd9f6; border-radius: 14px; text-align: left; color: #202438; box-shadow: 0 3px 12px #4338ca08; }
+.readmission-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.readmission-icon { display: grid; place-items: center; width: 42px; height: 42px; background: #eeebff; color: #5141db; border-radius: 12px; flex-shrink: 0; }
+.readmission-header > div { flex: 1; min-width: 160px; }
+.readmission-header h3 { margin: 0 0 4px; font-size: 16px; font-weight: 800; color: #28243d; }
+.readmission-header p, .readmission-footer p { margin: 0; color: #737487; font-size: 13px; line-height: 1.6; }
+.readmission-button, .readmission-cancel { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 16px; border: 1px solid transparent; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: background .15s, box-shadow .15s; }
+.readmission-button { background: #5141e9; color: white; box-shadow: 0 3px 8px #5141e922; }
+.readmission-button:hover { background: #4032ca; box-shadow: 0 4px 12px #5141e930; }
+.readmission-button .material-symbols-outlined { font-size: 21px; }
+.readmission-button:disabled, .readmission-cancel:disabled { opacity: .55; cursor: wait; }
+.readmission-button:focus-visible, .readmission-cancel:focus-visible { outline: 3px solid #c4b5fd; outline-offset: 3px; }
+.readmission-form { margin-top: 18px; padding-top: 18px; border-top: 1px solid #eeedf6; }
+.readmission-form label { display: block; font-size: 14px; font-weight: 700; }
+.readmission-required { color: #dc2626; }
+.readmission-form textarea { display: block; width: 100%; box-sizing: border-box; margin: 8px 0 14px; padding: 12px 14px; border: 1px solid #dcd9ee; border-radius: 10px; background: #fafaff; color: #202438; font: inherit; font-size: 14px; line-height: 1.6; resize: vertical; min-height: 90px; }
+.readmission-form textarea:focus { outline: 3px solid #ede9fe; border-color: #8b7de7; }
+.readmission-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+.readmission-actions { display: flex; gap: 8px; }
+.readmission-cancel { background: #f3f2f9; color: #595568; }
+.readmission-cancel:hover { background: #e9e7f2; }
+.readmission-status { margin: 14px 0 0; font-size: 14px; line-height: 1.7; white-space: pre-line; overflow-wrap: anywhere; }
+.readmission-status:empty { display: none; }
+.readmission-panel [hidden] { display: none !important; }
+@media (max-width: 600px) { .readmission-panel { padding: 16px; } .readmission-header > .readmission-button { width: 100%; } .readmission-footer, .readmission-actions { width: 100%; } .readmission-actions > button { flex: 1; } }

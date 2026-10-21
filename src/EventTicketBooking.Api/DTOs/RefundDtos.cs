@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Serialization;
 
 namespace EventTicketBooking.Api.DTOs
 {
@@ -30,9 +31,15 @@ namespace EventTicketBooking.Api.DTOs
         public Guid OrderId { get; set; }
         public int Amount { get; set; }
         public string Status { get; set; } = "Requested";
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? FailureReason { get; set; }
+
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? RetryCount { get; set; }
     }
 
     /// <summary>
@@ -48,6 +55,8 @@ namespace EventTicketBooking.Api.DTOs
         public bool Skipped { get; set; }
         public string? FailureReason { get; set; }
         public string Message { get; set; } = string.Empty;
+        public int RetryCount { get; set; }
+        public bool IsManualReview { get; set; }
 
         public static RefundExecutionResult CreateSuccess(Guid orderId, Guid refundId, int amount, string message) => new()
         {

@@ -401,9 +401,10 @@
     // Lấy ảnh mẫu theo thể loại sự kiện
     function getEventImage(index) {
       const sampleImages = [
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuC6Y662RrNSEt8F2-eLQOXa7MfNus6F1CpA-QqXtPkMilH5udUs8LA8SIDe9-phhtKxvMavTbZ2aqsa6BPXDHnQxcz-4enKNPCape8HtlZLzZtxqDEQX85vsYIZHreStfDPwjgrDC-qDThRVOID2YzX7o4et27dVRjTRx8NhZq32-mmev5-G4ijHttdiuIMFXRCyoMjkHoFZa1sh8qw4bK_-Ucp1Mrbxz_Lrbvzxip-7guZrUs2c_4gKA",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuAcos9mgh4rq9grnjMcFrfDiabJkUlBfE4nVLOrALwjU9-DFUBOXxPj6hy8T4taUy7OOg4Qb2VfVLSVijYDPhlgJIptSSt3Rc3dxCXfTZAc-kt1IBAkrF623erSBlEKS8dwAtk3E02z4n9pHhzD2recG6RJcZK7c-7ybuhSvhfKB7hnnvWKlwbyGkZXneGoOiuLe9l2B46VtdkgFnb3taMQYvlUuEJD9ux9BZ1pr4QVX1c2puB99Bn9yQ",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuC2itct696u25csjPm7B3zu9HKizSHui0xefuHOeLU3uMqxCNaWtuthk_bZXDP7uVf-D4XNUlMkJmI1moC_h1pToaXENs2Bc7w-MykOr9_gS7n6UCgRLY8Ni5eFJlcCr-7WuAJfRkrWYG2FMrCkjm_kazP2yL7ywIpS-Tg8av8qx4aU8dCRVKmimCvwuGfYZJiaXdaugmKHit5oaZIj4dz26_VPYRCAAWxsbp3TzzYD-UKrioVmdkt_8A"
+        "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80",
+        "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&q=80",
+        "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&q=80",
+        "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&q=80"
       ];
       return sampleImages[index % sampleImages.length];
     }
@@ -469,7 +470,7 @@
         card.innerHTML = `
           <!-- Image Container with Hover Overlay -->
           <div class="relative w-full h-52 overflow-hidden bg-surface-container cursor-pointer" onclick="window.location.href='${eventDetailUrl}'">
-            <img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.eventTitle)}">
+            <img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.eventTitle)}" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&q=80';">
             
             <!-- Live Badges -->
             <div class="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-tertiary font-label-sm text-label-sm shadow-sm font-bold">

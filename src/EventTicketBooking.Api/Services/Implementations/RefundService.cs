@@ -38,6 +38,7 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly ILogger<RefundService> _logger;
         private readonly IHubContext<SeatStatusHub>? _hubContext;
         private readonly IConnectionMultiplexer? _redis;
+        private readonly IWaitlistService? _waitlistService;
 
         private static readonly HashSet<string> NonRetryableErrorCodes = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -69,7 +70,8 @@ namespace EventTicketBooking.Api.Services.Implementations
             IOptions<RefundOptions> options,
             ILogger<RefundService> logger,
             IHubContext<SeatStatusHub>? hubContext = null,
-            IConnectionMultiplexer? redis = null)
+            IConnectionMultiplexer? redis = null,
+            IWaitlistService? waitlistService = null)
         {
             _context = context;
             _paymentGateway = paymentGateway;
@@ -79,6 +81,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             _logger = logger;
             _hubContext = hubContext;
             _redis = redis;
+            _waitlistService = waitlistService;
         }
 
         public RefundService(
@@ -87,7 +90,8 @@ namespace EventTicketBooking.Api.Services.Implementations
             IPaymentGateway? paymentGateway = null,
             ILogger<RefundService>? logger = null,
             IHubContext<SeatStatusHub>? hubContext = null,
-            IConnectionMultiplexer? redis = null)
+            IConnectionMultiplexer? redis = null,
+            IWaitlistService? waitlistService = null)
         {
             _context = context;
             _orderAuditService = orderAuditService;
@@ -96,6 +100,7 @@ namespace EventTicketBooking.Api.Services.Implementations
             _hubContext = hubContext;
             _redis = redis;
             _options = new RefundOptions();
+            _waitlistService = waitlistService;
         }
 
         public async Task<RefundRequest> CreateRefundRequestAsync(
@@ -120,7 +125,9 @@ namespace EventTicketBooking.Api.Services.Implementations
                      r.Status == RefundStatus.Processing ||
                      r.Status == RefundStatus.RetryScheduled ||
                      r.Status == RefundStatus.Succeeded ||
-                     r.Status == RefundStatus.ManualReviewRequired), cancellationToken);
+                     r.Status == RefundStatus.ManualReviewRequired ||
+                     r.Status == RefundStatus.AccountingProcessing ||
+                     r.Status == RefundStatus.AccountingResolved), cancellationToken);
 
             if (existingRefund != null)
             {
@@ -273,6 +280,14 @@ namespace EventTicketBooking.Api.Services.Implementations
                         refund.NextRetryAt = null;
                         refund.LockedUntil = null;
                         refund.UpdatedAt = DateTimeOffset.UtcNow;
+
+                        var syncRefund = await _context.Refunds.FirstOrDefaultAsync(r => r.OrderId == refund.OrderId, cancellationToken);
+                        if (syncRefund != null)
+                        {
+                            syncRefund.Status = "Succeeded";
+                            syncRefund.UpdatedAt = DateTimeOffset.UtcNow;
+                        }
+
                         await _context.SaveChangesAsync(cancellationToken);
 
                         _orderAuditService.Record(
@@ -363,6 +378,13 @@ namespace EventTicketBooking.Api.Services.Implementations
                 refund.LockedUntil = null;
                 refund.UpdatedAt = DateTimeOffset.UtcNow;
 
+                var syncRefundSuccess = await _context.Refunds.FirstOrDefaultAsync(r => r.OrderId == refund.OrderId, cancellationToken);
+                if (syncRefundSuccess != null)
+                {
+                    syncRefundSuccess.Status = "Succeeded";
+                    syncRefundSuccess.UpdatedAt = DateTimeOffset.UtcNow;
+                }
+
                 _orderAuditService.Record(
                     refund.OrderId,
                     "REFUND",
@@ -405,6 +427,14 @@ namespace EventTicketBooking.Api.Services.Implementations
                     refund.Status = RefundStatus.RetryScheduled;
                     refund.UpdatedAt = DateTimeOffset.UtcNow;
 
+                    var syncRefundRetry = await _context.Refunds.FirstOrDefaultAsync(r => r.OrderId == refund.OrderId, cancellationToken);
+                    if (syncRefundRetry != null)
+                    {
+                        syncRefundRetry.Status = "Failed";
+                        syncRefundRetry.FailureReason = $"Hoàn tiền thất bại lần {refund.RetryCount}/{refund.MaxRetries} ({sanitizedCode}). Đang chờ thử lại.";
+                        syncRefundRetry.UpdatedAt = DateTimeOffset.UtcNow;
+                    }
+
                     _orderAuditService.Record(
                         refund.OrderId,
                         "REFUND",
@@ -430,6 +460,14 @@ namespace EventTicketBooking.Api.Services.Implementations
                     refund.Status = RefundStatus.ManualReviewRequired;
                     refund.NextRetryAt = null;
                     refund.UpdatedAt = DateTimeOffset.UtcNow;
+
+                    var syncRefundManual = await _context.Refunds.FirstOrDefaultAsync(r => r.OrderId == refund.OrderId, cancellationToken);
+                    if (syncRefundManual != null)
+                    {
+                        syncRefundManual.Status = "RequiresManualReview";
+                        syncRefundManual.FailureReason = $"Hoàn tiền thất bại {refund.MaxRetries} lần - Đã chuyển thông tin cho kế toán xử lý thủ công";
+                        syncRefundManual.UpdatedAt = DateTimeOffset.UtcNow;
+                    }
 
                     string reasonFailure = !isRetryable
                         ? $"Lỗi không thể thử lại ({sanitizedCode}: {sanitizedMessage})."
@@ -537,7 +575,7 @@ namespace EventTicketBooking.Api.Services.Implementations
         {
             return await _context.RefundRequests
                 .Include(r => r.Order)
-                .Where(r => r.Status == RefundStatus.ManualReviewRequired)
+                .Where(r => r.Status == RefundStatus.ManualReviewRequired || r.Status == RefundStatus.AccountingProcessing)
                 .OrderByDescending(r => r.FailedAt)
                 .ToListAsync(cancellationToken);
         }
@@ -591,7 +629,9 @@ namespace EventTicketBooking.Api.Services.Implementations
         {
             return status == RefundStatus.Succeeded ||
                    status == RefundStatus.Failed ||
-                   status == RefundStatus.ManualReviewRequired;
+                   status == RefundStatus.ManualReviewRequired ||
+                   status == RefundStatus.AccountingProcessing ||
+                   status == RefundStatus.AccountingResolved;
         }
 
         private static string SanitizeText(string? input)
@@ -787,6 +827,19 @@ namespace EventTicketBooking.Api.Services.Implementations
                 }
             }
 
+            // Story S-59: Khi có ghế về kho do huỷ vé, gửi email thông báo cho người chờ theo thứ tự đăng ký
+            if (_waitlistService != null && seatsToRelease.Count > 0)
+            {
+                try
+                {
+                    await _waitlistService.ProcessAvailableSeatsNotificationAsync(order.ShowtimeId, seatsToRelease.Count, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi gửi thông báo danh sách chờ cho suất {ShowtimeId} khi huỷ vé (S-59)", order.ShowtimeId);
+                }
+            }
+
             // 4. Pha 2: Gọi cổng hoàn tiền NGOÀI transaction DB (không giữ lock DB khi chờ mạng)
             RefundCreationResult gatewayResult;
             bool gatewaySupportsRefund = _paymentGateway != null && _paymentGateway.SupportsRefund;
@@ -926,6 +979,324 @@ namespace EventTicketBooking.Api.Services.Implementations
             }
 
             return results;
+        }
+
+        /// <summary>
+        /// Giả lập hoàn tiền thất bại cho đơn hàng phục vụ kiểm thử Story S-48.
+        /// Ghi nhận RetryCount (tăng dần 1 -> 2 -> 3).
+        /// Khi RetryCount >= 3, tự động chuyển sang ManualReviewRequired và kích hoạt AccountingNotificationService.
+        /// </summary>
+        public async Task<OrderRefundExecutionResult> SimulateRefundFailureForOrderAsync(
+            Guid orderId,
+            string actorType = "USER",
+            string actorName = "User",
+            Guid? actorId = null,
+            CancellationToken cancellationToken = default)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var order = await _context.Orders
+                .Include(o => o.Showtime)
+                .Include(o => o.OrderItems)
+                .Include(o => o.PaymentTransaction)
+                .Include(o => o.Refunds)
+                .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+
+            if (order == null)
+            {
+                return OrderRefundExecutionResult.CreateFailed(orderId, null, 0, "ORDER_NOT_FOUND", "Không tìm thấy đơn hàng.");
+            }
+
+            // 1. Huỷ đơn và nhả ghế nếu đơn chưa huỷ
+            if (order.Status != OrderStatus.Cancelled)
+            {
+                var oldStatus = order.Status.ToString();
+                order.Status = OrderStatus.Cancelled;
+                order.CancelReason = OrderCancelReasons.CustomerRefund;
+                order.UpdatedAt = now;
+
+                _orderAuditService.Record(
+                    order.Id,
+                    "ORDER",
+                    order.Id.ToString(),
+                    "ORDER_CANCELLED",
+                    oldStatus,
+                    OrderStatus.Cancelled.ToString(),
+                    actorType,
+                    actorName,
+                    actorId,
+                    "Khách hàng huỷ đơn và yêu cầu hoàn tiền (Mô phỏng Story S-48).",
+                    now);
+
+                // Nhả ghế về AVAILABLE (S-46)
+                if (order.OrderItems != null && order.OrderItems.Any())
+                {
+                    var seatIds = order.OrderItems.Select(oi => oi.SeatId).Distinct().ToList();
+                    var seatsToRelease = await _context.Seats
+                        .Where(s => seatIds.Contains(s.Id) && s.Status == "SOLD")
+                        .ToListAsync(cancellationToken);
+
+                    foreach (var seat in seatsToRelease)
+                    {
+                        var oldSeatStatus = seat.Status;
+                        seat.Status = "AVAILABLE";
+                        var seatLabel = $"{seat.Row}{seat.SeatNumber}";
+                        _orderAuditService.Record(
+                            order.Id,
+                            "SEAT",
+                            seat.Id.ToString(),
+                            "SEAT_RELEASED",
+                            oldSeatStatus,
+                            "AVAILABLE",
+                            actorType,
+                            actorName,
+                            actorId,
+                            $"Ghế {seatLabel} của vé đã huỷ quay lại kho bán (S-46).",
+                            now);
+                    }
+
+                    var holdsToRelease = await _context.SeatHold
+                        .Where(sh => seatIds.Contains(sh.SeatId) && (sh.Status == "CONVERTED" || sh.Status == "ACTIVE"))
+                        .ToListAsync(cancellationToken);
+
+                    foreach (var hold in holdsToRelease)
+                    {
+                        var oldHoldStatus = hold.Status;
+                        hold.Status = "RELEASED";
+                        _orderAuditService.Record(
+                            order.Id,
+                            "SEAT_HOLD",
+                            hold.SeatId.ToString(),
+                            "SEAT_HOLD_RELEASED",
+                            oldHoldStatus,
+                            "RELEASED",
+                            actorType,
+                            actorName,
+                            actorId,
+                            "Giải phóng giữ chỗ do vé đã huỷ quay lại kho bán (S-46).",
+                            now);
+                    }
+
+                    if (_redis != null && _redis.IsConnected && seatsToRelease.Count > 0)
+                    {
+                        try
+                        {
+                            var redisDb = _redis.GetDatabase();
+                            var eventId = order.Showtime?.EventId;
+                            var keys = new List<RedisKey>();
+                            foreach (var s in seatsToRelease)
+                            {
+                                if (eventId.HasValue) keys.Add((RedisKey)$"seat_hold:{eventId.Value}:{s.Id}");
+                                keys.Add((RedisKey)$"seat_hold:{s.Id}");
+                            }
+                            if (keys.Count > 0) await redisDb.KeyDeleteAsync(keys.ToArray());
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Lỗi xóa Redis hold keys khi mô phỏng huỷ hoàn tiền {OrderId}", orderId);
+                        }
+                    }
+
+                    if (_hubContext != null && _hubContext.Clients != null && seatsToRelease.Count > 0)
+                    {
+                        try
+                        {
+                            var groupClient = _hubContext.Clients.Group(order.ShowtimeId.ToString());
+                            if (groupClient != null)
+                            {
+                                await groupClient.SendAsync("SeatReleased", new
+                                {
+                                    ShowtimeId = order.ShowtimeId,
+                                    SeatIds = seatsToRelease.Select(s => s.Id).ToList()
+                                }, cancellationToken);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Lỗi gửi SignalR SeatReleased {ShowtimeId}", order.ShowtimeId);
+                        }
+                    }
+
+                    // Story S-59: Khi có ghế về kho do huỷ vé, gửi email thông báo cho người chờ theo thứ tự đăng ký
+                    if (_waitlistService != null && seatsToRelease.Count > 0)
+                    {
+                        try
+                        {
+                            await _waitlistService.ProcessAvailableSeatsNotificationAsync(order.ShowtimeId, seatsToRelease.Count, cancellationToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Lỗi gửi thông báo danh sách chờ cho suất {ShowtimeId} khi huỷ hoàn vé (S-59)", order.ShowtimeId);
+                        }
+                    }
+                }
+            }
+
+            // 2. Tìm hoặc tạo RefundRequest (S-48) và Refund (S-45)
+            var refundReq = await _context.RefundRequests
+                .FirstOrDefaultAsync(r => r.OrderId == orderId, cancellationToken);
+
+            int refundAmount = order.TotalAmount > 0 ? (int)Math.Floor(order.TotalAmount * 0.9m) : 0;
+            if (refundAmount <= 0) refundAmount = order.TotalAmount > 0 ? order.TotalAmount : 500000;
+
+            if (refundReq == null)
+            {
+                long orderCode = order.PaymentTransaction?.OrderCode ??
+                    Math.Abs(BitConverter.ToInt64(order.Id.ToByteArray(), 0) % 9000000000L) + 1000000000L;
+
+                refundReq = new RefundRequest
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    OrderCode = orderCode,
+                    TransactionId = order.PaymentTransaction?.TransactionId,
+                    Amount = refundAmount,
+                    Currency = "VND",
+                    Reason = "[FAIL_RETRY] Mock hoàn tiền thất bại S48",
+                    Status = RefundStatus.Pending,
+                    AttemptCount = 0,
+                    RetryCount = 0,
+                    MaxRetries = 3,
+                    IdempotencyKey = $"ref_{order.Id}_{Guid.NewGuid():N}",
+                    CreatedAt = now,
+                    UpdatedAt = now
+                };
+                _context.RefundRequests.Add(refundReq);
+            }
+
+            var refundEntity = await _context.Refunds
+                .FirstOrDefaultAsync(r => r.OrderId == orderId, cancellationToken);
+
+            if (refundEntity == null)
+            {
+                refundEntity = new Refund
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    Amount = refundAmount,
+                    Status = "Requested",
+                    CreatedAt = now,
+                    UpdatedAt = now
+                };
+                _context.Refunds.Add(refundEntity);
+            }
+
+            // Nếu đã ở trạng thái ManualReviewRequired rồi
+            if (refundReq.Status == RefundStatus.ManualReviewRequired || refundReq.RetryCount >= 3)
+            {
+                refundEntity.Status = "RequiresManualReview";
+                refundEntity.FailureReason = "Hoàn tiền thất bại 3 lần - Đã chuyển thông tin cho kế toán xử lý thủ công";
+                refundEntity.UpdatedAt = now;
+                await _context.SaveChangesAsync(cancellationToken);
+
+                return new OrderRefundExecutionResult
+                {
+                    OrderId = order.Id,
+                    RefundId = refundEntity.Id,
+                    Amount = refundEntity.Amount,
+                    Status = "RequiresManualReview",
+                    Success = false,
+                    RetryCount = refundReq.RetryCount,
+                    IsManualReview = true,
+                    FailureReason = refundEntity.FailureReason,
+                    Message = "Hoàn tiền thất bại 3 lần - Đã chuyển thông tin cho kế toán xử lý thủ công"
+                };
+            }
+
+            // 3. Tăng RetryCount (1 -> 2 -> 3)
+            refundReq.AttemptCount++;
+            refundReq.RetryCount++;
+            refundReq.LastAttemptedAt = now;
+            refundReq.ErrorCode = "GATEWAY_TIMEOUT";
+            refundReq.ErrorMessage = "Mô phỏng: Lỗi Timeout kết nối Payment Gateway (Lỗi tạm thời, cho phép retry).";
+            refundReq.IsRetryable = true;
+            refundReq.UpdatedAt = now;
+
+            if (refundReq.RetryCount >= 3)
+            {
+                // Chạm mốc 3 lần thất bại -> chuyển sang ManualReviewRequired và báo kế toán
+                refundReq.Status = RefundStatus.ManualReviewRequired;
+                refundReq.FailedAt = now;
+                refundReq.NextRetryAt = null;
+
+                refundEntity.Status = "RequiresManualReview";
+                refundEntity.FailureReason = "Hoàn tiền thất bại 3 lần - Đã chuyển thông tin cho kế toán xử lý thủ công";
+                refundEntity.UpdatedAt = now;
+
+                _orderAuditService.Record(
+                    order.Id,
+                    "REFUND",
+                    refundEntity.Id.ToString(),
+                    "REFUND_MANUAL_REVIEW_REQUIRED",
+                    "Failed",
+                    "RequiresManualReview",
+                    "SYSTEM",
+                    "system:RefundService",
+                    null,
+                    "Hoàn tiền thất bại 3 lần - Đã chuyển thông tin cho kế toán xử lý thủ công",
+                    now);
+
+                await _context.SaveChangesAsync(cancellationToken);
+
+                _logger.LogWarning("S-48: Hoàn tiền đơn {OrderId} chạm mốc 3 lần thất bại. Kích hoạt AccountingNotificationService...", orderId);
+
+                // Kích hoạt dịch vụ AccountingNotificationService gửi thông báo cho kế toán
+                if (_accountingNotificationService != null)
+                {
+                    await _accountingNotificationService.NotifyFailedRefundAsync(refundReq, cancellationToken);
+                }
+
+                return new OrderRefundExecutionResult
+                {
+                    OrderId = order.Id,
+                    RefundId = refundEntity.Id,
+                    Amount = refundEntity.Amount,
+                    Status = "RequiresManualReview",
+                    Success = false,
+                    RetryCount = refundReq.RetryCount,
+                    IsManualReview = true,
+                    FailureReason = refundEntity.FailureReason,
+                    Message = "Hoàn tiền thất bại 3 lần - Đã chuyển thông tin cho kế toán xử lý thủ công"
+                };
+            }
+            else
+            {
+                // Lần 1 hoặc lần 2
+                var delay = GetBackoffDelay(refundReq.RetryCount);
+                refundReq.Status = RefundStatus.RetryScheduled;
+                refundReq.NextRetryAt = now.Add(delay);
+
+                refundEntity.Status = "Failed";
+                refundEntity.FailureReason = $"Hoàn tiền thất bại lần {refundReq.RetryCount}/3 (Mô phỏng lỗi Timeout từ cổng thanh toán).";
+                refundEntity.UpdatedAt = now;
+
+                _orderAuditService.Record(
+                    order.Id,
+                    "REFUND",
+                    refundEntity.Id.ToString(),
+                    "REFUND_FAILED",
+                    "Requested",
+                    "Failed",
+                    "SYSTEM",
+                    "gateway:Mock",
+                    null,
+                    $"Lần thử {refundReq.AttemptCount} thất bại (GATEWAY_TIMEOUT). Đã ghi nhận số lần thất bại (RetryCount = {refundReq.RetryCount}/3).",
+                    now);
+
+                await _context.SaveChangesAsync(cancellationToken);
+
+                return new OrderRefundExecutionResult
+                {
+                    OrderId = order.Id,
+                    RefundId = refundEntity.Id,
+                    Amount = refundEntity.Amount,
+                    Status = "Failed",
+                    Success = false,
+                    RetryCount = refundReq.RetryCount,
+                    IsManualReview = false,
+                    FailureReason = refundEntity.FailureReason,
+                    Message = $"Hoàn tiền thất bại lần {refundReq.RetryCount}/3 (Mô phỏng lỗi Timeout từ cổng thanh toán)."
+                };
+            }
         }
     }
 }

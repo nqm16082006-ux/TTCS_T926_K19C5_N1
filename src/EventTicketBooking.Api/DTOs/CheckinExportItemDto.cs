@@ -68,5 +68,7 @@ namespace EventTicketBooking.Api.DTOs
         /// Trạng thái đơn hàng của vé (phục vụ đối soát).
         /// </summary>
         public string? OrderStatus { get; set; }
+        public string EntryType { get; set; } = "Lần đầu";
+        public string Result { get; set; } = "Đã vào";
     }
 }

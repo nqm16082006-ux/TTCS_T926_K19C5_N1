@@ -11,7 +11,7 @@
 
   <header class="bg-white border-b border-slate-200 shadow-sm">
     <div class="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-      <h1 class="text-xl font-bold text-slate-800">Chi tiết đơn hàng</h1>
+      <h1 id="pageMainHeading" class="text-xl font-bold text-slate-800">Chi tiết đơn hàng</h1>
       <div class="flex items-center gap-4">
         <a href="my-orders.html" class="text-sm font-semibold text-slate-500 hover:text-indigo-600 transition flex items-center gap-1">
           <i class="fa-solid fa-list-check"></i>
@@ -31,7 +31,15 @@
     <div id="errorState" class="hidden text-center py-12">
       <i class="fa-solid fa-circle-exclamation text-rose-500 text-5xl mb-4"></i>
       <h2 class="text-xl font-bold text-slate-800 mb-2">Lỗi tải dữ liệu</h2>
-      <p id="errorMessage" class="text-slate-500"></p>
+      <p id="errorMessage" class="text-slate-500 max-w-md mx-auto mb-6"></p>
+      <div class="flex items-center justify-center gap-3">
+        <a href="my-orders.html" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-sm transition">
+          <i class="fa-solid fa-list-check mr-1.5"></i> Xem danh sách Đơn hàng của tôi
+        </a>
+        <a href="public-events.html" class="px-5 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-bold rounded-xl transition">
+          Về trang chủ
+        </a>
+      </div>
     </div>
 
     <div id="orderContent" class="hidden bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -47,14 +55,22 @@
         </div>
       </div>
 
-      <!-- S-45: Trạng thái & số tiền hoàn tiền (hiển thị khi đơn đã huỷ và có yêu cầu hoàn) -->
+      <!-- S-45 & S-48: Trạng thái & số tiền hoàn tiền (hiển thị khi đơn đã huỷ và có yêu cầu hoàn) -->
       <div id="refundInfoBox" class="hidden border-b border-slate-100 p-4 bg-emerald-50/60">
-        <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-6">
-          <div class="text-sm">
-            <span class="text-slate-500 font-medium">Tiền hoàn dự kiến/đã nhận:</span>
-            <span id="refundAmountDisplay" class="font-black text-emerald-700"></span>
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex flex-col gap-1">
+            <div class="text-sm">
+              <span class="text-slate-500 font-medium">Tiền hoàn dự kiến/đã nhận:</span>
+              <span id="refundAmountDisplay" class="font-black text-emerald-700"></span>
+            </div>
+            <div id="refundFailureBox" class="hidden text-sm font-medium"></div>
           </div>
-          <div id="refundFailureBox" class="hidden text-sm text-rose-700 font-medium"></div>
+          <div id="refundMockActionContainer" class="hidden">
+            <button id="btnRetryMockFail" onclick="mockCancelOrderFailed()" class="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5" title="Nhấn để tiếp tục giả lập lỗi retry lên kế toán">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+              <span id="btnRetryMockFailText">⚠️ Mock Hoàn thất bại tiếp (Test S48)</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -82,6 +98,51 @@
         </div>
       </div>
 
+      <!-- S-61: Thông tin Sự kiện, Suất diễn & Chỉ dẫn địa điểm -->
+      <div id="eventInfoCard" class="hidden p-6 border-b border-slate-100 bg-gradient-to-r from-indigo-50/40 via-white to-slate-50/60">
+        <div class="space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-700 tracking-wide uppercase">Sự kiện & Suất diễn</span>
+            <span id="reminderStatusBadge" class="hidden px-2.5 py-0.5 rounded-full text-[11px] font-semibold"></span>
+          </div>
+          <h2 id="eventTitleDisplay" class="text-xl font-bold text-slate-800"></h2>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-sm text-slate-600">
+            <div class="flex items-start gap-2.5">
+              <i class="fa-regular fa-calendar-days text-indigo-600 mt-1"></i>
+              <div>
+                <p class="text-xs text-slate-400 font-semibold uppercase">Thời gian diễn</p>
+                <p id="showtimeTimeDisplay" class="font-bold text-slate-700"></p>
+              </div>
+            </div>
+            <div class="flex items-start gap-2.5">
+              <i class="fa-solid fa-location-dot text-rose-500 mt-1"></i>
+              <div>
+                <p class="text-xs text-slate-400 font-semibold uppercase">Địa điểm tổ chức</p>
+                <p id="eventLocationDisplay" class="font-bold text-slate-700"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chỉ dẫn vào cửa & Check-in -->
+          <div class="mt-3 p-3.5 bg-white border border-indigo-100 rounded-xl text-xs text-slate-600 space-y-1.5">
+            <div class="font-bold text-indigo-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-map-location-dot text-indigo-600"></i>
+              <span>Chỉ dẫn địa điểm & Check-in trước giờ diễn:</span>
+            </div>
+            <ul class="list-disc list-inside space-y-1 text-slate-600 pl-1">
+              <li>Vui lòng có mặt tại địa điểm trước giờ diễn ít nhất <strong>30 - 45 phút</strong> để hoàn tất thủ tục soát vé.</li>
+              <li>Chuẩn bị sẵn mã đơn hàng hoặc vé điện tử (QR) đã được gửi qua email để xuất trình tại quầy check-in.</li>
+              <li>Trường hợp có thay đổi giờ diễn, hệ thống sẽ tự động gửi email cập nhật tới hộp thư của bạn.</li>
+            </ul>
+            <div id="reminderSentNote" class="hidden pt-1.5 border-t border-slate-100 text-emerald-700 font-semibold flex items-center gap-1.5">
+              <i class="fa-solid fa-envelope-circle-check text-emerald-600"></i>
+              <span id="reminderSentText"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Items List -->
       <div class="p-6">
         <h3 class="text-base font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">Danh sách vé</h3>
@@ -90,23 +151,155 @@
         </ul>
       </div>
 
-      <!-- Total & Action -->
-      <div class="p-6 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row items-center justify-between gap-6">
-        <div>
-          <p class="text-sm text-slate-500 font-medium mb-1">Tổng tiền thanh toán:</p>
-          <p id="totalAmountDisplay" class="text-2xl font-black text-indigo-700"></p>
+      <!-- S-56: Discount & Totals Section -->
+      <div class="p-6 bg-slate-50 border-t border-slate-200 space-y-4">
+        <!-- Tạm tính -->
+        <div class="flex justify-between items-center text-sm text-slate-600">
+          <span class="font-medium">Tạm tính</span>
+          <span id="originalAmountDisplay" class="font-semibold text-slate-800">--</span>
         </div>
 
-        <button id="btnRepay" class="hidden w-full md:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-sm shadow-indigo-200 transition-all flex items-center justify-center gap-2">
-          <span>Thanh toán lại</span>
-          <i class="fa-solid fa-arrow-right"></i>
-        </button>
+        <!-- Discount Code Input Box (hiển thị khi order Pending và chưa có mã) -->
+        <div id="discountInputSection" class="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
+          <label for="discountCodeInput" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">
+            <i class="fa-solid fa-ticket text-indigo-600 mr-1"></i> Mã giảm giá
+          </label>
+          <div class="flex gap-2">
+            <input type="text" id="discountCodeInput" placeholder="Nhập mã giảm giá..." class="flex-1 px-3.5 py-2.5 text-sm uppercase font-semibold border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono" maxlength="50">
+            <button id="btnApplyDiscount" onclick="applyDiscountCode()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition flex items-center gap-2 shadow-xs">
+              <span id="btnApplyDiscountText">Áp dụng</span>
+            </button>
+          </div>
+          <p id="discountError" class="hidden text-xs text-rose-600 font-semibold mt-2 flex items-center gap-1">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <span id="discountErrorMsg"></span>
+          </p>
+        </div>
 
-        <!-- S-45: Nút huỷ & hoàn tiền (chỉ hiện khi đơn đủ điều kiện huỷ) -->
-        <button id="btnCancelOrder" class="hidden w-full md:w-auto px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-sm shadow-rose-200 transition-all items-center justify-center gap-2">
-          <span>Huỷ &amp; hoàn tiền</span>
-          <i class="fa-solid fa-rotate-left"></i>
-        </button>
+        <!-- Applied Discount Badge (hiển thị khi order đã có mã) -->
+        <div id="discountAppliedSection" class="hidden p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-7 h-7 bg-emerald-600 text-white rounded-lg text-xs">
+              <i class="fa-solid fa-check"></i>
+            </span>
+            <div>
+              <p class="text-xs font-bold text-emerald-800">Đã áp dụng mã giảm giá: <span id="appliedCodeText" class="font-mono text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded"></span></p>
+              <p class="text-xs text-emerald-700 font-medium">Đã trừ trực tiếp vào tổng thanh toán</p>
+            </div>
+          </div>
+          <span id="appliedDiscountBadge" class="text-sm font-black text-emerald-700"></span>
+        </div>
+
+        <!-- Price Breakdown -->
+        <div class="pt-2 border-t border-slate-200/80 space-y-2">
+          <div id="discountRow" class="hidden flex justify-between items-center text-sm text-emerald-600 font-medium">
+            <span>Giảm giá</span>
+            <span id="discountAmountDisplay" class="font-bold text-emerald-700">--</span>
+          </div>
+          <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pt-3 border-t border-slate-200">
+            <div>
+              <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Tổng thanh toán</p>
+              <p id="totalAmountDisplay" class="text-2xl font-black text-indigo-700"></p>
+            </div>
+
+            <div class="flex items-center gap-3 w-full md:w-auto">
+              <button id="btnRepay" class="hidden w-full md:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-sm shadow-indigo-200 transition-all flex items-center justify-center gap-2">
+                <span>Thanh toán ngay</span>
+                <i class="fa-solid fa-arrow-right"></i>
+              </button>
+
+              <!-- S-45: Nút huỷ & hoàn tiền (chỉ hiện khi đơn đủ điều kiện huỷ) -->
+              <button id="btnCancelOrder" class="hidden w-full md:w-auto px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-sm shadow-rose-200 transition-all items-center justify-center gap-2">
+                <span>Huỷ &amp; hoàn tiền</span>
+                <i class="fa-solid fa-rotate-left"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- S-48: Section Hoàn Tiền Đơn Hàng -->
+      <div id="refundSectionCard" class="border-t border-slate-200 p-6 bg-white">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+              <i class="fa-solid fa-money-bill-transfer"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-slate-800">Thông tin hoàn tiền</h3>
+              <p class="text-xs text-slate-500">Trạng thái và tiến trình hoàn tiền cho đơn hàng (Story S-48)</p>
+            </div>
+          </div>
+          <span id="refundSectionStatusBadge" class="hidden px-3 py-1 text-xs font-bold rounded-full border self-start sm:self-auto"></span>
+        </div>
+
+        <!-- Empty state when no refund -->
+        <div id="refundEmptyState" class="py-4 text-center text-slate-500 text-sm bg-slate-50 rounded-xl border border-slate-100">
+          <i class="fa-solid fa-circle-info text-slate-400 mr-1.5"></i>
+          <span>Đơn hàng này chưa có yêu cầu hoàn tiền.</span>
+        </div>
+
+        <!-- Content state when refund exists -->
+        <div id="refundDetailsContent" class="hidden space-y-4">
+          <!-- Main Info Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+            <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="text-xs text-slate-500 block mb-0.5">Số tiền hoàn:</span>
+              <span id="cardRefundAmount" class="text-base font-black text-emerald-700">0 ₫</span>
+            </div>
+            <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="text-xs text-slate-500 block mb-0.5">Mã yêu cầu hoàn tiền:</span>
+              <div class="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-700">
+                <span id="cardRefundId">--</span>
+                <button type="button" id="btnCopyRefundId" onclick="copyRefundId()" class="text-slate-400 hover:text-indigo-600 p-1" title="Sao chép mã hoàn tiền">
+                  <i class="fa-regular fa-copy"></i>
+                </button>
+              </div>
+            </div>
+            <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="text-xs text-slate-500 block mb-0.5">Thời gian cập nhật:</span>
+              <span id="cardRefundUpdatedAt" class="font-semibold text-slate-700 text-xs">--</span>
+            </div>
+          </div>
+
+          <!-- Customer Message Alert -->
+          <div id="refundCustomerAlert" class="p-4 rounded-xl border text-sm flex items-start gap-3 bg-emerald-50 border-emerald-200">
+            <i id="refundCustomerIcon" class="fa-solid fa-circle-info text-base mt-0.5 shrink-0 text-emerald-600"></i>
+            <div class="flex-1">
+              <p id="refundCustomerTitle" class="font-bold text-sm text-emerald-900">Thông tin hoàn tiền</p>
+              <p id="refundCustomerDesc" class="text-xs mt-1 leading-relaxed text-emerald-700"></p>
+            </div>
+          </div>
+
+          <!-- Auditor/Technical Section (Only visible for Auditor/Admin) -->
+          <div id="refundTechnicalDetails" class="hidden p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2.5">
+            <div class="font-bold text-slate-700 flex items-center justify-between border-b border-slate-200/60 pb-1.5">
+              <span class="flex items-center gap-1.5">
+                <i class="fa-solid fa-terminal text-indigo-600"></i>
+                <span>Thông tin kỹ thuật (Kế toán / Auditor):</span>
+              </span>
+              <span class="text-[11px] font-normal text-slate-400">Chỉ hiển thị cho vai trò Kế toán / Quản trị viên</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-slate-600">
+              <div>Số lần thử thực tế: <strong id="techAttemptCount" class="text-slate-800">0</strong></div>
+              <div>Số lần thử lại: <strong id="techRetryCount" class="text-slate-800">0</strong></div>
+              <div>Lần thử gần nhất: <span id="techLastAttemptAt" class="font-semibold text-slate-800">--</span></div>
+              <div>Lịch thử lại kế tiếp: <span id="techNextRetryAt" class="font-semibold text-slate-800">--</span></div>
+            </div>
+            <div id="techErrorRow" class="pt-1.5 border-t border-slate-200/60 text-rose-700">
+              Lý do từ cổng: <span id="techErrorCode" class="font-mono font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200"></span>
+              <span id="techErrorMessage" class="ml-1 font-medium"></span>
+            </div>
+            <div class="pt-1 flex flex-wrap items-center gap-2">
+              <a href="./auditor.html" class="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-sm transition">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Cổng Kế Toán (Auditor)
+              </a>
+              <a id="techLinkAuditLog" href="./order-audit-logs.html" class="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg font-bold text-xs transition">
+                <i class="fa-solid fa-clock-rotate-left"></i> Nhật Ký Đối Soát
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- S-49: Audit Trail / Lịch sử thao tác & trạng thái -->
@@ -190,8 +383,12 @@
         </div>
         <p class="text-xs text-slate-500">Hạn huỷ: <span id="cancelDeadline" class="font-semibold"></span></p>
       </div>
-      <div class="p-5 pt-0 flex items-center justify-end gap-2">
+      <div class="p-5 pt-0 flex flex-wrap items-center justify-end gap-2">
         <button onclick="closeCancelRefundModal()" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50">Để sau</button>
+        <button id="btnMockCancelFail" onclick="mockCancelOrderFailed()" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold shadow-sm transition-all flex items-center gap-1.5" title="Mô phỏng lỗi hoàn tiền từ Payment Gateway (RetryCount tăng đến 3 chuyển kế toán)">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span id="btnMockCancelFailText">⚠️ Mock Hoàn thất bại (Test S48)</span>
+        </button>
         <button id="btnConfirmCancel" onclick="confirmCancelOrder()" class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold">Xác nhận huỷ &amp; hoàn tiền</button>
       </div>
     </div>
@@ -199,17 +396,121 @@
 
   <script>
     const urlParams = new URLSearchParams(window.location.search);
-    const orderId = urlParams.get('orderId') || urlParams.get('orderCode');
+    // S-48: Hỗ trợ canonical ?id=<GUID> và backward-compatible ?orderId= / ?orderCode=
+    const orderId = urlParams.get('id') || urlParams.get('orderId') || urlParams.get('orderCode');
+    let currentOrder = null;
     let countdownInterval = null;
 
     if (!orderId) {
-      showError("Không tìm thấy mã đơn hàng trong URL.");
+      showError("Không tìm thấy mã đơn hàng trong URL. Vui lòng chọn đơn hàng từ danh sách.");
+    } else if (orderId.includes('<') || orderId.includes('>') || orderId === 'null' || orderId === 'undefined') {
+      showError("Mã đơn hàng không hợp lệ (bạn đang nhập chuỗi mẫu giữ chỗ '" + escapeHtml(orderId) + "'). Vui lòng chọn một đơn hàng thực tế từ danh sách 'Đơn hàng của tôi'.");
     } else {
+      // Chuẩn hoá URL về canonical ?id= nếu đang dùng tham số cũ
+      if (!urlParams.get('id')) {
+        window.history.replaceState({}, '', `order-details.html?id=${encodeURIComponent(orderId)}`);
+      }
       loadOrderDetails();
     }
 
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
     function formatCurrency(amount) {
-      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
+    }
+
+    function formatDateTime(isoString) {
+      if (!isoString) return '—';
+      try {
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) return String(isoString);
+        return d.toLocaleString('vi-VN', {
+          timeZone: 'Asia/Ho_Chi_Minh',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+      } catch (e) {
+        return String(isoString);
+      }
+    }
+
+    function getUserRoles() {
+      try {
+        const raw = localStorage.getItem('user_info');
+        if (!raw) return [];
+        const user = JSON.parse(raw);
+        return (user.roles || []).map(r => String(r).toLowerCase());
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function isStaffOrAdmin() {
+      const roles = getUserRoles();
+      return roles.includes('auditor') || roles.includes('admin');
+    }
+
+    function isCurrentUserOrderOwner(order) {
+      if (!order) return false;
+      try {
+        const raw = localStorage.getItem('user_info');
+        if (!raw) return true;
+        const user = JSON.parse(raw);
+        const roles = (user.roles || []).map(r => String(r).toLowerCase());
+        const isPrivileged = roles.includes('admin') || roles.includes('auditor');
+
+        const userId = user.id || user.userId;
+        const userEmail = (user.email || '').toLowerCase().trim();
+        const orderUserId = order.userId;
+        const orderEmail = (order.customerEmail || '').toLowerCase().trim();
+
+        // 1. So khớp ID nếu cả 2 bên đều có
+        if (userId && orderUserId) {
+          return String(userId).toLowerCase() === String(orderUserId).toLowerCase();
+        }
+
+        // 2. So khớp Email nếu cả 2 bên đều có
+        if (userEmail && orderEmail) {
+          return userEmail === orderEmail;
+        }
+
+        // 3. Nếu là Admin/Auditor xem đơn người khác (không khớp thông tin cá nhân) -> không sở hữu
+        if (isPrivileged) {
+          return false;
+        }
+
+        // 4. Các role khác (Customer, Organizer, v.v.), API đã trả về đơn nghĩa là thuộc sở hữu
+        return true;
+      } catch (e) {
+        return true;
+      }
+    }
+
+    function copyRefundId() {
+      const el = document.getElementById('cardRefundId');
+      const fullId = el?.getAttribute('data-full-id') || el?.textContent;
+      if (!fullId || fullId === '--') return;
+      navigator.clipboard.writeText(fullId).then(() => {
+        const btn = document.getElementById('btnCopyRefundId');
+        if (btn) {
+          btn.innerHTML = '<i class="fa-solid fa-check text-emerald-600"></i>';
+          setTimeout(() => { btn.innerHTML = '<i class="fa-regular fa-copy"></i>'; }, 2000);
+        }
+      }).catch(() => {
+        alert('Mã hoàn tiền: ' + fullId);
+      });
     }
 
     function showError(message) {
@@ -243,13 +544,24 @@
           return;
         }
 
-        const response = await fetch(`/api/v1/orders/${orderId}`, {
+        const response = await fetch(`/api/v1/orders/${encodeURIComponent(orderId)}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        const result = await response.json();
+        let result = null;
+        try {
+          result = await response.json();
+        } catch (e) {
+          // Response body was not JSON or empty
+        }
+
         if (!response.ok) {
-          throw new Error(result.message || 'Không thể tải chi tiết đơn hàng.');
+          if (response.status === 404) {
+            throw new Error(`Không tìm thấy đơn hàng "${orderId}". Có thể đơn không tồn tại hoặc thuộc tài khoản khác.`);
+          } else if (response.status === 401 || response.status === 403) {
+            throw new Error('Bạn không có quyền xem đơn hàng này. Vui lòng đăng nhập đúng tài khoản.');
+          }
+          throw new Error((result && result.message) || `Không thể tải chi tiết đơn hàng (Mã lỗi: ${response.status}).`);
         }
 
         renderOrder(result.data);
@@ -257,7 +569,7 @@
         // S-45: deep-link ?cancel=1 từ my-orders → tự mở modal huỷ nếu nút huỷ đang hiển thị.
         if (urlParams.get('cancel') === '1') {
           urlParams.delete('cancel');
-          window.history.replaceState({}, '', `order-details.html?orderId=${encodeURIComponent(orderId)}`);
+          window.history.replaceState({}, '', `order-details.html?id=${encodeURIComponent(orderId)}`);
           const btnCancel = document.getElementById('btnCancelOrder');
           if (btnCancel && !btnCancel.classList.contains('hidden')) {
             openCancelRefundModal(result.data);
@@ -273,6 +585,29 @@
     }
 
     function renderOrder(order) {
+      currentOrder = order;
+
+      const ownsOrder = isCurrentUserOrderOwner(order);
+      const isPending = order.status === 'Pending';
+      const expiresAt = new Date(order.expiresAt).getTime();
+      const now = new Date().getTime();
+      const isExpired = expiresAt <= now;
+      const discountAlreadyApplied = Boolean(order.discountCode || order.discountCodeId);
+      const paymentAllowed = ownsOrder && isPending && !isExpired && !order.isPaymentProcessing;
+
+      const canApplyDiscount = ownsOrder && isPending && !isExpired && !discountAlreadyApplied && paymentAllowed;
+
+      const heading = document.getElementById('pageMainHeading');
+      if (heading) {
+        if (paymentAllowed) {
+          heading.textContent = 'Thanh toán đơn hàng';
+          document.title = 'Thanh toán đơn hàng - Event Ticket Booking';
+        } else {
+          heading.textContent = 'Chi tiết đơn hàng';
+          document.title = 'Chi tiết đơn hàng - Event Ticket Booking';
+        }
+      }
+
       document.getElementById('loadingState').classList.add('hidden');
       document.getElementById('orderContent').classList.remove('hidden');
 
@@ -290,11 +625,94 @@
         paymentCancelNote.classList.toggle('hidden', !isPaymentCancelled);
       }
 
-      document.getElementById('totalAmountDisplay').textContent = formatCurrency(order.totalAmount);
+      // S-56: Render pricing breakdown and discount code
+      const originalAmt = order.originalAmount || order.totalAmount;
+      const discountAmt = order.discountAmount || 0;
+      const finalAmt = order.totalAmount;
+
+      const origDisplay = document.getElementById('originalAmountDisplay');
+      if (origDisplay) origDisplay.textContent = formatCurrency(originalAmt);
+      document.getElementById('totalAmountDisplay').textContent = formatCurrency(finalAmt);
+
+      const discountRow = document.getElementById('discountRow');
+      const discountAmountDisplay = document.getElementById('discountAmountDisplay');
+      const discountInputSection = document.getElementById('discountInputSection');
+      const discountAppliedSection = document.getElementById('discountAppliedSection');
+      const appliedCodeText = document.getElementById('appliedCodeText');
+      const appliedDiscountBadge = document.getElementById('appliedDiscountBadge');
+      const discountError = document.getElementById('discountError');
+      if (discountError) discountError.classList.add('hidden');
+
+      if (order.discountCode) {
+        if (discountInputSection) discountInputSection.classList.add('hidden');
+        if (discountAppliedSection) {
+          discountAppliedSection.classList.remove('hidden');
+          if (appliedCodeText) appliedCodeText.textContent = order.discountCode;
+          if (appliedDiscountBadge) appliedDiscountBadge.textContent = '-' + formatCurrency(discountAmt);
+        }
+        if (discountRow) {
+          discountRow.classList.remove('hidden');
+          if (discountAmountDisplay) discountAmountDisplay.textContent = '-' + formatCurrency(discountAmt);
+        }
+      } else {
+        if (discountAppliedSection) discountAppliedSection.classList.add('hidden');
+        if (discountRow) discountRow.classList.add('hidden');
+
+        if (discountInputSection) {
+          discountInputSection.classList.toggle('hidden', !canApplyDiscount);
+        }
+      }
+
+      // S-61: Render thông tin Sự kiện, Suất diễn, Địa điểm và Trạng thái email nhắc nhở
+      const eventCard = document.getElementById('eventInfoCard');
+      if (order.eventTitle || order.showtimeStartTime) {
+        eventCard.classList.remove('hidden');
+        document.getElementById('eventTitleDisplay').textContent = order.eventTitle || 'Sự kiện';
+        
+        let timeStr = 'Chưa xác định';
+        if (order.showtimeStartTime) {
+          const start = new Date(order.showtimeStartTime);
+          const startFormatted = start.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
+          if (order.showtimeEndTime) {
+            const end = new Date(order.showtimeEndTime);
+            const endFormatted = end.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            timeStr = `${startFormatted} - ${endFormatted}`;
+          } else {
+            timeStr = startFormatted;
+          }
+        }
+        document.getElementById('showtimeTimeDisplay').textContent = timeStr;
+        document.getElementById('eventLocationDisplay').textContent = order.eventLocation || 'Xem chi tiết trên vé hoặc liên hệ BTC';
+
+        // S-61 Reminder status
+        const reminderBadge = document.getElementById('reminderStatusBadge');
+        const reminderSentNote = document.getElementById('reminderSentNote');
+        const reminderSentText = document.getElementById('reminderSentText');
+        
+        if (order.reminderSentAt) {
+          const sentDate = new Date(order.reminderSentAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
+          reminderBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 flex items-center gap-1';
+          reminderBadge.innerHTML = '<i class="fa-solid fa-check"></i> Đã gửi email nhắc 24h';
+          reminderBadge.classList.remove('hidden');
+
+          reminderSentNote.classList.remove('hidden');
+          reminderSentText.textContent = `Email nhắc nhở 24h kèm mã vé & chỉ dẫn địa điểm đã được gửi tới ${order.customerEmail || 'hộp thư của bạn'} lúc ${sentDate}.`;
+        } else if (order.status === 'Paid') {
+          reminderBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1';
+          reminderBadge.innerHTML = '<i class="fa-regular fa-bell"></i> Sẽ gửi email nhắc 24h trước suất';
+          reminderBadge.classList.remove('hidden');
+          reminderSentNote.classList.add('hidden');
+        } else {
+          reminderBadge.classList.add('hidden');
+          reminderSentNote.classList.add('hidden');
+        }
+      } else {
+        eventCard.classList.add('hidden');
+      }
 
       const itemsList = document.getElementById('orderItemsList');
       itemsList.innerHTML = '';
-      order.items.forEach(item => {
+      (order.items || []).forEach(item => {
         const li = document.createElement('li');
         li.className = 'flex items-center justify-between p-3 bg-slate-50/50 border border-slate-100 rounded-lg';
         li.innerHTML = `
@@ -312,13 +730,8 @@
       const timerWarning = document.getElementById('timerWarning');
       const processingWarning = document.getElementById('processingWarning');
 
-      const expiresAt = new Date(order.expiresAt).getTime();
-      const now = new Date().getTime();
-      const isExpired = expiresAt <= now;
-      const isPending = order.status === 'Pending';
-
       // Ẩn/Hiện nút Thanh toán
-      if (isPending && !isExpired && !order.isPaymentProcessing) {
+      if (paymentAllowed) {
         btnRepay.classList.remove('hidden');
         const btnText = order.hasFailedPayment ? 'Thanh toán lại' : 'Thanh toán ngay';
         const spanElem = btnRepay.querySelector('span');
@@ -366,6 +779,100 @@
       loadAuditLogs(order.id);
     }
 
+    // S-56: Xử lý áp dụng mã giảm giá
+    async function applyDiscountCode() {
+      const codeInput = document.getElementById('discountCodeInput');
+      const errorDiv = document.getElementById('discountError');
+      const errorMsg = document.getElementById('discountErrorMsg');
+      const btn = document.getElementById('btnApplyDiscount');
+      const btnText = document.getElementById('btnApplyDiscountText');
+
+      if (!codeInput || !errorDiv || !errorMsg || !btn) return;
+
+      const code = (codeInput.value || '').trim();
+      if (!code) {
+        errorMsg.textContent = 'Vui lòng nhập mã giảm giá.';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+
+      const targetOrderId = (currentOrder && currentOrder.id) || orderId;
+      if (!targetOrderId) {
+        errorMsg.textContent = 'Không tìm thấy thông tin đơn hàng.';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+
+      if (currentOrder && !isCurrentUserOrderOwner(currentOrder)) {
+        errorMsg.textContent = 'Bạn không có quyền thao tác đơn này.';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+
+      const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken') || sessionStorage.getItem('access_token') || sessionStorage.getItem('accessToken');
+      if (!token) {
+        errorMsg.textContent = 'Phiên đăng nhập đã hết hạn.';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+
+      errorDiv.classList.add('hidden');
+      btn.disabled = true;
+      if (btnText) btnText.textContent = 'Đang xử lý...';
+
+      try {
+        let res;
+        try {
+          res = await fetch(`/api/v1/orders/${encodeURIComponent(targetOrderId)}/apply-discount`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ code: code })
+          });
+        } catch (netErr) {
+          errorMsg.textContent = 'Không thể kết nối máy chủ. Vui lòng thử lại.';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
+
+        let data = null;
+        try {
+          data = await res.json();
+        } catch (jsonErr) {
+          // Response body was not JSON
+        }
+
+        if (res.status === 401) {
+          errorMsg.textContent = 'Phiên đăng nhập đã hết hạn.';
+          errorDiv.classList.remove('hidden');
+        } else if (res.status === 403) {
+          errorMsg.textContent = 'Bạn không có quyền thao tác đơn này.';
+          errorDiv.classList.remove('hidden');
+        } else if (res.status === 404) {
+          errorMsg.textContent = 'Mã giảm giá không hợp lệ hoặc không áp dụng cho sự kiện này.';
+          errorDiv.classList.remove('hidden');
+        } else if (res.status === 400) {
+          const backendMsg = (data && data.message) || (data && data.errors && Object.values(data.errors).flat()[0]);
+          errorMsg.textContent = backendMsg || 'Mã giảm giá không hợp lệ.';
+          errorDiv.classList.remove('hidden');
+        } else if (!res.ok || (data && !data.success)) {
+          errorMsg.textContent = 'Không thể kết nối máy chủ. Vui lòng thử lại.';
+          errorDiv.classList.remove('hidden');
+        } else {
+          currentOrder = data.data;
+          renderOrder(currentOrder);
+        }
+      } catch (err) {
+        errorMsg.textContent = 'Không thể kết nối máy chủ. Vui lòng thử lại.';
+        errorDiv.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        if (btnText) btnText.textContent = 'Áp dụng';
+      }
+    }
+
     function startTimer(expiresAt, timerWarning) {
       if (countdownInterval) clearInterval(countdownInterval);
 
@@ -394,43 +901,257 @@
       countdownInterval = setInterval(update, 1000);
     }
 
-    // ===== S-45: Huỷ vé & hoàn tiền =====
+    // ===== S-45 & S-48: Huỷ vé & hoàn tiền =====
     let pendingCancelOrderId = null;
 
-    function getRefundStatusDisplay(status) {
+    function getRefundStatusDisplay(status, isCustomerView = true) {
+      // Backend statuses: Pending, Processing, RetryScheduled, Succeeded, ManualReviewRequired, AccountingProcessing, AccountingResolved, Failed, Cancelled
       switch (status) {
-        case 'Succeeded': return { text: 'Đã hoàn tiền', css: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
-        case 'Failed': return { text: 'Hoàn tiền thất bại — cần xử lý tiếp', css: 'bg-rose-100 text-rose-800 border-rose-200' };
-        case 'ManualPending': return { text: 'Đang chờ xử lý hoàn tiền thủ công', css: 'bg-amber-100 text-amber-800 border-amber-200' };
-        case 'Requested': return { text: 'Yêu cầu hoàn tiền đang được xử lý', css: 'bg-blue-100 text-blue-800 border-blue-200' };
-        default: return { text: status || '', css: 'bg-slate-100 text-slate-800 border-slate-200' };
+        case 'Succeeded':
+          return {
+            text: isCustomerView ? 'Đã hoàn tiền' : 'Hoàn tiền thành công (Succeeded)',
+            css: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+            icon: 'fa-circle-check',
+            iconColor: 'text-emerald-600',
+            boxBg: 'bg-emerald-50 border-emerald-200',
+            titleColor: 'text-emerald-900',
+            descColor: 'text-emerald-700',
+            customerTitle: 'Đã hoàn tiền thành công',
+            customerDesc: 'Khoản tiền hoàn đã được cổng thanh toán chuyển trả về tài khoản ban đầu của bạn.'
+          };
+        case 'AccountingResolved':
+          return {
+            text: isCustomerView ? 'Đã hoàn tiền' : 'Kế toán đã giải quyết (AccountingResolved)',
+            css: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+            icon: 'fa-circle-check',
+            iconColor: 'text-emerald-600',
+            boxBg: 'bg-emerald-50 border-emerald-200',
+            titleColor: 'text-emerald-900',
+            descColor: 'text-emerald-700',
+            customerTitle: 'Đã hoàn tất hoàn tiền',
+            customerDesc: 'Bộ phận kế toán đã hoàn tất đối soát và hoàn tiền vào tài khoản ngân hàng của bạn.'
+          };
+        case 'RetryScheduled':
+          return {
+            text: isCustomerView ? 'Đang thử lại' : 'Đang xếp lịch thử lại (RetryScheduled)',
+            css: 'bg-amber-100 text-amber-800 border-amber-200',
+            icon: 'fa-clock-rotate-left',
+            iconColor: 'text-amber-600',
+            boxBg: 'bg-amber-50 border-amber-200',
+            titleColor: 'text-amber-900',
+            descColor: 'text-amber-700',
+            customerTitle: 'Đang tự động thử lại hoàn tiền',
+            customerDesc: 'Cổng thanh toán tạm thời gián đoạn. Hệ thống đang tự động xếp lịch thử lại hoàn tiền mà bạn không cần thao tác thêm.'
+          };
+        case 'RequiresManualReview':
+        case 'ManualReviewRequired':
+        case 'ManualPending':
+          return {
+            text: isCustomerView ? 'Cần bộ phận hỗ trợ kiểm tra' : 'Chờ kế toán xử lý (ManualReviewRequired)',
+            css: 'bg-rose-100 text-rose-800 border-rose-300',
+            icon: 'fa-triangle-exclamation',
+            iconColor: 'text-rose-600',
+            boxBg: 'bg-rose-50 border-rose-200',
+            titleColor: 'text-rose-900',
+            descColor: 'text-rose-700',
+            customerTitle: 'Cần bộ phận hỗ trợ kiểm tra',
+            customerDesc: 'Yêu cầu hoàn tiền đã được chuyển sang bộ phận kế toán để xử lý đối soát trực tiếp. Tiền hoàn của bạn sẽ được bảo toàn.'
+          };
+        case 'AccountingProcessing':
+          return {
+            text: isCustomerView ? 'Đang xử lý hoàn tiền' : 'Kế toán đang xử lý (AccountingProcessing)',
+            css: 'bg-sky-100 text-sky-800 border-sky-300',
+            icon: 'fa-spinner fa-spin',
+            iconColor: 'text-sky-600',
+            boxBg: 'bg-sky-50 border-sky-200',
+            titleColor: 'text-sky-900',
+            descColor: 'text-sky-700',
+            customerTitle: 'Kế toán đang xử lý hoàn tiền',
+            customerDesc: 'Hồ sơ hoàn tiền đã được chuyên viên kế toán tiếp nhận và đang tiến hành chuyển tiền qua ngân hàng.'
+          };
+        case 'Pending':
+        case 'Processing':
+        case 'Requested':
+          return {
+            text: isCustomerView ? 'Đang xử lý hoàn tiền' : 'Đang xử lý (' + (status || 'Processing') + ')',
+            css: 'bg-blue-100 text-blue-800 border-blue-200',
+            icon: 'fa-clock',
+            iconColor: 'text-blue-600',
+            boxBg: 'bg-blue-50 border-blue-200',
+            titleColor: 'text-blue-900',
+            descColor: 'text-blue-700',
+            customerTitle: 'Đang xử lý hoàn tiền',
+            customerDesc: 'Yêu cầu hoàn tiền đang được gửi đến cổng thanh toán để xử lý.'
+          };
+        case 'Failed':
+        case 'Cancelled':
+          return {
+            text: isCustomerView ? 'Cần bộ phận hỗ trợ kiểm tra' : 'Hoàn tiền thất bại (' + status + ')',
+            css: 'bg-rose-100 text-rose-800 border-rose-200',
+            icon: 'fa-circle-xmark',
+            iconColor: 'text-rose-600',
+            boxBg: 'bg-rose-50 border-rose-200',
+            titleColor: 'text-rose-900',
+            descColor: 'text-rose-700',
+            customerTitle: 'Cần bộ phận hỗ trợ kiểm tra',
+            customerDesc: 'Quá trình hoàn tiền tự động gặp sự cố và đã được chuyển sang danh sách hỗ trợ thủ công.'
+          };
+        default:
+          return {
+            text: isCustomerView ? 'Đang xử lý' : (status || 'Không xác định'),
+            css: 'bg-slate-100 text-slate-800 border-slate-200',
+            icon: 'fa-circle-info',
+            iconColor: 'text-slate-500',
+            boxBg: 'bg-slate-50 border-slate-200',
+            titleColor: 'text-slate-900',
+            descColor: 'text-slate-600',
+            customerTitle: 'Thông tin hoàn tiền',
+            customerDesc: 'Yêu cầu hoàn tiền đang được theo dõi trên hệ thống.'
+          };
       }
     }
 
     function renderRefundInfo(order) {
-      const badge = document.getElementById('refundStatusBadge');
+      const topBadge = document.getElementById('refundStatusBadge');
+      const cardSection = document.getElementById('refundSectionCard');
+      const emptyState = document.getElementById('refundEmptyState');
+      const detailsContent = document.getElementById('refundDetailsContent');
+      const sectionBadge = document.getElementById('refundSectionStatusBadge');
+      const cardAmountEl = document.getElementById('cardRefundAmount');
+      const cardRefundIdEl = document.getElementById('cardRefundId');
+      const cardUpdatedAtEl = document.getElementById('cardRefundUpdatedAt');
+      const customerAlert = document.getElementById('refundCustomerAlert');
+      const customerIcon = document.getElementById('refundCustomerIcon');
+      const customerTitle = document.getElementById('refundCustomerTitle');
+      const customerDesc = document.getElementById('refundCustomerDesc');
+      const techDetails = document.getElementById('refundTechnicalDetails');
+
+      // Legacy fallback elements
       const box = document.getElementById('refundInfoBox');
       const amountEl = document.getElementById('refundAmountDisplay');
       const failureBox = document.getElementById('refundFailureBox');
-      if (!badge || !box || !amountEl || !failureBox) return;
+      const mockActionContainer = document.getElementById('refundMockActionContainer');
 
-      if (!order.refundStatus) {
-        badge.classList.add('hidden');
-        box.classList.add('hidden');
+      const hasRefund = Boolean(order.refundStatus || order.refundRequestId || (order.refundAmount && order.refundAmount > 0));
+
+      // Trường hợp 1: Đơn chưa có hoàn tiền -> Hiện empty state thân thiện, không báo lỗi đỏ
+      if (!hasRefund) {
+        if (topBadge) topBadge.classList.add('hidden');
+        if (sectionBadge) sectionBadge.classList.add('hidden');
+        if (emptyState) emptyState.classList.remove('hidden');
+        if (detailsContent) detailsContent.classList.add('hidden');
+        if (box) box.classList.add('hidden');
+        if (mockActionContainer) mockActionContainer.classList.add('hidden');
         return;
       }
 
-      const cfg = getRefundStatusDisplay(order.refundStatus);
-      badge.textContent = cfg.text;
-      badge.className = 'px-3 py-1 text-xs font-bold rounded-full border ' + cfg.css;
-      amountEl.textContent = formatCurrency(order.refundAmount || 0);
-      box.classList.remove('hidden');
+      // Trường hợp 2: Có thông tin hoàn tiền
+      const isStaff = isStaffOrAdmin();
+      const cfg = getRefundStatusDisplay(order.refundStatus, !isStaff);
 
-      if (order.refundStatus === 'Failed' && order.refundFailureReason) {
-        failureBox.textContent = 'Lý do: ' + order.refundFailureReason;
-        failureBox.classList.remove('hidden');
-      } else {
-        failureBox.classList.add('hidden');
+      if (emptyState) emptyState.classList.add('hidden');
+      if (detailsContent) detailsContent.classList.remove('hidden');
+
+      // Badges
+      if (topBadge) {
+        topBadge.textContent = cfg.text;
+        topBadge.className = 'px-3 py-1 text-xs font-bold rounded-full border ' + cfg.css;
+        topBadge.classList.remove('hidden');
+      }
+      if (sectionBadge) {
+        sectionBadge.textContent = cfg.text;
+        sectionBadge.className = 'px-3 py-1 text-xs font-bold rounded-full border ' + cfg.css;
+        sectionBadge.classList.remove('hidden');
+      }
+
+      // Amount & IDs
+      const refundAmount = order.refundAmount || order.totalAmount || 0;
+      if (cardAmountEl) cardAmountEl.textContent = formatCurrency(refundAmount);
+      if (amountEl) amountEl.textContent = formatCurrency(refundAmount);
+
+      const refundIdStr = order.refundRequestId ? String(order.refundRequestId) : '';
+      if (cardRefundIdEl) {
+        cardRefundIdEl.textContent = refundIdStr ? (refundIdStr.substring(0, 8) + '...') : '—';
+        cardRefundIdEl.setAttribute('data-full-id', refundIdStr);
+        cardRefundIdEl.title = refundIdStr ? `Mã đầy đủ: ${refundIdStr} (Bấm biểu tượng để sao chép)` : '';
+      }
+
+      const updateTime = order.refundUpdatedAt || order.refundCreatedAt || order.createdAt;
+      if (cardUpdatedAtEl) cardUpdatedAtEl.textContent = formatDateTime(updateTime);
+
+      // Customer Friendly Message Box
+      if (customerAlert) {
+        customerAlert.className = `p-4 rounded-xl border text-sm flex items-start gap-3 ${cfg.boxBg}`;
+      }
+      if (customerIcon) {
+        customerIcon.className = `fa-solid ${cfg.icon} text-base mt-0.5 shrink-0 ${cfg.iconColor}`;
+      }
+      if (customerTitle) {
+        customerTitle.textContent = cfg.customerTitle;
+        customerTitle.className = `font-bold text-sm ${cfg.titleColor}`;
+      }
+      if (customerDesc) {
+        let descText = cfg.customerDesc;
+        // Nếu có thời gian retry kế tiếp và đang ở RetryScheduled
+        if (order.refundStatus === 'RetryScheduled' && order.refundNextRetryAt) {
+          descText += ` Lịch thử lại dự kiến: ${formatDateTime(order.refundNextRetryAt)}.`;
+        }
+        customerDesc.textContent = descText;
+        customerDesc.className = `text-xs mt-1 leading-relaxed ${cfg.descColor}`;
+      }
+
+      // Auditor / Technical Details: Chỉ hiển thị cho Kế toán / Quản trị viên
+      if (techDetails) {
+        if (isStaff) {
+          techDetails.classList.remove('hidden');
+          const elAttempt = document.getElementById('techAttemptCount');
+          if (elAttempt) elAttempt.textContent = order.refundAttemptCount || (order.refundRetryCount ? order.refundRetryCount + 1 : 1);
+
+          const elRetry = document.getElementById('techRetryCount');
+          if (elRetry) elRetry.textContent = order.refundRetryCount || 0;
+
+          const elLast = document.getElementById('techLastAttemptAt');
+          if (elLast) elLast.textContent = formatDateTime(order.refundLastAttemptedAt);
+
+          const elNext = document.getElementById('techNextRetryAt');
+          if (elNext) elNext.textContent = order.refundNextRetryAt ? formatDateTime(order.refundNextRetryAt) : '—';
+
+          const errorRow = document.getElementById('techErrorRow');
+          const errorCodeEl = document.getElementById('techErrorCode');
+          const errorMsgEl = document.getElementById('techErrorMessage');
+          const hasError = Boolean(order.refundErrorCode || order.refundErrorMessage || order.refundFailureReason);
+
+          if (hasError && errorRow) {
+            errorRow.classList.remove('hidden');
+            if (errorCodeEl) errorCodeEl.textContent = escapeHtml(order.refundErrorCode || 'GATEWAY_ERROR');
+            if (errorMsgEl) errorMsgEl.textContent = escapeHtml(order.refundErrorMessage || order.refundFailureReason || 'Không có mô tả lỗi.');
+          } else if (errorRow) {
+            errorRow.classList.add('hidden');
+          }
+
+          const linkAudit = document.getElementById('techLinkAuditLog');
+          if (linkAudit) linkAudit.href = `./order-audit-logs.html?orderId=${encodeURIComponent(order.id)}`;
+        } else {
+          techDetails.classList.add('hidden');
+        }
+      }
+
+      // Giữ legacy infoBox đồng bộ nếu cần
+      if (box) box.classList.remove('hidden');
+      if (failureBox) {
+        if (order.refundStatus === 'ManualReviewRequired' || (order.refundRetryCount && order.refundRetryCount >= 3)) {
+          failureBox.innerHTML = `<span class="text-xs text-rose-700 font-medium">Lý do từ cổng: ${escapeHtml(order.refundErrorMessage || order.refundFailureReason || 'Timeout / từ chối')} (Đã bàn giao Kế toán)</span>`;
+          failureBox.classList.remove('hidden');
+        } else if (order.refundStatus === 'RetryScheduled' || order.refundStatus === 'Failed') {
+          failureBox.innerHTML = `<span class="text-xs text-amber-700 font-medium">Lần thử: ${order.refundRetryCount || 1}/3 - Lý do: ${escapeHtml(order.refundErrorMessage || order.refundFailureReason || 'Đang chờ')}</span>`;
+          failureBox.classList.remove('hidden');
+        } else {
+          failureBox.classList.add('hidden');
+        }
+      }
+      if (mockActionContainer) {
+        // Mock buttons chỉ hiển thị cho auditor/admin hoặc khi có lỗi thử lại
+        mockActionContainer.classList.toggle('hidden', !isStaff);
       }
     }
 
@@ -498,6 +1219,73 @@
       } finally {
         btn.disabled = false;
         btn.textContent = 'Xác nhận huỷ & hoàn tiền';
+      }
+    }
+
+    // ===== Story S-48: Mock hoàn tiền thất bại & chuyển tiếp kế toán =====
+    async function mockCancelOrderFailed() {
+      const targetOrderId = pendingCancelOrderId || orderId;
+      if (!targetOrderId) return;
+
+      // Cloud-safe mode check: Cảnh báo người dùng đây là thao tác giả lập kiểm thử
+      const confirmed = confirm("⚠️ CẢNH BÁO KIỂM THỬ (Dev Only):\nThao tác này chỉ dùng để kiểm thử lỗi cổng thanh toán trên môi trường phát triển (Local Test).\nTUYỆT ĐỐI KHÔNG SỬ DỤNG TRÊN PRODUCTION / SHARED CLOUD.\n\nBạn có chắc chắn muốn chạy thử nghiệm này?");
+      if (!confirmed) return;
+
+      const btnModal = document.getElementById('btnMockCancelFail');
+      const btnRetry = document.getElementById('btnRetryMockFail');
+      const originalModalText = btnModal ? btnModal.innerHTML : '';
+      const originalRetryText = btnRetry ? btnRetry.innerHTML : '';
+
+      try {
+        if (btnModal) {
+          btnModal.disabled = true;
+          btnModal.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Đang mô phỏng lỗi...`;
+        }
+        if (btnRetry) {
+          btnRetry.disabled = true;
+          btnRetry.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Đang mô phỏng lỗi...`;
+        }
+
+        const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+        const res = await fetch(`/api/v1/orders/${encodeURIComponent(targetOrderId)}/cancel?simulateFailure=true`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ simulateFailure: true })
+        });
+
+        const result = await res.json();
+        if (!res.ok) {
+          alert(result.message || 'Mô phỏng hoàn tiền thất bại không thành công.');
+          return;
+        }
+
+        const retryCount = result.data?.retryCount ?? 1;
+        const isManual = result.data?.isManualReview || retryCount >= 3;
+
+        if (isManual) {
+          closeCancelRefundModal();
+          alert('⚠️ Hoàn tiền thất bại 3 lần - Đã chuyển thông tin cho kế toán xử lý thủ công!');
+        } else {
+          alert(`⚠️ Giả lập hoàn tiền thất bại lần ${retryCount}/3 thành công! Đã ghi nhận số lần thất bại (RetryCount = ${retryCount}).`);
+        }
+
+        await loadOrderDetails();
+
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Mô phỏng hoàn tiền thất bại gặp lỗi.');
+      } finally {
+        if (btnModal) {
+          btnModal.disabled = false;
+          btnModal.innerHTML = originalModalText;
+        }
+        if (btnRetry) {
+          btnRetry.disabled = false;
+          btnRetry.innerHTML = originalRetryText;
+        }
       }
     }
 
@@ -574,7 +1362,7 @@
         }
 
         const json = await res.json();
-        orderAuditLogs = json.data || [];
+        orderAuditLogs = Array.isArray(json.data) ? json.data : [];
 
         // Update counts
         document.getElementById('auditCountAll').textContent = orderAuditLogs.length;
@@ -701,6 +1489,10 @@
         case 'REFUND_REQUESTED': return 'Tạo yêu cầu hoàn tiền';
         case 'REFUND_SUCCEEDED': return 'Hoàn tiền thành công';
         case 'REFUND_FAILED': return 'Hoàn tiền thất bại';
+        case 'REFUND_RETRY_SCHEDULED': return 'Lên lịch thử lại hoàn tiền';
+        case 'REFUND_MANUAL_REVIEW_REQUIRED': return 'Chuyển kế toán xử lý (S-48)';
+        case 'ACCOUNTING_PROCESSING': return 'Kế toán tiếp nhận xử lý (S-48)';
+        case 'ACCOUNTING_RESOLVED': return 'Kế toán hoàn tất hoàn tiền (S-48)';
         case 'REFUND_MANUAL_PENDING': return 'Chờ hoàn tiền thủ công';
         default: return act;
       }
@@ -712,6 +1504,7 @@
         case 'TICKET': return 'bg-emerald-100 text-emerald-700';
         case 'SEAT_HOLD': return 'bg-amber-100 text-amber-700';
         case 'SEAT': return 'bg-sky-100 text-sky-700';
+        case 'REFUND': return 'bg-rose-100 text-rose-700';
         default: return 'bg-slate-100 text-slate-700';
       }
     }
@@ -720,6 +1513,8 @@
       switch (type) {
         case 'USER': return { label: 'Người dùng', icon: 'fa-solid fa-user', css: 'bg-blue-50 text-blue-700' };
         case 'STAFF': return { label: 'Nhân viên', icon: 'fa-solid fa-id-badge', css: 'bg-teal-50 text-teal-700' };
+        case 'ACCOUNTING': return { label: 'Kế toán viên', icon: 'fa-solid fa-calculator', css: 'bg-amber-100 text-amber-900 border border-amber-300' };
+        case 'AUDITOR': return { label: 'Kế toán viên', icon: 'fa-solid fa-calculator', css: 'bg-amber-100 text-amber-900 border border-amber-300' };
         case 'ADMIN': return { label: 'Quản trị', icon: 'fa-solid fa-user-shield', css: 'bg-purple-50 text-purple-700' };
         case 'SYSTEM': return { label: 'Hệ thống', icon: 'fa-solid fa-server', css: 'bg-cyan-50 text-cyan-700' };
         case 'BACKGROUND_JOB': return { label: 'Job ngầm', icon: 'fa-solid fa-robot', css: 'bg-rose-50 text-rose-700' };

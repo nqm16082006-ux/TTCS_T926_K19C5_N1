@@ -52,6 +52,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-event_ticket_db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password_123}
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB:-event_ticket_db};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres_password_123}
       ConnectionStrings__Redis: redis:6379
       SmtpSettings__Server: ${SmtpSettings__Server:-smtp.gmail.com}
       SmtpSettings__Port: ${SmtpSettings__Port:-587}

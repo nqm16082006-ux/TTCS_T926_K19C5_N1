@@ -1093,6 +1093,36 @@
     }
 
     // --- TERMS & PRIVACY MODAL (S-54) ---
+    function formatLegalText(raw) {
+      if (!raw) return '';
+      const lines = raw.split('\n');
+      let html = '';
+      let currentSection = null;
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        if (trimmed.startsWith('ĐIỀU ')) {
+          if (currentSection) html += '</div></div>';
+          html += `<div class="mb-4 pb-3 border-b border-slate-200/80 last:border-0 last:pb-0 last:mb-0">
+            <h4 class="font-bold text-indigo-900 text-xs tracking-wide mb-1.5 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-primary inline-block"></span>
+              ${trimmed}
+            </h4>
+            <div class="text-slate-600 pl-3 leading-relaxed text-[11px] space-y-1">`;
+          currentSection = true;
+        } else if (currentSection) {
+          html += `<div>${trimmed}</div>`;
+        } else {
+          html += `<p class="mb-2 text-slate-700">${trimmed}</p>`;
+        }
+      });
+
+      if (currentSection) html += '</div></div>';
+      return html;
+    }
+
     async function openTermsModal(initialTab = 'terms') {
       const modal = document.getElementById('termsModal');
       modal.classList.remove('hidden');
@@ -1103,12 +1133,12 @@
         if (res.ok) {
           const data = await res.json();
           document.getElementById('modalPolicyVersion').textContent = data.version || 'v1.0';
-          document.getElementById('modalPolicyDate').textContent = data.effectiveDate || '09/10/2026';
+          document.getElementById('modalPolicyDate').textContent = data.effectiveDate || '2026-10-18';
           if (data.termsContent) {
-            document.getElementById('modalTermsContent').innerHTML = data.termsContent.replace(/\n/g, '<br><br>');
+            document.getElementById('modalTermsContent').innerHTML = formatLegalText(data.termsContent);
           }
           if (data.privacyContent) {
-            document.getElementById('modalPrivacyContent').innerHTML = data.privacyContent.replace(/\n/g, '<br><br>');
+            document.getElementById('modalPrivacyContent').innerHTML = formatLegalText(data.privacyContent);
           }
         }
       } catch (err) {
@@ -1155,7 +1185,7 @@
             <span>Điều khoản dịch vụ &amp; Chính sách riêng tư</span>
             <span id="modalPolicyVersion" class="px-2 py-0.5 rounded-full bg-indigo-50 text-primary text-[11px] font-bold">v1.0</span>
           </h3>
-          <p class="text-xs text-slate-500 mt-0.5">Ngày hiệu lực: <span id="modalPolicyDate">09/10/2026</span> • Tuân thủ Nghị định 13/2023/NĐ-CP</p>
+          <p class="text-xs text-slate-500 mt-0.5">Ngày hiệu lực: <span id="modalPolicyDate">2026-10-18</span> • Tuân thủ Nghị định 13/2023/NĐ-CP</p>
         </div>
         <button onclick="closeTermsModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition">
           <span class="material-symbols-outlined text-[20px]">close</span>
@@ -1167,16 +1197,12 @@
         <button id="tabPrivacyBtn" onclick="switchTermsTab('privacy')" class="px-4 py-2 border-b-2 border-transparent font-medium text-slate-500 hover:text-slate-800 text-xs transition">2. Chính sách riêng tư &amp; Tiếp thị</button>
       </div>
 
-      <div class="max-h-80 overflow-y-auto p-4 my-3 bg-slate-50 rounded-xl text-xs text-slate-700 leading-relaxed border border-slate-200">
+      <div class="max-h-96 overflow-y-auto p-4 my-3 bg-slate-50 rounded-xl text-xs text-slate-700 leading-relaxed border border-slate-200">
         <div id="modalTermsContent">
-          <strong>1. Chấp thuận điều khoản:</strong> Bằng việc tạo tài khoản, bạn đồng ý tuân thủ toàn bộ các quy định đặt vé, thanh toán và bảo mật của EventPulse.<br><br>
-          <strong>2. Tài khoản và Bảo mật:</strong> Người dùng có trách nhiệm tự bảo mật mã xác thực OTP gửi về hòm thư điện tử.<br><br>
-          <strong>3. Thay đổi chính sách:</strong> Khi hệ thống cập nhật phiên bản chính sách mới, người dùng sẽ được nhắc nhở xác nhận lại ở lần đăng nhập tiếp theo.
+          Đang tải điều khoản dịch vụ...
         </div>
         <div id="modalPrivacyContent" class="hidden">
-          <strong>1. Thu thập &amp; Xử lý dữ liệu:</strong> Dữ liệu người dùng (tên, email, số điện thoại) được sử dụng để phát hành vé điện tử và gửi thông báo hệ thống.<br><br>
-          <strong>2. Chữ ký số và Chống giả mạo:</strong> Mã QR vé điện tử được ký số bằng mật mã ECDSA nhằm đảm bảo an toàn tuyệt đối khi soát vé tại cổng.<br><br>
-          <strong>3. Quyền thu hồi nhận email tiếp thị (S-54):</strong> Người dùng có quyền thu hồi sự đồng ý nhận email tiếp thị bất cứ lúc nào trong mục <em>Cài đặt riêng tư</em>. Khi người dùng thu hồi, hệ thống cam kết chặn và không gửi email tiếp thị nữa.
+          Đang tải chính sách bảo vệ dữ liệu cá nhân...
         </div>
       </div>
 

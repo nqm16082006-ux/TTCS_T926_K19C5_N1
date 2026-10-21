@@ -505,7 +505,39 @@
 
     // --- TERMS UPDATE PROMPT MODAL (S-54) ---
     let termsModalResolver = null;
-    function promptTermsAcceptanceModal(version) {
+    let cachedPolicyData = null;
+
+    function formatLegalText(raw) {
+      if (!raw) return '';
+      const lines = raw.split('\n');
+      let html = '';
+      let currentSection = null;
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        if (trimmed.startsWith('ĐIỀU ')) {
+          if (currentSection) html += '</div></div>';
+          html += `<div class="mb-3.5 pb-2.5 border-b border-slate-200/80 last:border-0 last:pb-0 last:mb-0">
+            <h4 class="font-bold text-indigo-900 text-xs tracking-wide mb-1 flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span>
+              ${trimmed}
+            </h4>
+            <div class="text-slate-600 pl-2.5 leading-relaxed text-[11px] space-y-1">`;
+          currentSection = true;
+        } else if (currentSection) {
+          html += `<div>${trimmed}</div>`;
+        } else {
+          html += `<p class="mb-1.5 text-slate-700">${trimmed}</p>`;
+        }
+      });
+
+      if (currentSection) html += '</div></div>';
+      return html;
+    }
+
+    async function promptTermsAcceptanceModal(version) {
       return new Promise((resolve) => {
         const modal = document.getElementById('termsUpdateModal');
         if (!modal) {
@@ -514,8 +546,95 @@
         }
         document.getElementById('termsModalVersionBadge').textContent = version || 'v1.0';
         termsModalResolver = resolve;
+        // Reset view to summary
+        showTermsView('summary');
         modal.classList.remove('hidden');
       });
+    }
+
+    async function toggleTermsDetailView() {
+      const summaryView = document.getElementById('termsSummaryView');
+      const detailView = document.getElementById('termsDetailView');
+      const toggleBtnText = document.getElementById('toggleTermsDetailText');
+      const toggleBtnIcon = document.getElementById('toggleTermsDetailIcon');
+
+      if (detailView.classList.contains('hidden')) {
+        showTermsView('detail');
+      } else {
+        showTermsView('summary');
+      }
+    }
+
+    async function showTermsView(mode) {
+      const summaryView = document.getElementById('termsSummaryView');
+      const detailView = document.getElementById('termsDetailView');
+      const toggleBtnText = document.getElementById('toggleTermsDetailText');
+      const toggleBtnIcon = document.getElementById('toggleTermsDetailIcon');
+
+      if (mode === 'detail') {
+        summaryView.classList.add('hidden');
+        detailView.classList.remove('hidden');
+        toggleBtnText.textContent = 'Thu gọn về bản tóm tắt';
+        toggleBtnIcon.textContent = 'expand_less';
+        await loadPolicyContent();
+      } else {
+        detailView.classList.add('hidden');
+        summaryView.classList.remove('hidden');
+        toggleBtnText.textContent = 'Đọc toàn văn Điều khoản & Chính sách đầy đủ';
+        toggleBtnIcon.textContent = 'menu_book';
+      }
+    }
+
+    async function loadPolicyContent() {
+      const termsBody = document.getElementById('modalFullTermsContent');
+      const privacyBody = document.getElementById('modalFullPrivacyContent');
+      if (cachedPolicyData) {
+        renderPolicyData(cachedPolicyData);
+        return;
+      }
+
+      termsBody.innerHTML = '<div class="py-4 text-center text-slate-500"><span class="material-symbols-outlined animate-spin text-xl">sync</span><p class="text-xs mt-1">Đang tải toàn văn điều khoản...</p></div>';
+      try {
+        const res = await fetch('/api/v1/user/terms/policy');
+        if (res.ok) {
+          cachedPolicyData = await res.json();
+          renderPolicyData(cachedPolicyData);
+        } else {
+          termsBody.innerHTML = '<p class="text-error text-xs">Không thể tải nội dung điều khoản. Vui lòng thử lại sau.</p>';
+        }
+      } catch (e) {
+        termsBody.innerHTML = '<p class="text-error text-xs">Lỗi kết nối khi tải điều khoản.</p>';
+      }
+    }
+
+    function renderPolicyData(data) {
+      if (data.version) {
+        document.getElementById('termsModalVersionBadge').textContent = data.version;
+      }
+      if (data.effectiveDate) {
+        document.getElementById('termsModalDateBadge').textContent = 'Hiệu lực: ' + data.effectiveDate;
+      }
+      document.getElementById('modalFullTermsContent').innerHTML = formatLegalText(data.termsContent || '');
+      document.getElementById('modalFullPrivacyContent').innerHTML = formatLegalText(data.privacyContent || '');
+    }
+
+    function switchLoginTermsTab(tab) {
+      const termsTab = document.getElementById('loginTabTermsBtn');
+      const privacyTab = document.getElementById('loginTabPrivacyBtn');
+      const termsBody = document.getElementById('modalFullTermsContent');
+      const privacyBody = document.getElementById('modalFullPrivacyContent');
+
+      if (tab === 'terms') {
+        termsTab.className = "px-3 py-1.5 border-b-2 border-primary font-bold text-primary text-xs transition";
+        privacyTab.className = "px-3 py-1.5 border-b-2 border-transparent font-medium text-slate-500 hover:text-slate-800 text-xs transition";
+        termsBody.classList.remove('hidden');
+        privacyBody.classList.add('hidden');
+      } else {
+        privacyTab.className = "px-3 py-1.5 border-b-2 border-primary font-bold text-primary text-xs transition";
+        termsTab.className = "px-3 py-1.5 border-b-2 border-transparent font-medium text-slate-500 hover:text-slate-800 text-xs transition";
+        privacyBody.classList.remove('hidden');
+        termsBody.classList.add('hidden');
+      }
     }
 
     function onConfirmTermsModal() {
@@ -535,47 +654,83 @@
         termsModalResolver = null;
       }
       // Re-enable login button
-      submitBtn.disabled = false;
-      btnText.textContent = 'Đăng nhập';
-      btnIcon.classList.remove('animate-spin');
-      btnIcon.textContent = 'arrow_forward';
-      errorAlert.classList.remove('hidden');
+      const submitBtn = document.getElementById('submitLoginBtn');
+      const btnText = document.getElementById('btnText');
+      const btnIcon = document.getElementById('btnIcon');
+      const errorAlert = document.getElementById('errorAlert');
+      const errorMessage = document.getElementById('errorMessage');
+
+      if (submitBtn) submitBtn.disabled = false;
+      if (btnText) btnText.textContent = 'Đăng nhập';
+      if (btnIcon) {
+        btnIcon.classList.remove('animate-spin');
+        btnIcon.textContent = 'arrow_forward';
+      }
+      if (errorAlert) errorAlert.classList.remove('hidden');
       document.getElementById('errorTitle').textContent = 'Chưa đồng ý điều khoản';
-      errorMessage.textContent = 'Bạn cần đồng ý với phiên bản điều khoản mới nhất để tiếp tục sử dụng hệ thống.';
+      if (errorMessage) errorMessage.textContent = 'Bạn cần đồng ý với phiên bản điều khoản mới nhất để tiếp tục sử dụng hệ thống.';
     }
   </script>
 
   <!-- Modal Terms Re-Acceptance (S-54 AC3) -->
   <div id="termsUpdateModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="relative bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
-      <div class="flex items-center gap-3 pb-3 border-b border-slate-100">
-        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-          <span class="material-symbols-outlined text-[24px]">verified_user</span>
+    <div class="relative bg-white rounded-2xl max-w-xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 transition-all">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-[24px]">verified_user</span>
+          </div>
+          <div>
+            <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <span>Cập nhật Điều khoản dịch vụ</span>
+              <span id="termsModalVersionBadge" class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">v1.0</span>
+            </h3>
+            <p class="text-xs text-slate-500">EventPulse cập nhật Điều khoản &amp; Chính sách bảo vệ dữ liệu</p>
+          </div>
         </div>
-        <div>
-          <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
-            <span>Cập nhật Điều khoản dịch vụ</span>
-            <span id="termsModalVersionBadge" class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">v1.1</span>
-          </h3>
-          <p class="text-xs text-slate-500">EventPulse đã cập nhật Chính sách riêng tư &amp; Điều khoản mới</p>
-        </div>
+        <span id="termsModalDateBadge" class="text-[11px] text-slate-400 font-medium"></span>
       </div>
 
-      <div class="my-4 p-4 bg-slate-50 rounded-xl text-xs text-slate-600 space-y-2.5 border border-slate-200 leading-relaxed">
-        <p class="font-medium text-slate-800">Để tiếp tục đăng nhập, bạn cần xem lại và đồng ý với phiên bản chính sách mới:</p>
-        <ul class="list-disc pl-4 space-y-1 text-slate-600 text-[11px]">
-          <li>Bảo vệ dữ liệu cá nhân theo Nghị định 13/2023/NĐ-CP.</li>
-          <li>Quyền thu hồi nhận email tiếp thị bất cứ lúc nào trong mục <em>Cài đặt riêng tư</em>.</li>
-          <li>Quy trình mã hóa chữ ký số vé điện tử ECDSA nâng cao.</li>
+      <!-- SUMMARY VIEW -->
+      <div id="termsSummaryView" class="my-4 p-4 bg-slate-50 rounded-xl text-xs text-slate-600 space-y-3 border border-slate-200 leading-relaxed">
+        <p class="font-semibold text-slate-800">Để tiếp tục đăng nhập, bạn cần xem lại và đồng ý với các nội dung chính sách mới:</p>
+        <ul class="list-disc pl-4 space-y-1.5 text-slate-600 text-[11px]">
+          <li><strong>Mô hình nền tảng &amp; vé sự kiện:</strong> Quy định rõ ràng vai trò nền tảng trung gian công nghệ, minh bạch quyền lợi và nghĩa vụ giữa Khách hàng, Ban Tổ Chức (BTC) và EventPulse.</li>
+          <li><strong>Quy định mua vé &amp; Hoàn hủy:</strong> Khách hàng có quyền chủ động hủy vé trước 24h &amp; hoàn tiền 90% (tự động nhả ghế); hoàn tiền 100% khi BTC hoãn/hủy sự kiện.</li>
+          <li><strong>Soát vé điện tử E-ticket:</strong> Mã QR tích hợp chữ ký số mật mã ECDSA chống vé giả mạo tuyệt đối; nghiêm cấm phe vé &amp; gom vé số lượng lớn.</li>
+          <li><strong>Bảo vệ dữ liệu cá nhân (Nghị định 13/2023/NĐ-CP):</strong> Hỗ trợ quyền yêu cầu xóa/ẩn danh dữ liệu cá nhân ("quyền được lãng quên") và quyền thu hồi email tiếp thị bất cứ lúc nào trong mục <em>Cài đặt riêng tư</em>.</li>
         </ul>
       </div>
 
-      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-        <button onclick="onCancelTermsModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition">Từ chối</button>
-        <button onclick="onConfirmTermsModal()" class="px-5 py-2 rounded-xl bg-primary hover:bg-primary-container text-white text-xs font-bold transition shadow-sm flex items-center gap-1.5">
-          <span class="material-symbols-outlined text-[16px]">check</span>
-          <span>Tôi đồng ý &amp; Đăng nhập</span>
+      <!-- DETAIL FULL TERMS VIEW (Expandable) -->
+      <div id="termsDetailView" class="hidden my-3">
+        <div class="flex gap-2 border-b border-slate-200 mb-2">
+          <button id="loginTabTermsBtn" onclick="switchLoginTermsTab('terms')" type="button" class="px-3 py-1.5 border-b-2 border-primary font-bold text-primary text-xs transition">1. Điều khoản dịch vụ</button>
+          <button id="loginTabPrivacyBtn" onclick="switchLoginTermsTab('privacy')" type="button" class="px-3 py-1.5 border-b-2 border-transparent font-medium text-slate-500 hover:text-slate-800 text-xs transition">2. Chính sách riêng tư &amp; Tiếp thị</button>
+        </div>
+        <div class="max-h-80 overflow-y-auto p-3.5 bg-slate-50 rounded-xl text-xs text-slate-700 leading-relaxed border border-slate-200">
+          <div id="modalFullTermsContent"></div>
+          <div id="modalFullPrivacyContent" class="hidden"></div>
+        </div>
+      </div>
+
+      <!-- Action Link to Toggle Detail -->
+      <div class="mb-3 text-center">
+        <button onclick="toggleTermsDetailView()" type="button" class="inline-flex items-center gap-1.5 text-primary hover:text-indigo-700 text-xs font-bold hover:underline transition">
+          <span class="material-symbols-outlined text-[16px]" id="toggleTermsDetailIcon">menu_book</span>
+          <span id="toggleTermsDetailText">Đọc toàn văn Điều khoản &amp; Chính sách đầy đủ</span>
         </button>
+      </div>
+
+      <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+        <span class="text-[11px] text-slate-400">Bấm đồng ý để lưu xác nhận và hoàn tất đăng nhập.</span>
+        <div class="flex items-center gap-2">
+          <button onclick="onCancelTermsModal()" type="button" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition">Từ chối</button>
+          <button onclick="onConfirmTermsModal()" type="button" class="px-5 py-2 rounded-xl bg-primary hover:bg-primary-container text-white text-xs font-bold transition shadow-sm flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[16px]">check</span>
+            <span>Tôi đồng ý &amp; Đăng nhập</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>

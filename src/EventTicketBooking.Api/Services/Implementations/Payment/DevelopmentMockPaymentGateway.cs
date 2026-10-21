@@ -63,13 +63,22 @@ public sealed class DevelopmentMockPaymentGateway : IPaymentGateway
     {
         if (request == null || request.Amount <= 0)
         {
-            return Task.FromResult(RefundCreationResult.CreateFailure("Yêu cầu hoàn tiền không hợp lệ."));
+            return Task.FromResult(RefundCreationResult.CreateFailure("Yêu cầu hoàn tiền không hợp lệ.", "INVALID_REQUEST", false));
         }
 
-        bool simulateFailure = string.Equals(_mockOptions.RefundOutcome, "Failed", StringComparison.OrdinalIgnoreCase);
+        bool simulateFailure = request.SimulateFailure
+            || string.Equals(_mockOptions.RefundOutcome, "Failed", StringComparison.OrdinalIgnoreCase)
+            || (!string.IsNullOrWhiteSpace(request.Description) && (
+                request.Description.Contains("FAIL_RETRY", StringComparison.OrdinalIgnoreCase) ||
+                request.Description.Contains("SIMULATE", StringComparison.OrdinalIgnoreCase) ||
+                request.Description.Contains("TIMEOUT", StringComparison.OrdinalIgnoreCase)));
+
         if (simulateFailure)
         {
-            return Task.FromResult(RefundCreationResult.CreateFailure("Mock gateway mô phỏng hoàn tiền thất bại (RefundOutcome=Failed)."));
+            return Task.FromResult(RefundCreationResult.CreateFailure(
+                "Mô phỏng: Cổng thanh toán phản hồi lỗi Timeout kết nối (Lỗi tạm thời, cho phép retry).",
+                "GATEWAY_TIMEOUT",
+                isRetryable: true));
         }
 
         return Task.FromResult(RefundCreationResult.CreateSuccess($"MOCK-REFUND-{request.OrderCode}-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}"));

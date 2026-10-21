@@ -72,5 +72,17 @@ namespace EventTicketBooking.Api.Services.Interfaces
             string actorName,
             Guid? actorId = null,
             CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Giả lập hoàn tiền thất bại cho đơn hàng phục vụ kiểm thử Story S-48.
+        /// Ghi nhận RetryCount (tăng dần 1 -> 2 -> 3).
+        /// Khi RetryCount >= 3, tự động chuyển sang ManualReviewRequired và kích hoạt AccountingNotificationService.
+        /// </summary>
+        Task<EventTicketBooking.Api.DTOs.RefundExecutionResult> SimulateRefundFailureForOrderAsync(
+            Guid orderId,
+            string actorType = "USER",
+            string actorName = "User",
+            Guid? actorId = null,
+            CancellationToken cancellationToken = default);
     }
 }

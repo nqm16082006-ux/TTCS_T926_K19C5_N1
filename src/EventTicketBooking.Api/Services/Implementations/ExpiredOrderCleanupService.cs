@@ -23,17 +23,23 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly ILogger<ExpiredOrderCleanupService> _logger;
         private readonly IHubContext<SeatStatusHub>? _hubContext;
         private readonly IOrderAuditService _orderAuditService;
+        private readonly IDiscountCodeService _discountCodeService;
+        private readonly IWaitlistService? _waitlistService;
 
         public ExpiredOrderCleanupService(
             AppDbContext dbContext,
             ILogger<ExpiredOrderCleanupService> logger,
             IHubContext<SeatStatusHub>? hubContext = null,
-            IOrderAuditService? orderAuditService = null)
+            IOrderAuditService? orderAuditService = null,
+            IDiscountCodeService? discountCodeService = null,
+            IWaitlistService? waitlistService = null)
         {
             _dbContext = dbContext;
             _logger = logger;
             _hubContext = hubContext;
             _orderAuditService = orderAuditService ?? new OrderAuditService(dbContext, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
+            _discountCodeService = discountCodeService ?? new DiscountCodeService(dbContext);
+            _waitlistService = waitlistService;
         }
 
         public async Task<int> CleanupExpiredOrdersAsync(DateTimeOffset? fakeNow = null, CancellationToken cancellationToken = default)
@@ -110,6 +116,12 @@ namespace EventTicketBooking.Api.Services.Implementations
                         null,
                         "Job nền quét và huỷ đơn hàng do quá hạn thời gian thanh toán.");
 
+                    // Story S-56: Giải phóng lượt sử dụng mã giảm giá nếu đơn hàng có áp dụng
+                    if (order.DiscountCodeId.HasValue)
+                    {
+                        await _discountCodeService.ReleaseDiscountReservationAsync(order, cancellationToken);
+                    }
+
                     if (order.OrderItems != null && order.OrderItems.Any())
                     {
                         seatIdsToRelease.AddRange(order.OrderItems.Select(oi => oi.SeatId));
@@ -117,6 +129,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                 }
 
                 seatIdsToRelease = seatIdsToRelease.Distinct().ToList();
+                var heldSeats = new List<Seat>();
 
                 if (seatIdsToRelease.Any())
                 {
@@ -148,7 +161,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                     }
 
                     // 2. Chuyển trạng thái ghế từ HELD về AVAILABLE
-                    var heldSeats = await _dbContext.Seats
+                    heldSeats = await _dbContext.Seats
                         .Where(s => seatIdsToRelease.Contains(s.Id) && s.Status == "HELD")
                         .ToListAsync(cancellationToken);
 
@@ -179,6 +192,23 @@ namespace EventTicketBooking.Api.Services.Implementations
                 if (transaction != null)
                 {
                     await transaction.CommitAsync(cancellationToken);
+                }
+
+                // Story S-59: Khi có ghế về kho do đơn hàng quá hạn thanh toán, gửi email thông báo cho người chờ theo thứ tự đăng ký
+                if (_waitlistService != null && seatIdsToRelease.Any())
+                {
+                    var grouped = heldSeats.GroupBy(s => s.ShowtimeId);
+                    foreach (var group in grouped)
+                    {
+                        try
+                        {
+                            await _waitlistService.ProcessAvailableSeatsNotificationAsync(group.Key, group.Count(), cancellationToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Lỗi thông báo danh sách chờ cho suất {ShowtimeId} sau khi huỷ đơn quá hạn.", group.Key);
+                        }
+                    }
                 }
 
                 _logger.LogInformation("Đã huỷ thành công {Count} đơn hàng quá hạn.", cancelledCount);

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using EventTicketBooking.Api.Models;
 using EventTicketBooking.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -16,23 +17,36 @@ namespace EventTicketBooking.Api.Data
     /// </summary>
     public static class DataSeeder
     {
-        public static async Task SeedAsync(IServiceProvider serviceProvider)
+        public static async Task SeedAsync(IServiceProvider serviceProvider, Microsoft.Extensions.Configuration.IConfiguration? configuration = null)
         {
             using var scope = serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
             var logger = scope.ServiceProvider.GetService<ILogger<AppDbContext>>();
+            configuration ??= scope.ServiceProvider.GetService<IConfiguration>();
 
-            // Migration failures must stop startup rather than be swallowed as seed warnings.
-            if (context.Database.IsRelational())
+            // Story S-55 & S-43: Kiểm tra cấu hình AutoMigrate và AutoSeed/SeedDemoData
+            // AutoMigrate và AutoSeed mặc định là false khi không có cấu hình (fail-safe)
+            bool autoMigrate = configuration?.GetValue<bool?>("Database:AutoMigrate") ?? false;
+            bool autoSeed = (configuration?.GetValue<bool?>("Database:AutoSeed") ?? false)
+                            || (configuration?.GetValue<bool>("Database:SeedDemoData") ?? false);
+
+            if (!autoMigrate && !autoSeed)
+            {
+                logger?.LogInformation("[S-55] Cả Database:AutoMigrate và Database:AutoSeed đều bị tắt. Bỏ qua toàn bộ migration và seeding.");
+                return;
+            }
+
+            // Chỉ chạy migration khi AutoMigrate được bật rõ ràng
+            if (autoMigrate && context.Database.IsRelational())
             {
                 await context.Database.MigrateAsync();
             }
 
             try
             {
-
-                if (context.Database.IsNpgsql())
+                // Chỉ chạy các lệnh DDL, Cast, Alter Type khi AutoMigrate được bật
+                if (autoMigrate && context.Database.IsNpgsql())
                 {
                     var conn = (Npgsql.NpgsqlConnection)context.Database.GetDbConnection();
                     if (conn.State != System.Data.ConnectionState.Open)
@@ -194,12 +208,26 @@ namespace EventTicketBooking.Api.Data
                     {
                         logger?.LogWarning(ex, "Could not normalize statuses in DB.");
                     }
+
+                    try
+                    {
+                        using var s61Cmd = conn.CreateCommand();
+                        s61Cmd.CommandText = "ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"ReminderSentAt\" timestamp with time zone;";
+                        await s61Cmd.ExecuteNonQueryAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger?.LogWarning(ex, "Could not ensure ReminderSentAt column on orders table.");
+                    }
                 }
 
-                // 1. Kiểm tra nếu bảng Roles chưa có dữ liệu thì seed 5 roles
-                if (!await context.Roles.AnyAsync())
+                // Chỉ thực hiện seeding dữ liệu nếu AutoSeed được bật
+                if (autoSeed)
                 {
-                    var roles = new List<Role>
+                    // 1. Kiểm tra nếu bảng Roles chưa có dữ liệu thì seed 5 roles
+                    if (!await context.Roles.AnyAsync())
+                    {
+                        var roles = new List<Role>
                     {
                         new Role { Id = Guid.NewGuid(), Name = "Admin", Description = "Quản trị viên toàn hệ thống", CreatedAt = DateTime.UtcNow },
                         new Role { Id = Guid.NewGuid(), Name = "Organizer", Description = "Ban tổ chức sự kiện", CreatedAt = DateTime.UtcNow },
@@ -208,45 +236,45 @@ namespace EventTicketBooking.Api.Data
                         new Role { Id = Guid.NewGuid(), Name = "Auditor", Description = "Kiểm toán viên và quản lý tài chính", CreatedAt = DateTime.UtcNow }
                     };
 
-                    await context.Roles.AddRangeAsync(roles);
-                    await context.SaveChangesAsync();
-                }
+                        await context.Roles.AddRangeAsync(roles);
+                        await context.SaveChangesAsync();
+                    }
 
-                // 2. Kiểm tra nếu bảng Users chưa có dữ liệu thì seed 2 tài khoản demo
-                if (!await context.Users.AnyAsync())
-                {
-                    var adminRole = await context.Roles.FirstAsync(r => r.Name == "Admin");
-                    var organizerRole = await context.Roles.FirstAsync(r => r.Name == "Organizer");
-
-                    var adminUser = new User
+                    // 2. Kiểm tra nếu bảng Users chưa có dữ liệu thì seed 2 tài khoản demo
+                    if (!await context.Users.AnyAsync())
                     {
-                        Id = Guid.NewGuid(),
-                        Username = "admin",
-                        Email = "admin@eventticket.com",
-                        PasswordHash = passwordHasher.Hash("Admin@123456"),
-                        FullName = "System Administrator",
-                        IsActive = true,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
+                        var adminRole = await context.Roles.FirstAsync(r => r.Name == "Admin");
+                        var organizerRole = await context.Roles.FirstAsync(r => r.Name == "Organizer");
 
-                    var organizerUser = new User
-                    {
-                        Id = Guid.NewGuid(),
-                        Username = "organizer",
-                        Email = "organizer@eventticket.com",
-                        PasswordHash = passwordHasher.Hash("Organizer@123456"),
-                        FullName = "Event Organizer",
-                        IsActive = true,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
+                        var adminUser = new User
+                        {
+                            Id = Guid.NewGuid(),
+                            Username = "admin",
+                            Email = "admin@eventticket.com",
+                            PasswordHash = passwordHasher.Hash("Admin@123456"),
+                            FullName = "System Administrator",
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
 
-                    await context.Users.AddRangeAsync(adminUser, organizerUser);
-                    await context.SaveChangesAsync();
+                        var organizerUser = new User
+                        {
+                            Id = Guid.NewGuid(),
+                            Username = "organizer",
+                            Email = "organizer@eventticket.com",
+                            PasswordHash = passwordHasher.Hash("Organizer@123456"),
+                            FullName = "Event Organizer",
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
 
-                    // Gán quan hệ tương ứng vào bảng trung gian UserRoles
-                    var userRoles = new List<UserRole>
+                        await context.Users.AddRangeAsync(adminUser, organizerUser);
+                        await context.SaveChangesAsync();
+
+                        // Gán quan hệ tương ứng vào bảng trung gian UserRoles
+                        var userRoles = new List<UserRole>
                     {
                         new UserRole
                         {
@@ -262,132 +290,230 @@ namespace EventTicketBooking.Api.Data
                         }
                     };
 
-                    await context.UserRoles.AddRangeAsync(userRoles);
-                    await context.SaveChangesAsync();
-                }
-
-                // 3. Kiểm tra và seed các sự kiện công khai mẫu nếu chưa có trong DB
-                var organizer = await context.Users.FirstOrDefaultAsync(u => u.Username == "organizer");
-                if (organizer != null)
-                {
-                    string[] rows = new[] { "A", "B", "C", "D", "E" };
-
-                    // Event 1: Anh Trai Say Hi
-                    if (!await context.Events.AnyAsync(e => e.Title.Contains("Anh Trai Say Hi")))
-                    {
-                        var event1 = new Event
-                        {
-                            Id = Guid.NewGuid(),
-                            OwnerId = organizer.Id,
-                            Title = "Live Concert Anh Trai Say Hi 2026",
-                            Description = "Đêm nhạc quy tụ dàn ca sĩ hàng đầu với hệ thống âm thanh, ánh sáng chuẩn quốc tế đỉnh cao.",
-                            Location = "Sân vận động Quốc gia Mỹ Đình, Hà Nội",
-                            ImageUrl = "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80",
-                            StartTime = DateTime.UtcNow.AddDays(7),
-                            EndTime = DateTime.UtcNow.AddDays(7).AddHours(4),
-                            TotalSeats = 50,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        };
-
-                        var showtime1 = new Showtime
-                        {
-                            Id = Guid.NewGuid(),
-                            EventId = event1.Id,
-                            StartTime = event1.StartTime,
-                            EndTime = event1.EndTime,
-                            AvailableSeats = 50
-                        };
-                        showtime1.ChangeStatus(ShowtimeStatus.OnSale);
-
-                        var catStandard = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "Standard / Vé Thường", Price = 300000 };
-                        var catVip = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "VIP / Vé Cao Cấp", Price = 1200000 };
-                        var catVvip = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "VVIP / Vé Đặc Biệt", Price = 2500000 };
-
-                        showtime1.SeatCategories.Add(catStandard);
-                        showtime1.SeatCategories.Add(catVip);
-                        showtime1.SeatCategories.Add(catVvip);
-                        event1.Showtimes.Add(showtime1);
-
-                        await context.Events.AddAsync(event1);
-                        await context.SaveChangesAsync();
-
-                        var seatsList1 = new List<Seat>();
-                        foreach (var r in rows)
-                        {
-                            for (int num = 1; num <= 10; num++)
-                            {
-                                var cat = (r == "A" || r == "B") ? catVvip : (r == "C" ? catVip : catStandard);
-                                seatsList1.Add(new Seat
-                                {
-                                    Id = Guid.NewGuid(),
-                                    ShowtimeId = showtime1.Id,
-                                    SeatCategoryId = cat.Id,
-                                    Row = r,
-                                    SeatNumber = num
-                                });
-                            }
-                        }
-                        await context.Seats.AddRangeAsync(seatsList1);
+                        await context.UserRoles.AddRangeAsync(userRoles);
                         await context.SaveChangesAsync();
                     }
 
-                    // Event 2: Festival Âm Nhạc Mùa Hè
-                    if (!await context.Events.AnyAsync(e => e.Title.Contains("Festival Âm Nhạc Mùa Hè")))
+                    // 3. Kiểm tra và seed các sự kiện công khai mẫu nếu chưa có trong DB
+                    var organizer = await context.Users.FirstOrDefaultAsync(u => u.Username == "organizer");
+                    if (organizer != null)
                     {
-                        var event2 = new Event
+                        string[] rows = new[] { "A", "B", "C", "D", "E" };
+
+                        // Event 1: Anh Trai Say Hi
+                        if (!await context.Events.AnyAsync(e => e.Title.Contains("Anh Trai Say Hi")))
                         {
-                            Id = Guid.NewGuid(),
-                            OwnerId = organizer.Id,
-                            Title = "Festival Âm Nhạc Mùa Hè 2026",
-                            Description = "Lễ hội âm nhạc mùa hè cuồng nhiệt với nhiều nghệ sĩ Indie và Rock bùng nổ.",
-                            Location = "Phố đi bộ Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh",
-                            ImageUrl = "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&q=80",
-                            StartTime = DateTime.UtcNow.AddDays(14),
-                            EndTime = DateTime.UtcNow.AddDays(14).AddHours(5),
-                            TotalSeats = 50,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        };
-
-                        var showtime2 = new Showtime
-                        {
-                            Id = Guid.NewGuid(),
-                            EventId = event2.Id,
-                            StartTime = event2.StartTime,
-                            EndTime = event2.EndTime,
-                            AvailableSeats = 50
-                        };
-                        showtime2.ChangeStatus(ShowtimeStatus.OnSale);
-
-                        var catFanZone = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime2.Id, Name = "Vé Fan Zone", Price = 800000 };
-                        var catPhoThong = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime2.Id, Name = "Vé Phổ Thông", Price = 200000 };
-
-                        showtime2.SeatCategories.Add(catPhoThong);
-                        showtime2.SeatCategories.Add(catFanZone);
-                        event2.Showtimes.Add(showtime2);
-
-                        await context.Events.AddAsync(event2);
-                        await context.SaveChangesAsync();
-
-                        var seatsList2 = new List<Seat>();
-                        foreach (var r in rows)
-                        {
-                            for (int num = 1; num <= 10; num++)
+                            var event1 = new Event
                             {
-                                var cat = (r == "A" || r == "B") ? catFanZone : catPhoThong;
-                                seatsList2.Add(new Seat
+                                Id = Guid.NewGuid(),
+                                OwnerId = organizer.Id,
+                                Title = "Live Concert Anh Trai Say Hi 2026",
+                                Description = "Đêm nhạc quy tụ dàn ca sĩ hàng đầu với hệ thống âm thanh, ánh sáng chuẩn quốc tế đỉnh cao.",
+                                Location = "Sân vận động Quốc gia Mỹ Đình, Hà Nội",
+                                ImageUrl = "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=80",
+                                StartTime = DateTime.UtcNow.AddDays(7),
+                                EndTime = DateTime.UtcNow.AddDays(7).AddHours(4),
+                                TotalSeats = 50,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            };
+
+                            var showtime1 = new Showtime
+                            {
+                                Id = Guid.NewGuid(),
+                                EventId = event1.Id,
+                                StartTime = event1.StartTime,
+                                EndTime = event1.EndTime,
+                                AvailableSeats = 50
+                            };
+                            showtime1.ChangeStatus(ShowtimeStatus.OnSale);
+
+                            var catStandard = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "Standard / Vé Thường", Price = 300000 };
+                            var catVip = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "VIP / Vé Cao Cấp", Price = 1200000 };
+                            var catVvip = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime1.Id, Name = "VVIP / Vé Đặc Biệt", Price = 2500000 };
+
+                            showtime1.SeatCategories.Add(catStandard);
+                            showtime1.SeatCategories.Add(catVip);
+                            showtime1.SeatCategories.Add(catVvip);
+                            event1.Showtimes.Add(showtime1);
+
+                            await context.Events.AddAsync(event1);
+                            await context.SaveChangesAsync();
+
+                            var seatsList1 = new List<Seat>();
+                            foreach (var r in rows)
+                            {
+                                for (int num = 1; num <= 10; num++)
                                 {
-                                    Id = Guid.NewGuid(),
-                                    ShowtimeId = showtime2.Id,
-                                    SeatCategoryId = cat.Id,
-                                    Row = r,
-                                    SeatNumber = num
-                                });
+                                    var cat = (r == "A" || r == "B") ? catVvip : (r == "C" ? catVip : catStandard);
+                                    seatsList1.Add(new Seat
+                                    {
+                                        Id = Guid.NewGuid(),
+                                        ShowtimeId = showtime1.Id,
+                                        SeatCategoryId = cat.Id,
+                                        Row = r,
+                                        SeatNumber = num
+                                    });
+                                }
                             }
+                            await context.Seats.AddRangeAsync(seatsList1);
+                            await context.SaveChangesAsync();
                         }
-                        await context.Seats.AddRangeAsync(seatsList2);
-                        await context.SaveChangesAsync();
+
+                        // Event 2: Festival Âm Nhạc Mùa Hè
+                        if (!await context.Events.AnyAsync(e => e.Title.Contains("Festival Âm Nhạc Mùa Hè")))
+                        {
+                            var event2 = new Event
+                            {
+                                Id = Guid.NewGuid(),
+                                OwnerId = organizer.Id,
+                                Title = "Festival Âm Nhạc Mùa Hè 2026",
+                                Description = "Lễ hội âm nhạc mùa hè cuồng nhiệt với nhiều nghệ sĩ Indie và Rock bùng nổ.",
+                                Location = "Phố đi bộ Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh",
+                                ImageUrl = "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&q=80",
+                                StartTime = DateTime.UtcNow.AddDays(14),
+                                EndTime = DateTime.UtcNow.AddDays(14).AddHours(5),
+                                TotalSeats = 50,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            };
+
+                            var showtime2 = new Showtime
+                            {
+                                Id = Guid.NewGuid(),
+                                EventId = event2.Id,
+                                StartTime = event2.StartTime,
+                                EndTime = event2.EndTime,
+                                AvailableSeats = 50
+                            };
+                            showtime2.ChangeStatus(ShowtimeStatus.OnSale);
+
+                            var catFanZone = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime2.Id, Name = "Vé Fan Zone", Price = 800000 };
+                            var catPhoThong = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime2.Id, Name = "Vé Phổ Thông", Price = 200000 };
+
+                            showtime2.SeatCategories.Add(catPhoThong);
+                            showtime2.SeatCategories.Add(catFanZone);
+                            event2.Showtimes.Add(showtime2);
+
+                            await context.Events.AddAsync(event2);
+                            await context.SaveChangesAsync();
+
+                            var seatsList2 = new List<Seat>();
+                            foreach (var r in rows)
+                            {
+                                for (int num = 1; num <= 10; num++)
+                                {
+                                    var cat = (r == "A" || r == "B") ? catFanZone : catPhoThong;
+                                    seatsList2.Add(new Seat
+                                    {
+                                        Id = Guid.NewGuid(),
+                                        ShowtimeId = showtime2.Id,
+                                        SeatCategoryId = cat.Id,
+                                        Row = r,
+                                        SeatNumber = num
+                                    });
+                                }
+                            }
+                            await context.Seats.AddRangeAsync(seatsList2);
+                            await context.SaveChangesAsync();
+                        }
+
+                        // Event 3: Đại Nhạc Hội Quốc Tế 2026 (Demo Sơ Đồ 3.000 Ghế S-60 / TTKN-127)
+                        if (!await context.Events.AnyAsync(e => e.Title.Contains("3.000 Ghế")))
+                        {
+                            var event3 = new Event
+                            {
+                                Id = Guid.NewGuid(),
+                                OwnerId = organizer.Id,
+                                Title = "Đại Nhạc Hội Quốc Tế 2026 (Demo Sơ Đồ 3.000 Ghế)",
+                                Description = "Sự kiện quy mô lớn kiểm thử hiệu năng sơ đồ ghế và xuất báo cáo PDF 3.000 chỗ (Story S-60 / TTKN-127).",
+                                Location = "Sân vận động Quốc gia Mỹ Đình (Sơ đồ Đại trà 3.000 chỗ)",
+                                ImageUrl = "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=1200&q=80",
+                                StartTime = DateTime.UtcNow.AddDays(20),
+                                EndTime = DateTime.UtcNow.AddDays(20).AddHours(4),
+                                TotalSeats = 3000,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            };
+
+                            var showtime3 = new Showtime
+                            {
+                                Id = Guid.NewGuid(),
+                                EventId = event3.Id,
+                                StartTime = event3.StartTime,
+                                EndTime = event3.EndTime,
+                                AvailableSeats = 3000
+                            };
+                            showtime3.ChangeStatus(ShowtimeStatus.OnSale);
+
+                            var catStandard = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime3.Id, Name = "Vé Tiêu Chuẩn", Price = 500000 };
+                            var catVip = new SeatCategory { Id = Guid.NewGuid(), ShowtimeId = showtime3.Id, Name = "Vé VIP", Price = 1500000 };
+
+                            showtime3.SeatCategories.Add(catStandard);
+                            showtime3.SeatCategories.Add(catVip);
+                            event3.Showtimes.Add(showtime3);
+
+                            await context.Events.AddAsync(event3);
+                            await context.SaveChangesAsync();
+
+                            // Tạo 50 hàng (R01..R50), mỗi hàng 60 ghế = 3.000 ghế
+                            var seatsList3 = new List<Seat>(3000);
+                            for (int rIdx = 1; rIdx <= 50; rIdx++)
+                            {
+                                var rowCode = $"R{rIdx:D2}";
+                                var cat = rIdx <= 15 ? catVip : catStandard;
+                                for (int num = 1; num <= 60; num++)
+                                {
+                                    seatsList3.Add(new Seat
+                                    {
+                                        Id = Guid.NewGuid(),
+                                        ShowtimeId = showtime3.Id,
+                                        SeatCategoryId = cat.Id,
+                                        Row = rowCode,
+                                        SeatNumber = num
+                                    });
+                                }
+                            }
+                            await context.Seats.AddRangeAsync(seatsList3);
+                            await context.SaveChangesAsync();
+
+                            var buyer = await context.Users.FirstOrDefaultAsync(u => u.Username == "buyer") ?? organizer;
+
+                            // 1.000 ghế SOLD (Đã bán)
+                            var soldSeats = seatsList3.Take(1000).ToList();
+                            var order = new Order
+                            {
+                                Id = Guid.NewGuid(),
+                                UserId = buyer.Id,
+                                ShowtimeId = showtime3.Id,
+                                Status = OrderStatus.Paid,
+                                TotalAmount = 500000 * 1000,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            };
+                            var orderItems = soldSeats.Select(s => new OrderItem
+                            {
+                                Id = Guid.NewGuid(),
+                                OrderId = order.Id,
+                                SeatId = s.Id,
+                                Price = 500000
+                            }).ToList();
+                            order.OrderItems = orderItems;
+                            await context.Orders.AddAsync(order);
+
+                            // 300 ghế HELD (Đang giữ chỗ)
+                            var heldSeats = seatsList3.Skip(1000).Take(300).ToList();
+                            var holds = heldSeats.Select(s => new SeatHolds
+                            {
+                                SeatId = s.Id,
+                                UserId = buyer.Id,
+                                Status = "ACTIVE",
+                                HeldAt = DateTime.UtcNow,
+                                ExpiresAt = DateTime.UtcNow.AddHours(2)
+                            }).ToList();
+                            await context.SeatHold.AddRangeAsync(holds);
+                            await context.SaveChangesAsync();
+                        }
                     }
                 }
             }

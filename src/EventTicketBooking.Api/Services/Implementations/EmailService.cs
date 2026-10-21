@@ -161,6 +161,131 @@ public class EmailService : IEmailService
         return true;
     }
 
+    /// <inheritdoc/>
+    public async Task<bool> SendShowtimeReminderEmailAsync(
+        string toEmail,
+        string toName,
+        string eventTitle,
+        string location,
+        string showtime,
+        System.Collections.Generic.IEnumerable<string> seatNames,
+        System.Collections.Generic.IEnumerable<string>? ticketCodes = null,
+        string? orderId = null,
+        string? directions = null)
+    {
+        try
+        {
+            var message = CreateMessage(toEmail, toName);
+            message.Subject = $"⏰ [Nhắc nhở] Sự kiện sắp diễn ra trong 24 giờ tới: {eventTitle}";
+
+            var appUrl = (_configuration["App:PublicBaseUrl"] ?? _configuration["AppUrl"] ?? _configuration["PublicUrl"] ?? "http://localhost:5012").TrimEnd('/');
+            var seatsText = string.Join(", ", seatNames);
+            var ticketsText = ticketCodes != null ? string.Join(", ", ticketCodes) : string.Empty;
+
+            message.Body = new TextPart("html")
+            {
+                Text = BuildShowtimeReminderEmailBody(
+                    System.Net.WebUtility.HtmlEncode(toName),
+                    System.Net.WebUtility.HtmlEncode(eventTitle),
+                    System.Net.WebUtility.HtmlEncode(location),
+                    System.Net.WebUtility.HtmlEncode(showtime),
+                    System.Net.WebUtility.HtmlEncode(seatsText),
+                    System.Net.WebUtility.HtmlEncode(ticketsText),
+                    orderId,
+                    directions,
+                    appUrl)
+            };
+
+            await SendEmailInternalAsync(message, toEmail);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send showtime reminder email to {Email}", toEmail);
+            return false;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> SendShowtimeRescheduledEmailAsync(
+        string toEmail,
+        string toName,
+        string eventTitle,
+        string location,
+        string oldShowtime,
+        string newShowtime,
+        System.Collections.Generic.IEnumerable<string> seatNames,
+        string? orderId = null,
+        string? directions = null)
+    {
+        try
+        {
+            var message = CreateMessage(toEmail, toName);
+            message.Subject = $"📢 [Cập nhật quan trọng] Thay đổi giờ diễn sự kiện: {eventTitle}";
+
+            var appUrl = (_configuration["App:PublicBaseUrl"] ?? _configuration["AppUrl"] ?? _configuration["PublicUrl"] ?? "http://localhost:5012").TrimEnd('/');
+            var seatsText = string.Join(", ", seatNames);
+
+            message.Body = new TextPart("html")
+            {
+                Text = BuildShowtimeRescheduledEmailBody(
+                    System.Net.WebUtility.HtmlEncode(toName),
+                    System.Net.WebUtility.HtmlEncode(eventTitle),
+                    System.Net.WebUtility.HtmlEncode(location),
+                    System.Net.WebUtility.HtmlEncode(oldShowtime),
+                    System.Net.WebUtility.HtmlEncode(newShowtime),
+                    System.Net.WebUtility.HtmlEncode(seatsText),
+                    orderId,
+                    directions,
+                    appUrl)
+            };
+
+            await SendEmailInternalAsync(message, toEmail);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send showtime rescheduled email to {Email}", toEmail);
+            return false;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> SendWaitlistSeatAvailableEmailAsync(
+        string toEmail,
+        string toName,
+        string eventTitle,
+        string location,
+        string showtime,
+        int availableSeatsCount,
+        string bookingUrl)
+    {
+        try
+        {
+            var message = CreateMessage(toEmail, toName);
+            message.Subject = $"🎟️ [Có vé trống] Cơ hội đặt vé cho suất diễn bạn đang chờ: {eventTitle}";
+
+            message.Body = new TextPart("html")
+            {
+                Text = BuildWaitlistSeatAvailableEmailBody(
+                    System.Net.WebUtility.HtmlEncode(toName),
+                    System.Net.WebUtility.HtmlEncode(eventTitle),
+                    System.Net.WebUtility.HtmlEncode(location),
+                    System.Net.WebUtility.HtmlEncode(showtime),
+                    availableSeatsCount,
+                    bookingUrl)
+            };
+
+            await SendEmailInternalAsync(message, toEmail);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send waitlist seat available email to {Email}", toEmail);
+            return false;
+        }
+    }
+
     private MimeMessage CreateMessage(string toEmail, string toName)
     {
         var senderEmail = GetSetting("SenderEmail", "FromEmail", "Username", "User", "SmtpUser");
@@ -209,10 +334,10 @@ public class EmailService : IEmailService
             return;
         }
 
-        // Tự động chuẩn hóa mật khẩu ứng dụng Gmail (loại bỏ khoảng trắng nếu có)
+        // Tự động chuẩn hóa mật khẩu ứng dụng Gmail (loại bỏ khoảng trắng, dấu gạch ngang nếu có)
         if (host.Contains("gmail.com", StringComparison.OrdinalIgnoreCase))
         {
-            pass = pass.Replace(" ", "");
+            pass = pass.Replace(" ", "").Replace("-", "").Trim();
         }
 
         try
@@ -584,4 +709,357 @@ public class EmailService : IEmailService
         </body>
         </html>
         """;
+
+    // ─── Template email Nhắc nhở trước 24 giờ (Story S-61) ───────────────────
+    private static string BuildShowtimeReminderEmailBody(
+        string name,
+        string eventTitle,
+        string location,
+        string showtime,
+        string seats,
+        string ticketCodes,
+        string? orderId,
+        string? directions,
+        string baseUrl)
+    {
+        var orderLink = !string.IsNullOrWhiteSpace(orderId)
+            ? $"{baseUrl}/order-details.html?id={orderId}"
+            : $"{baseUrl}/my-orders.html";
+
+        var directionsHtml = !string.IsNullOrWhiteSpace(directions)
+            ? System.Net.WebUtility.HtmlEncode(directions)
+            : "Vui lòng có mặt tại địa điểm trước giờ diễn ít nhất 30 - 45 phút để làm thủ tục check-in soát vé và ổn định vị trí ngồi. Bãi gửi xe được bố trí tại cổng chính của địa điểm.";
+
+        var ticketCodesSection = !string.IsNullOrWhiteSpace(ticketCodes)
+            ? $"""
+              <tr>
+                <td style="font-weight: 700; padding: 8px 0; border-bottom: 1px solid #e2e8f0; vertical-align: top;">🎫 Mã vé:</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-family: monospace; font-weight: bold; color: #3525cd;">{ticketCodes}</td>
+              </tr>
+              """
+            : "";
+
+        return $"""
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="UTF-8"/>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+          <title>Nhắc nhở: Sự kiện sắp diễn ra trong 24 giờ tới</title>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center">
+                <table width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+                  <!-- Header -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #3525cd 0%, #712ae2 100%); padding: 32px 24px; text-align: center;">
+                      <div style="font-size: 38px; line-height: 1;">⏰</div>
+                      <h1 style="color: #ffffff; margin: 10px 0 0 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
+                        Sự Kiện Sắp Diễn Ra Trong 24 Giờ Tới!
+                      </h1>
+                      <p style="color: #e0e7ff; margin: 6px 0 0 0; font-size: 13px;">EventPulse Ticketing • Thông báo nhắc lịch tự động</p>
+                    </td>
+                  </tr>
+
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding: 32px 28px;">
+                      <p style="font-size: 16px; color: #1e293b; margin: 0 0 12px 0;">Xin chào <strong>{name}</strong>,</p>
+                      <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 20px 0;">
+                        Chỉ còn <strong>chưa đầy 24 giờ nữa</strong> là sự kiện bạn mong đợi sẽ chính thức diễn ra! EventPulse xin gửi email nhắc nhở để bạn có sự chuẩn bị chu đáo nhất.
+                      </p>
+
+                      <!-- Event Info Card -->
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 0 0 24px 0;">
+                        <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #0f172a; font-weight: 800;">{eventTitle}</h2>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13px; color: #475569;">
+                          <tr>
+                            <td width="32%" style="font-weight: 700; padding: 8px 0; border-bottom: 1px solid #e2e8f0;">⏰ Giờ diễn:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: #0f172a;">{showtime}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700; padding: 8px 0; border-bottom: 1px solid #e2e8f0;">📍 Địa điểm:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">{location}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700; padding: 8px 0; border-bottom: 1px solid #e2e8f0;">💺 Ghế đã đặt:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: #3525cd;">{seats}</td>
+                          </tr>
+                          {ticketCodesSection}
+                        </table>
+                      </div>
+
+                      <!-- Directions & Venue Instructions Box -->
+                      <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 0 10px 10px 0; padding: 16px 18px; margin: 0 0 24px 0;">
+                        <div style="font-size: 14px; font-weight: 700; color: #1e40af; margin-bottom: 6px;">
+                          🗺️ Chỉ Dẫn Địa Điểm &amp; Lưu Ý Tham Dự:
+                        </div>
+                        <div style="font-size: 13px; color: #1e3a8a; line-height: 1.6;">
+                          {directionsHtml}
+                        </div>
+                        <ul style="margin: 10px 0 0 0; padding-left: 18px; font-size: 12px; color: #3b82f6; line-height: 1.6;">
+                          <li>Vui lòng chuẩn bị sẵn mã QR hoặc mã vé trên điện thoại để quét vào cổng nhanh chóng.</li>
+                          <li>Không mang theo vũ khí, chất cháy nổ hoặc vật dụng bị cấm vào khán phòng.</li>
+                        </ul>
+                      </div>
+
+                      <!-- CTA Button -->
+                      <div style="text-align: center; margin: 28px 0 20px 0;">
+                        <a href="{orderLink}"
+                           style="background: linear-gradient(135deg, #3525cd 0%, #4f46e5 100%); color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 12px; font-size: 14px; font-weight: 800; display: inline-block; box-shadow: 0 4px 14px rgba(53,37,205,0.3); letter-spacing: 0.3px;">
+                          👉 Xem Vé &amp; Mã QR Của Bạn
+                        </a>
+                      </div>
+
+                      <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; text-align: center; margin: 0;">
+                        Chúc bạn có một buổi trải nghiệm sự kiện thật bùng nổ và đáng nhớ!
+                      </p>
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f8fafc; padding: 20px 24px; text-align: center; border-top: 1px solid #f1f5f9;">
+                      <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+                        © 2026 EventPulse System. Hỗ trợ khách hàng: 1900 8899 | support@eventticket.com
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        """;
+    }
+
+    // ─── Template email Thông báo cập nhật đổi giờ diễn (Story S-61) ──────────
+    private static string BuildShowtimeRescheduledEmailBody(
+        string name,
+        string eventTitle,
+        string location,
+        string oldShowtime,
+        string newShowtime,
+        string seats,
+        string? orderId,
+        string? directions,
+        string baseUrl)
+    {
+        var orderLink = !string.IsNullOrWhiteSpace(orderId)
+            ? $"{baseUrl}/order-details.html?id={orderId}"
+            : $"{baseUrl}/my-orders.html";
+
+        var directionsHtml = !string.IsNullOrWhiteSpace(directions)
+            ? System.Net.WebUtility.HtmlEncode(directions)
+            : "Quý khách vui lòng đến trước giờ diễn mới 30 - 45 phút để hoàn tất thủ tục check-in.";
+
+        return $"""
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="UTF-8"/>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+          <title>Thông báo quan trọng: Cập nhật giờ diễn sự kiện</title>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center">
+                <table width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+                  <!-- Header -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #e11d48 0%, #9333ea 100%); padding: 32px 24px; text-align: center;">
+                      <div style="font-size: 38px; line-height: 1;">📢</div>
+                      <h1 style="color: #ffffff; margin: 10px 0 0 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
+                        Thông Báo Cập Nhật Giờ Diễn
+                      </h1>
+                      <p style="color: #fce7f3; margin: 6px 0 0 0; font-size: 13px;">EventPulse Ticketing • Thay đổi lịch biểu diễn chính thức</p>
+                    </td>
+                  </tr>
+
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding: 32px 28px;">
+                      <p style="font-size: 16px; color: #1e293b; margin: 0 0 12px 0;">Xin chào <strong>{name}</strong>,</p>
+                      <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 20px 0;">
+                        Ban tổ chức sự kiện <strong>{eventTitle}</strong> xin trân trọng thông báo rằng lịch biểu diễn đã được điều chỉnh. Dưới đây là thông tin chi tiết về sự thay đổi:
+                      </p>
+
+                      <!-- Time Change Comparison Card -->
+                      <div style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 20px; margin: 0 0 24px 0;">
+                        <h2 style="margin: 0 0 14px 0; font-size: 17px; color: #9f1239; font-weight: 800;">{eventTitle}</h2>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13px; color: #475569;">
+                          <tr>
+                            <td width="35%" style="font-weight: 700; padding: 8px 0; border-bottom: 1px solid #fecdd3; color: #e11d48;">⏳ Thời gian cũ:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #fecdd3; color: #9f1239; text-decoration: line-through;">{oldShowtime}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700; padding: 8px 0; border-bottom: 1px solid #fecdd3; color: #15803d;">⏰ THỜI GIAN MỚI:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #fecdd3; font-weight: 800; color: #15803d; font-size: 14px;">{newShowtime}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700; padding: 8px 0; border-bottom: 1px solid #fecdd3;">📍 Địa điểm:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #fecdd3;">{location}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700; padding: 8px 0;">💺 Ghế của bạn:</td>
+                            <td style="padding: 8px 0; font-weight: bold; color: #3525cd;">{seats}</td>
+                          </tr>
+                        </table>
+                      </div>
+
+                      <!-- Reassurance & Instructions -->
+                      <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; border-radius: 0 10px 10px 0; padding: 16px 18px; margin: 0 0 24px 0;">
+                        <div style="font-size: 14px; font-weight: 700; color: #166534; margin-bottom: 6px;">
+                          ✅ Vé Của Bạn Vẫn Hoàn Toàn Hợp Lệ!
+                        </div>
+                        <p style="font-size: 13px; color: #15803d; line-height: 1.6; margin: 0 0 8px 0;">
+                          Toàn bộ vé và vị trí ghế bạn đã đặt mua <strong>tự động có giá trị</strong> cho khung giờ biểu diễn mới. Bạn không cần thao tác đổi vé hay cập nhật thông tin.
+                        </p>
+                        <div style="font-size: 12px; color: #166534; line-height: 1.5;">
+                          {directionsHtml}
+                        </div>
+                      </div>
+
+                      <p style="font-size: 13px; color: #64748b; line-height: 1.6; margin: 0 0 24px 0;">
+                        Nếu khung giờ mới không phù hợp với kế hoạch của bạn hoặc bạn có bất kỳ câu hỏi nào, xin vui lòng liên hệ tổng đài hỗ trợ <strong>1900 8899</strong> hoặc gửi email về <strong>support@eventticket.com</strong> để được hỗ trợ tốt nhất.
+                      </p>
+
+                      <!-- CTA Button -->
+                      <div style="text-align: center; margin: 28px 0 16px 0;">
+                        <a href="{orderLink}"
+                           style="background: linear-gradient(135deg, #e11d48 0%, #be123c 100%); color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 12px; font-size: 14px; font-weight: 800; display: inline-block; box-shadow: 0 4px 14px rgba(225,29,72,0.3); letter-spacing: 0.3px;">
+                          Kiểm Tra Chi Tiết Đơn Hàng
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f8fafc; padding: 20px 24px; text-align: center; border-top: 1px solid #f1f5f9;">
+                      <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+                        © 2026 EventPulse System. Thành thật xin lỗi vì sự bất tiện này và cảm ơn sự thông cảm của quý khách!
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        """;
+    }
+
+    // ─── Template email Thông báo danh sách chờ khi có vé về kho (Story S-59) ──────────
+    private static string BuildWaitlistSeatAvailableEmailBody(
+        string name,
+        string eventTitle,
+        string location,
+        string showtime,
+        int availableSeatsCount,
+        string bookingUrl)
+    {
+        var seatsBadge = availableSeatsCount > 0 ? $"{availableSeatsCount} ghế trống vừa mở lại" : "Có ghế vừa nhả về kho";
+
+        return $"""
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="UTF-8"/>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+          <title>Thông báo: Có vé mở lại cho suất diễn bạn đang chờ</title>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center">
+                <table width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+                  <!-- Header -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #3525cd 0%, #712ae2 100%); padding: 32px 24px; text-align: center;">
+                      <div style="font-size: 38px; line-height: 1;">🎟️</div>
+                      <h1 style="color: #ffffff; margin: 10px 0 0 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
+                        Có Vé Về Kho – Đến Lượt Bạn!
+                      </h1>
+                      <p style="color: #dad7ff; margin: 6px 0 0 0; font-size: 13px;">EventPulse Waitlist • Ưu tiên thông báo cho người đăng ký chờ</p>
+                    </td>
+                  </tr>
+
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding: 32px 28px;">
+                      <p style="font-size: 16px; color: #1e293b; margin: 0 0 12px 0;">Xin chào <strong>{name}</strong>,</p>
+                      <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 20px 0;">
+                        Bạn nhận được thông báo này vì đã đăng ký vào <strong>Danh sách chờ (Waitlist)</strong> cho sự kiện dưới đây khi suất diễn tạm thời hết vé. Do có khán giả huỷ vé hoặc lượt giữ chỗ hết hạn, ghế đã được giải phóng và quay trở lại kho bán:
+                      </p>
+
+                      <!-- Showtime Information Box -->
+                      <div style="background-color: #f8fafc; border-radius: 12px; padding: 18px 20px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+                        <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px; color: #334155;">
+                          <tr>
+                            <td style="font-weight: 700; width: 130px; padding: 8px 0; border-bottom: 1px solid #e2e8f0;">🎭 Sự kiện:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">{eventTitle}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700; padding: 8px 0; border-bottom: 1px solid #e2e8f0;">⏰ Thời gian diễn:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: #3525cd;">{showtime}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700; padding: 8px 0; border-bottom: 1px solid #e2e8f0;">📍 Địa điểm:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">{location}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-weight: 700; padding: 8px 0;">⚡ Tình trạng kho:</td>
+                            <td style="padding: 8px 0; color: #16a34a; font-weight: 700;">{seatsBadge}</td>
+                          </tr>
+                        </table>
+                      </div>
+
+                      <!-- Priority Notice Box -->
+                      <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 0 10px 10px 0; padding: 16px 18px; margin: 0 0 24px 0;">
+                        <div style="font-size: 14px; font-weight: 700; color: #b45309; margin-bottom: 6px;">
+                          ⚡ Nhanh Tay Đặt Vé Ngay:
+                        </div>
+                        <p style="font-size: 13px; color: #92400e; line-height: 1.6; margin: 0;">
+                          Vé được mở bán công khai theo thứ tự ưu tiên ai chọn trước sẽ giữ chỗ trước. Vì số lượng ghế quay về kho có hạn, hãy click vào nút bên dưới để chọn ghế và hoàn tất đơn hàng ngay lập tức!
+                        </p>
+                      </div>
+
+                      <!-- CTA Button -->
+                      <div style="text-align: center; margin: 28px 0 20px 0;">
+                        <a href="{bookingUrl}"
+                           style="background: linear-gradient(135deg, #3525cd 0%, #4f46e5 100%); color: #ffffff; padding: 14px 34px; text-decoration: none; border-radius: 12px; font-size: 15px; font-weight: 800; display: inline-block; box-shadow: 0 4px 14px rgba(53,37,205,0.35); letter-spacing: 0.3px;">
+                          👉 Chọn Ghế &amp; Đặt Vé Ngay
+                        </a>
+                      </div>
+
+                      <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; text-align: center; margin: 0;">
+                        Nếu bạn không còn nhu cầu mua vé suất này, bạn có thể bỏ qua email này.
+                      </p>
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f8fafc; padding: 20px 24px; text-align: center; border-top: 1px solid #f1f5f9;">
+                      <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+                        © 2026 EventPulse System. Hỗ trợ khách hàng: 1900 8899 | support@eventticket.com
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        """;
+    }
 }
+
+

@@ -29,6 +29,8 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly ILogger<SeatHoldService> _logger;
         private readonly IHubContext<SeatStatusHub>? _hubContext;
         private readonly IAppMetrics? _metrics;
+        private readonly IDiscountCodeService _discountCodeService;
+        private readonly IWaitlistService? _waitlistService;
 
         public const int DefaultHoldTtlSeconds = 600; // 10 phút
 
@@ -37,13 +39,17 @@ namespace EventTicketBooking.Api.Services.Implementations
             ILogger<SeatHoldService> logger,
             IHubContext<SeatStatusHub>? hubContext = null,
             IConnectionMultiplexer? redis = null,
-            IAppMetrics? metrics = null)
+            IAppMetrics? metrics = null,
+            IDiscountCodeService? discountCodeService = null,
+            IWaitlistService? waitlistService = null)
         {
             _context = context;
             _logger = logger;
             _hubContext = hubContext;
             _redis = redis;
             _metrics = metrics;
+            _discountCodeService = discountCodeService ?? new DiscountCodeService(context);
+            _waitlistService = waitlistService;
         }
 
         public async Task<HoldSeatsResult> HoldSeatsAsync(
@@ -91,6 +97,8 @@ namespace EventTicketBooking.Api.Services.Implementations
                 return HoldSeatsResult.NotFoundResult("Suất chiếu không tồn tại.");
             }
 
+            if (showtime.IsSaleExpired(DateTime.UtcNow))
+                return HoldSeatsResult.InvalidResult("Suất diễn đã hết thời gian bán vé.");
             if (showtime.Status != ShowtimeStatus.OnSale)
                 return HoldSeatsResult.InvalidResult("Suất diễn chưa mở bán hoặc đã đóng bán.");
 
@@ -406,6 +414,12 @@ namespace EventTicketBooking.Api.Services.Implementations
                     order.Status = OrderStatus.Cancelled;
                     order.UpdatedAt = DateTimeOffset.UtcNow;
 
+                    // Story S-56: Giải phóng lượt sử dụng mã giảm giá nếu đơn hàng huỷ do bỏ chọn ghế cuối
+                    if (order.DiscountCodeId.HasValue)
+                    {
+                        await _discountCodeService.ReleaseDiscountReservationAsync(order, cancellationToken);
+                    }
+
                     _context.OrderAuditLogs.Add(new OrderAuditLog
                     {
                         Id = Guid.NewGuid(),
@@ -491,6 +505,19 @@ namespace EventTicketBooking.Api.Services.Implementations
                 if (groupClient != null)
                 {
                     await groupClient.SendAsync("SeatReleased", new { ShowtimeId = showtimeId, SeatIds = new List<Guid> { seatId } });
+                }
+            }
+
+            // Story S-59: Khi có ghế về kho do huỷ giữ chỗ, gửi email thông báo cho người chờ theo thứ tự đăng ký
+            if (_waitlistService != null)
+            {
+                try
+                {
+                    await _waitlistService.ProcessAvailableSeatsNotificationAsync(showtimeId, 1, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Lỗi thông báo danh sách chờ khi huỷ giữ chỗ ghế {SeatId} trong suất {ShowtimeId} (S-59)", seatId, showtimeId);
                 }
             }
 

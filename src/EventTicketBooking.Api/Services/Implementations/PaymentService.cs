@@ -27,6 +27,9 @@ namespace EventTicketBooking.Api.Services.Implementations
         private readonly IOrderAuditService _orderAuditService;
         private readonly StackExchange.Redis.IConnectionMultiplexer? _redis;
         private readonly Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>? _hubContext;
+        private readonly IEmailService? _emailService;
+        private readonly Microsoft.Extensions.Options.IOptions<EventTicketBooking.Api.Options.AccountingOptions>? _accountingOptions;
+        private readonly IDiscountCodeService _discountCodeService;
 
         public PaymentService(
             AppDbContext context,
@@ -36,7 +39,10 @@ namespace EventTicketBooking.Api.Services.Implementations
             ITicketService? ticketService = null,
             StackExchange.Redis.IConnectionMultiplexer? redis = null,
             Microsoft.AspNetCore.SignalR.IHubContext<EventTicketBooking.Api.Hubs.SeatStatusHub>? hubContext = null,
-            IOrderAuditService? orderAuditService = null)
+            IOrderAuditService? orderAuditService = null,
+            IEmailService? emailService = null,
+            Microsoft.Extensions.Options.IOptions<EventTicketBooking.Api.Options.AccountingOptions>? accountingOptions = null,
+            IDiscountCodeService? discountCodeService = null)
         {
             _context = context;
             _paymentGateway = paymentGateway;
@@ -46,6 +52,9 @@ namespace EventTicketBooking.Api.Services.Implementations
             _redis = redis;
             _hubContext = hubContext;
             _orderAuditService = orderAuditService ?? new OrderAuditService(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<OrderAuditService>.Instance);
+            _emailService = emailService;
+            _accountingOptions = accountingOptions;
+            _discountCodeService = discountCodeService ?? new DiscountCodeService(context);
         }
 
         public async Task<PaymentCreationResult> CreatePaymentForOrderAsync(Guid orderId, Guid userId, CancellationToken cancellationToken = default)
@@ -75,6 +84,8 @@ namespace EventTicketBooking.Api.Services.Implementations
                 return PaymentCreationResult.CreateFailure($"Đơn hàng không ở trạng thái chờ thanh toán (Trạng thái: {order.Status}).");
             }
 
+            if (await _context.Showtimes.AnyAsync(s => s.Id == order.ShowtimeId && s.EndTime <= DateTime.UtcNow, cancellationToken))
+                return PaymentCreationResult.CreateFailure("Suất diễn đã kết thúc, không thể thanh toán.");
             if (order.ExpiresAt <= DateTimeOffset.UtcNow)
             {
                 var cleanup = new ExpiredOrderCleanupService(_context,
@@ -361,6 +372,12 @@ namespace EventTicketBooking.Api.Services.Implementations
                     order.CancelReason = OrderCancelReasons.PaymentCancelled;
                     order.UpdatedAt = DateTimeOffset.UtcNow;
 
+                    // Story S-56: Giải phóng lượt sử dụng mã giảm giá của đơn chờ bị huỷ thanh toán
+                    if (order.DiscountCodeId.HasValue)
+                    {
+                        await _discountCodeService.ReleaseDiscountReservationAsync(order, cancellationToken);
+                    }
+
                     var cancelledTx = await _context.PaymentTransactions
                         .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
                     if (cancelledTx != null)
@@ -546,11 +563,63 @@ namespace EventTicketBooking.Api.Services.Implementations
 
                 if (result.Amount != order.TotalAmount)
                 {
-                    _logger.LogWarning("Số tiền thanh toán ({PaymentAmount}) KHÔNG khớp với số tiền đơn hàng {OrderId} ({OrderAmount}). Giao dịch bị từ chối.",
-                        result.Amount, order.Id, order.TotalAmount);
+                    var oldStatus = order.Status.ToString();
+                    order.Status = OrderStatus.NeedsAttention;
+                    order.UpdatedAt = DateTimeOffset.UtcNow;
+
+                    var paymentTxMismatch = await _context.PaymentTransactions
+                        .FirstOrDefaultAsync(pt => pt.OrderId == order.Id, cancellationToken);
+                    if (paymentTxMismatch != null)
+                    {
+                        paymentTxMismatch.Status = "NEEDS_ATTENTION";
+                        paymentTxMismatch.UpdatedAt = DateTimeOffset.UtcNow;
+                        if (!string.IsNullOrEmpty(result.TransactionId))
+                        {
+                            paymentTxMismatch.TransactionId = result.TransactionId;
+                        }
+                    }
+
+                    // Story S-18 (AC4 & Task T-42): Đánh dấu đơn cần kiểm tra và ghi nhận kiểm toán
+                    _orderAuditService.Record(
+                        order.Id,
+                        "ORDER",
+                        order.Id.ToString(),
+                        "ORDER_NEEDS_ATTENTION",
+                        oldStatus,
+                        OrderStatus.NeedsAttention.ToString(),
+                        "SYSTEM",
+                        "system:PaymentWebhook",
+                        null,
+                        $"Số tiền thanh toán ({result.Amount:N0} đ) không khớp với giá trị đơn hàng ({order.TotalAmount:N0} đ). Chuyển sang NeedsAttention để kế toán đối soát.");
+
+                    // Thông báo khẩn cho bộ phận kế toán nếu có cấu hình
+                    var accountingEmail = _accountingOptions?.Value?.Email;
+                    if (!string.IsNullOrWhiteSpace(accountingEmail) && _emailService != null)
+                    {
+                        try
+                        {
+                            var subject = $"[CẢNH BÁO ĐỐI SOÁT] Lệch số tiền thanh toán đơn #{order.Id.ToString()[..8].ToUpper()}";
+                            var body = $@"<h3>Cảnh báo đối soát thanh toán đơn hàng</h3>
+<p>Đơn hàng ID: <b>{order.Id}</b> (Mã GD: <b>{result.TransactionId ?? paymentTxMismatch?.TransactionId ?? "N/A"}</b>, OrderCode: <b>{result.OrderCode ?? paymentTxMismatch?.OrderCode}</b>)</p>
+<p>Số tiền cổng thanh toán xác nhận: <b>{result.Amount:N0} VNĐ</b></p>
+<p>Tổng tiền thực tế của đơn hàng: <b>{order.TotalAmount:N0} VNĐ</b></p>
+<p>Hệ thống đã tự động chuyển đơn sang trạng thái <b>NeedsAttention</b> và chặn xuất vé tự động. Vui lòng kiểm tra đối soát thủ công.</p>";
+                            await _emailService.SendAccountingAlertEmailAsync(accountingEmail, subject, body);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Lỗi gửi email cảnh báo đối soát cho đơn hàng {OrderId}.", order.Id);
+                        }
+                    }
+
+                    await _context.SaveChangesAsync(cancellationToken);
                     if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
+
+                    _logger.LogWarning("Số tiền thanh toán ({PaymentAmount}) KHÔNG khớp với số tiền đơn hàng {OrderId} ({OrderAmount}). Đơn đã chuyển sang NeedsAttention và ghi nhận audit.",
+                        result.Amount, order.Id, order.TotalAmount);
+
                     return PaymentExecutionResult.CreateFailure(
-                        $"Số tiền thanh toán ({result.Amount}) không khớp với giá trị đơn hàng ({order.TotalAmount}).",
+                        $"Số tiền thanh toán ({result.Amount}) không khớp với giá trị đơn hàng ({order.TotalAmount}). Đơn hàng đã được chuyển sang trạng thái cần kiểm tra (NeedsAttention).",
                         order.Id,
                         result.OrderCode,
                         order.Status.ToString()
@@ -695,6 +764,27 @@ namespace EventTicketBooking.Api.Services.Implementations
                 if (dbTransaction != null)
                 {
                     await dbTransaction.CommitAsync(cancellationToken);
+                }
+
+                // Story S-44: Broadcast realtime ghế vừa bán thành công để các client cập nhật sơ đồ ngay lập tức
+                if (_hubContext != null && _hubContext.Clients != null)
+                {
+                    try
+                    {
+                        var grouped = seats.GroupBy(s => s.ShowtimeId);
+                        foreach (var g in grouped)
+                        {
+                            var client = _hubContext.Clients.Group(g.Key.ToString());
+                            if (client != null)
+                            {
+                                await client.SendAsync("SeatSold", new { ShowtimeId = g.Key, SeatIds = g.Select(x => x.Id).ToList() }, cancellationToken);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Lỗi khi gửi SignalR SeatSold cho đơn hàng {OrderId}.", order.Id);
+                    }
                 }
 
                 // Gửi email vé cho khách hàng (không làm chặn luồng thanh toán)

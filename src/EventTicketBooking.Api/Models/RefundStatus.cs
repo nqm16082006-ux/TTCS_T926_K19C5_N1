@@ -31,8 +31,18 @@ namespace EventTicketBooking.Api.Models
         Failed = 4,
 
         /// <summary>
-        /// Vượt quá số lần thử tối đa (3 lần retry bổ sung) hoặc cần kế toán xử lý thủ công (Trạng thái cuối cùng).
+        /// Vượt quá số lần thử tối đa (3 lần retry bổ sung) hoặc cần kế toán xử lý thủ công (Trạng thái chuyển kế toán).
         /// </summary>
-        ManualReviewRequired = 5
+        ManualReviewRequired = 5,
+
+        /// <summary>
+        /// Kế toán đã tiếp nhận và đang xử lý hoàn tiền thủ công.
+        /// </summary>
+        AccountingProcessing = 6,
+
+        /// <summary>
+        /// Kế toán đã hoàn tất xử lý hoàn tiền thủ công (Trạng thái kết thúc).
+        /// </summary>
+        AccountingResolved = 7
     }
 }
