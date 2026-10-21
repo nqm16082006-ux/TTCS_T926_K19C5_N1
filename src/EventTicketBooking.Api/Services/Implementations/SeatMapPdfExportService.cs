@@ -289,7 +289,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                     bgColor = "#EF4444";     // Đỏ đậm nổi bật
                     borderColor = "#DC2626";
                     textColor = "#FFFFFF";
-                    symbolText = " ✕";
+                    symbolText = " X";
                     break;
                 case "HELD":
                     bgColor = "#F59E0B";     // Vàng hổ phách
@@ -339,7 +339,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                         {
                             r.AutoItem().Width(14).Height(12).Background("#EF4444").Border(0.5f).BorderColor("#DC2626");
                             r.AutoItem().PaddingLeft(4).AlignMiddle()
-                                .Text($"[✕] Đã bán ({data.SoldCount} - {data.SoldPercentage}%)").FontSize(8).Bold().FontColor(Colors.Grey.Darken3);
+                                .Text($"[X] Đã bán ({data.SoldCount} - {data.SoldPercentage}%)").FontSize(8).Bold().FontColor(Colors.Grey.Darken3);
                         });
 
                         // Held
@@ -355,7 +355,7 @@ namespace EventTicketBooking.Api.Services.Implementations
                         {
                             r.AutoItem().Width(14).Height(12).Background("#10B981").Border(0.5f).BorderColor("#059669");
                             r.AutoItem().PaddingLeft(4).AlignMiddle()
-                                .Text($"[○] Còn trống ({data.AvailableCount} - {data.AvailablePercentage}%)").FontSize(8).Bold().FontColor(Colors.Grey.Darken3);
+                                .Text($"[O] Còn trống ({data.AvailableCount} - {data.AvailablePercentage}%)").FontSize(8).Bold().FontColor(Colors.Grey.Darken3);
                         });
                     });
 

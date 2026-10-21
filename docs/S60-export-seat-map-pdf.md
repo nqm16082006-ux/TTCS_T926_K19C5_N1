@@ -11,7 +11,7 @@
 - **Tiêu chí chấp nhận (Acceptance Criteria)**:
   - Xuất tệp PDF đúng **1 trang A4 Landscape duy nhất**, có sơ đồ tô màu theo trạng thái và chú giải.
   - Dữ liệu phản ánh chính xác trạng thái ghế tại thời điểm xuất theo thời gian thực (Real-time).
-  - Kèm ký hiệu phân biệt trạng thái (`[✕]` Đã bán, `[~]` Đang giữ chỗ, `[○]` Còn trống) hỗ trợ người khiếm thị màu hoặc khi in đen trắng (photocopy) dán ở cửa sự kiện theo tinh thần S-09.
+  - Kèm ký hiệu phân biệt trạng thái (`[X]` Đã bán, `[~]` Đang giữ chỗ, `[O]` Còn trống) hỗ trợ người khiếm thị màu hoặc khi in đen trắng (photocopy) dán ở cửa sự kiện theo tinh thần S-09.
 
 ---
 
@@ -19,14 +19,14 @@
 
 1. **Trạng thái Đã bán (SOLD)**:
    - Ghế có `Seat.Status == "SOLD"` hoặc ghế nằm trong các đơn hàng đã thanh toán thành công (`Order.Status == OrderStatus.Paid`).
-   - Màu sắc: Đỏ nổi bật (`#EF4444`, viền `#DC2626`), ký hiệu `[✕]`.
+   - Màu sắc: Đỏ nổi bật (`#EF4444`, viền `#DC2626`), ký hiệu `[X]`.
 2. **Trạng thái Đang giữ chỗ (HELD)**:
    - Ghế đang có bản ghi giữ chỗ `SeatHold` với `Status == "ACTIVE"` và thời gian hết hạn `ExpiresAt > now`.
    - Các lượt giữ chỗ đã hết hạn (`ExpiresAt <= now`) tự động hoàn về trạng thái Còn trống (AVAILABLE).
    - Màu sắc: Vàng hổ phách (`#F59E0B`, viền `#D97706`), ký hiệu `[~]`.
 3. **Trạng thái Còn trống (AVAILABLE)**:
    - Các ghế còn lại chưa bán và không bị giữ chỗ còn hiệu lực.
-   - Màu sắc: Xanh lục tươi (`#10B981`, viền `#059669`), ký hiệu `[○]`.
+   - Màu sắc: Xanh lục tươi (`#10B981`, viền `#059669`), ký hiệu `[O]`.
 4. **Quy chuẩn hiển thị PDF**:
    - Khổ giấy: **A4 Landscape**.
    - Bố cục:
