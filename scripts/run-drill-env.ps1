@@ -66,9 +66,11 @@ $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($BackupDir)) {
     $BackupDir = Join-Path $PSScriptRoot "..\artifacts\database-backups"
 }
+$BackupDir = [System.IO.Path]::GetFullPath($BackupDir)
 if ([string]::IsNullOrWhiteSpace($EvidenceDir)) {
     $EvidenceDir = Join-Path $PSScriptRoot "..\artifacts\drill-evidence"
 }
+$EvidenceDir = [System.IO.Path]::GetFullPath($EvidenceDir)
 
 # Nạp module dùng chung S-55 (Test-S55BackupValidity) và test helpers (Docker snapshot)
 . (Join-Path $PSScriptRoot "s55-common.ps1")

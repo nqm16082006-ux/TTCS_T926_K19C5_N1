@@ -111,6 +111,7 @@ $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($BackupDir)) {
     $BackupDir = Join-Path $PSScriptRoot "..\artifacts\database-backups"
 }
+$BackupDir = [System.IO.Path]::GetFullPath($BackupDir)
 
 # Nạp module dùng chung S-55 (Get-PgToolExecutable, Parse-PgConnectionString, Invoke-PgSqlQuery, Invoke-ProcessWithTimeout, Test-S55BackupValidity, Assert-SafeDrillEnvironment)
 . (Join-Path $PSScriptRoot "s55-common.ps1")

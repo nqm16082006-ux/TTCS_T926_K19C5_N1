@@ -113,6 +113,36 @@ Run-AssertTest 'Path.4: HostDir rong hoac gia tri rong -> giu nguyen' {
     if ((ConvertTo-S55ContainerPath -PathValue '' -HostDir 'C:\Data') -ne '') { throw "Sai" }
 }
 
+Run-AssertTest 'Path.5: PathValue chua ".." nam duoi HostDir da chuan hoa -> /s55work/...' {
+    $r = ConvertTo-S55ContainerPath -PathValue 'C:\repo\scripts\..\artifacts\file.dump' -HostDir 'C:\repo\artifacts'
+    if ($r -ne '/s55work/file.dump') { throw "Sai ket qua: $r" }
+}
+
+Run-AssertTest 'Path.6: HostDir chua ".." va PathValue chua ".." -> /s55work/...' {
+    $r = ConvertTo-S55ContainerPath -PathValue 'C:\repo\scripts\..\artifacts\file.dump' -HostDir 'C:\repo\scripts\..\artifacts'
+    if ($r -ne '/s55work/file.dump') { throw "Sai ket qua: $r" }
+}
+
+Run-AssertTest 'Path.7: HostDir chua ".." nhung PathValue da chuan hoa -> /s55work/...' {
+    $r = ConvertTo-S55ContainerPath -PathValue 'C:\repo\artifacts\file.dump' -HostDir 'C:\repo\scripts\..\artifacts'
+    if ($r -ne '/s55work/file.dump') { throw "Sai ket qua: $r" }
+}
+
+Run-AssertTest 'Path.8: Argument CLI khong phai duong dan (-h, -p, 5432, -Fc, postgres) giu nguyen' {
+    $nonPaths = @('-h', '-p', '5432', '-Fc', 'postgres', 'neondb', '-U')
+    foreach ($arg in $nonPaths) {
+        $r = ConvertTo-S55ContainerPath -PathValue $arg -HostDir 'C:\repo\artifacts'
+        if ($r -ne $arg) { throw "Argument '$arg' bi bien doi sai thanh: $r" }
+    }
+}
+
+Run-AssertTest 'Path.9: HostDir co dau gach cheo o cuoi (trailing slash) van remap dung /s55work/...' {
+    $r1 = ConvertTo-S55ContainerPath -PathValue 'C:\Data\file.dump' -HostDir 'C:\Data\'
+    if ($r1 -ne '/s55work/file.dump') { throw "Trailing backslash sai: $r1" }
+    $r2 = ConvertTo-S55ContainerPath -PathValue 'C:\Data\file.dump' -HostDir 'C:/Data/'
+    if ($r2 -ne '/s55work/file.dump') { throw "Trailing slash sai: $r2" }
+}
+
 # ==============================================================================
 # NHOM 3: INVOKE-PGTOOLCOMMAND DOCKER MODE (MOCK) — ARGS, ENV-FILE, EXIT CODE
 # ==============================================================================
@@ -206,6 +236,49 @@ Run-AssertTest 'Docker.5: Native mode trong Invoke-PgToolCommand van chay binh t
     $res = Invoke-PgToolCommand -ToolName 'psql' -ToolArgs @('/c', 'echo native-ok') `
         -Mode 'Native' -NativeExePath (Get-Command cmd.exe).Source -CaptureOutput -TimeoutSeconds 30
     if ($res.ExitCode -ne 0 -or $res.Output -notmatch 'native-ok') { throw "Native mode sai: $($res | ConvertTo-Json -Compress)" }
+}
+
+Run-AssertTest 'Docker.6: Invoke-PgToolCommand voi HostDir chua ".." mount dung canonical path va remap /s55work' {
+    $script:recordedCalls = @()
+    $mock = {
+        param($Command, $Arguments, $ArgsList, $ToolName, $ConnParams, $HostDir, $EnvFilePath, $ContainerName)
+        $script:recordedCalls += [PSCustomObject]@{ Command = $Command; Args = @($ArgsList); EnvFile = $EnvFilePath; Name = $ContainerName }
+        return @{ ExitCode = 0; Output = '' }
+    }
+    $conn = @{ Host = 'ep-x.neon.tech'; Port = 5432; Username = 'postgres'; Password = $mockPassword; SslMode = 'VerifyFull' }
+    $dotDotHostDir = Join-Path $PSScriptRoot "..\artifacts\database-backups"
+    $expectedCanonical = [System.IO.Path]::GetFullPath($dotDotHostDir).TrimEnd('\', '/')
+    $stagingFile = Join-Path $dotDotHostDir "eventpulse_backup_test_in_progress.dump"
+
+    Invoke-PgToolCommand -ToolName 'pg_dump' -ToolArgs @('-h', 'ep-x.neon.tech', '-f', $stagingFile) `
+        -ConnParams $conn -Mode 'Docker' -DockerImage 'postgres:18-alpine' -HostDir $dotDotHostDir -TimeoutSeconds 60 -MockCommandBlock $mock | Out-Null
+
+    $call = $script:recordedCalls[0]
+    $joined = $call.Args -join ' '
+    if ($joined -notmatch [regex]::Escape("-v $expectedCanonical`:/s55work")) {
+        throw "Mount khong dung canonical path: $joined (ky vong: -v $expectedCanonical`:/s55work)"
+    }
+    if ($joined -notmatch '/s55work/eventpulse_backup_test_in_progress\.dump') {
+        throw "Khong remap duong dan file staging chua '..': $joined"
+    }
+}
+
+Run-AssertTest 'Docker.7: Invoke-PgToolCommand khong bao gio tao mount co trailing backslash truoc :' {
+    $script:recordedCalls = @()
+    $mock = {
+        param($Command, $Arguments, $ArgsList, $ToolName, $ConnParams, $HostDir, $EnvFilePath, $ContainerName)
+        $script:recordedCalls += [PSCustomObject]@{ Command = $Command; Args = @($ArgsList) }
+        return @{ ExitCode = 0; Output = '' }
+    }
+    $conn = @{ Host = 'ep-x.neon.tech'; Port = 5432; Username = 'postgres'; Password = $mockPassword }
+    Invoke-PgToolCommand -ToolName 'pg_dump' -ToolArgs @('-f', 'C:\Data\out.dump') `
+        -ConnParams $conn -Mode 'Docker' -DockerImage 'postgres:18-alpine' -HostDir 'C:\Data\' -TimeoutSeconds 60 -MockCommandBlock $mock | Out-Null
+
+    $call = $script:recordedCalls[0]
+    $joined = $call.Args -join ' '
+    if ($joined -notmatch '-v C:\\Data:/s55work') {
+        throw "Mount bi loi trailing slash: $joined"
+    }
 }
 
 # ==============================================================================

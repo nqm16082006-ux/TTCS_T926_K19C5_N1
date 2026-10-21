@@ -564,13 +564,49 @@ function ConvertTo-S55ContainerPath {
     if ([string]::IsNullOrWhiteSpace($PathValue)) { return $PathValue }
     if ([string]::IsNullOrWhiteSpace($HostDir)) { return $PathValue }
 
+    # Chuan hoa HostDir thanh duong dan day du va loai bo dau gach cheo o cuoi
+    $canonicalHost = $null
+    try {
+        $canonicalHost = [System.IO.Path]::GetFullPath($HostDir).TrimEnd('\', '/')
+    } catch {
+        $canonicalHost = $HostDir.TrimEnd('\', '/')
+    }
+
     $normalizedHost = $HostDir.TrimEnd('\', '/')
-    if (-not ($PathValue -eq $normalizedHost -or
-              $PathValue.StartsWith($normalizedHost + '\', [System.StringComparison]::OrdinalIgnoreCase))) {
+    $matchedHost = $null
+    $targetPath = $PathValue
+
+    # 1. So khop truc tiep chuoi goc voi HostDir truyen vao
+    if ($PathValue -eq $normalizedHost -or
+        $PathValue.StartsWith($normalizedHost + '\', [System.StringComparison]::OrdinalIgnoreCase) -or
+        $PathValue.StartsWith($normalizedHost + '/', [System.StringComparison]::OrdinalIgnoreCase)) {
+        $matchedHost = $normalizedHost
+        $targetPath = $PathValue
+    } elseif ($PathValue -eq $canonicalHost -or
+              $PathValue.StartsWith($canonicalHost + '\', [System.StringComparison]::OrdinalIgnoreCase) -or
+              $PathValue.StartsWith($canonicalHost + '/', [System.StringComparison]::OrdinalIgnoreCase)) {
+        $matchedHost = $canonicalHost
+        $targetPath = $PathValue
+    } else {
+        # 2. Neu PathValue la duong dan co goc (IsPathRooted), chuan hoa GetFullPath() de so khop voi canonicalHost (loai bo '..')
+        if ([System.IO.Path]::IsPathRooted($PathValue)) {
+            try {
+                $canonicalPath = [System.IO.Path]::GetFullPath($PathValue)
+                if ($canonicalPath -eq $canonicalHost -or
+                    $canonicalPath.StartsWith($canonicalHost + '\', [System.StringComparison]::OrdinalIgnoreCase) -or
+                    $canonicalPath.StartsWith($canonicalHost + '/', [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $matchedHost = $canonicalHost
+                    $targetPath = $canonicalPath
+                }
+            } catch { }
+        }
+    }
+
+    if ($null -eq $matchedHost) {
         return $PathValue
     }
 
-    $rest = $PathValue.Substring($normalizedHost.Length).TrimStart('\', '/')
+    $rest = $targetPath.Substring($matchedHost.Length).TrimStart('\', '/')
     if ([string]::IsNullOrWhiteSpace($rest)) { return "/s55work" }
     return "/s55work/" + ($rest -replace '\\', '/')
 }
@@ -768,7 +804,7 @@ function Invoke-PgToolCommand {
     $containerToolArgs = @()
     $fullHostDir = $null
     if (-not [string]::IsNullOrWhiteSpace($HostDir)) {
-        $fullHostDir = [System.IO.Path]::GetFullPath($HostDir)
+        $fullHostDir = [System.IO.Path]::GetFullPath($HostDir).TrimEnd('\', '/')
         foreach ($a in $ToolArgs) {
             $containerToolArgs += (ConvertTo-S55ContainerPath -PathValue $a -HostDir $fullHostDir)
         }
