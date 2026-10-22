@@ -1168,7 +1168,13 @@
         const res = await fetch(`/api/v1/orders/${encodeURIComponent(order.id)}/refund-preview`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        const result = await res.json();
+        const rawText = await res.text();
+        let result;
+        try {
+          result = JSON.parse(rawText);
+        } catch {
+          result = { message: rawText || 'Không kiểm tra được điều kiện huỷ.' };
+        }
         if (!res.ok) {
           alert(result.message || 'Không kiểm tra được điều kiện huỷ.');
           return;
@@ -1203,9 +1209,19 @@
         const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
         const res = await fetch(`/api/v1/orders/${encodeURIComponent(pendingCancelOrderId)}/cancel`, {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({})
         });
-        const result = await res.json();
+        const rawText = await res.text();
+        let result;
+        try {
+          result = JSON.parse(rawText);
+        } catch {
+          result = { message: rawText || 'Lỗi xử lý phản hồi từ hệ thống.' };
+        }
         if (!res.ok) {
           alert(result.message || 'Huỷ đơn thất bại.');
           return;
@@ -1256,7 +1272,13 @@
           body: JSON.stringify({ simulateFailure: true })
         });
 
-        const result = await res.json();
+        const rawText = await res.text();
+        let result;
+        try {
+          result = JSON.parse(rawText);
+        } catch {
+          result = { message: rawText || 'Mô phỏng hoàn tiền thất bại không thành công.' };
+        }
         if (!res.ok) {
           alert(result.message || 'Mô phỏng hoàn tiền thất bại không thành công.');
           return;
