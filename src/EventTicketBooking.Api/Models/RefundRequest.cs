@@ -32,7 +32,7 @@ namespace EventTicketBooking.Api.Models
         /// <summary>
         /// Khóa Idempotency chống gửi trùng lệnh hoàn tiền cho cổng thanh toán.
         /// </summary>
-        public string IdempotencyKey { get; set; } = string.Empty;
+        public string IdempotencyKey { get; set; } = $"ref_{Guid.NewGuid():N}";
 
         /// <summary>
         /// Số tiền hoàn (VNĐ).

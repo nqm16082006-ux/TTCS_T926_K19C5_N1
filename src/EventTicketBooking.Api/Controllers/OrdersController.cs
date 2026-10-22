@@ -631,7 +631,7 @@ namespace EventTicketBooking.Api.Controllers
         public async Task<IActionResult> CancelOrderAndRefund(
             Guid orderId,
             [FromQuery] bool simulateFailure = false,
-            [FromBody] CancelOrderRequestDto? body = null)
+            [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] CancelOrderRequestDto? body = null)
         {
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("id")?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
             if (!Guid.TryParse(userIdStr, out var userId))
@@ -957,6 +957,7 @@ namespace EventTicketBooking.Api.Controllers
                         OrderCode = paymentOrderCode,
                         TransactionId = orderForDto.PaymentTransaction?.TransactionId,
                         RefundTransactionId = gatewayResult.RefundReference ?? $"REF_{paymentOrderCode}",
+                        IdempotencyKey = $"ref_{orderId}_{Guid.NewGuid():N}",
                         Amount = refundEntity.Amount,
                         Currency = "VND",
                         Reason = "CustomerCancelAndRefund",
@@ -987,6 +988,7 @@ namespace EventTicketBooking.Api.Controllers
                         OrderId = orderId,
                         OrderCode = paymentOrderCode,
                         TransactionId = orderForDto.PaymentTransaction?.TransactionId,
+                        IdempotencyKey = $"ref_{orderId}_{Guid.NewGuid():N}",
                         Amount = refundEntity.Amount,
                         Currency = "VND",
                         Reason = "CustomerCancelAndRefund",

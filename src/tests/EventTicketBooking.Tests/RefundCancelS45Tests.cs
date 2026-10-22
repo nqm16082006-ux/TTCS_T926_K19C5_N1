@@ -435,6 +435,61 @@ public sealed class RefundCancelS45Tests
         Assert.Equal("Succeeded", refund.Status);
     }
 
+    [Fact]
+    public async Task Cancel_WithNullAndEmptyBody_SucceedsWithoutModelBindingError()
+    {
+        // Kiểm thử gọi Cancel với body = null và body rỗng
+        await using var context = CreateContext();
+        var (userId, _, orderId, _, _) = await SeedPaidOrderAsync(context, DateTime.UtcNow.AddDays(3), 100_000);
+        var controller = CreateOrdersController(context, userId);
+
+        var result = await controller.CancelOrderAndRefund(orderId, simulateFailure: false, body: null);
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ApiResponse<object>>(ok.Value);
+        Assert.True(response.Success);
+
+        var order = await context.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
+        Assert.Equal(OrderStatus.Cancelled, order.Status);
+        Assert.Equal("CUSTOMER_REFUND", order.CancelReason);
+    }
+
+    [Fact]
+    public async Task Cancel_WithSimulateFailureFalseInBody_Succeeds()
+    {
+        await using var context = CreateContext();
+        var (userId, _, orderId, _, _) = await SeedPaidOrderAsync(context, DateTime.UtcNow.AddDays(3), 100_000);
+        var controller = CreateOrdersController(context, userId);
+
+        var result = await controller.CancelOrderAndRefund(orderId, simulateFailure: false, body: new CancelOrderRequestDto { SimulateFailure = false });
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<ApiResponse<object>>(ok.Value);
+        Assert.True(response.Success);
+    }
+
+    [Fact]
+    public async Task Cancel_CreatesRefundRequest_WithUniqueIdempotencyKey()
+    {
+        await using var context = CreateContext();
+        var (userId1, _, orderId1, _, _) = await SeedPaidOrderAsync(context, DateTime.UtcNow.AddDays(3), 100_000);
+        var (userId2, _, orderId2, _, _) = await SeedPaidOrderAsync(context, DateTime.UtcNow.AddDays(3), 100_000);
+
+        var controller1 = CreateOrdersController(context, userId1);
+        var controller2 = CreateOrdersController(context, userId2);
+
+        var res1 = await controller1.CancelOrderAndRefund(orderId1);
+        var res2 = await controller2.CancelOrderAndRefund(orderId2);
+
+        Assert.IsType<OkObjectResult>(res1);
+        Assert.IsType<OkObjectResult>(res2);
+
+        var req1 = await context.RefundRequests.AsNoTracking().SingleAsync(r => r.OrderId == orderId1);
+        var req2 = await context.RefundRequests.AsNoTracking().SingleAsync(r => r.OrderId == orderId2);
+
+        Assert.False(string.IsNullOrWhiteSpace(req1.IdempotencyKey));
+        Assert.False(string.IsNullOrWhiteSpace(req2.IdempotencyKey));
+        Assert.NotEqual(req1.IdempotencyKey, req2.IdempotencyKey);
+    }
+
     /// <summary>
     /// Gateway giả lập kiểu payOS: không hỗ trợ hoàn tiền tự động (SupportsRefund = false).
     /// </summary>
