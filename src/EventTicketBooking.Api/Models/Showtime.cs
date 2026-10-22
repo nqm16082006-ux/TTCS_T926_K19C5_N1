@@ -61,6 +61,17 @@ namespace EventTicketBooking.Api.Models
                 return;
             }
 
+            if (Status == ShowtimeStatus.Closed && newStatus == ShowtimeStatus.OnSale)
+            {
+                if (IsSaleExpired(DateTime.UtcNow))
+                {
+                    throw new InvalidOperationException("Không thể mở bán lại vì suất diễn đã hết hạn bán vé hoặc đã kết thúc.");
+                }
+
+                Status = ShowtimeStatus.OnSale;
+                return;
+            }
+
             if (Status == ShowtimeStatus.OnSale && newStatus == ShowtimeStatus.Closed)
             {
                 Status = ShowtimeStatus.Closed;

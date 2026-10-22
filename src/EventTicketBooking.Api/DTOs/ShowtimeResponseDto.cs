@@ -25,7 +25,7 @@ namespace EventTicketBooking.Api.DTOs
         public int SoldSeatCount { get; set; }
         public EventTicketBooking.Api.Models.ShowtimeStatus Status { get; set; }
         public List<SeatCategoryPriceDto> SeatCategories { get; set; } = new();
-        public bool CanOpenSale => Status == EventTicketBooking.Api.Models.ShowtimeStatus.Draft && (SalesEndTime ?? StartTime) > DateTime.UtcNow && EndTime > DateTime.UtcNow && AvailableSeats > 0 &&
+        public bool CanOpenSale => (Status == EventTicketBooking.Api.Models.ShowtimeStatus.Draft || Status == EventTicketBooking.Api.Models.ShowtimeStatus.Closed) && (SalesEndTime ?? StartTime) > DateTime.UtcNow && EndTime > DateTime.UtcNow && AvailableSeats > 0 &&
             (!ActualSeatCount.HasValue || (ActualSeatCount > 0 && SeatCategories.Count > 0 && SeatCategories.TrueForAll(c => c.Price is >= 0)));
         public bool CanCloseSale => Status == EventTicketBooking.Api.Models.ShowtimeStatus.OnSale;
         public bool CanCancel => (Status == EventTicketBooking.Api.Models.ShowtimeStatus.OnSale || Status == EventTicketBooking.Api.Models.ShowtimeStatus.Closed) && EndTime >= DateTime.UtcNow;

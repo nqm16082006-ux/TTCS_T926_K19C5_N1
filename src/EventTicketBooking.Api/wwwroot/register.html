@@ -936,6 +936,8 @@
 
       timerContainer.classList.remove('hidden');
       btnResend.classList.add('hidden');
+      btnResend.disabled = false;
+      btnResend.textContent = 'Gửi lại mã xác thực ngay';
       timerEl.textContent = resendCountdown;
 
       resendTimerInterval = setInterval(() => {
@@ -945,6 +947,8 @@
         if (resendCountdown <= 0) {
           clearInterval(resendTimerInterval);
           timerContainer.classList.add('hidden');
+          btnResend.disabled = false;
+          btnResend.textContent = 'Gửi lại mã xác thực ngay';
           btnResend.classList.remove('hidden');
         }
       }, 1000);
@@ -968,15 +972,22 @@
         const data = await res.json().catch(() => ({}));
 
         if (res.ok) {
-          showSuccess('Đã gửi lại mã xác thực mới vào email của bạn. Vui lòng kiểm tra hộp thư.');
+          showSuccess(data.message || 'Đã gửi lại mã xác thực mới vào email của bạn. Vui lòng kiểm tra hộp thư.');
           focusFirstOtpDigit();
           startResendTimer();
         } else {
           showAlert(data.message || 'Không thể gửi lại mã xác nhận.');
+          if (res.status === 429) {
+            btnResend.disabled = true;
+            btnResend.classList.add('opacity-50', 'cursor-not-allowed');
+            btnResend.textContent = 'Đã đạt giới hạn gửi lại';
+            return;
+          }
+          btnResend.disabled = false;
+          btnResend.textContent = 'Gửi lại mã xác thực ngay';
         }
       } catch (err) {
         showAlert('Lỗi kết nối máy chủ.');
-      } finally {
         btnResend.disabled = false;
         btnResend.textContent = 'Gửi lại mã xác thực ngay';
       }

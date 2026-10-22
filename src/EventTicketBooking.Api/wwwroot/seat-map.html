@@ -166,7 +166,7 @@
       <div class="max-w-7xl mx-auto px-margin w-full py-space-lg">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-space-md">
           <div class="space-y-space-xs">
-            <div class="flex items-center gap-space-xs text-primary font-label-sm text-label-sm uppercase tracking-wider font-bold">
+            <div id="liveHoldGateStatus" class="flex items-center gap-space-xs text-primary font-label-sm text-label-sm uppercase tracking-wider font-bold">
               <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
               <span>Đang mở cổng giữ chỗ trực tuyến</span>
             </div>
@@ -212,7 +212,7 @@
             <div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg relative overflow-hidden border border-surface-container-high/60">
 
               <!-- Top Toolstrip / Zoom controls -->
-              <div class="flex items-center justify-between pb-space-md mb-space-md bg-surface-container-low/50 -mx-space-lg -mt-space-lg px-space-lg pt-space-md border-b border-surface-container-high/40">
+              <div id="seatMapToolstrip" class="flex items-center justify-between pb-space-md mb-space-md bg-surface-container-low/50 -mx-space-lg -mt-space-lg px-space-lg pt-space-md border-b border-surface-container-high/40">
                 <div class="flex items-center gap-space-xs">
                   <span class="material-symbols-outlined text-primary text-[20px]">airline_seat_recline_extra</span>
                   <span class="font-headline-sm text-headline-sm text-on-surface font-bold" id="hallName">Sơ đồ chỗ ngồi</span>
@@ -235,6 +235,28 @@
                     <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
                     <span class="hidden sm:inline">Xuất PDF (S-60)</span>
                   </button>
+                </div>
+              </div>
+
+              <!-- Showtime Not On Sale Notice Container -->
+              <div id="showtimeNotOnSaleContainer" class="hidden flex-col items-center justify-center py-16 px-6 text-center">
+                <div id="notOnSaleIconWrapper" class="w-20 h-20 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mb-5 shadow-inner">
+                  <span id="notOnSaleIcon" class="material-symbols-outlined text-[42px]">schedule</span>
+                </div>
+                <span id="notOnSaleBadge" class="px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-3 bg-amber-100 text-amber-900 border border-amber-300">Bản nháp • Chưa mở bán</span>
+                <h3 id="notOnSaleTitle" class="text-2xl md:text-3xl font-extrabold text-on-surface mb-3 tracking-tight">Suất diễn chưa mở bán</h3>
+                <p id="notOnSaleMessage" class="text-on-surface-variant max-w-lg text-sm md:text-base mb-8 leading-relaxed">
+                  Suất diễn này đang ở trạng thái bản nháp và chưa được mở bán chính thức. Quý khách vui lòng quay lại sau khi Ban Tổ Chức mở bán vé.
+                </p>
+                <div class="flex flex-wrap items-center justify-center gap-3">
+                  <a id="btnNotOnSaleBackEvent" href="./public-events.html" class="px-5 py-2.5 rounded-xl bg-primary hover:bg-on-primary-fixed-variant text-white font-bold text-sm transition shadow-sm flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+                    <span>Quay lại thông tin sự kiện</span>
+                  </a>
+                  <a href="./public-events.html" class="px-5 py-2.5 rounded-xl bg-surface-container-highest hover:bg-surface-container-high text-on-surface font-semibold text-sm transition flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">explore</span>
+                    <span>Xem tất cả sự kiện</span>
+                  </a>
                 </div>
               </div>
 
@@ -1076,13 +1098,154 @@
     }
 
     // --- 3. Fetch Data ---
+    let currentShowtimeData = null;
+
+    function getShowtimeSaleStatus(data) {
+      if (!data) return { notOnSale: false };
+      const statusStr = String(data.status || '').toLowerCase();
+      const isDraft = statusStr === 'draft' || data.status === 1;
+      const isCancelled = statusStr === 'cancelled' || data.status === 4;
+      const now = Date.now();
+      const salesEnd = data.salesEndTime ? new Date(data.salesEndTime).getTime() : (data.startTime ? new Date(data.startTime).getTime() : 0);
+      const showEnd = data.endTime ? new Date(data.endTime).getTime() : 0;
+      const isExpired = (salesEnd > 0 && now >= salesEnd) || (showEnd > 0 && now >= showEnd);
+      const isClosed = statusStr === 'closed' || data.status === 3 || isExpired;
+
+      if (isDraft) {
+        return {
+          notOnSale: true,
+          reason: 'draft',
+          title: 'Suất diễn đang ở trạng thái bản nháp',
+          badge: 'Bản nháp • Chưa mở bán',
+          message: 'Suất diễn này đang ở trạng thái bản nháp và chưa được mở bán chính thức. Quý khách vui lòng quay lại sau khi Ban Tổ Chức mở bán vé.'
+        };
+      }
+      if (isCancelled) {
+        return {
+          notOnSale: true,
+          reason: 'cancelled',
+          title: 'Suất diễn đã bị hủy',
+          badge: 'Đã hủy',
+          message: 'Rất tiếc, suất diễn này đã bị hủy bỏ bởi Ban Tổ Chức.'
+        };
+      }
+      if (isClosed) {
+        return {
+          notOnSale: true,
+          reason: 'closed',
+          title: 'Suất diễn đã đóng bán',
+          badge: 'Đã đóng bán',
+          message: isExpired
+            ? 'Suất diễn này đã kết thúc thời gian mở bán vé.'
+            : 'Suất diễn này hiện đã đóng cổng bán vé.'
+        };
+      }
+      if (statusStr !== 'onsale' && data.status !== 2) {
+        return {
+          notOnSale: true,
+          reason: 'unavailable',
+          title: 'Suất diễn không mở bán',
+          badge: 'Chưa mở bán',
+          message: 'Suất diễn hiện không ở trạng thái mở bán vé.'
+        };
+      }
+      return { notOnSale: false };
+    }
+
+    function showNotOnSaleUI(info) {
+      const loading = document.getElementById('seatGridLoading');
+      const loadedArea = document.getElementById('seatGridLoadedArea');
+      const toolstrip = document.getElementById('seatMapToolstrip');
+      const notOnSaleContainer = document.getElementById('showtimeNotOnSaleContainer');
+      const gateStatus = document.getElementById('liveHoldGateStatus');
+
+      if (loading) loading.classList.add('hidden');
+      if (loadedArea) loadedArea.classList.add('hidden');
+      if (toolstrip) toolstrip.classList.add('hidden');
+      if (notOnSaleContainer) {
+        notOnSaleContainer.classList.remove('hidden');
+        notOnSaleContainer.classList.add('flex');
+      }
+
+      if (gateStatus) {
+        const dotColor = info.reason === 'draft' ? 'bg-amber-500' : 'bg-rose-500';
+        const textColor = info.reason === 'draft' ? 'text-amber-800' : 'text-rose-800';
+        gateStatus.className = `flex items-center gap-space-xs font-label-sm text-label-sm uppercase tracking-wider font-bold ${textColor}`;
+        gateStatus.innerHTML = `<span class="w-2 h-2 rounded-full ${dotColor}"></span><span>${escapeHtml(info.badge)}</span>`;
+      }
+
+      const iconEl = document.getElementById('notOnSaleIcon');
+      const iconWrap = document.getElementById('notOnSaleIconWrapper');
+      const badgeEl = document.getElementById('notOnSaleBadge');
+      const titleEl = document.getElementById('notOnSaleTitle');
+      const msgEl = document.getElementById('notOnSaleMessage');
+      const backBtn = document.getElementById('btnNotOnSaleBackEvent');
+
+      if (iconEl) iconEl.textContent = info.reason === 'draft' ? 'edit_calendar' : (info.reason === 'cancelled' ? 'cancel' : 'event_busy');
+      if (iconWrap) {
+        iconWrap.className = info.reason === 'draft'
+          ? "w-20 h-20 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mb-5 shadow-inner"
+          : "w-20 h-20 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center mb-5 shadow-inner";
+      }
+      if (badgeEl) {
+        badgeEl.textContent = info.badge;
+        badgeEl.className = info.reason === 'draft'
+          ? "px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-3 bg-amber-100 text-amber-900 border border-amber-300"
+          : "px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-3 bg-rose-100 text-rose-900 border border-rose-300";
+      }
+      if (titleEl) titleEl.textContent = info.title;
+      if (msgEl) msgEl.textContent = info.message;
+
+      const evId = eventId || (currentShowtimeData && currentShowtimeData.eventId);
+      if (backBtn && evId) {
+        backBtn.href = `./event-info.html?id=${encodeURIComponent(evId)}`;
+      }
+
+      // Banner thông báo lỗi / cảnh báo màu hồng nổi bật trên đầu
+      showConflictToast(info.message);
+
+      // Disable Giữ vé & Cart Panel
+      const holdBtn = document.getElementById('btnHoldSeats');
+      if (holdBtn) {
+        holdBtn.disabled = true;
+        holdBtn.className = "w-full h-12 rounded-xl bg-surface-container-high text-outline cursor-not-allowed font-label-lg text-label-lg flex items-center justify-center gap-2 font-bold opacity-60";
+        holdBtn.innerHTML = `<span>${escapeHtml(info.badge)}</span>`;
+      }
+
+      const cartContainer = document.getElementById('selectedSeatsListContainer');
+      if (cartContainer) {
+        cartContainer.innerHTML = `
+          <div class="text-center py-8 text-on-surface-variant text-sm font-medium flex flex-col items-center justify-center">
+            <span class="material-symbols-outlined text-outline text-3xl mb-1">lock</span>
+            <span class="font-semibold text-on-surface mb-1">${escapeHtml(info.title)}</span>
+            <span class="text-xs text-outline">${escapeHtml(info.message)}</span>
+          </div>
+        `;
+      }
+
+      const holdTimerCard = document.getElementById('holdTimerCard');
+      if (holdTimerCard) holdTimerCard.classList.add('hidden');
+
+      // Clear any pending/stored seats
+      selectedSeatIds.clear();
+      if (showtimeId) {
+        sessionStorage.removeItem(`pending_seats_${showtimeId}`);
+        sessionStorage.removeItem(`eventpulse_held_${showtimeId}`);
+      }
+    }
+
     async function loadEventInfo() {
       try {
-        if (eventId && showtimeId) {
-          const res = await fetch(`${API_BASE}/api/public/events/${eventId}/showtimes/${showtimeId}`).catch(() => null);
+        if (showtimeId) {
+          const detailUrl = eventId 
+            ? `${API_BASE}/api/public/events/${eventId}/showtimes/${showtimeId}`
+            : `${API_BASE}/api/public/showtimes/${showtimeId}`;
+          const res = await fetch(detailUrl).catch(() => null);
           if (res && res.ok) {
             const json = await res.json();
             if (json.success && json.data) {
+              currentShowtimeData = json.data;
+              if (json.data.eventId && !eventId) eventId = json.data.eventId;
               applyEventDetails(json.data);
               return;
             }
@@ -1094,6 +1257,10 @@
           if (res && res.ok) {
             const json = await res.json();
             if (json.success && json.data) {
+              if (showtimeId && json.data.showtimes) {
+                const found = json.data.showtimes.find(s => s.id === showtimeId);
+                if (found) currentShowtimeData = found;
+              }
               applyEventDetails(json.data);
               return;
             }
@@ -1107,6 +1274,7 @@
           const items = (json.data && json.data.items) ? json.data.items : [];
           const found = items.find(s => s.id === showtimeId || s.eventId === eventId);
           if (found) {
+            currentShowtimeData = found;
             applyEventDetails(found);
           }
         }
@@ -1149,6 +1317,9 @@
     }
 
     async function loadSeats() {
+      if (getShowtimeSaleStatus(currentShowtimeData).notOnSale) {
+        return;
+      }
       const loading = document.getElementById('seatGridLoading');
       const loadedArea = document.getElementById('seatGridLoadedArea');
 
@@ -2075,14 +2246,22 @@
         return;
       }
 
+      renderAuthNav();
+      await loadEventInfo();
+
+      // Kiểm tra trạng thái mở bán của suất diễn
+      const saleStatus = getShowtimeSaleStatus(currentShowtimeData);
+      if (saleStatus.notOnSale) {
+        showNotOnSaleUI(saleStatus);
+        return; // Dừng lại, KHÔNG hiển thị sơ đồ ghế và KHÔNG cho chọn vé
+      }
+
       // S-40: Tự động kiểm tra quyền truy cập phòng chờ
       const hasAccess = await ensureWaitingRoomAccess();
       if (!hasAccess) {
         return; // Đã chuyển hướng sang waiting-room.html
       }
 
-      renderAuthNav();
-      await loadEventInfo();
       await loadSeats();
       restorePendingSeats();
       await restoreMyHoldsOnLoad();

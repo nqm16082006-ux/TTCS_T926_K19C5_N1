@@ -114,7 +114,7 @@ namespace EventTicketBooking.Tests
         [InlineData(ShowtimeStatus.OnSale)]
         public void ChangeStatus_ClosedToOtherStatus_ShouldThrowInvalidOperationException(ShowtimeStatus targetStatus)
         {
-            // Arrange
+            // Arrange - without future dates, sale is considered expired
             var showtime = new Showtime { AvailableSeats = 50 };
             showtime.ChangeStatus(ShowtimeStatus.OnSale);
             showtime.ChangeStatus(ShowtimeStatus.Closed);
@@ -122,6 +122,27 @@ namespace EventTicketBooking.Tests
             // Act & Assert
             Assert.Throws<InvalidOperationException>(() => showtime.ChangeStatus(targetStatus));
             Assert.Equal(ShowtimeStatus.Closed, showtime.Status);
+        }
+
+        [Fact]
+        public void ChangeStatus_ClosedToOnSale_WhenNotExpired_ShouldSucceed()
+        {
+            // Arrange
+            var showtime = new Showtime
+            {
+                AvailableSeats = 50,
+                StartTime = DateTime.UtcNow.AddDays(2),
+                EndTime = DateTime.UtcNow.AddDays(2).AddHours(3),
+                SalesEndTime = DateTime.UtcNow.AddDays(1)
+            };
+            showtime.ChangeStatus(ShowtimeStatus.OnSale);
+            showtime.ChangeStatus(ShowtimeStatus.Closed);
+
+            // Act
+            showtime.ChangeStatus(ShowtimeStatus.OnSale);
+
+            // Assert
+            Assert.Equal(ShowtimeStatus.OnSale, showtime.Status);
         }
 
         [Fact]
