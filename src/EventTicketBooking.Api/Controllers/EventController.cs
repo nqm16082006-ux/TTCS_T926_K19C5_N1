@@ -1542,6 +1542,10 @@ namespace EventTicketBooking.Api.Controllers
 
             if (showtime.Status == ShowtimeStatus.Closed)
             {
+                if (!showtime.IsSaleExpired(DateTime.UtcNow))
+                {
+                    return "Suất diễn đang tạm đóng bán. Có thể mở bán lại trước hạn bán vé.";
+                }
                 return "Suất diễn đã đóng bán.";
             }
 

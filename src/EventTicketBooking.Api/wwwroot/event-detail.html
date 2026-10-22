@@ -1041,6 +1041,9 @@
         </button>
       </div>
 
+      <!-- Error alert container -->
+      <div id="seatErrorContainer" class="hidden p-4 rounded-xl bg-rose-50 text-rose-900 border border-rose-200 text-xs space-y-1 max-h-60 overflow-y-auto"></div>
+
       <!-- Seat preview grid -->
       <div id="seatPreviewContainer" class="hidden space-y-2">
         <div class="font-label-md text-label-md text-on-surface font-semibold flex items-center justify-between">
@@ -1343,7 +1346,7 @@
                 <p class="st-subtext">Còn ${Math.max(0, totalSeats - sold).toLocaleString('vi-VN')} chỗ chưa bán</p>
               </section>
             </div>
-            ${isDraft && s.canOpenSale === false ? `<p class="st-warning-note">${escapeHtml(s.statusActionMessage || 'Cần hoàn tất sơ đồ và bảng giá trước khi mở bán.')}</p>` : ''}
+            ${(isDraft || isClosed) && s.canOpenSale === false && !expired ? `<p class="st-warning-note">${escapeHtml(s.statusActionMessage || (isDraft ? 'Cần hoàn tất sơ đồ và bảng giá trước khi mở bán.' : 'Không thể mở bán lại.'))}</p>` : ''}
             <footer class="st-card-actions">
               <div class="flex items-center gap-2">
                 <button type="button" onclick="openDuplicateShowtime('${s.id}')" class="showtime-copy-button"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Nhân bản suất diễn</button>
@@ -1367,7 +1370,7 @@
                     <button type="button" class="st-danger" onclick="confirmDeleteShowtime('${s.id}')"><span class="material-symbols-outlined" aria-hidden="true">delete</span>Hủy / xóa suất diễn</button>
                   </div>
                 </details>
-                ${isDraft ? `<button type="button" class="st-sale-button" onclick="toggleShowtimeSale('${s.id}', true)" ${s.canOpenSale === false ? 'disabled' : ''}>Mở bán</button>` : isOnSale ? `<button type="button" class="st-close-button" onclick="toggleShowtimeSale('${s.id}', false)">Đóng bán</button>` : ''}
+                ${isDraft ? `<button type="button" class="st-sale-button" onclick="toggleShowtimeSale('${s.id}', true)" ${s.canOpenSale === false ? 'disabled' : ''}>Mở bán</button>` : isOnSale ? `<button type="button" class="st-close-button" onclick="toggleShowtimeSale('${s.id}', false)">Đóng bán</button>` : (isClosed && !expired) ? `<button type="button" class="st-sale-button" onclick="toggleShowtimeSale('${s.id}', true)" ${s.canOpenSale === false ? 'disabled' : ''}>Mở bán lại</button>` : ''}
               </div>
             </footer>
           </article>
@@ -1954,7 +1957,9 @@
 
     // ==================== OPEN/CLOSE SALE TOGGLE ====================
     async function toggleShowtimeSale(showtimeId, shouldOpen) {
-      const actionText = shouldOpen ? 'mở bán' : 'đóng bán';
+      const showtime = (currentShowtimes || []).find(s => s.id === showtimeId);
+      const isReopening = shouldOpen && showtime && (showtime.status === 3 || showtime.status === 'Closed');
+      const actionText = isReopening ? 'mở bán lại' : (shouldOpen ? 'mở bán' : 'đóng bán');
       if (!confirm(`Bạn có chắc chắn muốn ${actionText} vé cho suất diễn này không?`)) return;
 
       const endpoint = shouldOpen ? 'open-sale' : 'close-sale';
@@ -2077,12 +2082,18 @@
       document.getElementById('seatFileInput').value = '';
       document.getElementById('seatFileNameLabel').textContent = 'Chọn hoặc kéo thả tệp sơ đồ ghế .JSON';
       document.getElementById('seatPreviewContainer').classList.add('hidden');
+      const errorBox = document.getElementById('seatErrorContainer');
+      if (errorBox) {
+        errorBox.innerHTML = '';
+        errorBox.classList.add('hidden');
+      }
       document.getElementById('btnConfirmImportSeats').disabled = true;
       normalizedSeatImportBlob = null;
 
       const alertBox = document.getElementById('seatImportAlert');
       if (alreadyHasSeats) {
         alertBox.textContent = '⚠️ Lưu ý: Suất diễn này đã có ghế trong cơ sở dữ liệu. Nạp lại ghế sẽ bổ sung hoặc chuẩn hóa sơ đồ.';
+        alertBox.className = 'p-3 rounded-lg text-sm font-semibold bg-amber-50 text-amber-900 border border-amber-200';
         alertBox.classList.remove('hidden');
       } else {
         alertBox.classList.add('hidden');
@@ -2091,28 +2102,90 @@
       openModal('seatImportModal');
     }
 
-    function handleSeatFileSelected(e) {
+    function renderSeatErrors(errors) {
+      const errorBox = document.getElementById('seatErrorContainer');
+      if (!errorBox) return;
+      let html = `<div class="font-bold flex items-center gap-1.5 text-sm text-rose-700 mb-2">
+        <span class="material-symbols-outlined text-[18px]">error</span>
+        Tệp JSON có lỗi cấu trúc hoặc dữ liệu:
+      </div><ul class="list-disc pl-5 space-y-1">`;
+      errors.forEach(e => {
+        const indexText = (e.seatIndex !== null && e.seatIndex !== undefined) ? `(Ghế thứ ${e.seatIndex + 1}) ` : '';
+        html += `<li><strong>${indexText}</strong>${escapeHtml(e.errorMessage)}</li>`;
+      });
+      html += `</ul>`;
+      errorBox.innerHTML = html;
+      errorBox.classList.remove('hidden');
+
+      const previewContainer = document.getElementById('seatPreviewContainer');
+      if (previewContainer) previewContainer.classList.add('hidden');
+      document.getElementById('btnConfirmImportSeats').disabled = true;
+    }
+
+    async function handleSeatFileSelected(e) {
       const file = e.target.files[0];
       if (!file) return;
 
+      const showtimeId = document.getElementById('importShowtimeId').value;
+      if (!showtimeId) {
+        alert('Mã suất diễn không hợp lệ.');
+        return;
+      }
+
       document.getElementById('seatFileNameLabel').textContent = `Đã chọn: ${file.name}`;
-      const reader = new FileReader();
-      reader.onload = function(evt) {
-        try {
-          const parsed = JSON.parse(evt.target.result);
-          const seats = Array.isArray(parsed) ? parsed : (parsed.seats || []);
-          if (seats.length === 0) {
-            alert('Tệp JSON không chứa danh sách ghế hợp lệ.');
-            return;
-          }
+      
+      const errorBox = document.getElementById('seatErrorContainer');
+      if (errorBox) errorBox.classList.add('hidden');
+      const previewContainer = document.getElementById('seatPreviewContainer');
+      previewContainer.classList.add('hidden');
+      const btnConfirm = document.getElementById('btnConfirmImportSeats');
+      btnConfirm.disabled = true;
+      normalizedSeatImportBlob = null;
+
+      // 1. Kiểm tra kích thước file 5MB (NFR)
+      if (file.size > 5 * 1024 * 1024) {
+        renderSeatErrors([{ seatIndex: null, errorMessage: 'Tệp JSON không được vượt quá 5MB.' }]);
+        return;
+      }
+
+      // 2. Gọi API Preview của Backend để xác thực cấu trúc & gom lỗi theo S-06 / T-13
+      const formData = new FormData();
+      formData.append('file', file, file.name);
+
+      const alertBox = document.getElementById('seatImportAlert');
+      alertBox.textContent = '⌛ Đang kiểm tra cấu trúc sơ đồ ghế...';
+      alertBox.className = 'p-3 rounded-lg text-sm font-semibold bg-sky-50 text-sky-800 border border-sky-200';
+      alertBox.classList.remove('hidden');
+
+      try {
+        const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}/seats/preview`, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token },
+          body: formData
+        });
+
+        const result = await res.json().catch(() => ({}));
+
+        if (res.ok && Array.isArray(result)) {
+          alertBox.textContent = `✅ Tệp hợp lệ! Sẵn sàng nạp ${result.length} ghế.`;
+          alertBox.className = 'p-3 rounded-lg text-sm font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200';
           normalizedSeatImportBlob = file;
-          renderSeatPreview(seats);
-          document.getElementById('btnConfirmImportSeats').disabled = false;
-        } catch (err) {
-          alert('Tệp JSON không đúng định dạng cú pháp.');
+          renderSeatPreview(result);
+          btnConfirm.disabled = false;
+        } else if (res.status === 400 && result.errors && Array.isArray(result.errors)) {
+          alertBox.classList.add('hidden');
+          renderSeatErrors(result.errors);
+          btnConfirm.disabled = true;
+        } else {
+          alertBox.textContent = result.message || result.detail || 'Tệp sơ đồ ghế không hợp lệ.';
+          alertBox.className = 'p-3 rounded-lg text-sm font-semibold bg-rose-50 text-rose-800 border border-rose-200';
+          btnConfirm.disabled = true;
         }
-      };
-      reader.readAsText(file);
+      } catch (err) {
+        alertBox.textContent = 'Lỗi kết nối máy chủ khi kiểm tra sơ đồ ghế.';
+        alertBox.className = 'p-3 rounded-lg text-sm font-semibold bg-rose-50 text-rose-800 border border-rose-200';
+        btnConfirm.disabled = true;
+      }
     }
 
     function loadSample50Seats() {
@@ -2131,6 +2204,12 @@
       const jsonStr = JSON.stringify(sample, null, 2);
       normalizedSeatImportBlob = new Blob([jsonStr], { type: 'application/json' });
       document.getElementById('seatFileNameLabel').textContent = '⚡ Đã tải sẵn tệp mẫu 50 ghế (A1..E10 • VIP & Standard)';
+      const errorBox = document.getElementById('seatErrorContainer');
+      if (errorBox) errorBox.classList.add('hidden');
+      const alertBox = document.getElementById('seatImportAlert');
+      alertBox.textContent = '✅ Đã tải mẫu 50 ghế hợp lệ. Sẵn sàng nạp.';
+      alertBox.className = 'p-3 rounded-lg text-sm font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200';
+      alertBox.classList.remove('hidden');
       renderSeatPreview(sample);
       document.getElementById('btnConfirmImportSeats').disabled = false;
     }
@@ -2207,7 +2286,11 @@
           await loadShowtimes(currentEventId);
         } else {
           const errData = await res.json().catch(() => ({}));
-          showAlert(errData.detail || errData.title || 'Nạp sơ đồ ghế thất bại.', 'error');
+          if (errData.errors && Array.isArray(errData.errors)) {
+            renderSeatErrors(errData.errors);
+          } else {
+            showAlert(errData.detail || errData.title || errData.message || 'Nạp sơ đồ ghế thất bại.', 'error');
+          }
         }
       } catch (err) {
         showAlert('Lỗi kết nối máy chủ API.', 'error');

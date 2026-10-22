@@ -36,6 +36,7 @@ namespace EventTicketBooking.Api.Controllers
         private readonly IConfiguration _configuration;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<AuthController> _logger;
+        private readonly IRegistrationOtpRateLimiter _otpRateLimiter;
 
         public AuthController(
             IAuthService authService,
@@ -45,7 +46,8 @@ namespace EventTicketBooking.Api.Controllers
             ITokenService tokenService,
             IConfiguration configuration,
             IHttpClientFactory httpClientFactory,
-            ILogger<AuthController> logger)
+            ILogger<AuthController> logger,
+            IRegistrationOtpRateLimiter? otpRateLimiter = null)
         {
             _authService = authService;
             _context = context;
@@ -55,6 +57,7 @@ namespace EventTicketBooking.Api.Controllers
             _configuration = configuration;
             _httpClientFactory = httpClientFactory;
             _logger = logger;
+            _otpRateLimiter = otpRateLimiter ?? new EventTicketBooking.Api.Services.Implementations.RegistrationOtpRateLimiter();
         }
 
         /// <summary>
@@ -187,7 +190,23 @@ namespace EventTicketBooking.Api.Controllers
 
             if (existingUser != null)
             {
-                // Người dùng đã đăng ký trước đó nhưng chưa xác thực OTP -> cập nhật lại thông tin & mã mới
+                // Người dùng đã đăng ký trước đó nhưng chưa xác thực OTP -> kiểm tra giới hạn gửi lại mã (tối đa 5 lần/giờ)
+                var rateLimitResult = await _otpRateLimiter.CheckAndRecordResendAsync(normalizedEmail);
+                if (!rateLimitResult.Allowed)
+                {
+                    Response.Headers.RetryAfter = rateLimitResult.RetryAfterSeconds.ToString();
+                    return StatusCode(StatusCodes.Status429TooManyRequests, new
+                    {
+                        success = false,
+                        requiresOtp = false,
+                        email = normalizedEmail,
+                        message = $"Bạn đã vượt quá giới hạn 5 lần gửi lại mã mỗi giờ cho email này. Vui lòng thử lại sau {rateLimitResult.RetryAfterMinutes} phút.",
+                        retryAfterSeconds = rateLimitResult.RetryAfterSeconds,
+                        retryAfterMinutes = rateLimitResult.RetryAfterMinutes
+                    });
+                }
+
+                // Cập nhật lại thông tin & mã mới
                 existingUser.FullName = request.FullName?.Trim();
                 existingUser.PasswordHash = hashedPassword;
                 existingUser.VerificationCode = otpCode;
@@ -310,6 +329,7 @@ namespace EventTicketBooking.Api.Controllers
             user.VerificationCodeExpiresAt = null;
             user.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+            await _otpRateLimiter.ResetAsync(normalizedEmail);
 
             if (!EventTicketBooking.Api.Services.TermsPolicy.IsCurrent(user))
             {
@@ -398,6 +418,20 @@ namespace EventTicketBooking.Api.Controllers
             if (string.IsNullOrEmpty(user.VerificationCode))
                 return StatusCode(StatusCodes.Status423Locked, new { message = "Tài khoản đã bị khóa bởi Quản trị viên." });
 
+            // Kiểm tra giới hạn 5 lần gửi lại mã mỗi giờ cho một email
+            var rateLimitResult = await _otpRateLimiter.CheckAndRecordResendAsync(normalizedEmail);
+            if (!rateLimitResult.Allowed)
+            {
+                Response.Headers.RetryAfter = rateLimitResult.RetryAfterSeconds.ToString();
+                return StatusCode(StatusCodes.Status429TooManyRequests, new
+                {
+                    success = false,
+                    message = $"Bạn đã vượt quá giới hạn 5 lần gửi lại mã mỗi giờ cho email này. Vui lòng thử lại sau {rateLimitResult.RetryAfterMinutes} phút.",
+                    retryAfterSeconds = rateLimitResult.RetryAfterSeconds,
+                    retryAfterMinutes = rateLimitResult.RetryAfterMinutes
+                });
+            }
+
             // Sinh mã OTP 6 số mới
             string newOtp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
             user.VerificationCode = newOtp;
@@ -422,7 +456,12 @@ namespace EventTicketBooking.Api.Controllers
                 });
             }
 
-            return Ok(new { success = true, message = "Đã gửi lại mã xác thực mới vào email của bạn. Vui lòng kiểm tra hộp thư." });
+            return Ok(new
+            {
+                success = true,
+                remainingAttempts = rateLimitResult.RemainingAttempts,
+                message = "Đã gửi lại mã xác thực mới vào email của bạn. Vui lòng kiểm tra hộp thư."
+            });
         }
 
         /// <summary>
@@ -758,6 +797,7 @@ namespace EventTicketBooking.Api.Controllers
             user.VerificationCodeExpiresAt = null;
             user.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+            await _otpRateLimiter.ResetAsync(normalizedEmail);
 
             if (!EventTicketBooking.Api.Services.TermsPolicy.IsCurrent(user))
             {
@@ -830,6 +870,20 @@ namespace EventTicketBooking.Api.Controllers
 
             if (string.IsNullOrEmpty(user.VerificationCode))
                 return StatusCode(StatusCodes.Status423Locked, new { message = "Tài khoản đã bị khóa bởi Quản trị viên." });
+
+            // Kiểm tra giới hạn 5 lần gửi lại mỗi giờ cho một email
+            var rateLimitResult = await _otpRateLimiter.CheckAndRecordResendAsync(normalizedEmail);
+            if (!rateLimitResult.Allowed)
+            {
+                Response.Headers.RetryAfter = rateLimitResult.RetryAfterSeconds.ToString();
+                return StatusCode(StatusCodes.Status429TooManyRequests, new
+                {
+                    success = false,
+                    message = $"Bạn đã vượt quá giới hạn 5 lần gửi lại mã mỗi giờ cho email này. Vui lòng thử lại sau {rateLimitResult.RetryAfterMinutes} phút.",
+                    retryAfterSeconds = rateLimitResult.RetryAfterSeconds,
+                    retryAfterMinutes = rateLimitResult.RetryAfterMinutes
+                });
+            }
 
             string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
             user.VerificationCode = token;

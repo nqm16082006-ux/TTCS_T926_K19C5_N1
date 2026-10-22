@@ -165,6 +165,11 @@ builder.Services.Configure<EventTicketBooking.Api.Options.AuthSecurityOptions>(o
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.ITokenService, EventTicketBooking.Api.Services.Implementations.TokenService>();
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IAuthService, EventTicketBooking.Api.Services.Implementations.AuthService>();
 
+// Đăng ký dịch vụ giới hạn số lần gửi lại mã OTP đăng ký (tối đa 5 lần/giờ cho 1 email)
+builder.Services.Configure<EventTicketBooking.Api.Options.RegistrationOtpRateLimitOptions>(
+    builder.Configuration.GetSection(EventTicketBooking.Api.Options.RegistrationOtpRateLimitOptions.SectionName));
+builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IRegistrationOtpRateLimiter, EventTicketBooking.Api.Services.Implementations.RegistrationOtpRateLimiter>();
+
 // Đăng ký dịch vụ Email (T-08)
 builder.Services.AddScoped<EventTicketBooking.Api.Services.Interfaces.IEmailService, EventTicketBooking.Api.Services.Implementations.EmailService>();
 
