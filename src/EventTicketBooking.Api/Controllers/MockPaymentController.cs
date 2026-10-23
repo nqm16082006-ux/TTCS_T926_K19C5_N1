@@ -36,7 +36,8 @@ namespace EventTicketBooking.Api.Controllers
         {
             var environment = HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>();
             var configuration = HttpContext.RequestServices.GetRequiredService<IConfiguration>();
-            if (!environment.IsDevelopment() || !string.Equals(configuration["PaymentSettings:Provider"], "Mock", StringComparison.OrdinalIgnoreCase))
+            var provider = configuration["PaymentSettings:Provider"] ?? configuration["PAYMENT_PROVIDER"] ?? "Mock";
+            if (environment.IsProduction() || !string.Equals(provider, "Mock", StringComparison.OrdinalIgnoreCase))
                 return NotFound();
             var userIdValue = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("id")?.Value;
             if (!Guid.TryParse(userIdValue, out var currentUserId)) return Unauthorized();

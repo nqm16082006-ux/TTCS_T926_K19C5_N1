@@ -67,6 +67,15 @@ else if (string.IsNullOrWhiteSpace(pgConnection))
 {
     pgConnection = builder.Configuration.GetConnectionString("DefaultConnection");
 }
+
+if (!string.IsNullOrWhiteSpace(pgConnection))
+{
+    pgConnection = pgConnection.Trim().Trim('"', '\'');
+    while (pgConnection.EndsWith(";") || pgConnection.EndsWith(" ") || pgConnection.EndsWith("\r") || pgConnection.EndsWith("\n"))
+    {
+        pgConnection = pgConnection.TrimEnd(';', ' ', '\r', '\n');
+    }
+}
 if (string.Equals(selectedDbProvider, "InMemory", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase("EventTicketBooking"));
@@ -154,9 +163,9 @@ builder.Services.AddSingleton<EventTicketBooking.Api.Services.Interfaces.IPasswo
 builder.Services.Configure<EventTicketBooking.Api.Options.AuthSecurityOptions>(options =>
 {
     builder.Configuration.GetSection(EventTicketBooking.Api.Options.AuthSecurityOptions.SectionName).Bind(options);
-    if (builder.Environment.IsDevelopment())
+    if (builder.Environment.IsDevelopment() || !redisMultiplexer.IsConnected)
     {
-        // Trong môi trường Local Development, cho phép tự động fallback khi Redis chưa khởi động
+        // Trong môi trường Local Development hoặc Staging không có Redis ngoài, cho phép tự động fallback sang CSDL
         options.FailClosedOnRedisDown = false;
     }
 });
